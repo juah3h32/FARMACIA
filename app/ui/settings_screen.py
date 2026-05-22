@@ -1,0 +1,524 @@
+import customtkinter as ctk
+from tkinter import messagebox
+import tkinter as tk
+from app.database.connection import get_db_session
+from app.database.models import Configuracion
+from app.services.printer_service import printer_service, PrinterService
+from app.services.scanner_service import scanner_service
+import app.config as cfg
+
+
+class SettingsScreen(ctk.CTkFrame):
+    def __init__(self, parent, user):
+        super().__init__(parent, corner_radius=0, fg_color="transparent")
+        self.user = user
+        self._build_ui()
+
+    def _build_ui(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        scroll = ctk.CTkScrollableFrame(self, corner_radius=0, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(scroll, text="⚙️ Configuración", font=ctk.CTkFont(size=20, weight="bold")).grid(
+            row=0, column=0, pady=(0, 16), sticky="w")
+
+        # Seccion: Info farmacia
+        self._seccion(scroll, "🏥 Información de la Farmacia", row=1)
+        info_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        info_frame.grid(row=2, column=0, sticky="ew", pady=(0, 16))
+        info_frame.grid_columnconfigure(1, weight=1)
+
+        farm_fields = [
+            ("Nombre de la Farmacia:", "farmacia_nombre"),
+            ("Dirección:", "farmacia_direccion"),
+            ("Teléfono:", "farmacia_telefono"),
+            ("RFC:", "farmacia_rfc"),
+        ]
+        self.farm_entries = {}
+        for i, (label, key) in enumerate(farm_fields):
+            ctk.CTkLabel(info_frame, text=label, anchor="e", font=ctk.CTkFont(size=12)).grid(
+                row=i, column=0, padx=(16, 8), pady=8, sticky="e")
+            e = ctk.CTkEntry(info_frame, height=34)
+            e.grid(row=i, column=1, padx=(0, 16), pady=8, sticky="ew")
+            self.farm_entries[key] = e
+
+        ctk.CTkButton(
+            info_frame, text="💾 Guardar Info Farmacia", height=36, width=200,
+            fg_color="#4CAF50", hover_color="#388E3C",
+            command=lambda: self._guardar_seccion(self.farm_entries)
+        ).grid(row=len(farm_fields), column=0, columnspan=2, padx=16, pady=(4, 16))
+
+        # Seccion: Impresora
+        self._seccion(scroll, "🖨️ Impresora de Tickets", row=3)
+        print_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        print_frame.grid(row=4, column=0, sticky="ew", pady=(0, 16))
+        print_frame.grid_columnconfigure(1, weight=1)
+
+        # Tipo
+        ctk.CTkLabel(print_frame, text="Tipo:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.opt_impresora = ctk.CTkOptionMenu(
+            print_frame,
+            values=["windows", "usb", "serial", "network"],
+            command=self._on_printer_type_change,
+        )
+        self.opt_impresora.grid(row=0, column=1, padx=(0, 16), pady=8, sticky="ew")
+
+        # Ancho de papel
+        ctk.CTkLabel(print_frame, text="Papel:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=1, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.opt_ancho = ctk.CTkOptionMenu(print_frame, values=["58mm  (32 col)", "80mm  (48 col)"])
+        self.opt_ancho.grid(row=1, column=1, padx=(0, 16), pady=8, sticky="ew")
+
+        # Fila Windows: lista de impresoras
+        self._row_win = ctk.CTkFrame(print_frame, fg_color="transparent")
+        self._row_win.grid(row=2, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 4))
+        self._row_win.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self._row_win, text="Impresora:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(0, 8), sticky="e")
+        self.opt_win_printer = ctk.CTkOptionMenu(self._row_win, values=["(cargando...)"])
+        self.opt_win_printer.grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(self._row_win, text="↺", width=36, height=34,
+                      command=self._refresh_win_printers).grid(row=0, column=2, padx=(6, 0))
+
+        # Fila manual: puerto / IP
+        self._row_port = ctk.CTkFrame(print_frame, fg_color="transparent")
+        self._row_port.grid(row=3, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 4))
+        self._row_port.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self._row_port, text="Puerto/IP:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(0, 8), sticky="e")
+        self.entry_puerto = ctk.CTkEntry(self._row_port, height=34,
+                                          placeholder_text="COM1  ó  192.168.1.x:9100")
+        self.entry_puerto.grid(row=0, column=1, sticky="ew")
+
+        btn_frame = ctk.CTkFrame(print_frame, fg_color="transparent")
+        btn_frame.grid(row=4, column=0, columnspan=2, padx=16, pady=(8, 8))
+        ctk.CTkButton(btn_frame, text="💾 Guardar", height=36, fg_color="#4CAF50",
+                      command=self._guardar_impresora).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_frame, text="🔌 Conectar y Probar", height=36,
+                      fg_color="#2196F3", hover_color="#1976D2",
+                      command=self._probar_impresora).pack(side="left")
+
+        self.lbl_printer_status = ctk.CTkLabel(print_frame, text="Estado: Desconectada",
+                                                text_color="#F44336", font=ctk.CTkFont(size=12))
+        self.lbl_printer_status.grid(row=5, column=0, columnspan=2, padx=16, pady=(0, 12))
+
+        # Seccion: API
+        self._seccion(scroll, "🌐 API REST (Conexión con App)", row=5)
+        api_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        api_frame.grid(row=6, column=0, sticky="ew", pady=(0, 16))
+
+        api_url = f"http://localhost:{cfg.API_PORT}/api"
+        ctk.CTkLabel(api_frame, text="URL de la API:", font=ctk.CTkFont(size=13)).pack(
+            anchor="w", padx=16, pady=(12, 4))
+        url_frame = ctk.CTkFrame(api_frame, fg_color=("#f5f5f5", "#3b3b3b"), corner_radius=6)
+        url_frame.pack(fill="x", padx=16, pady=(0, 8))
+        ctk.CTkLabel(url_frame, text=api_url, font=ctk.CTkFont(size=12, family="Courier"),
+                     text_color="#2196F3").pack(padx=10, pady=8, anchor="w")
+
+        ctk.CTkLabel(api_frame, text="Documentación interactiva (Swagger):", font=ctk.CTkFont(size=13)).pack(
+            anchor="w", padx=16, pady=(0, 4))
+        docs_frame = ctk.CTkFrame(api_frame, fg_color=("#f5f5f5", "#3b3b3b"), corner_radius=6)
+        docs_frame.pack(fill="x", padx=16, pady=(0, 12))
+        ctk.CTkLabel(docs_frame, text=f"http://localhost:{cfg.API_PORT}/docs",
+                     font=ctk.CTkFont(size=12, family="Courier"), text_color="#4CAF50").pack(
+            padx=10, pady=8, anchor="w")
+
+        ctk.CTkLabel(api_frame,
+                     text="Tu app móvil/web debe hacer POST a /api/auth/login primero para obtener el token,\n"
+                          "luego incluirlo en el header: Authorization: Bearer <token>",
+                     font=ctk.CTkFont(size=11), text_color="gray60", justify="left").pack(
+            padx=16, pady=(0, 12), anchor="w")
+
+        # Seccion: Escáner
+        self._seccion(scroll, "📡 Escáner de Código de Barras", row=7)
+        scan_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        scan_frame.grid(row=8, column=0, sticky="ew", pady=(0, 16))
+        scan_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(scan_frame, text="Modo de conexión:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.opt_scanner_modo = ctk.CTkOptionMenu(
+            scan_frame,
+            values=["hid", "serial"],
+            command=self._on_scanner_mode_change,
+        )
+        self.opt_scanner_modo.grid(row=0, column=1, padx=(0, 16), pady=8, sticky="ew")
+
+        ctk.CTkLabel(scan_frame, text="Puerto COM:", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=1, column=0, padx=(16, 8), pady=8, sticky="e")
+
+        port_row = ctk.CTkFrame(scan_frame, fg_color="transparent")
+        port_row.grid(row=1, column=1, padx=(0, 16), pady=8, sticky="ew")
+        port_row.grid_columnconfigure(0, weight=1)
+
+        self._scan_ports: list[str] = []
+        self.opt_scanner_puerto = ctk.CTkOptionMenu(port_row, values=["(seleccionar)"])
+        self.opt_scanner_puerto.grid(row=0, column=0, sticky="ew")
+        ctk.CTkButton(port_row, text="↺", width=36, height=34,
+                      command=self._refresh_ports).grid(row=0, column=1, padx=(6, 0))
+
+        ctk.CTkLabel(scan_frame, text="Velocidad (baud):", anchor="e",
+                     font=ctk.CTkFont(size=12)).grid(row=2, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.opt_scanner_baud = ctk.CTkOptionMenu(
+            scan_frame,
+            values=["9600", "115200", "38400", "19200", "4800"],
+        )
+        self.opt_scanner_baud.grid(row=2, column=1, padx=(0, 16), pady=8, sticky="ew")
+
+        scan_btn_row = ctk.CTkFrame(scan_frame, fg_color="transparent")
+        scan_btn_row.grid(row=3, column=0, columnspan=2, padx=16, pady=(4, 8))
+        ctk.CTkButton(scan_btn_row, text="🔍 Detectar puertos", height=36,
+                      command=self._refresh_ports).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(scan_btn_row, text="💾 Guardar y conectar", height=36,
+                      fg_color="#4CAF50", hover_color="#388E3C",
+                      command=self._guardar_scanner).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(scan_btn_row, text="🔌 Probar", height=36,
+                      fg_color="#2196F3", hover_color="#1976D2",
+                      command=self._probar_scanner).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(scan_btn_row, text="🔎 Diagnóstico", height=36,
+                      fg_color="#9C27B0", hover_color="#7B1FA2",
+                      command=self._abrir_diagnostico).pack(side="left")
+
+        self.lbl_scanner_status = ctk.CTkLabel(
+            scan_frame, text="Estado: HID (teclado) activo",
+            text_color="#4CAF50", font=ctk.CTkFont(size=12))
+        self.lbl_scanner_status.grid(row=4, column=0, columnspan=2, padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(
+            scan_frame,
+            text="HID = escáner conectado como teclado USB/Bluetooth (modo por defecto).\n"
+                 "Serial = escáner vía puerto COM (Bluetooth SPP, USB-CDC, RS-232).",
+            font=ctk.CTkFont(size=11), text_color="gray60", justify="left",
+        ).grid(row=5, column=0, columnspan=2, padx=16, pady=(0, 12), sticky="w")
+
+        # Seccion: Sistema
+        self._seccion(scroll, "🖥️ Sistema", row=9)
+        sys_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        sys_frame.grid(row=10, column=0, sticky="ew", pady=(0, 16))
+
+        ctk.CTkLabel(sys_frame, text="Modo de apariencia:", font=ctk.CTkFont(size=12)).pack(
+            anchor="w", padx=16, pady=(12, 4))
+        self.opt_apariencia = ctk.CTkOptionMenu(
+            sys_frame, values=["System", "Light", "Dark"],
+            command=lambda v: ctk.set_appearance_mode(v)
+        )
+        self.opt_apariencia.pack(anchor="w", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(sys_frame, text=f"Versión: {cfg.VERSION}  |  Base de datos: {cfg.DB_PATH}",
+                     font=ctk.CTkFont(size=11), text_color="gray60").pack(
+            padx=16, pady=(0, 12), anchor="w")
+
+        self._cargar_config()
+
+    def _seccion(self, parent, titulo: str, row: int):
+        ctk.CTkLabel(parent, text=titulo, font=ctk.CTkFont(size=14, weight="bold")).grid(
+            row=row, column=0, pady=(8, 4), sticky="w")
+
+    def _cargar_config(self):
+        db = get_db_session()
+        try:
+            configs = {c.clave: c.valor for c in db.query(Configuracion).all()}
+        finally:
+            db.close()
+
+        for key, entry in self.farm_entries.items():
+            entry.delete(0, "end")
+            entry.insert(0, configs.get(key, ""))
+
+        tipo = configs.get("impresora_tipo", "windows")
+        self.opt_impresora.set(tipo)
+        self.entry_puerto.delete(0, "end")
+        self.entry_puerto.insert(0, configs.get("impresora_puerto", ""))
+
+        # Ancho de papel
+        ancho = configs.get("impresora_ancho", "32")
+        self.opt_ancho.set("80mm  (48 col)" if ancho == "48" else "58mm  (32 col)")
+
+        # Windows printer list
+        self._refresh_win_printers()
+        saved_wprinter = configs.get("impresora_nombre", "")
+        printers = PrinterService.list_windows_printers()
+        if saved_wprinter in printers:
+            self.opt_win_printer.set(saved_wprinter)
+
+        self._on_printer_type_change(tipo)
+
+        # Scanner
+        modo = configs.get("scanner_modo", "hid")
+        self.opt_scanner_modo.set(modo)
+        self.opt_scanner_baud.set(configs.get("scanner_baud", "9600"))
+        self._refresh_ports()
+        saved_port = configs.get("scanner_puerto", "")
+        if saved_port and saved_port in self._scan_ports:
+            self.opt_scanner_puerto.set(saved_port)
+        self._on_scanner_mode_change(modo)
+        self._update_scanner_status()
+
+    def _guardar_seccion(self, entries: dict):
+        db = get_db_session()
+        try:
+            for key, entry in entries.items():
+                valor = entry.get().strip()
+                c = db.query(Configuracion).filter(Configuracion.clave == key).first()
+                if c:
+                    c.valor = valor
+                else:
+                    db.add(Configuracion(clave=key, valor=valor))
+            db.commit()
+            messagebox.showinfo("OK", "Configuración guardada")
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", str(e))
+        finally:
+            db.close()
+
+    def _on_printer_type_change(self, tipo: str):
+        if tipo == "windows":
+            self._row_win.grid()
+            self._row_port.grid_remove()
+            self._refresh_win_printers()
+        else:
+            self._row_win.grid_remove()
+            self._row_port.grid()
+
+    def _refresh_win_printers(self):
+        printers = PrinterService.list_windows_printers()
+        if printers:
+            self.opt_win_printer.configure(values=printers)
+            current = self.opt_win_printer.get()
+            if current not in printers:
+                self.opt_win_printer.set(printers[0])
+        else:
+            self.opt_win_printer.configure(values=["(sin impresoras)"])
+            self.opt_win_printer.set("(sin impresoras)")
+
+    def _guardar_impresora(self):
+        tipo = self.opt_impresora.get()
+        ancho = "48" if "80mm" in self.opt_ancho.get() else "32"
+        if tipo == "windows":
+            puerto = self.opt_win_printer.get()
+            nombre_win = puerto
+        else:
+            puerto = self.entry_puerto.get().strip()
+            nombre_win = ""
+
+        db = get_db_session()
+        try:
+            for key, valor in [
+                ("impresora_tipo",   tipo),
+                ("impresora_puerto", puerto),
+                ("impresora_nombre", nombre_win),
+                ("impresora_ancho",  ancho),
+            ]:
+                c = db.query(Configuracion).filter(Configuracion.clave == key).first()
+                if c:
+                    c.valor = valor
+                else:
+                    db.add(Configuracion(clave=key, valor=valor))
+            db.commit()
+            messagebox.showinfo("OK", "Configuración de impresora guardada")
+        finally:
+            db.close()
+
+    def _probar_impresora(self):
+        tipo = self.opt_impresora.get()
+        if tipo == "windows":
+            puerto = self.opt_win_printer.get()
+        else:
+            puerto = self.entry_puerto.get().strip()
+        connected = printer_service.connect(tipo, puerto)
+        if connected:
+            ok = printer_service.test_printer()
+            if ok:
+                self.lbl_printer_status.configure(text="✅ Conectada y funcionando", text_color="#4CAF50")
+            else:
+                self.lbl_printer_status.configure(text="⚠ Conectada pero no imprime", text_color="#FF9800")
+        else:
+            self.lbl_printer_status.configure(text="❌ No se pudo conectar", text_color="#F44336")
+
+    # ── Scanner helpers ───────────────────────────────────────────────────────
+
+    def _refresh_ports(self):
+        ports = scanner_service.list_ports()
+        self._scan_ports = [p["device"] for p in ports]
+        desc_list = [f"{p['device']} — {p['description'][:40]}" for p in ports] or ["(sin puertos COM)"]
+        self._scan_port_labels = desc_list
+        # Re-map label → device
+        self._port_label_map = {}
+        for p, label in zip(self._scan_ports, desc_list):
+            self._port_label_map[label] = p
+        self.opt_scanner_puerto.configure(values=desc_list if desc_list else ["(sin puertos COM)"])
+        if desc_list:
+            self.opt_scanner_puerto.set(desc_list[0])
+
+    def _on_scanner_mode_change(self, mode: str):
+        state = "normal" if mode == "serial" else "disabled"
+        self.opt_scanner_puerto.configure(state=state)
+        self.opt_scanner_baud.configure(state=state)
+
+    def _guardar_scanner(self):
+        modo   = self.opt_scanner_modo.get()
+        label  = self.opt_scanner_puerto.get()
+        puerto = self._port_label_map.get(label, label.split(" — ")[0]) if hasattr(self, "_port_label_map") else ""
+        baud   = self.opt_scanner_baud.get()
+
+        db = get_db_session()
+        try:
+            for key, valor in [
+                ("scanner_modo",   modo),
+                ("scanner_puerto", puerto if modo == "serial" else ""),
+                ("scanner_baud",   baud),
+            ]:
+                c = db.query(Configuracion).filter(Configuracion.clave == key).first()
+                if c:
+                    c.valor = valor
+                else:
+                    db.add(Configuracion(clave=key, valor=valor))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", str(e))
+            return
+        finally:
+            db.close()
+
+        # Tell MainWindow to restart scanner
+        main = self._get_main_window()
+        if main and hasattr(main, "restart_scanner"):
+            ok = main.restart_scanner(modo, puerto if modo == "serial" else "", int(baud))
+            if modo == "serial":
+                if ok:
+                    self.lbl_scanner_status.configure(
+                        text=f"✅ Serial activo: {puerto} @ {baud}", text_color="#4CAF50")
+                else:
+                    self.lbl_scanner_status.configure(
+                        text=f"❌ No se pudo abrir {puerto}", text_color="#F44336")
+            else:
+                self.lbl_scanner_status.configure(
+                    text="✅ HID (teclado) activo", text_color="#4CAF50")
+        else:
+            messagebox.showinfo("Guardado", "Configuración guardada. Reinicia la app para aplicar.")
+
+    def _probar_scanner(self):
+        modo = self.opt_scanner_modo.get()
+        if modo == "hid":
+            messagebox.showinfo(
+                "Modo HID",
+                "El escáner está en modo teclado (HID).\n\n"
+                "Asegúrate de que el escáner esté emparejado como dispositivo Bluetooth HID "
+                "o conectado por USB.\n\n"
+                "Para probar: haz clic en cualquier parte de la ventana principal y escanea "
+                "un código — el sistema lo detectará automáticamente.",
+            )
+        else:
+            label  = self.opt_scanner_puerto.get()
+            puerto = self._port_label_map.get(label, label.split(" — ")[0]) if hasattr(self, "_port_label_map") else ""
+            baud   = int(self.opt_scanner_baud.get())
+            if not puerto:
+                messagebox.showwarning("Puerto", "Selecciona un puerto COM primero")
+                return
+            self.lbl_scanner_status.configure(text=f"Probando {puerto}…", text_color="#FF9800")
+            self.update()
+            ok = scanner_service.start_serial(puerto, baud)
+            if ok:
+                self.lbl_scanner_status.configure(
+                    text=f"✅ Puerto {puerto} abierto — escanea un código para probar",
+                    text_color="#4CAF50")
+            else:
+                self.lbl_scanner_status.configure(
+                    text=f"❌ No se pudo abrir {puerto}", text_color="#F44336")
+
+    def _update_scanner_status(self):
+        parts = []
+        if scanner_service.is_hid_running:
+            parts.append("✅ Hook HID activo (USB/BT)")
+        if scanner_service.is_serial_running:
+            parts.append(f"✅ Serial: {scanner_service.active_port}")
+        if not parts:
+            parts.append("⚠ Sin modo activo")
+        self.lbl_scanner_status.configure(
+            text="  |  ".join(parts),
+            text_color="#4CAF50" if parts and "✅" in parts[0] else "#FF9800"
+        )
+
+    def _abrir_diagnostico(self):
+        win = ctk.CTkToplevel(self)
+        win.title("Diagnóstico de Escáner")
+        win.geometry("520x460")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text="🔎 Diagnóstico de Escáner",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(16, 4))
+        ctk.CTkLabel(
+            win,
+            text="Haz clic en el campo de abajo y escanea un código.\n"
+                 "Verás exactamente qué teclas envía tu escáner.",
+            font=ctk.CTkFont(size=12), text_color="gray60",
+        ).pack(pady=(0, 8))
+
+        entry = ctk.CTkEntry(win, placeholder_text="← Haz clic aquí, luego escanea",
+                             height=44, font=ctk.CTkFont(size=14))
+        entry.pack(fill="x", padx=20, pady=(0, 8))
+        entry.focus()
+
+        log_frame = ctk.CTkScrollableFrame(win, height=220)
+        log_frame.pack(fill="both", expand=True, padx=20, pady=(0, 8))
+        log_frame.grid_columnconfigure(0, weight=1)
+
+        self._diag_row = 0
+        self._diag_buf = []
+
+        def add_line(text, color="#0F172A"):
+            ctk.CTkLabel(log_frame, text=text, anchor="w",
+                         font=ctk.CTkFont(size=11, family="Courier"),
+                         text_color=color).grid(
+                row=self._diag_row, column=0, sticky="w", padx=4, pady=1)
+            self._diag_row += 1
+
+        def on_key(event):
+            char_repr = repr(event.char) if event.char else "(none)"
+            color = "#16A34A" if event.keysym in ("Return", "KP_Enter", "Tab") else "#0F172A"
+            add_line(
+                f"keysym={event.keysym:<15} char={char_repr:<8} keycode={event.keycode}",
+                color=color,
+            )
+            self._diag_buf.append(event.char if event.char and event.char.isprintable() else "")
+            if event.keysym in ("Return", "KP_Enter", "Tab"):
+                barcode = "".join(self._diag_buf[:-1]).strip()
+                add_line(f"  → CÓDIGO COMPLETO: {barcode}", color="#2563EB")
+                self._diag_buf.clear()
+
+        entry.bind("<Key>", on_key)
+        try:
+            entry._entry.bind("<Key>", on_key)
+        except Exception:
+            pass
+
+        add_line("Esperando escaneo...", color="gray")
+
+        ctk.CTkButton(win, text="Limpiar", height=34,
+                      command=lambda: [
+                          w.destroy() for w in log_frame.winfo_children()
+                      ] or add_line("Esperando escaneo...", color="gray") or
+                      self._reset_diag()
+                      ).pack(padx=20, pady=(0, 16), fill="x")
+
+    def _reset_diag(self):
+        self._diag_row = 0
+        self._diag_buf = []
+
+    def _get_main_window(self):
+        w = self
+        while w is not None:
+            import customtkinter as _ctk
+            if hasattr(w, "restart_scanner"):
+                return w
+            w = getattr(w, "master", None)
+        return None
+
+    def on_show(self):
+        self._cargar_config()

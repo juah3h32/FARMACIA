@@ -1,0 +1,195 @@
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from typing import Optional
+from app.database.connection import get_db_session
+from app.database.models import Venta, ItemVenta, Producto, Lote, MovimientoStock, TipoMovimiento, EstadoVenta, MetodoPago
+from app.api.routes.auth_routes import get_current_api_user
+import random
+import string
+
+router = APIRouter()
+
+
+class ItemVentaIn(BaseModel):
+    producto_id: int
+    cantidad: int
+    precio_unitario: float
+    descuento: float = 0.0
+
+
+class CreateVentaIn(BaseModel):
+    cliente_id: Optional[int] = None
+    items: list[ItemVentaIn]
+    metodo_pago: str = "efectivo"
+    monto_pagado: float
+    descuento_global: float = 0.0
+    notas: Optional[str] = None
+
+
+def _gen_folio() -> str:
+    return "F" + "".join(random.choices(string.digits, k=8))
+
+
+def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
+    """
+    Decrement lote quantities in FEFO order (earliest expiry first).
+    Lotes without fecha_vencimiento are consumed last.
+    Silently handles products without lotes (legacy/pre-lote-tracking).
+    """
+    lotes = (
+        db.query(Lote)
+        .filter(Lote.producto_id == producto_id, Lote.cantidad > 0)
+        .order_by(
+            Lote.fecha_vencimiento.is_(None),   # nulls last
+            Lote.fecha_vencimiento.asc(),
+        )
+        .all()
+    )
+    remaining = cantidad
+    for lote in lotes:
+        if remaining <= 0:
+            break
+        consume = min(lote.cantidad, remaining)
+        lote.cantidad -= consume
+        remaining -= consume
+
+
+@router.post("/")
+def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    db = get_db_session()
+    try:
+        # Single query for all products at once (1 HTTP call instead of 2N)
+        product_ids = [i.producto_id for i in body.items]
+        products = {
+            p.id: p
+            for p in db.query(Producto).filter(Producto.id.in_(product_ids)).all()
+        }
+
+        # Guard: reject if all available lotes are expired (no usable stock)
+        from datetime import date as _date
+        hoy = _date.today()
+        for item in body.items:
+            prod = products.get(item.producto_id)
+            if not prod:
+                continue
+            lotes_all = db.query(Lote).filter(
+                Lote.producto_id == item.producto_id, Lote.cantidad > 0
+            ).all()
+            if lotes_all:
+                lotes_ok = [
+                    l for l in lotes_all
+                    if l.fecha_vencimiento is None or l.fecha_vencimiento >= hoy
+                ]
+                if not lotes_ok:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"'{prod.nombre}' tiene todos los lotes vencidos — no se puede vender",
+                    )
+
+        # Calculate totals in one pass
+        subtotal  = 0.0
+        iva_total = 0.0
+        for item in body.items:
+            prod = products.get(item.producto_id)
+            if not prod:
+                raise HTTPException(status_code=404, detail=f"Producto {item.producto_id} no encontrado")
+            item_base = (item.precio_unitario * item.cantidad) - item.descuento
+            subtotal  += item_base
+            if prod.aplica_iva:
+                iva_total += item_base * 0.16
+
+        base   = subtotal - body.descuento_global
+        total  = base + iva_total
+        cambio = max(0.0, body.monto_pagado - total)
+        folio  = _gen_folio()
+
+        try:
+            metodo = MetodoPago(body.metodo_pago)
+        except ValueError:
+            metodo = MetodoPago.efectivo
+
+        venta = Venta(
+            folio=folio,
+            usuario_id=int(payload["sub"]),
+            cliente_id=body.cliente_id,
+            subtotal=subtotal,
+            descuento=body.descuento_global,
+            iva=iva_total,
+            total=total,
+            metodo_pago=metodo,
+            monto_pagado=body.monto_pagado,
+            cambio=cambio,
+            estado=EstadoVenta.completada,
+            notas=body.notas,
+        )
+        db.add(venta)
+        db.flush()  # Get venta.id for items
+
+        usuario_id = int(payload["sub"])
+        for item in body.items:
+            db.add(ItemVenta(
+                venta_id=venta.id,
+                producto_id=item.producto_id,
+                cantidad=item.cantidad,
+                precio_unitario=item.precio_unitario,
+                descuento=item.descuento,
+                subtotal=(item.precio_unitario * item.cantidad) - item.descuento,
+            ))
+            prod = products[item.producto_id]
+            stock_ant = prod.stock
+            prod.stock = max(0, prod.stock - item.cantidad)
+            # FEFO: decrement individual lot quantities (earliest-expiry first)
+            _fefo_consume(db, item.producto_id, item.cantidad)
+            db.add(MovimientoStock(
+                producto_id=item.producto_id,
+                tipo=TipoMovimiento.salida,
+                cantidad=item.cantidad,
+                stock_anterior=stock_ant,
+                stock_nuevo=prod.stock,
+                referencia_id=venta.id,
+                referencia_tipo="venta",
+                usuario_id=usuario_id,
+                notas=f"Folio {folio}",
+            ))
+
+        db.commit()
+
+        # Imprimir ticket
+        from app.services.printer_service import printer_service
+        from app.database.models import Usuario
+        cajero_obj = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+        cajero_nombre = cajero_obj.nombre if cajero_obj else "Cajero"
+        venta_data = {
+            "folio": folio,
+            "cajero": cajero_nombre,
+            "cliente": None,
+            "items": [
+                {
+                    "nombre": products[i.producto_id].nombre,
+                    "cantidad": i.cantidad,
+                    "subtotal": (i.precio_unitario * i.cantidad) - i.descuento,
+                }
+                for i in body.items
+            ],
+            "subtotal": subtotal,
+            "descuento": body.descuento_global,
+            "iva": iva_total,
+            "total": total,
+            "metodo_pago": body.metodo_pago,
+            "monto_pagado": body.monto_pagado,
+            "cambio": cambio,
+        }
+        bg.add_task(printer_service.print_receipt, venta_data)
+
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
