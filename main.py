@@ -7,6 +7,15 @@ from app.database.connection import init_db
 from app.api.server import start_api_server
 
 
+def _hide_console():
+    """Hide the console window when running as a frozen windowed EXE."""
+    if getattr(sys, 'frozen', False):
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE
+
+
 def _find_free_port(start: int, attempts: int = 10) -> int | None:
     for port in range(start, start + attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -29,6 +38,7 @@ def _wait_for_api(port: int, timeout: int = 12) -> bool:
 
 
 def main():
+    _hide_console()
     init_db()
 
     if cfg.TURSO_SYNC:
