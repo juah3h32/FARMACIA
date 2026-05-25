@@ -1,11 +1,11 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
-PHARMACY_ADDRESS = "Dirección de la farmacia"
+PHARMACY_ADDRESS = "DirecciÃ³n de la farmacia"
 PHARMACY_PHONE = "Tel: 000-000-0000"
 PHARMACY_RFC = "RFC: XXXX000000XX0"
 
@@ -23,7 +23,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "farmacia.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-# ── Secret key — auto-generated per installation, never hardcoded ─────────────
+# â”€â”€ Secret key â€” auto-generated per installation, never hardcoded â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _key_file = DATA_DIR / "secret.key"
 if _key_file.exists():
     SECRET_KEY = _key_file.read_text().strip()
@@ -32,15 +32,15 @@ else:
     SECRET_KEY = _secrets.token_hex(32)
     _key_file.write_text(SECRET_KEY)
 
-# ── Turso (LibSQL) cloud DB ───────────────────────────────────────────────────
-# Keep these private — do NOT commit to public repositories.
+# â”€â”€ Turso (LibSQL) cloud DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Keep these private â€” do NOT commit to public repositories.
 TURSO_DATABASE_URL = "libsql://farmacia-juanpa.aws-us-east-1.turso.io"
 TURSO_AUTH_TOKEN   = (
     "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9"
     ".eyJhIjoicnciLCJpYXQiOjE3NzkxNTUwOTQsImlkIjoiMDE5ZTNkZTctZjQwMS03NmViLWFkYjgtZTRkMzAxZGExMTdjIiwicmlkIjoiNDVkNDAzNjItNzg4Ni00MDViLWE0Y2QtNDUxMjY1YTgxMzQ0In0"
     ".B3nY0-9gzbXkqNlj8MlzBjw44JP9OpVrG9QGrdx_tkB19QF8l7f5IgYoW3mLjOqUq4sTOVNQu78GEJMaVA0sDg"
 )
-# USE_TURSO=False → local SQLite primary; TURSO_SYNC=True → background backup to Turso
+# USE_TURSO=False â†’ local SQLite primary; TURSO_SYNC=True â†’ background backup to Turso
 USE_TURSO   = False
 TURSO_SYNC  = True
 
