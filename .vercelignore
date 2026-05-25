@@ -1,0 +1,9 @@
+dist/
+data/
+instalador/
+assets/
+*.spec
+version_info.txt
+scripts/
+FarmaciaPOS_debug2.spec
+LOGO.png

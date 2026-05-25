@@ -22,10 +22,14 @@ app = FastAPI(
     openapi_url=_openapi,
 )
 
-# Only allow requests from localhost — the app is local-only anyway
+_cors_origins = ["http://127.0.0.1", "http://localhost"]
+# En Vercel el frontend es same-origin, pero permitir *.vercel.app para previews
+_cors_regex = r"https://.*\.vercel\.app" if cfg._ON_VERCEL else None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1", "http://localhost"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
