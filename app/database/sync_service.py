@@ -25,9 +25,12 @@ _TABLE_ORDER = [
     "compras", "items_compra", "cortes_caja", "movimientos_stock", "auditoria_log",
 ]
 
-# Mutable tables — always full-replace sync (stock, prices, configs change in-place)
+# Mutable tables — always full-replace sync (rows can be updated in-place)
+# lotes: cantidad cambia con cada venta/ajuste de stock
+# cortes_caja: monto_cierre/cerrado_en se llenan al cerrar turno (update, no insert)
 _FULL_SYNC = frozenset({
-    "categorias", "proveedores", "usuarios", "clientes", "configuracion", "productos",
+    "categorias", "proveedores", "usuarios", "clientes", "configuracion",
+    "productos", "lotes", "cortes_caja",
 })
 
 # Watermark per table: last id synced to Turso (append-only tables only)
@@ -125,11 +128,13 @@ def import_from_turso() -> bool:
     """
     lconn = _local_conn()
     try:
-        n = lconn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+        # Check both usuarios AND productos: a seeded-but-empty-inventory DB should still import
+        n_users = lconn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+        n_prod  = lconn.execute("SELECT COUNT(*) FROM productos").fetchone()[0]
     except Exception:
-        n = 0
+        n_users = n_prod = 0
 
-    if n > 0:
+    if n_users > 0 and n_prod > 0:
         lconn.close()
         print("[Sync] Local DB has data — skipping Turso import")
         return False
