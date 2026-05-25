@@ -14,7 +14,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[460px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="timer" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="timer" style="width:18px;height:18px;color:#243366"></i>
         <h2 class="font-bold" style="color:#0F172A">Control de Turno</h2>
       </div>
       <button onclick="closeModal('modal-turno')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -57,9 +57,9 @@
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3 mb-4 text-xs">
-        <div class="rounded-xl p-3 text-center" style="background:#EFF6FF">
+        <div class="rounded-xl p-3 text-center" style="background:#EEF1F9">
           <p style="color:#64748B">Ventas del turno</p>
-          <p id="tp-num-ventas" class="font-bold text-lg mt-1" style="color:#2563EB">0</p>
+          <p id="tp-num-ventas" class="font-bold text-lg mt-1" style="color:#243366">0</p>
         </div>
         <div class="rounded-xl p-3 text-center" style="background:#F0FDF4">
           <p style="color:#64748B">Total ingresado</p>
@@ -108,7 +108,7 @@
                 class="inp flex-1" oninput="calcDiferencia()">
               <button onclick="usarEsperado()"
                 class="px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition-all hover:opacity-80"
-                style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE">
+                style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
                 Usar esperado
               </button>
             </div>
@@ -154,7 +154,7 @@
       <h2 class="font-bold text-lg mb-1" style="color:#0F172A">Turno Cerrado</h2>
       <p id="cierre-estado" class="text-sm font-semibold mb-4">—</p>
       <div id="cierre-body" class="text-left space-y-2 text-xs border rounded-xl p-4 mb-5" style="border-color:#E2E8F0"></div>
-      <button onclick="closeModal('modal-cierre-resumen')" class="w-full h-10 rounded-xl font-semibold text-white text-sm" style="background:#2563EB">Aceptar</button>
+      <button onclick="closeModal('modal-cierre-resumen')" class="w-full h-10 rounded-xl font-semibold text-white text-sm" style="background:#243366">Aceptar</button>
     </div>
   </div>
 </div>
@@ -165,7 +165,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[700px] max-h-[80vh] flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="history" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="history" style="width:18px;height:18px;color:#243366"></i>
         <h2 class="font-bold" style="color:#0F172A">Mis Turnos</h2>
       </div>
       <button onclick="closeModal('modal-historial-turno')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -190,7 +190,7 @@
       </table>
     </div>
     <div class="px-6 py-3 border-t flex-shrink-0" style="border-color:#E2E8F0">
-      <button onclick="openModal('modal-turno');closeModal('modal-historial-turno')" class="h-8 px-4 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#2563EB">← Volver al turno</button>
+      <button onclick="openModal('modal-turno');closeModal('modal-historial-turno')" class="h-8 px-4 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">← Volver al turno</button>
     </div>
   </div>
 </div>
@@ -314,7 +314,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[480px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="clock" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="clock" style="width:18px;height:18px;color:#243366"></i>
         <h2 class="font-bold" style="color:#0F172A">Detalle de Corte</h2>
       </div>
       <button onclick="closeModal('modal-corte-detalle')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -347,7 +347,7 @@
     <div id="cad-chips" class="flex gap-3 px-6 py-3 border-b flex-shrink-0" style="border-color:#F1F5F9"></div>
     <!-- Filtro -->
     <div class="px-6 py-2 flex gap-2 flex-shrink-0">
-      <button onclick="filterCad('todos')"   id="fcad-todos"   class="fcad-btn active px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#EFF6FF;color:#2563EB">Todos</button>
+      <button onclick="filterCad('todos')"   id="fcad-todos"   class="fcad-btn active px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#EEF1F9;color:#243366">Todos</button>
       <button onclick="filterCad('vencido')" id="fcad-vencido" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Vencidos</button>
       <button onclick="filterCad('critico')" id="fcad-critico" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Críticos ≤30d</button>
       <button onclick="filterCad('proximo')" id="fcad-proximo" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Próximos ≤90d</button>
@@ -411,8 +411,8 @@
       <i data-lucide="x" style="width:16px;height:16px"></i>
     </button>
     <div id="upd-checking" class="text-center py-4">
-      <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:#EFF6FF">
-        <i data-lucide="loader" style="width:24px;height:24px;color:#2563EB" class="animate-spin"></i>
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:#EEF1F9">
+        <i data-lucide="loader" style="width:24px;height:24px;color:#243366" class="animate-spin"></i>
       </div>
       <p class="font-semibold" style="color:#0F172A">Buscando actualizaciones...</p>
     </div>
@@ -422,7 +422,7 @@
       </div>
       <p class="font-bold text-lg mb-1" style="color:#0F172A">Tienes la versión más reciente</p>
       <p id="upd-current-v" class="text-sm" style="color:#64748B"></p>
-      <button onclick="closeUpdateModal()" class="mt-6 h-9 px-6 rounded-xl text-sm font-semibold text-white" style="background:#2563EB">Cerrar</button>
+      <button onclick="closeUpdateModal()" class="mt-6 h-9 px-6 rounded-xl text-sm font-semibold text-white" style="background:#243366">Cerrar</button>
     </div>
     <div id="upd-available" class="hidden">
       <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:#FFFBEB">
@@ -436,13 +436,13 @@
           <span id="upd-progress-pct">0%</span>
         </div>
         <div class="w-full rounded-full h-2" style="background:#E2E8F0">
-          <div id="upd-progress-bar" class="h-2 rounded-full transition-all" style="background:#2563EB;width:0%"></div>
+          <div id="upd-progress-bar" class="h-2 rounded-full transition-all" style="background:#243366;width:0%"></div>
         </div>
       </div>
       <p id="upd-error" class="text-xs text-center mb-3 hidden" style="color:#EF4444"></p>
       <div class="flex gap-3">
         <button id="upd-btn-cancel" onclick="closeUpdateModal()" class="flex-1 h-10 rounded-xl text-sm font-semibold border" style="color:#64748B;border-color:#E2E8F0">Cancelar</button>
-        <button id="upd-btn-install" onclick="startUpdate()" class="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style="background:#2563EB">Descargar e instalar</button>
+        <button id="upd-btn-install" onclick="startUpdate()" class="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style="background:#243366">Descargar e instalar</button>
       </div>
     </div>
   </div>
@@ -532,7 +532,7 @@
   .page[data-page="dashboard"].active { display:flex; flex-direction:column; gap:0.75rem; }
   .nav-item { transition:background .15s,color .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
-  .nav-item.active { background:#2563EB !important; color:#fff !important; }
+  .nav-item.active { background:#243366 !important; color:#fff !important; }
 
   /* ── KPI cards ───────────────────────────────────────── */
   .kpi-card { transition:box-shadow .2s,transform .2s; }
@@ -553,7 +553,7 @@
   .logo-ring    { animation:pulseRing 2.2s ease infinite; }
 
   /* ── Inputs ──────────────────────────────────────────── */
-  input:focus,select:focus,textarea:focus { outline:2px solid #2563EB; outline-offset:0; }
+  input:focus,select:focus,textarea:focus { outline:2px solid #243366; outline-offset:0; }
 
   /* ── Toast ───────────────────────────────────────────── */
   .t-in  { animation:tin  .28s ease forwards; }
@@ -578,7 +578,7 @@
   .lbl { display:block; font-size:11px; font-weight:600; color:#374151; margin-bottom:4px; }
   .inp { display:block; width:100%; height:38px; padding:0 11px; border-radius:9px;
          border:1px solid #E2E8F0; background:#F8FAFF; font-size:13px; transition:border-color .15s; }
-  .inp:focus { border-color:#2563EB; }
+  .inp:focus { border-color:#243366; }
   select.inp { appearance:auto; }
   textarea.inp { height:auto; padding:8px 11px; resize:vertical; }
 </style>
@@ -607,15 +607,15 @@
 
       <!-- feature pills -->
       <div class="flex flex-col gap-2 mt-10 w-full max-w-xs">
-        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.1)">
+        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(36,51,102,.07);border:1px solid rgba(36,51,102,.12)">
           <i data-lucide="shield-check" style="width:16px;height:16px;color:#16A34A;flex-shrink:0"></i>
           <span class="text-xs" style="color:#475569">Control de inventario y caducidades</span>
         </div>
-        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.1)">
-          <i data-lucide="bar-chart-2" style="width:16px;height:16px;color:#2563EB;flex-shrink:0"></i>
+        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(36,51,102,.07);border:1px solid rgba(36,51,102,.12)">
+          <i data-lucide="bar-chart-2" style="width:16px;height:16px;color:#243366;flex-shrink:0"></i>
           <span class="text-xs" style="color:#475569">Ventas, reportes y cortes de caja</span>
         </div>
-        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.1)">
+        <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl" style="background:rgba(36,51,102,.07);border:1px solid rgba(36,51,102,.12)">
           <i data-lucide="cloud" style="width:16px;height:16px;color:#7C3AED;flex-shrink:0"></i>
           <span class="text-xs" style="color:#475569">Sincronización en la nube</span>
         </div>
@@ -653,7 +653,7 @@
 
       <button id="l-btn" onclick="doLogin()"
               class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 mt-1"
-              style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">
+              style="background:linear-gradient(135deg,#243366,#1a2a57)">
         Iniciar Sesión
       </button>
 
@@ -666,7 +666,7 @@
 <div id="app" class="hidden flex h-screen">
 
   <!-- ── Sidebar ───────────────────────────────────── -->
-  <aside class="w-60 flex flex-col flex-shrink-0" style="background:#0F172A">
+  <aside class="w-60 flex flex-col flex-shrink-0" style="background:#243366">
     <!-- Brand -->
     <div class="px-3 py-3" style="border-bottom:1px solid rgba(255,255,255,.06)">
       <div style="background:#fff;border-radius:10px;padding:6px 10px">
@@ -755,7 +755,7 @@
           </div>
           <button onclick="loadDashboard()"
                   class="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all hover:opacity-80"
-                  style="background:#EFF6FF;color:#2563EB">
+                  style="background:#EEF1F9;color:#243366">
             <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
           </button>
         </div>
@@ -763,7 +763,7 @@
         <!-- KPI cards -->
         <div class="grid grid-cols-4 gap-4" style="flex-shrink:0">
           <div class="kpi-card rounded-2xl p-4 relative overflow-hidden"
-               style="background:linear-gradient(135deg,#3B82F6,#2563EB)">
+               style="background:linear-gradient(135deg,#2e4a8a,#243366)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
             <div class="absolute bottom-1 right-4 w-16 h-16 rounded-full" style="background:rgba(255,255,255,.05)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
@@ -821,7 +821,7 @@
               </div>
               <button onclick="navigate('pos')"
                       class="h-8 px-4 rounded-xl text-xs font-bold text-white flex items-center gap-1.5"
-                      style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">
+                      style="background:linear-gradient(135deg,#243366,#1a2a57)">
                 <i data-lucide="plus" style="width:13px;height:13px"></i> Nueva venta
               </button>
             </div>
@@ -889,7 +889,7 @@
             <div class="bg-white rounded-2xl border flex flex-col flex-1" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color:#E2E8F0">
                 <div class="flex items-center gap-2">
-                  <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#2563EB"></i>
+                  <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#243366"></i>
                   <h2 class="font-semibold text-sm" style="color:#0F172A">Carrito</h2>
                 </div>
                 <button onclick="clearCart()" class="text-xs flex items-center gap-1" style="color:#EF4444">
@@ -927,7 +927,7 @@
                   </div>
                 </div>
                 <button onclick="processSale()" class="w-full h-11 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90"
-                        style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">
+                        style="background:linear-gradient(135deg,#243366,#1a2a57)">
                   <i data-lucide="credit-card" style="width:16px;height:16px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
                 </button>
               </div>
@@ -950,7 +950,7 @@
             <div class="ml-auto" id="inv-add-btn-wrap">
               <button onclick="openProductModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#2563EB">
+                      style="background:#243366">
                 <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar producto
               </button>
             </div>
@@ -988,7 +988,7 @@
             <div class="ml-auto">
               <button onclick="openCustModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#2563EB">
+                      style="background:#243366">
                 <i data-lucide="user-plus" style="width:15px;height:15px"></i> Agregar cliente
               </button>
             </div>
@@ -1025,14 +1025,14 @@
             <input id="rep-hasta" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0">
           </div>
           <div class="flex gap-1">
-            <button onclick="repPeriodo(0)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EFF6FF;color:#2563EB">Hoy</button>
-            <button onclick="repPeriodo(7)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EFF6FF;color:#2563EB">7 días</button>
-            <button onclick="repPeriodo(-1)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EFF6FF;color:#2563EB">Este mes</button>
-            <button onclick="repPeriodo(-2)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EFF6FF;color:#2563EB">Mes ant.</button>
+            <button onclick="repPeriodo(0)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Hoy</button>
+            <button onclick="repPeriodo(7)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">7 días</button>
+            <button onclick="repPeriodo(-1)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Este mes</button>
+            <button onclick="repPeriodo(-2)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Mes ant.</button>
           </div>
           <button onclick="loadReports()"
                   class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                  style="background:#2563EB">
+                  style="background:#243366">
             <i data-lucide="bar-chart-2" style="width:14px;height:14px"></i> Generar
           </button>
           <button onclick="exportCSV()"
@@ -1046,7 +1046,7 @@
         <div class="flex gap-1 p-1 rounded-xl" style="background:#F1F5F9">
           <button id="rep-tab-ventas" onclick="repTab('ventas')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
-                  style="background:#2563EB;color:#fff">📊 Ventas</button>
+                  style="background:#243366;color:#fff">📊 Ventas</button>
           <button id="rep-tab-cortes" onclick="repTab('cortes')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
                   style="background:transparent;color:#64748B">🧾 Cortes de Caja</button>
@@ -1061,12 +1061,12 @@
           <div class="grid grid-cols-4 gap-4">
             <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="flex items-center gap-2 mb-3">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#EFF6FF">
-                  <i data-lucide="trending-up" style="width:15px;height:15px;color:#2563EB"></i>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#EEF1F9">
+                  <i data-lucide="trending-up" style="width:15px;height:15px;color:#243366"></i>
                 </div>
                 <p class="text-xs font-medium" style="color:#64748B">Total Ventas</p>
               </div>
-              <p id="rep-total" class="text-2xl font-bold" style="color:#2563EB">$0.00</p>
+              <p id="rep-total" class="text-2xl font-bold" style="color:#243366">$0.00</p>
             </div>
             <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="flex items-center gap-2 mb-3">
@@ -1105,10 +1105,10 @@
               <div><p class="text-xs" style="color:#64748B">Efectivo</p><p id="rep-ef" class="font-bold text-lg" style="color:#22C55E">$0.00</p></div>
             </div>
             <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-              <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:#EFF6FF">
-                <i data-lucide="credit-card" style="width:20px;height:20px;color:#2563EB"></i>
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+                <i data-lucide="credit-card" style="width:20px;height:20px;color:#243366"></i>
               </div>
-              <div><p class="text-xs" style="color:#64748B">Tarjeta</p><p id="rep-ta" class="font-bold text-lg" style="color:#2563EB">$0.00</p></div>
+              <div><p class="text-xs" style="color:#64748B">Tarjeta</p><p id="rep-ta" class="font-bold text-lg" style="color:#243366">$0.00</p></div>
             </div>
             <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:#F5F3FF">
@@ -1174,7 +1174,7 @@
             </div>
             <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <p class="text-xs font-medium mb-1" style="color:#64748B">Total Ventas</p>
-              <p id="cc-total" class="text-2xl font-bold" style="color:#2563EB">—</p>
+              <p id="cc-total" class="text-2xl font-bold" style="color:#243366">—</p>
             </div>
             <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <p class="text-xs font-medium mb-1" style="color:#64748B">Efectivo</p>
@@ -1229,7 +1229,7 @@
           <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
             <span class="text-xs font-semibold" style="color:#374151">Filtrar:</span>
             <div class="flex gap-1">
-              <button onclick="vencFilter('todos')"      id="vf-todos"      class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#2563EB;color:#fff">Todos</button>
+              <button onclick="vencFilter('todos')"      id="vf-todos"      class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#243366;color:#fff">Todos</button>
               <button onclick="vencFilter('vencidos')"   id="vf-vencidos"   class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#FEF2F2;color:#EF4444">Vencidos</button>
               <button onclick="vencFilter('por_vencer')" id="vf-por_vencer" class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#FFFBEB;color:#D97706">Por vencer</button>
               <button onclick="vencFilter('vigentes')"   id="vf-vigentes"   class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#F0FDF4;color:#16A34A">Vigentes</button>
@@ -1266,8 +1266,8 @@
       <!-- ─── SUPPLIERS ─────────────────────────────── -->
       <div data-page="suppliers" class="page">
         <div class="bg-white rounded-2xl border p-16 flex flex-col items-center justify-center" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style="background:#EFF6FF">
-            <i data-lucide="truck" style="width:36px;height:36px;color:#2563EB"></i>
+          <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style="background:#EEF1F9">
+            <i data-lucide="truck" style="width:36px;height:36px;color:#243366"></i>
           </div>
           <h2 class="font-bold text-xl mb-2" style="color:#0F172A">Proveedores</h2>
           <p class="text-sm" style="color:#64748B">Módulo disponible próximamente.</p>
@@ -1285,7 +1285,7 @@
             <div class="ml-auto">
               <button onclick="openEmpModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#2563EB">
+                      style="background:#243366">
                 <i data-lucide="user-plus" style="width:15px;height:15px"></i> Agregar empleado
               </button>
             </div>
@@ -1325,7 +1325,7 @@
         <!-- API Token Generator -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <!-- Gradient header strip -->
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#8B5CF6,#6366F1,#3B82F6)"></div>
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#8B5CF6,#6366F1,#2e4a8a)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#F5F3FF">
               <i data-lucide="key-round" style="width:20px;height:20px;color:#8B5CF6"></i>
@@ -1449,10 +1449,10 @@
 
         <!-- API Endpoints Reference -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#0EA5E9,#22C55E)"></div>
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#243366,#0EA5E9,#22C55E)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EFF6FF">
-              <i data-lucide="book-open" style="width:20px;height:20px;color:#2563EB"></i>
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+              <i data-lucide="book-open" style="width:20px;height:20px;color:#243366"></i>
             </div>
             <div>
               <h2 class="font-bold" style="color:#0F172A">Referencia de Endpoints</h2>
@@ -1460,7 +1460,7 @@
             </div>
             <button onclick="loadEndpoints()"
                     class="ml-auto h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-80"
-                    style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE">
+                    style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar
             </button>
           </div>
@@ -1484,7 +1484,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="package" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="package" style="width:18px;height:18px;color:#243366"></i>
         <h2 id="prod-modal-title" class="font-bold" style="color:#0F172A">Agregar Producto</h2>
       </div>
       <button onclick="closeModal('modal-product')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -1582,7 +1582,7 @@
         <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
           <div class="flex items-center justify-between mb-2">
             <p class="text-xs font-bold" style="color:#374151">Lotes / Fechas de vencimiento</p>
-            <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#2563EB">
+            <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">
               + Agregar entrada
             </button>
           </div>
@@ -1596,7 +1596,7 @@
     <!-- Footer -->
     <div class="flex gap-3 px-5 py-4 border-t" style="border-color:#E2E8F0">
       <button onclick="closeModal('modal-product')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveProduct()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">Guardar producto</button>
+      <button onclick="saveProduct()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#243366,#1a2a57)">Guardar producto</button>
     </div>
   </div>
 </div>
@@ -1607,7 +1607,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[420px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="user-round" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="user-round" style="width:18px;height:18px;color:#243366"></i>
         <h2 id="cust-modal-title" class="font-bold" style="color:#0F172A">Agregar Cliente</h2>
       </div>
       <button onclick="closeModal('modal-customer')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -1622,7 +1622,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-customer')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveCustomer()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#2563EB">Guardar</button>
+      <button onclick="saveCustomer()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Guardar</button>
     </div>
   </div>
 </div>
@@ -1633,7 +1633,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[440px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="user-cog" style="width:18px;height:18px;color:#2563EB"></i>
+        <i data-lucide="user-cog" style="width:18px;height:18px;color:#243366"></i>
         <h2 class="font-bold" style="color:#0F172A">Nuevo Empleado</h2>
       </div>
       <button onclick="closeModal('modal-employee')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -1656,7 +1656,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-employee')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#2563EB">Crear empleado</button>
+      <button onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Crear empleado</button>
     </div>
   </div>
 </div>
@@ -1672,13 +1672,13 @@
     <p id="pay-folio" class="text-sm mb-2" style="color:#64748B"></p>
     <p class="text-xs font-semibold uppercase tracking-widest mb-0" style="color:#64748B">Total cobrado</p>
     <p id="pay-total" class="text-3xl font-extrabold mb-3" style="color:#16A34A"></p>
-    <div class="rounded-2xl py-4 px-5 mb-5" style="background:#EFF6FF;border:2px solid #2563EB">
-      <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#2563EB">CAMBIO A ENTREGAR</p>
-      <p id="pay-cambio" class="text-5xl font-black" style="color:#1D4ED8"></p>
+    <div class="rounded-2xl py-4 px-5 mb-5" style="background:#EEF1F9;border:2px solid #243366">
+      <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#243366">CAMBIO A ENTREGAR</p>
+      <p id="pay-cambio" class="text-5xl font-black" style="color:#1a2a57"></p>
     </div>
     <button onclick="closeModal('modal-payment')"
             class="w-full h-11 rounded-xl text-white font-semibold flex items-center justify-center gap-2"
-            style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">
+            style="background:linear-gradient(135deg,#243366,#1a2a57)">
       <i data-lucide="plus" style="width:15px;height:15px"></i> Nueva venta
     </button>
   </div>
@@ -1715,7 +1715,7 @@
         </div>
         <!-- Camera badge -->
         <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-             style="background:#2563EB;border:2px solid #0F172A">
+             style="background:#243366;border:2px solid #0F172A">
           <i data-lucide="camera" style="width:10px;height:10px;color:#fff"></i>
         </div>
       </div>
@@ -1732,7 +1732,7 @@
       <!-- Change photo -->
       <button onclick="document.getElementById('photo-input').click()"
           class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80"
-          style="background:#EFF6FF;color:#2563EB">
+          style="background:#EEF1F9;color:#243366">
         <i data-lucide="image" style="width:16px;height:16px"></i>
         Cambiar foto de perfil
       </button>
@@ -1890,7 +1890,7 @@ async function api(path, opts={}) {
 }
 
 function toast(msg, kind='info', title='') {
-  const colors = { success:'#22C55E', error:'#EF4444', warning:'#F59E0B', info:'#3B82F6' };
+  const colors = { success:'#22C55E', error:'#EF4444', warning:'#F59E0B', info:'#2e4a8a' };
   const icoMap = { success:'check-circle-2', error:'x-circle', warning:'alert-triangle', info:'info' };
   const c  = colors[kind]||colors.info;
   const ic = icoMap[kind]||icoMap.info;
@@ -2093,6 +2093,8 @@ function launchApp() {
   loadAlertasCaducidad();
   setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
   checkUpdateSilent();
+  // Re-check every 30 min while app is open — shows banner without re-login
+  setInterval(checkUpdateSilent, 30 * 60 * 1000);
 }
 
 function buildNav() {
@@ -2203,7 +2205,7 @@ function removeProfilePhoto() {
   const initials    = displayName[0].toUpperCase();
   const prev = document.getElementById('profile-photo-preview');
   prev.innerHTML = initials;
-  prev.style.background = '#2563EB';
+  prev.style.background = '#243366';
   document.getElementById('remove-photo-btn').classList.add('hidden');
   updateUserCard();
   toast('Foto eliminada', 'info');
@@ -2303,7 +2305,7 @@ async function loadDashboard() {
   const qa = document.getElementById('dash-quick-actions');
   if (qa) {
     const btnPri = (icon, label, action) =>
-      `<button onclick="${action}" class="w-full h-9 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 px-3 transition-all hover:opacity-90 col-span-2" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)"><i data-lucide="${icon}" style="width:13px;height:13px"></i> ${label}</button>`;
+      `<button onclick="${action}" class="w-full h-9 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 px-3 transition-all hover:opacity-90 col-span-2" style="background:linear-gradient(135deg,#243366,#1a2a57)"><i data-lucide="${icon}" style="width:13px;height:13px"></i> ${label}</button>`;
     const btn2 = (icon, label, action, color='#64748B') =>
       `<button onclick="${action}" class="h-9 rounded-xl text-xs font-medium flex items-center gap-1.5 px-3 border transition-all hover:bg-slate-50" style="border-color:#E2E8F0;color:#374151"><i data-lucide="${icon}" style="width:12px;height:12px;color:${color}"></i> ${label}</button>`;
     qa.style.display = 'grid';
@@ -2370,11 +2372,11 @@ async function loadDashboard() {
 
   // Recent sales
   const tbody=document.getElementById('dash-recent');
-  const methBg={efectivo:'#F0FDF4',tarjeta:'#EFF6FF',transferencia:'#F5F3FF'};
-  const methCl={efectivo:'#16A34A',tarjeta:'#2563EB',transferencia:'#8B5CF6'};
+  const methBg={efectivo:'#F0FDF4',tarjeta:'#EEF1F9',transferencia:'#F5F3FF'};
+  const methCl={efectivo:'#16A34A',tarjeta:'#243366',transferencia:'#8B5CF6'};
   tbody.innerHTML=d.recent_sales.length ? d.recent_sales.map(v=>`
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
-      <td class="px-6 py-3 font-mono text-xs font-bold" style="color:#2563EB">${v.folio}</td>
+      <td class="px-6 py-3 font-mono text-xs font-bold" style="color:#243366">${v.folio}</td>
       <td class="px-6 py-3 text-xs" style="color:#374151">${v.cajero||'—'}</td>
       <td class="px-6 py-3">
         <span class="px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -2400,7 +2402,7 @@ async function loadDashboard() {
     const grand=Math.max(rs.total||1, 0.01);
     const bars=[
       {label:'Efectivo', val:rs.efectivo||0, color:'#22C55E', bg:'#F0FDF4', icon:'banknote'},
-      {label:'Tarjeta',  val:rs.tarjeta||0,  color:'#2563EB', bg:'#EFF6FF', icon:'credit-card'},
+      {label:'Tarjeta',  val:rs.tarjeta||0,  color:'#243366', bg:'#EEF1F9', icon:'credit-card'},
     ];
     const pbEl=document.getElementById('dash-pay-bars');
     if (pbEl) pbEl.innerHTML=bars.map(b=>{
@@ -2453,12 +2455,12 @@ function renderPosGrid(prods) {
       class="bg-white rounded-xl border p-3 text-left hover:border-blue-300 hover:shadow-md transition-all"
       style="border-color:#E2E8F0">
       <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2" style="background:#F0F7FF">
-        <i data-lucide="pill" style="width:28px;height:28px;color:#3B82F6"></i>
+        <i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>
       </div>
       <p class="text-xs font-semibold truncate" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[10px] truncate" style="color:#64748B">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
       <div class="flex items-center justify-between mt-1.5">
-        <span class="text-sm font-bold" style="color:#2563EB">${fmt(p.precio_venta)}</span>
+        <span class="text-sm font-bold" style="color:#243366">${fmt(p.precio_venta)}</span>
         <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
               style="background:${p.stock<=0?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4'};
                      color:${p.stock<=0?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A'}">${p.stock}</span>
@@ -2531,7 +2533,7 @@ function renderCart() {
             <span class="w-8 text-center text-xs font-semibold">${i.cantidad}</span>
             <button onclick="changeQty(${i.id},+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
           </div>
-          <span class="text-xs font-bold" style="color:#2563EB">${fmt(i.precio_venta*i.cantidad)}</span>
+          <span class="text-xs font-bold" style="color:#243366">${fmt(i.precio_venta*i.cantidad)}</span>
         </div>
       </div>`).join('');
   }
@@ -2654,7 +2656,7 @@ function renderInvTable(prods) {
     if (!info) return '<span style="color:#CBD5E1;font-size:11px">Sin fecha</span>';
     const diasLabel = info.dias < 0 ? `Hace ${-info.dias}d` : `${info.dias}d`;
     const lotesBadge = info.count > 1
-      ? `<span style="font-size:10px;background:#EFF6FF;color:#2563EB;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
+      ? `<span style="font-size:10px;background:#EEF1F9;color:#243366;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
       : '';
     const fechaFmt = fmtDate(info.fecha);
     if (info.estado==='vencido')  return `<div style="font-size:11px"><span style="background:#FEF2F2;color:#EF4444;padding:2px 7px;border-radius:10px;font-weight:700">⛔ Vencido ${diasLabel}</span>${lotesBadge}</div>`;
@@ -2677,7 +2679,7 @@ function renderInvTable(prods) {
         <span class="font-bold text-sm ${p.stock<=0?'text-red-500':p.stock<=p.stock_minimo?'text-amber-500':'text-green-600'}">${p.stock}</span>
       </td>
       <td class="px-5 py-3 text-xs" style="color:#64748B">${p.stock_minimo}</td>
-      <td class="px-5 py-3 font-semibold text-sm" style="color:#2563EB">${fmt(p.precio_venta)}</td>
+      <td class="px-5 py-3 font-semibold text-sm" style="color:#243366">${fmt(p.precio_venta)}</td>
       <td class="px-5 py-3">${expBadge(expInfo)}</td>
       <td class="px-5 py-3">
         <span class="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -2697,7 +2699,7 @@ function renderInvTable(prods) {
           <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico de inventario" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#F5F3FF;color:#7C3AED">
             <i data-lucide="clipboard-check" style="width:11px;height:11px"></i>
           </button>
-          <button onclick="openProductModal(${p.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EFF6FF;color:#2563EB">
+          <button onclick="openProductModal(${p.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#243366">
             <i data-lucide="pencil" style="width:11px;height:11px"></i>
           </button>
           <button onclick="deleteProduct(${p.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#FEF2F2;color:#EF4444">
@@ -2913,7 +2915,7 @@ function renderCustTable(cs) {
       <td class="px-5 py-3">
         ${S.user?.rol==='admin' ? `
         <div class="flex gap-1.5">
-          <button onclick="openCustModal(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EFF6FF;color:#2563EB">
+          <button onclick="openCustModal(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#243366">
             <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
           </button>
           <button onclick="deleteCust(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#FEF2F2;color:#EF4444">
@@ -3002,7 +3004,7 @@ function repTab(tab) {
     const btn = document.getElementById(`rep-tab-${t}`);
     const con = document.getElementById(`rep-tab-content-${t}`);
     const active = t === tab;
-    btn.style.background = active ? '#2563EB' : 'transparent';
+    btn.style.background = active ? '#243366' : 'transparent';
     btn.style.color      = active ? '#fff'    : '#64748B';
     con.classList.toggle('hidden', !active);
   });
@@ -3044,7 +3046,7 @@ async function loadReports() {
         <tr class="hovrow border-b" style="border-color:#F1F5F9">
           <td class="px-4 py-2 font-bold text-sm" style="color:${medals[i]||'#64748B'}">${i+1}</td>
           <td class="px-4 py-2 font-medium" style="color:#0F172A">${p.nombre}</td>
-          <td class="px-4 py-2 text-right font-semibold" style="color:#2563EB">${fmtN(p.cantidad)}</td>
+          <td class="px-4 py-2 text-right font-semibold" style="color:#243366">${fmtN(p.cantidad)}</td>
           <td class="px-4 py-2 text-right font-semibold" style="color:#22C55E">${fmt(p.ingreso)}</td>
         </tr>`).join('')
       : '<tr><td colspan="4" class="text-center py-6" style="color:#94A3B8">Sin ventas en el periodo</td></tr>';
@@ -3055,7 +3057,7 @@ async function loadReports() {
     document.getElementById('rep-tbody').innerHTML = ventas.length
       ? ventas.map((v,i) => `
         <tr class="hovrow border-b" style="border-color:#F1F5F9;background:${i%2?'#F8FAFF':'#fff'}">
-          <td class="px-4 py-2 font-mono font-semibold" style="color:#2563EB">${v.folio||v.id}</td>
+          <td class="px-4 py-2 font-mono font-semibold" style="color:#243366">${v.folio||v.id}</td>
           <td class="px-4 py-2" style="color:#374151">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
           <td class="px-4 py-2 font-semibold" style="color:#0F172A">${fmt(v.total)}</td>
           <td class="px-4 py-2" style="color:#64748B">${v.metodo_pago}</td>
@@ -3110,7 +3112,7 @@ async function loadCortes() {
           <td class="px-4 py-2" style="color:#374151">${fmtDT(c.cerrado_en)}</td>
           <td class="px-4 py-2 text-center" style="color:#64748B">${fmtDur(c.duracion_min)}</td>
           <td class="px-4 py-2 text-right" style="color:#64748B">${c.num_ventas}</td>
-          <td class="px-4 py-2 text-right font-semibold" style="color:#2563EB">${fmt(c.total_ventas)}</td>
+          <td class="px-4 py-2 text-right font-semibold" style="color:#243366">${fmt(c.total_ventas)}</td>
           <td class="px-4 py-2 text-right" style="color:#22C55E">${fmt(c.total_efectivo)}</td>
           <td class="px-4 py-2 text-right" style="color:#F59E0B">${fmt(c.total_tarjeta)}</td>
           <td class="px-4 py-2 text-right" style="color:#8B5CF6">${fmt(c.total_transferencia)}</td>
@@ -3143,7 +3145,7 @@ function showCorteDetalle(c) {
     <div class="border-t pt-3" style="border-color:#E2E8F0">
       <p class="text-xs font-semibold mb-2" style="color:#64748B">Ventas del turno</p>
       <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-        <div class="flex justify-between"><span style="color:#94A3B8">Total ventas</span><span class="font-bold" style="color:#2563EB">${fmt(c.total_ventas)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Total ventas</span><span class="font-bold" style="color:#243366">${fmt(c.total_ventas)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Efectivo</span><span class="font-bold" style="color:#22C55E">${fmt(c.total_efectivo)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Tarjeta</span><span class="font-bold" style="color:#F59E0B">${fmt(c.total_tarjeta)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Transferencia</span><span class="font-bold" style="color:#8B5CF6">${fmt(c.total_transferencia)}</span></div>
@@ -3175,7 +3177,7 @@ async function loadVencimientos(filtro) {
     if (!btn) return;
     const active = f === _vencFiltro;
     if (active) {
-      btn.style.boxShadow = '0 0 0 2px #2563EB';
+      btn.style.boxShadow = '0 0 0 2px #243366';
       btn.style.fontWeight = '700';
     } else {
       btn.style.boxShadow = 'none';
@@ -3282,7 +3284,7 @@ function filterCad(f) {
     b.style.background = '#F1F5F9'; b.style.color = '#64748B';
   });
   const active = document.getElementById('fcad-' + f);
-  if (active) { active.style.background = '#EFF6FF'; active.style.color = '#2563EB'; }
+  if (active) { active.style.background = '#EEF1F9'; active.style.color = '#243366'; }
   renderCadModal();
 }
 
@@ -3678,13 +3680,13 @@ async function loadEmployees() {
   if (!res.ok) return;
   const emps=await res.json();
   const tbody=document.getElementById('emp-tbody');
-  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EFF6FF;color:#2563EB',farmaceutico:'background:#F0FDF4;color:#16A34A'};
+  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EEF1F9;color:#243366',farmaceutico:'background:#F0FDF4;color:#16A34A'};
   tbody.innerHTML=emps.length?emps.map(e=>`
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
       <td class="px-5 py-3">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
-               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':'#2563EB'}">
+               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':'#243366'}">
             ${(e.nombre||'?')[0].toUpperCase()}
           </div>
           <span class="font-medium text-sm" style="color:#0F172A">${e.nombre}</span>
@@ -4011,7 +4013,7 @@ async function loadEndpoints() {
   const res = await api('/admin/endpoints');
   if (!res.ok) { toast('Error cargando endpoints','error'); return; }
   const endpoints = await res.json();
-  const mc = {GET:'#22C55E', POST:'#2563EB', PUT:'#F59E0B', DELETE:'#EF4444'};
+  const mc = {GET:'#22C55E', POST:'#243366', PUT:'#F59E0B', DELETE:'#EF4444'};
   const el = document.getElementById('endpoints-list');
   el.innerHTML = `
     <div class="overflow-x-auto rounded-xl" style="border:1px solid #F1F5F9">
@@ -4029,7 +4031,7 @@ async function loadEndpoints() {
               <td class="px-4 py-2.5">
                 <span class="px-2 py-1 rounded-lg font-bold text-white text-[10px]" style="background:${mc[e.method]||'#64748B'}">${e.method}</span>
               </td>
-              <td class="px-4 py-2.5 font-mono" style="color:#2563EB">${e.path}</td>
+              <td class="px-4 py-2.5 font-mono" style="color:#243366">${e.path}</td>
               <td class="px-4 py-2.5" style="color:#64748B">${e.desc}</td>
             </tr>`).join('')}
         </tbody>
