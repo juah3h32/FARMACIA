@@ -10,6 +10,8 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      PYTHONUTF8: "1"
 
     steps:
       - name: Checkout
@@ -41,24 +43,24 @@ jobs:
 
           # app/config.py
           p = "app/config.py"
-          t = open(p).read()
+          t = open(p, encoding="utf-8").read()
           t = re.sub(r'VERSION\s*=\s*"[^"]+"', f'VERSION = "{v}"', t)
-          open(p, "w").write(t)
+          open(p, "w", encoding="utf-8").write(t)
 
           # version_info.txt
           p = "version_info.txt"
-          t = open(p).read()
+          t = open(p, encoding="utf-8").read()
           t = re.sub(r"filevers=\([^)]+\)", f"filevers=({tup})", t)
           t = re.sub(r"prodvers=\([^)]+\)", f"prodvers=({tup})", t)
           t = re.sub(r"'FileVersion',\s*'[^']+'",    f"'FileVersion', '{dot4}'", t)
           t = re.sub(r"'ProductVersion',\s*'[^']+'", f"'ProductVersion', '{dot4}'", t)
-          open(p, "w").write(t)
+          open(p, "w", encoding="utf-8").write(t)
 
           # installer.iss
           p = "installer.iss"
-          t = open(p).read()
+          t = open(p, encoding="utf-8").read()
           t = re.sub(r'#define AppVersion\s+"[^"]+"', f'#define AppVersion   "{v}"', t)
-          open(p, "w").write(t)
+          open(p, "w", encoding="utf-8").write(t)
 
           print(f"Version set to {v}")
 
