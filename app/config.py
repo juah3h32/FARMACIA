@@ -62,3 +62,4 @@ DEV_MODE = not getattr(sys, 'frozen', False)  # False when compiled to EXE
 
 GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+GITHUB_TOKEN = ""  # PAT con scope 'repo' (lectura) para repo privado

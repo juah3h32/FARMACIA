@@ -16,6 +16,7 @@ _status: dict = {
     "available": False,
     "version": None,
     "url": None,
+    "asset_api_url": None,
 }
 _callbacks: list = []
 
@@ -54,14 +55,18 @@ def get_status() -> dict:
 
 # ── Internal ──────────────────────────────────────────────────────────────────
 
+def _auth_headers() -> dict:
+    h = {"User-Agent": "FarmaciaPOS-Updater/1.0", "Accept": "application/vnd.github+json"}
+    if getattr(cfg, "GITHUB_TOKEN", ""):
+        h["Authorization"] = f"Bearer {cfg.GITHUB_TOKEN}"
+    return h
+
+
 def _do_check() -> None:
     if not cfg.GITHUB_RELEASES_URL:
         return
     try:
-        req = urllib.request.Request(
-            cfg.GITHUB_RELEASES_URL,
-            headers={"User-Agent": "FarmaciaPOS-Updater/1.0"},
-        )
+        req = urllib.request.Request(cfg.GITHUB_RELEASES_URL, headers=_auth_headers())
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
 
@@ -70,15 +75,19 @@ def _do_check() -> None:
         current = _parse_version(cfg.VERSION)
         available = latest > current
         version = tag.lstrip("v")
+        # For private repos: use the API asset URL (requires auth on download too)
         url = None
+        asset_api_url = None
         for asset in data.get("assets", []):
             if asset.get("name", "").lower().endswith(".zip"):
-                url = asset["browser_download_url"]
+                url = asset.get("browser_download_url") or asset.get("url")
+                asset_api_url = asset.get("url")
                 break
 
         with _lock:
             _status.update({"checked": True, "available": available,
-                            "version": version, "url": url})
+                            "version": version, "url": url,
+                            "asset_api_url": asset_api_url})
     except Exception:
         with _lock:
             _status.update({"checked": True, "available": False})
@@ -104,7 +113,12 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     install_dir = Path(sys.executable).parent
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "FarmaciaPOS-Updater/1.0"})
+        # For private repo assets, use API URL with Accept: octet-stream + auth
+        asset_api_url = st.get("asset_api_url")
+        download_url = asset_api_url if asset_api_url else url
+        dl_headers = _auth_headers()
+        dl_headers["Accept"] = "application/octet-stream"
+        req = urllib.request.Request(download_url, headers=dl_headers)
         with urllib.request.urlopen(req, timeout=300) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
             downloaded = 0
