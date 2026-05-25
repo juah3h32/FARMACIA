@@ -50,9 +50,8 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
 @router.get("/update/check")
 def check_update(payload: dict = Depends(get_current_api_user)):
     from app.services import updater_service
-    st = updater_service.get_status()
-    if not st["checked"]:
-        st = updater_service.force_check()
+    # Siempre consulta GitHub — no devolver caché viejo
+    st = updater_service.force_check()
     return {
         "available": bool(st["available"]),
         "latest_version": st["version"] or "",

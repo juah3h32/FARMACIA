@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -31,8 +32,12 @@ def _parse_version(v: str) -> tuple:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def start_background_check() -> None:
-    """Fire-and-forget check on app startup."""
-    threading.Thread(target=_do_check, daemon=True).start()
+    """Check on startup, then re-check every 30 min so new releases are detected."""
+    def _loop():
+        while True:
+            _do_check()
+            time.sleep(30 * 60)
+    threading.Thread(target=_loop, daemon=True, name="UpdateChecker").start()
 
 
 def check_for_update_async(callback=None) -> None:
