@@ -49,7 +49,6 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
 
 @router.get("/update/check")
 def check_update(payload: dict = Depends(get_current_api_user)):
-    _require_admin(payload)
     from app.services import updater_service
     st = updater_service.get_status()
     if not st["checked"]:
@@ -64,7 +63,6 @@ def check_update(payload: dict = Depends(get_current_api_user)):
 
 @router.post("/update/install")
 def install_update(payload: dict = Depends(get_current_api_user)):
-    _require_admin(payload)
     if _update_state["running"]:
         raise HTTPException(status_code=409, detail="Instalación en progreso")
     if not getattr(sys, "frozen", False):
@@ -91,7 +89,6 @@ def install_update(payload: dict = Depends(get_current_api_user)):
 
 @router.get("/update/progress")
 def update_progress(payload: dict = Depends(get_current_api_user)):
-    _require_admin(payload)
     return dict(_update_state)
 
 

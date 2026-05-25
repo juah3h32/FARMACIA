@@ -2094,7 +2094,7 @@ function launchApp() {
   loadTurnoStatus();
   loadAlertasCaducidad();
   setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
-  if (S.user?.rol === 'admin') checkUpdateSilent();
+  checkUpdateSilent();
 }
 
 function buildNav() {
