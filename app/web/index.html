@@ -2997,9 +2997,14 @@ function initReports() {
   document.getElementById('rep-hasta').value=hoy.toISOString().split('T')[0];
   document.getElementById('rep-desde').value=new Date(y,m,1).toISOString().split('T')[0];
   _repActiveTab = 'ventas';
+  const isAdmin = S.user?.rol === 'admin';
+  ['cortes','vencimientos'].forEach(t => {
+    const btn = document.getElementById(`rep-tab-${t}`);
+    if (btn) btn.style.display = isAdmin ? '' : 'none';
+  });
   repTab('ventas');
   loadReports();
-  loadVencimientos('todos');
+  if (isAdmin) loadVencimientos('todos');
 }
 
 function repPeriodo(d) {
@@ -3019,6 +3024,7 @@ function repPeriodo(d) {
 // ── Reports tab switching ─────────────────────────────────────────────────
 let _repActiveTab = 'ventas';
 function repTab(tab) {
+  if ((tab==='cortes'||tab==='vencimientos') && S.user?.rol!=='admin') tab='ventas';
   _repActiveTab = tab;
   ['ventas','cortes','vencimientos'].forEach(t => {
     const btn = document.getElementById(`rep-tab-${t}`);
@@ -4152,7 +4158,7 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'F7':
       e.preventDefault();
-      navigate('reports');
+      if (S.user?.rol === 'admin') navigate('reports');
       break;
     case 'F8':
       e.preventDefault();

@@ -21,6 +21,8 @@ def listar_ventas(
     db = get_db_session()
     try:
         q = db.query(Venta)
+        if payload.get("rol") != "admin":
+            q = q.filter(Venta.usuario_id == int(payload["sub"]))
         if fecha_inicio:
             q = q.filter(Venta.creado_en >= datetime.combine(fecha_inicio, datetime.min.time()))
         if fecha_fin:
@@ -50,7 +52,7 @@ def resumen_ventas(
 ):
     db = get_db_session()
     try:
-        fecha_consulta = fecha or datetime.utcnow().date()
+        fecha_consulta = fecha or datetime.now().date()
         inicio = datetime.combine(fecha_consulta, datetime.min.time())
         fin = datetime.combine(fecha_consulta, datetime.max.time())
 

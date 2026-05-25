@@ -11,22 +11,23 @@ router = APIRouter()
 @router.get("/stats")
 def dashboard_stats(payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
+    is_admin = payload.get("rol") == "admin"
+    user_id  = int(payload["sub"])
     try:
-        now = datetime.utcnow()
+        now = datetime.now()
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end   = now.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        ventas_hoy = db.query(func.count(Venta.id)).filter(
+        _day_filters = [
             Venta.creado_en >= day_start,
             Venta.creado_en <= day_end,
             Venta.estado == EstadoVenta.completada,
-        ).scalar() or 0
+        ]
+        if not is_admin:
+            _day_filters.append(Venta.usuario_id == user_id)
 
-        ingresos_hoy = db.query(func.sum(Venta.total)).filter(
-            Venta.creado_en >= day_start,
-            Venta.creado_en <= day_end,
-            Venta.estado == EstadoVenta.completada,
-        ).scalar() or 0.0
+        ventas_hoy   = db.query(func.count(Venta.id)).filter(*_day_filters).scalar() or 0
+        ingresos_hoy = db.query(func.sum(Venta.total)).filter(*_day_filters).scalar() or 0.0
 
         stock_bajo = db.query(func.count(Producto.id)).filter(
             Producto.stock <= Producto.stock_minimo,
@@ -37,7 +38,10 @@ def dashboard_stats(payload: dict = Depends(get_current_api_user)):
             Producto.activo == True,
         ).scalar() or 0
 
-        recent = db.query(Venta).order_by(Venta.creado_en.desc()).limit(8).all()
+        recent_q = db.query(Venta).order_by(Venta.creado_en.desc())
+        if not is_admin:
+            recent_q = recent_q.filter(Venta.usuario_id == user_id)
+        recent = recent_q.limit(8).all()
         recent_sales = [
             {
                 "folio":      v.folio or str(v.id),
