@@ -1,11 +1,11 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
-PHARMACY_ADDRESS = "Dirección de la farmacia"
+PHARMACY_ADDRESS = "DirecciÃ³n de la farmacia"
 PHARMACY_PHONE = "Tel: 000-000-0000"
 PHARMACY_RFC = "RFC: XXXX000000XX0"
 
@@ -14,8 +14,8 @@ BASE_DIR = Path(__file__).parent.parent
 # Vercel sets VERCEL=1 in the environment
 _ON_VERCEL = bool(os.getenv("VERCEL"))
 
-# ── DATA_DIR ─────────────────────────────────────────────────────────────────
-# Vercel:  /tmp (único dir escribible en lambdas — ephemeral, Turso es la fuente real)
+# â”€â”€ DATA_DIR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Vercel:  /tmp (Ãºnico dir escribible en lambdas â€” ephemeral, Turso es la fuente real)
 # EXE:     %APPDATA%\FarmaciaEbenEzer\
 # Dev:     /data/ junto al proyecto
 if _ON_VERCEL:
@@ -30,14 +30,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "farmacia.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-# ── Secret key ────────────────────────────────────────────────────────────────
+# â”€â”€ Secret key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # En Vercel: leer de variable de entorno SECRET_KEY (configurar en Vercel dashboard)
 # En EXE/dev: generar una vez y guardar en archivo local
 if _ON_VERCEL:
     SECRET_KEY = os.getenv("SECRET_KEY", "")
     if not SECRET_KEY:
         import secrets as _secrets
-        SECRET_KEY = _secrets.token_hex(32)  # ephemeral — sesiones no sobreviven cold starts
+        SECRET_KEY = _secrets.token_hex(32)  # ephemeral â€” sesiones no sobreviven cold starts
 else:
     _key_file = DATA_DIR / "secret.key"
     if _key_file.exists():
@@ -47,7 +47,7 @@ else:
         SECRET_KEY = _secrets.token_hex(32)
         _key_file.write_text(SECRET_KEY)
 
-# ── Turso (LibSQL) cloud DB ───────────────────────────────────────────────────
+# â”€â”€ Turso (LibSQL) cloud DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Prioridad: variables de entorno (Vercel dashboard) > valores hardcoded (fallback local)
 TURSO_DATABASE_URL = os.getenv(
     "TURSO_DATABASE_URL",
@@ -65,7 +65,7 @@ TURSO_AUTH_TOKEN = os.getenv(
 # Vercel: Turso es la BD primaria (no hay disco persistente)
 # EXE local: SQLite local + sync a Turso en background
 USE_TURSO  = _ON_VERCEL
-TURSO_SYNC = not _ON_VERCEL  # solo sincroniza local→Turso desde el EXE
+TURSO_SYNC = not _ON_VERCEL  # solo sincroniza localâ†’Turso desde el EXE
 
 API_HOST = "127.0.0.1"
 API_PORT = 8000
@@ -81,7 +81,7 @@ SIDEBAR_WIDTH = 230
 WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 820
 
-# DEV_MODE: False en EXE compilado y en Vercel (no exponer /docs en producción)
+# DEV_MODE: False en EXE compilado y en Vercel (no exponer /docs en producciÃ³n)
 DEV_MODE = not getattr(sys, 'frozen', False) and not _ON_VERCEL
 
 GITHUB_REPO = "juah3h32/FARMACIA"
