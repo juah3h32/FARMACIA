@@ -66,6 +66,15 @@ def dev_stamp():
 _WEB_DIR = cfg.BASE_DIR / "app" / "web"
 
 
+@app.get("/logo.png")
+async def serve_logo():
+    logo = _WEB_DIR / "logo.png"
+    if logo.exists():
+        return FileResponse(str(logo), media_type="image/png")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404)
+
+
 @app.get("/")
 @app.get("/{path:path}")
 async def serve_spa(path: str = ""):
