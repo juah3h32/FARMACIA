@@ -40,4 +40,4 @@ git push --tags
 
 Write-Host ""
 Write-Host "Tag v$Version publicado. GitHub Actions construira el EXE en ~5 minutos."
-Write-Host "Progreso: https://github.com/Juah3h32/FarmaciaPOS/actions"
+Write-Host "Progreso: https://github.com/juah3h32/FARMACIA/actions"
