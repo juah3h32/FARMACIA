@@ -396,6 +396,22 @@
     </div>
   </div>
 </div>
+<!-- ═══════════ UPDATE DOWNLOAD PROGRESS (background) ═══════════ -->
+<div id="update-dl-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
+     background:#1a2a57;padding:10px 20px;box-shadow:0 -2px 16px rgba(0,0,0,.2)">
+  <div style="max-width:600px;margin:0 auto;display:flex;align-items:center;gap:14px">
+    <i data-lucide="download-cloud" style="width:18px;height:18px;color:#93C5FD;flex-shrink:0"></i>
+    <div style="flex:1">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span id="dl-label" style="font-size:12px;color:#CBD5E1;font-weight:500">Descargando actualización...</span>
+        <span id="dl-pct" style="font-size:12px;color:#93C5FD;font-weight:600">0%</span>
+      </div>
+      <div style="background:rgba(255,255,255,.15);border-radius:4px;height:4px">
+        <div id="dl-bar" style="background:#60A5FA;height:4px;border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <style>
 @keyframes slideUpIn {
   from { opacity:0; transform:translateY(20px); }
@@ -1970,8 +1986,6 @@ function closeUpdateModal() {
 async function startUpdate() {
   document.getElementById('upd-btn-install').disabled = true;
   document.getElementById('upd-btn-install').style.opacity = '0.5';
-  document.getElementById('upd-btn-cancel').disabled = true;
-  document.getElementById('upd-progress-wrap').classList.remove('hidden');
   document.getElementById('upd-error').classList.add('hidden');
   try {
     const res = await api('/admin/update/install', {method:'POST'});
@@ -1979,11 +1993,18 @@ async function startUpdate() {
       const err = await res.json();
       throw new Error(err.detail || 'Error al iniciar');
     }
+    // Cierra modal — descarga en segundo plano
+    closeUpdateModal();
+    document.getElementById('update-banner').style.display = 'none';
+    const dlBar = document.getElementById('update-dl-bar');
+    dlBar.style.display = 'block';
+    icons();
     _updPollTimer = setInterval(_pollProgress, 600);
   } catch(e) {
     document.getElementById('upd-error').textContent = e.message || 'Error al iniciar';
     document.getElementById('upd-error').classList.remove('hidden');
-    document.getElementById('upd-btn-cancel').disabled = false;
+    document.getElementById('upd-btn-install').disabled = false;
+    document.getElementById('upd-btn-install').style.opacity = '1';
   }
 }
 
@@ -1991,17 +2012,18 @@ async function _pollProgress() {
   try {
     const d = await (await api('/admin/update/progress')).json();
     const pct = Math.round((d.progress || 0) * 100);
-    document.getElementById('upd-progress-bar').style.width = pct + '%';
-    document.getElementById('upd-progress-pct').textContent = pct + '%';
+    document.getElementById('dl-bar').style.width = pct + '%';
+    document.getElementById('dl-pct').textContent = pct + '%';
     if (d.done) {
       clearInterval(_updPollTimer);
-      document.getElementById('upd-progress-label').textContent = '¡Instalado! Reiniciando...';
+      document.getElementById('dl-label').textContent = '✓ Instalado — el programa se reiniciará en instantes...';
+      document.getElementById('dl-bar').style.background = '#4ADE80';
+      document.getElementById('dl-pct').textContent = '100%';
     }
     if (d.error) {
       clearInterval(_updPollTimer);
-      document.getElementById('upd-error').textContent = d.error;
-      document.getElementById('upd-error').classList.remove('hidden');
-      document.getElementById('upd-btn-cancel').disabled = false;
+      document.getElementById('update-dl-bar').style.display = 'none';
+      toast('Error al actualizar: ' + d.error, 'error', 'Actualización fallida');
     }
   } catch {}
 }
