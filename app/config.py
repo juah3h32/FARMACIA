@@ -59,3 +59,6 @@ WINDOW_WIDTH = 1300
 WINDOW_HEIGHT = 820
 
 DEV_MODE = not getattr(sys, 'frozen', False)  # False when compiled to EXE
+
+GITHUB_REPO = "Juah3h32/FarmaciaPOS"
+GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

@@ -1,0 +1,80 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Extract version from tag
+        id: ver
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Inject version into source files
+        shell: python
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: |
+          import os, re
+          v = os.environ["VERSION"]
+          parts = v.split(".")
+          while len(parts) < 4:
+              parts.append("0")
+          tup = ",".join(parts[:4])
+          dot4 = ".".join(parts[:4])
+
+          # app/config.py
+          p = "app/config.py"
+          t = open(p).read()
+          t = re.sub(r'VERSION\s*=\s*"[^"]+"', f'VERSION = "{v}"', t)
+          open(p, "w").write(t)
+
+          # version_info.txt
+          p = "version_info.txt"
+          t = open(p).read()
+          t = re.sub(r"filevers=\([^)]+\)", f"filevers=({tup})", t)
+          t = re.sub(r"prodvers=\([^)]+\)", f"prodvers=({tup})", t)
+          t = re.sub(r"'FileVersion',\s*'[^']+'",    f"'FileVersion', '{dot4}'", t)
+          t = re.sub(r"'ProductVersion',\s*'[^']+'", f"'ProductVersion', '{dot4}'", t)
+          open(p, "w").write(t)
+
+          # installer.iss
+          p = "installer.iss"
+          t = open(p).read()
+          t = re.sub(r'#define AppVersion\s+"[^"]+"', f'#define AppVersion   "{v}"', t)
+          open(p, "w").write(t)
+
+          print(f"Version set to {v}")
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: pyinstaller FarmaciaPOS.spec --clean --noconfirm
+
+      - name: Package release zip
+        shell: pwsh
+        run: Compress-Archive -Path "dist\FarmaciaPOS\*" -DestinationPath "dist\FarmaciaPOS.zip"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/FarmaciaPOS.zip
+          generate_release_notes: true
+          name: "FarmaciaPOS ${{ github.ref_name }}"

@@ -1,10 +1,18 @@
+import sys
+import threading
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+
+import app.config as cfg
 from app.api.routes.auth_routes import get_current_api_user
 from app.auth.auth_service import create_long_token
 
 router = APIRouter()
+
+# ── Update state (shared across requests) ─────────────────────────────────────
+_update_state: dict = {"running": False, "progress": 0.0, "error": None, "done": False}
 
 
 def _require_admin(payload: dict):
@@ -37,6 +45,53 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
         "expires_at": expires_at,
         "dias": body.dias,
     }
+
+
+@router.get("/update/check")
+def check_update(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.services import updater_service
+    updater_service._do_check()
+    available, version, url = updater_service.get_status()
+    return {
+        "available": bool(available),
+        "latest_version": version or "",
+        "current_version": cfg.VERSION,
+        "has_download": url is not None,
+    }
+
+
+@router.post("/update/install")
+def install_update(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    if _update_state["running"]:
+        raise HTTPException(status_code=409, detail="Instalación en progreso")
+    if not getattr(sys, "frozen", False):
+        raise HTTPException(status_code=400, detail="Solo disponible en EXE instalado")
+
+    _update_state.update({"running": True, "progress": 0.0, "error": None, "done": False})
+
+    def _run():
+        from app.services import updater_service
+        def on_progress(pct):
+            _update_state["progress"] = pct
+        ok, err = updater_service.download_and_install(on_progress)
+        if ok:
+            _update_state.update({"progress": 1.0, "done": True, "running": False})
+            import time
+            time.sleep(1.5)
+            sys.exit(0)
+        else:
+            _update_state.update({"error": err, "running": False})
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"started": True}
+
+
+@router.get("/update/progress")
+def update_progress(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    return dict(_update_state)
 
 
 @router.get("/endpoints")

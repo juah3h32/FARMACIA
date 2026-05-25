@@ -2,18 +2,20 @@ import threading
 import socket
 import time
 import sys
+import traceback
 import app.config as cfg
 from app.database.connection import init_db
 from app.api.server import start_api_server
 
 
-def _hide_console():
-    """Hide the console window when running as a frozen windowed EXE."""
-    if getattr(sys, 'frozen', False):
-        import ctypes
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE
+def _log_error(msg: str) -> None:
+    try:
+        log = cfg.DATA_DIR / "error.log"
+        with open(log, "a", encoding="utf-8") as f:
+            from datetime import datetime
+            f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}\n")
+    except Exception:
+        pass
 
 
 def _find_free_port(start: int, attempts: int = 10) -> int | None:
@@ -38,7 +40,6 @@ def _wait_for_api(port: int, timeout: int = 12) -> bool:
 
 
 def main():
-    _hide_console()
     init_db()
 
     if cfg.TURSO_SYNC:
@@ -52,13 +53,24 @@ def main():
         sys.exit(1)
 
     cfg.API_PORT = port
-    api_thread = threading.Thread(target=start_api_server, daemon=True, name="APIServer")
+
+    def _api_with_log():
+        try:
+            start_api_server()
+        except Exception as e:
+            _log_error(f"API thread crash: {e}\n" + traceback.format_exc())
+
+    api_thread = threading.Thread(target=_api_with_log, daemon=True, name="APIServer")
     api_thread.start()
 
     if not _wait_for_api(port):
-        print("[FarmaciaPOS] El servidor API no respondió a tiempo")
+        _log_error("El servidor API no respondió a tiempo")
         sys.exit(1)
 
+    _start_ui(port)
+
+
+def _start_ui(port: int) -> None:
     try:
         import webview
         window = webview.create_window(
@@ -68,16 +80,24 @@ def main():
             height=cfg.WINDOW_HEIGHT,
             resizable=True,
             min_size=(1000, 680),
+            fullscreen=True,
         )
         webview.start(debug=False)
-    except ImportError:
-        # Fallback to CustomTkinter if pywebview not installed
+        return
+    except Exception as e:
+        _log_error(f"pywebview falló ({type(e).__name__}: {e}) — usando CustomTkinter\n"
+                   + traceback.format_exc())
+
+    # Fallback: CustomTkinter
+    try:
         import customtkinter as ctk
         ctk.set_appearance_mode("Light")
         ctk.set_default_color_theme("blue")
         from app.ui.login_screen import LoginScreen
         app = LoginScreen()
         app.mainloop()
+    except Exception as e:
+        _log_error(f"CustomTkinter falló: {e}\n" + traceback.format_exc())
 
 
 if __name__ == "__main__":

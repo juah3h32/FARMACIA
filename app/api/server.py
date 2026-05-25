@@ -79,4 +79,6 @@ async def serve_spa(path: str = ""):
 
 
 def start_api_server():
-    uvicorn.run(app, host=cfg.API_HOST, port=cfg.API_PORT, log_level="error")
+    # log_config=None avoids uvicorn trying isatty() on stdout=None (windowed EXE)
+    uvicorn.run(app, host=cfg.API_HOST, port=cfg.API_PORT,
+                log_level="error", log_config=None)
