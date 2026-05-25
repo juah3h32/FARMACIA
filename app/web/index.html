@@ -373,6 +373,36 @@
   </div>
 </div>
 
+<!-- ═══════════ UPDATE NOTIFICATION BANNER ═══════════ -->
+<div id="update-banner" style="display:none;position:fixed;bottom:24px;right:24px;z-index:200;
+     width:320px;background:#fff;border:1.5px solid #F59E0B;border-radius:16px;
+     box-shadow:0 8px 32px rgba(0,0,0,.15);padding:16px 18px;animation:slideUpIn .4s ease">
+  <div style="display:flex;align-items:flex-start;gap:12px">
+    <div style="width:36px;height:36px;border-radius:10px;background:#FEF3C7;display:flex;
+                align-items:center;justify-content:center;flex-shrink:0">
+      <i data-lucide="arrow-up-circle" style="width:20px;height:20px;color:#D97706"></i>
+    </div>
+    <div style="flex:1;min-width:0">
+      <p style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:2px">Nueva versión disponible</p>
+      <p id="update-banner-ver" style="font-size:11px;color:#B45309;margin-bottom:10px"></p>
+      <button onclick="openUpdateModal()" style="height:32px;padding:0 14px;border-radius:8px;
+              background:#F59E0B;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;
+              margin-right:8px">Actualizar ahora</button>
+      <button onclick="document.getElementById('update-banner').style.display='none'"
+              style="height:32px;padding:0 12px;border-radius:8px;background:transparent;
+              color:#B45309;font-size:12px;font-weight:500;border:1px solid #FCD34D;cursor:pointer">
+        Después
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes slideUpIn {
+  from { opacity:0; transform:translateY(20px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+</style>
+
 <!-- ═══════════ UPDATE MODAL ═══════════ -->
 <div id="modal-update" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeUpdateModal()"></div>
@@ -1995,13 +2025,20 @@ async function checkUpdateSilent() {
     if (!res.ok) return;
     const d = await res.json();
     const btn = document.getElementById('btn-update');
-    if (!btn) return;
-    btn.style.display = 'flex';
+    if (btn) btn.style.display = 'flex';
     if (d.available) {
-      btn.style.background = '#FEF3C7';
-      btn.style.borderColor = '#F59E0B';
-      btn.style.color = '#92400E';
-      document.getElementById('btn-update-label').textContent = `⬆ v${d.latest_version}`;
+      // Highlight header button
+      if (btn) {
+        btn.style.background = '#FEF3C7';
+        btn.style.borderColor = '#F59E0B';
+        btn.style.color = '#92400E';
+        document.getElementById('btn-update-label').textContent = `⬆ v${d.latest_version}`;
+      }
+      // Show persistent notification banner
+      document.getElementById('update-banner-ver').textContent =
+        `v${d.current_version}  →  v${d.latest_version}`;
+      document.getElementById('update-banner').style.display = 'block';
+      icons();
     }
   } catch {}
 }
