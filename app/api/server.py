@@ -71,10 +71,18 @@ _WEB_DIR = cfg.BASE_DIR / "app" / "web"
 
 
 @app.get("/logo.png")
-async def serve_logo():
+async def serve_logo_png():
     logo = _WEB_DIR / "logo.png"
     if logo.exists():
         return FileResponse(str(logo), media_type="image/png")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404)
+
+@app.get("/logo.svg")
+async def serve_logo_svg():
+    logo = _WEB_DIR / "logo.svg"
+    if logo.exists():
+        return FileResponse(str(logo), media_type="image/svg+xml")
     from fastapi import HTTPException
     raise HTTPException(status_code=404)
 
