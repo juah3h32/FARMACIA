@@ -67,6 +67,9 @@ def main():
         _log_error("El servidor API no respondió a tiempo")
         sys.exit(1)
 
+    from app.services import updater_service
+    updater_service.start_background_check()
+
     _start_ui(port)
 
 

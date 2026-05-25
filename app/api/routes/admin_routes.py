@@ -51,13 +51,14 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
 def check_update(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     from app.services import updater_service
-    updater_service._do_check()
-    available, version, url = updater_service.get_status()
+    st = updater_service.get_status()
+    if not st["checked"]:
+        st = updater_service.force_check()
     return {
-        "available": bool(available),
-        "latest_version": version or "",
+        "available": bool(st["available"]),
+        "latest_version": st["version"] or "",
         "current_version": cfg.VERSION,
-        "has_download": url is not None,
+        "has_download": st["url"] is not None,
     }
 
 

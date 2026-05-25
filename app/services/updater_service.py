@@ -10,7 +10,13 @@ from pathlib import Path
 
 import app.config as cfg
 
-_status = {"available": None, "version": None, "url": None}
+_lock = threading.Lock()
+_status: dict = {
+    "checked": False,
+    "available": False,
+    "version": None,
+    "url": None,
+}
 _callbacks: list = []
 
 
@@ -21,15 +27,32 @@ def _parse_version(v: str) -> tuple:
         return (0,)
 
 
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def start_background_check() -> None:
+    """Fire-and-forget check on app startup."""
+    threading.Thread(target=_do_check, daemon=True).start()
+
+
 def check_for_update_async(callback=None) -> None:
+    """Legacy helper used by CustomTkinter fallback UI."""
     if callback:
         _callbacks.append(callback)
     threading.Thread(target=_do_check, daemon=True).start()
 
 
-def get_status() -> tuple:
-    return _status["available"], _status["version"], _status["url"]
+def force_check() -> dict:
+    """Synchronous check — blocks caller. Use only from API request handler."""
+    _do_check()
+    return get_status()
 
+
+def get_status() -> dict:
+    with _lock:
+        return dict(_status)
+
+
+# ── Internal ──────────────────────────────────────────────────────────────────
 
 def _do_check() -> None:
     if not cfg.GITHUB_RELEASES_URL:
@@ -39,22 +62,26 @@ def _do_check() -> None:
             cfg.GITHUB_RELEASES_URL,
             headers={"User-Agent": "FarmaciaPOS-Updater/1.0"},
         )
-        with urllib.request.urlopen(req, timeout=6) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
 
         tag = data.get("tag_name", "")
         latest = _parse_version(tag)
         current = _parse_version(cfg.VERSION)
-
-        _status["available"] = latest > current
-        _status["version"] = tag.lstrip("v")
-
+        available = latest > current
+        version = tag.lstrip("v")
+        url = None
         for asset in data.get("assets", []):
             if asset.get("name", "").lower().endswith(".zip"):
-                _status["url"] = asset["browser_download_url"]
+                url = asset["browser_download_url"]
                 break
+
+        with _lock:
+            _status.update({"checked": True, "available": available,
+                            "version": version, "url": url})
     except Exception:
-        _status["available"] = False
+        with _lock:
+            _status.update({"checked": True, "available": False})
 
     for cb in list(_callbacks):
         try:
@@ -63,8 +90,11 @@ def _do_check() -> None:
             pass
 
 
+# ── Download & install ────────────────────────────────────────────────────────
+
 def download_and_install(progress_callback=None) -> tuple[bool, str]:
-    url = _status.get("url")
+    st = get_status()
+    url = st.get("url")
     if not url:
         return False, "No se encontró archivo de descarga en el release"
 
@@ -73,7 +103,6 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     extract_dir = tmp / "FarmaciaPOS_update_extracted"
     install_dir = Path(sys.executable).parent
 
-    # Download
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "FarmaciaPOS-Updater/1.0"})
         with urllib.request.urlopen(req, timeout=300) as resp:
@@ -91,7 +120,6 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Error de descarga: {e}"
 
-    # Extract
     try:
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
@@ -102,11 +130,9 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Error al extraer: {e}"
 
-    # If zip contains a single top-level folder, use that as source
     contents = list(extract_dir.iterdir())
     source_dir = contents[0] if len(contents) == 1 and contents[0].is_dir() else extract_dir
 
-    # PowerShell updater: copy files, request elevation if needed, restart app
     ps_path = tmp / "farmacia_updater.ps1"
     src = str(source_dir).replace("'", "''")
     dst = str(install_dir).replace("'", "''")
