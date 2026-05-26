@@ -1,6 +1,5 @@
 import json
 import shutil
-import subprocess
 import sys
 import tempfile
 import threading
@@ -154,39 +153,36 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     contents = list(extract_dir.iterdir())
     source_dir = contents[0] if len(contents) == 1 and contents[0].is_dir() else extract_dir
 
-    # ── Build self-elevating PowerShell updater ───────────────────────────────
-    # PS single-quoted strings: escape ' as ''
+    # ── Build PowerShell updater script ──────────────────────────────────────
+    # Escape paths for PS single-quoted strings (' → '')
     src = str(source_dir).replace("'", "''")
     dst = str(install_dir).replace("'", "''")
     exe = str(install_dir / "FarmaciaPOS.exe").replace("'", "''")
+    log = str(tmp / "farmacia_update.log").replace("'", "''")
     zp  = str(zip_path).replace("'", "''")
     xd  = str(extract_dir).replace("'", "''")
 
     ps_script = (
-        "param()\n"
-        # Self-elevate: if not admin, relaunch as admin and exit
-        "if (-not ([Security.Principal.WindowsPrincipal]"
-        "[Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole("
-        "[Security.Principal.WindowsBuiltInRole]::Administrator)) {\n"
-        "    Start-Process PowerShell -Verb RunAs"
-        " -ArgumentList \"-NonInteractive -WindowStyle Hidden -File `\"$PSCommandPath`\"\""
-        " -Wait\n"
-        "    exit\n"
-        "}\n\n"
+        # No self-elevation — Python launches this already elevated via ShellExecuteW runas
         f"$src = '{src}'\n"
         f"$dst = '{dst}'\n"
-        f"$exe = '{exe}'\n\n"
-        # Wait for the app process to fully exit (max 30 s)
+        f"$exe = '{exe}'\n"
+        f"$log = '{log}'\n\n"
+        # Wait for FarmaciaPOS to exit (max 30 s)
         "$deadline = (Get-Date).AddSeconds(30)\n"
         "while ((Get-Process -Name 'FarmaciaPOS' -ErrorAction SilentlyContinue)"
-        " -and (Get-Date) -lt $deadline) {\n"
-        "    Start-Sleep -Milliseconds 500\n"
-        "}\n"
+        " -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 400 }\n"
         "Start-Sleep -Seconds 1\n\n"
-        # Copy new files over existing install
-        "Copy-Item -Path \"$src\\*\" -Destination \"$dst\" -Recurse -Force\n\n"
+        # Copy new files over existing install — log any errors
+        "try {\n"
+        "    Copy-Item -Path \"$src\\*\" -Destination \"$dst\" -Recurse -Force -ErrorAction Stop\n"
+        "    \"OK $(Get-Date)\" | Out-File $log -Encoding utf8\n"
+        "} catch {\n"
+        "    \"ERROR $_ $(Get-Date)\" | Out-File $log -Encoding utf8\n"
+        "    exit 1\n"
+        "}\n\n"
         # Restart updated app
-        "Start-Process -FilePath \"$exe\"\n\n"
+        "if (Test-Path \"$exe\") { Start-Process -FilePath \"$exe\" }\n\n"
         # Cleanup
         f"Remove-Item -Path '{zp}' -Force -ErrorAction SilentlyContinue\n"
         f"Remove-Item -Path '{xd}' -Recurse -Force -ErrorAction SilentlyContinue\n"
@@ -195,18 +191,30 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     )
 
     ps_path = tmp / "farmacia_updater.ps1"
-    # UTF-8 with BOM so PowerShell 5.1 reads it correctly
     ps_path.write_text(ps_script, encoding="utf-8-sig")
 
-    # CREATE_BREAKAWAY_FROM_JOB ensures PS survives when the Python process exits
-    flags = (subprocess.DETACHED_PROCESS
-             | subprocess.CREATE_NO_WINDOW
-             | subprocess.CREATE_BREAKAWAY_FROM_JOB)
-    subprocess.Popen(
-        ["powershell", "-NonInteractive", "-WindowStyle", "Hidden", "-File", str(ps_path)],
-        creationflags=flags,
-        close_fds=True,
-    )
+    if progress_callback:
+        progress_callback(0.97)
+
+    # ── Launch via ShellExecuteW (runas) ──────────────────────────────────────
+    # ShellExecuteW creates a shell-owned process — survives parent Job Object
+    # destruction. runas = proper UAC elevation (shows consent dialog if needed).
+    try:
+        import ctypes
+        ps_exe = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+        ps_args = f'-ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File "{ps_path}"'
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None,      # hwnd
+            "runas",   # verb — triggers UAC elevation
+            ps_exe,    # file
+            ps_args,   # parameters
+            None,      # directory
+            0,         # SW_HIDE
+        )
+        if ret <= 32:
+            return False, f"No se pudo lanzar el actualizador (código {ret})"
+    except Exception as e:
+        return False, f"Error al lanzar actualizador: {e}"
 
     if progress_callback:
         progress_callback(1.0)
