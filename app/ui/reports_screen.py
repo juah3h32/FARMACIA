@@ -3,9 +3,11 @@ from tkinter import ttk, messagebox, filedialog
 import tkinter as tk
 from datetime import date, datetime, timedelta
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Lote
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Lote, RolUsuario
 from sqlalchemy import func
 import app.config as cfg
+
+_PIN_ADMIN = "171215"
 
 # Palette (matches main_window)
 CARD_BG = "#FFFFFF"
@@ -113,7 +115,16 @@ class ReportsScreen(ctk.CTkFrame):
             border_width=1, border_color="#BBF7D0",
             font=ctk.CTkFont(size=12, weight="bold"),
             command=self._exportar_excel,
-        ).pack(side="left")
+        ).pack(side="left", padx=(0, 6))
+
+        if self.user.rol == RolUsuario.admin:
+            ctk.CTkButton(
+                ab, text="🗑  Purgar datos", width=120, height=34, corner_radius=8,
+                fg_color="#FEF2F2", hover_color="#FEE2E2", text_color="#EF4444",
+                border_width=1, border_color="#FECACA",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                command=self._dlg_purgar,
+            ).pack(side="left")
 
     def _build_tabs(self):
         self.tabs = ctk.CTkTabview(self, fg_color=CONT_BG,
@@ -785,6 +796,155 @@ class ReportsScreen(ctk.CTkFrame):
             self.lbl_venc_status.configure(text=f"Mostrando {count} lotes")
         finally:
             db.close()
+
+    # ── Admin purge ───────────────────────────────────────────────────────────
+
+    def _dlg_purgar(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("⚠️ Purgar datos")
+        dlg.geometry("440x340")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width()  - 440) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 340) // 2
+        dlg.geometry(f"440x340+{x}+{y}")
+
+        ctk.CTkLabel(dlg, text="⚠️  Eliminar datos",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color="#EF4444").pack(pady=(20, 4))
+        ctk.CTkLabel(dlg, text="Selecciona qué deseas eliminar (local + Turso).",
+                     font=ctk.CTkFont(size=11), text_color="#94A3B8").pack(pady=(0, 16))
+
+        # Option 1
+        ctk.CTkButton(
+            dlg,
+            text="🗑  Eliminar ventas, historial y cierres",
+            height=40, corner_radius=10,
+            fg_color="#F97316", hover_color="#C2410C", text_color="white",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=lambda: self._pedir_pin(
+                dlg,
+                "Eliminar ventas, historial y cierres",
+                "Se borrarán ventas, movimientos, auditoría y cortes.\n"
+                "Conserva productos, clientes y proveedores.",
+                self._purgar_ventas,
+            ),
+        ).pack(fill="x", padx=24, pady=(0, 8))
+        ctk.CTkLabel(
+            dlg,
+            text="Conserva: productos, clientes, proveedores, categorías.",
+            font=ctk.CTkFont(size=10), text_color="#94A3B8",
+        ).pack(anchor="w", padx=28, pady=(0, 12))
+
+        ctk.CTkFrame(dlg, height=1, fg_color="#EF4444").pack(fill="x", padx=24, pady=(0, 12))
+
+        # Option 2
+        ctk.CTkButton(
+            dlg,
+            text="💀  Eliminar TODO sin dejar nada",
+            height=40, corner_radius=10,
+            fg_color="#EF4444", hover_color="#7F1D1D", text_color="white",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=lambda: self._pedir_pin(
+                dlg,
+                "Eliminar TODOS los registros",
+                "Se eliminará absolutamente todo excepto usuarios.\nACCIÓN IRREVERSIBLE.",
+                self._purgar_todo,
+            ),
+        ).pack(fill="x", padx=24, pady=(0, 4))
+        ctk.CTkLabel(
+            dlg,
+            text="Elimina: productos, ventas, clientes, compras, todo.",
+            font=ctk.CTkFont(size=10), text_color="#94A3B8",
+        ).pack(anchor="w", padx=28, pady=(0, 12))
+
+        ctk.CTkButton(
+            dlg, text="Cancelar", height=32, corner_radius=8,
+            fg_color="transparent", border_width=1, border_color="#E2E8F0",
+            text_color="#94A3B8", command=dlg.destroy,
+        ).pack(pady=(4, 0))
+
+    def _pedir_pin(self, parent_dlg, titulo, descripcion, on_confirm):
+        parent_dlg.destroy()
+        pin_dlg = ctk.CTkToplevel(self)
+        pin_dlg.title(f"⚠️ {titulo}")
+        pin_dlg.geometry("420x260")
+        pin_dlg.resizable(False, False)
+        pin_dlg.grab_set()
+        pin_dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width()  - 420) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 260) // 2
+        pin_dlg.geometry(f"420x260+{x}+{y}")
+
+        ctk.CTkLabel(pin_dlg, text=f"⚠️  {titulo}",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color="#EF4444", wraplength=380).pack(pady=(18, 4))
+        ctk.CTkLabel(pin_dlg, text=descripcion,
+                     font=ctk.CTkFont(size=11), text_color="#94A3B8",
+                     wraplength=380, justify="center").pack(pady=(0, 10))
+        ctk.CTkLabel(pin_dlg, text="PIN de administrador:",
+                     font=ctk.CTkFont(size=12)).pack(pady=(0, 4))
+
+        entry = ctk.CTkEntry(pin_dlg, width=150, height=36, justify="center", show="●")
+        entry.pack(pady=(0, 4))
+        entry.focus()
+
+        lbl_err = ctk.CTkLabel(pin_dlg, text="", text_color="#EF4444",
+                               font=ctk.CTkFont(size=11))
+        lbl_err.pack(pady=(0, 6))
+
+        def _ok(event=None):
+            if entry.get().strip() != _PIN_ADMIN:
+                lbl_err.configure(text="PIN incorrecto")
+                entry.delete(0, "end")
+                return
+            pin_dlg.destroy()
+            on_confirm()
+
+        entry.bind("<Return>", _ok)
+        ctk.CTkButton(pin_dlg, text="Confirmar", height=34,
+                      fg_color="#EF4444", hover_color="#B91C1C", text_color="white",
+                      command=_ok).pack(pady=(0, 6))
+        ctk.CTkButton(pin_dlg, text="Cancelar", height=30,
+                      fg_color="transparent", border_width=1, border_color="#E2E8F0",
+                      text_color="#94A3B8", command=pin_dlg.destroy).pack()
+
+    def _purgar_ventas(self):
+        import threading
+        from app.database.sync_service import purgar_ventas_historial_cierres
+        from app.ui import toast
+
+        def _run():
+            try:
+                purgar_ventas_historial_cierres()
+                self.after(0, lambda: (
+                    toast.show("Ventas, historial y cierres eliminados", kind="success", duration=5000),
+                    self._generar(),
+                ))
+            except Exception as exc:
+                self.after(0, lambda e=exc: toast.show(f"Error: {e}", kind="error", duration=7000))
+
+        toast.show("Eliminando ventas, historial y cierres…", kind="warning", duration=15000)
+        threading.Thread(target=_run, daemon=True, name="PurgarVentasR").start()
+
+    def _purgar_todo(self):
+        import threading
+        from app.database.sync_service import purgar_todos_los_datos
+        from app.ui import toast
+
+        def _run():
+            try:
+                purgar_todos_los_datos()
+                self.after(0, lambda: (
+                    toast.show("Todos los registros eliminados", kind="success", duration=5000),
+                    self._generar(),
+                ))
+            except Exception as exc:
+                self.after(0, lambda e=exc: toast.show(f"Error: {e}", kind="error", duration=7000))
+
+        toast.show("Eliminando todos los registros…", kind="warning", duration=15000)
+        threading.Thread(target=_run, daemon=True, name="PurgarTodoR").start()
 
     def on_show(self):
         self._generar()
