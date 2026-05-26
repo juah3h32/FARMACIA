@@ -76,6 +76,10 @@ class MainWindow(ctk.CTkToplevel):
         self.geometry(f"{cfg.WINDOW_WIDTH}x{cfg.WINDOW_HEIGHT}")
         self.minsize(1000, 680)
         self._center_window()
+        try:
+            self.after(100, lambda: self.iconbitmap(str(cfg.ICON_PATH)))
+        except Exception:
+            pass
         self._build_layout()
         self._show_screen("pos")
         self.protocol("WM_DELETE_WINDOW", self._on_close)

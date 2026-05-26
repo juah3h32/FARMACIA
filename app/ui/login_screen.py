@@ -13,6 +13,11 @@ class LoginScreen(ctk.CTk):
         self.title("Farmacia Eben-Ezer")
         self.resizable(False, False)
         self.attributes("-alpha", 0.0)
+        try:
+            import app.config as _cfg
+            self.iconbitmap(str(_cfg.ICON_PATH))
+        except Exception:
+            pass
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")

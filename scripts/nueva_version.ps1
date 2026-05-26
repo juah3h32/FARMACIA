@@ -12,23 +12,25 @@ $parts = $Version.Split('.')
 $verTuple = "$($parts[0]),$($parts[1]),$($parts[2]),0"
 $verDots  = "$Version.0"
 
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
 # --- app/config.py ---
-$cfg = Get-Content "app\config.py" -Raw
+$cfg = [System.IO.File]::ReadAllText((Resolve-Path "app\config.py"), $utf8NoBom)
 $cfg = $cfg -replace 'VERSION\s*=\s*"[^"]+"', "VERSION = `"$Version`""
-Set-Content "app\config.py" $cfg -NoNewline -Encoding utf8
+[System.IO.File]::WriteAllText((Resolve-Path "app\config.py"), $cfg, $utf8NoBom)
 
 # --- version_info.txt ---
-$vi = Get-Content "version_info.txt" -Raw
+$vi = [System.IO.File]::ReadAllText((Resolve-Path "version_info.txt"), $utf8NoBom)
 $vi = $vi -replace 'filevers=\([^)]+\)',   "filevers=($verTuple)"
 $vi = $vi -replace 'prodvers=\([^)]+\)',   "prodvers=($verTuple)"
 $vi = $vi -replace "'FileVersion',\s*'[^']+'",    "'FileVersion', '$verDots'"
 $vi = $vi -replace "'ProductVersion',\s*'[^']+'", "'ProductVersion', '$verDots'"
-Set-Content "version_info.txt" $vi -NoNewline -Encoding utf8
+[System.IO.File]::WriteAllText((Resolve-Path "version_info.txt"), $vi, $utf8NoBom)
 
 # --- installer.iss ---
-$iss = Get-Content "installer.iss" -Raw
+$iss = [System.IO.File]::ReadAllText((Resolve-Path "installer.iss"), $utf8NoBom)
 $iss = $iss -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion   `"$Version`""
-Set-Content "installer.iss" $iss -NoNewline -Encoding utf8
+[System.IO.File]::WriteAllText((Resolve-Path "installer.iss"), $iss, $utf8NoBom)
 
 Write-Host "Version actualizada a $Version"
 
