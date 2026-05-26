@@ -681,7 +681,7 @@
         Iniciar Sesión
       </button>
 
-      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer &nbsp;·&nbsp; v1.0.0</p>
+      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer &nbsp;·&nbsp; <span id="login-ver">...</span></p>
     </div>
   </div>
 </div>
@@ -4443,6 +4443,10 @@ async function saveEntrada() {
 // ══════════════════════════════════════════════════════════
 window.addEventListener('load', () => {
   icons(); // render login icons
+  // Fetch real version from health endpoint (no auth required)
+  fetch('/api/health').then(r=>r.ok?r.json():null).then(d=>{
+    if (d?.version) document.getElementById('login-ver').textContent = 'v' + d.version;
+  }).catch(()=>{});
   if (S.token && S.user) {
     api('/auth/me').then(r=>{ if (r.ok) launchApp(); else { S.token=null; localStorage.removeItem('token'); } }).catch(()=>{});
   }
