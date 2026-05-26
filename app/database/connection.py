@@ -65,9 +65,11 @@ def get_db_session() -> Session:
 def _migrate():
     """Add new columns to existing tables without dropping data."""
     new_cols = [
-        ("productos", "presentacion",  "VARCHAR(50)"),
-        ("productos", "concentracion", "VARCHAR(50)"),
-        ("productos", "contenido",     "VARCHAR(50)"),
+        ("productos", "presentacion",         "VARCHAR(50)"),
+        ("productos", "concentracion",        "VARCHAR(50)"),
+        ("productos", "contenido",            "VARCHAR(50)"),
+        ("productos", "sustancia_controlada", "BOOLEAN DEFAULT 0"),
+        ("lotes",     "precio_compra",        "REAL DEFAULT 0.0"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in new_cols:

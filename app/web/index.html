@@ -224,7 +224,7 @@
           </tr>
         </thead>
         <tbody id="lotes-tbody">
-          <tr><td colspan="5" class="text-center py-6" style="color:#94A3B8">Cargando...</td></tr>
+          <tr><td colspan="6" class="text-center py-6" style="color:#94A3B8">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2551,6 +2551,13 @@ function removeFromCart(pid) { S.cart=S.cart.filter(i=>i.id!==pid); renderCart()
 function changeQty(pid, delta) {
   const i=S.cart.find(x=>x.id===pid);
   if (!i) return;
+  if (delta > 0) {
+    const prod = (S.allProducts||[]).find(p=>p.id===pid);
+    if (prod && i.cantidad >= prod.stock) {
+      toast(`Solo hay ${prod.stock} unidad(es) en stock`, 'warning');
+      return;
+    }
+  }
   i.cantidad=Math.max(1,i.cantidad+delta);
   renderCart();
 }
@@ -4218,6 +4225,11 @@ async function posSearchKeydown(e) {
         exact = await r.json();
         if (exact && S.allProducts && !S.allProducts.find(p => p.id === exact.id))
           S.allProducts.push(exact);
+      } else if (r.status === 409) {
+        const err = await r.json().catch(()=>({}));
+        toast('⛔ ' + (err.detail || 'Producto VENCIDO — no se puede vender'), 'error');
+        document.getElementById('pos-search').value = '';
+        return;
       }
     } catch (_) {}
   }
@@ -4228,6 +4240,7 @@ async function posSearchKeydown(e) {
     toast(exact.nombre + ' agregado al carrito', 'success');
   } else {
     toast('Producto no encontrado: ' + q, 'warning');
+    document.getElementById('pos-search').select();
   }
 }
 

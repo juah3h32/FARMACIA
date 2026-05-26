@@ -65,13 +65,20 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             for p in db.query(Producto).filter(Producto.id.in_(product_ids)).all()
         }
 
-        # Guard: reject if all available lotes are expired (no usable stock)
+        # Guard: validate stock and expiry before touching any data
         from datetime import date as _date
         hoy = _date.today()
         for item in body.items:
+            if item.cantidad <= 0:
+                raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
             prod = products.get(item.producto_id)
             if not prod:
-                continue
+                raise HTTPException(status_code=404, detail=f"Producto {item.producto_id} no encontrado")
+            if prod.stock < item.cantidad:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"'{prod.nombre}' solo tiene {prod.stock} unidad(es) en stock (solicitado: {item.cantidad})",
+                )
             lotes_all = db.query(Lote).filter(
                 Lote.producto_id == item.producto_id, Lote.cantidad > 0
             ).all()
@@ -84,6 +91,12 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                     raise HTTPException(
                         status_code=409,
                         detail=f"'{prod.nombre}' tiene todos los lotes vencidos — no se puede vender",
+                    )
+                total_disp = sum(l.cantidad for l in lotes_ok)
+                if total_disp < item.cantidad:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"'{prod.nombre}' solo tiene {total_disp} unidad(es) vigente(s) (solicitado: {item.cantidad})",
                     )
 
         # Calculate totals in one pass

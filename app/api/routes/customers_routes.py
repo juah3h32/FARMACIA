@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from app.database.connection import get_db_session
 from app.database.models import Cliente
 from app.api.routes.auth_routes import get_current_api_user
+
+
+def _sync_bg(bg: BackgroundTasks):
+    import app.config as _cfg
+    if _cfg.TURSO_SYNC:
+        from app.database.sync_service import sync_to_turso
+        bg.add_task(sync_to_turso)
 
 router = APIRouter()
 
@@ -36,13 +43,14 @@ def listar_clientes(payload: dict = Depends(get_current_api_user)):
 
 
 @router.post("/")
-def crear_cliente(body: ClienteIn, payload: dict = Depends(get_current_api_user)):
+def crear_cliente(body: ClienteIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         c = Cliente(**body.model_dump())
         db.add(c)
         db.commit()
         db.refresh(c)
+        _sync_bg(bg)
         return {"id": c.id, "nombre": c.nombre}
     except Exception as e:
         db.rollback()
@@ -52,7 +60,7 @@ def crear_cliente(body: ClienteIn, payload: dict = Depends(get_current_api_user)
 
 
 @router.put("/{cid}")
-def actualizar_cliente(cid: int, body: ClienteIn, payload: dict = Depends(get_current_api_user)):
+def actualizar_cliente(cid: int, body: ClienteIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -62,6 +70,7 @@ def actualizar_cliente(cid: int, body: ClienteIn, payload: dict = Depends(get_cu
         for k, v in body.model_dump().items():
             setattr(c, k, v)
         db.commit()
+        _sync_bg(bg)
         return {"ok": True}
     except HTTPException:
         raise
@@ -73,7 +82,7 @@ def actualizar_cliente(cid: int, body: ClienteIn, payload: dict = Depends(get_cu
 
 
 @router.delete("/{cid}")
-def eliminar_cliente(cid: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_cliente(cid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -82,6 +91,7 @@ def eliminar_cliente(cid: int, payload: dict = Depends(get_current_api_user)):
             raise HTTPException(status_code=404, detail="No encontrado")
         c.activo = False
         db.commit()
+        _sync_bg(bg)
         return {"ok": True}
     except HTTPException:
         raise

@@ -347,9 +347,9 @@ def start_background_sync(interval: int = 60) -> threading.Thread:
     """Daemon thread: daily backup + sync local → Turso every `interval` seconds."""
     def _loop():
         time.sleep(30)  # let app fully initialize first
-        make_daily_backup()
         while True:
             try:
+                make_daily_backup()  # no-op if already backed up today
                 sync_to_turso()
             except Exception as e:
                 print(f"[Sync] Background sync error: {e}")
