@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v[0-9]*'
+    branches:
+      - 'claude/update-install-bar-bugs-5DXC5'
 
 jobs:
   build:
@@ -23,10 +25,16 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Extract version from tag
+      - name: Extract version
         id: ver
         shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(grep -oP 'VERSION\s*=\s*"\K[^"]+' app/config.py)
+            echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Inject version into source files
         shell: python
@@ -52,8 +60,8 @@ jobs:
           t = open(p, encoding="utf-8").read()
           t = re.sub(r"filevers=\([^)]+\)", f"filevers=({tup})", t)
           t = re.sub(r"prodvers=\([^)]+\)", f"prodvers=({tup})", t)
-          t = re.sub(r"'FileVersion',\s*'[^']+'",    f"'FileVersion', '{dot4}'", t)
-          t = re.sub(r"'ProductVersion',\s*'[^']+'", f"'ProductVersion', '{dot4}'", t)
+          t = re.sub(r"'FileVersion',\s*'[^']+'" ,    f"'FileVersion', '{dot4}'", t)
+          t = re.sub(r"'ProductVersion',\s*'[^']+'" , f"'ProductVersion', '{dot4}'", t)
           open(p, "w", encoding="utf-8").write(t)
 
           # installer.iss
@@ -77,6 +85,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: "v${{ steps.ver.outputs.VERSION }}"
           files: dist/FarmaciaPOS.zip
           generate_release_notes: true
-          name: "FarmaciaPOS ${{ github.ref_name }}"
+          name: "FarmaciaPOS v${{ steps.ver.outputs.VERSION }}"

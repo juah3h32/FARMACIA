@@ -8,6 +8,23 @@ from app.api.routes.auth_routes import get_current_api_user
 import app.config as cfg
 
 
+def _fefo_reduce(db, producto_id: int, cantidad: int) -> None:
+    """Reduce lote quantities in FEFO order (earliest-expiry first). Used by physical adjustments."""
+    lotes = (
+        db.query(Lote)
+        .filter(Lote.producto_id == producto_id, Lote.cantidad > 0)
+        .order_by(Lote.fecha_vencimiento.is_(None), Lote.fecha_vencimiento.asc())
+        .all()
+    )
+    remaining = cantidad
+    for lote in lotes:
+        if remaining <= 0:
+            break
+        consume = min(lote.cantidad, remaining)
+        lote.cantidad -= consume
+        remaining -= consume
+
+
 def _require_admin(payload: dict):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
@@ -365,6 +382,18 @@ def ajuste_fisico(body: AjusteFisicoIn, bg: BackgroundTasks, payload: dict = Dep
 
         stock_ant = prod.stock
         prod.stock = body.stock_fisico
+
+        if diferencia < 0:
+            # Stock decreased: consume lotes in FEFO order to keep lote totals consistent
+            _fefo_reduce(db, prod.id, abs(diferencia))
+        else:
+            # Stock increased: create an adjustment lote entry (no expiry date)
+            db.add(Lote(
+                producto_id=prod.id,
+                numero_lote=f"AJUSTE-{datetime.now().strftime('%Y%m%d')}",
+                cantidad=diferencia,
+                precio_compra=0.0,
+            ))
 
         db.add(MovimientoStock(
             producto_id=prod.id,

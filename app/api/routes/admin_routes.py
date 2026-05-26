@@ -1,3 +1,4 @@
+import os
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -78,7 +79,7 @@ def install_update(payload: dict = Depends(get_current_api_user)):
             _update_state.update({"progress": 1.0, "done": True, "running": False})
             import time
             time.sleep(1.5)
-            sys.exit(0)
+            os._exit(0)  # sys.exit() only raises SystemExit in this thread; os._exit() kills the whole process
         else:
             _update_state.update({"error": err, "running": False})
 

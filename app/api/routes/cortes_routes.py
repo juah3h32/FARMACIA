@@ -118,7 +118,7 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
         tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
         tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-        tv = ef + tj + tr
+        tv = sum(v.total for v in ventas)  # includes mixto and any future payment types
 
         c.monto_cierre       = body.monto_cierre
         c.cerrado_en         = datetime.now()

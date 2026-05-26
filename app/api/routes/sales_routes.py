@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from datetime import date, datetime
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta
 from app.api.routes.auth_routes import get_current_api_user
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -59,7 +59,7 @@ def resumen_ventas(
         ventas = db.query(Venta).filter(
             Venta.creado_en >= inicio,
             Venta.creado_en <= fin,
-            Venta.estado == "completada",
+            Venta.estado == EstadoVenta.completada,
         ).all()
 
         total = sum(v.total for v in ventas)

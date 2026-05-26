@@ -68,7 +68,8 @@ def listar_productos(
             q = q.filter(
                 Producto.nombre.ilike(f"%{busqueda}%") |
                 Producto.codigo_barras.ilike(f"%{busqueda}%") |
-                Producto.nombre_generico.ilike(f"%{busqueda}%")
+                Producto.nombre_generico.ilike(f"%{busqueda}%") |
+                Producto.marca.ilike(f"%{busqueda}%")
             )
         if categoria_id:
             q = q.filter(Producto.categoria_id == categoria_id)
@@ -135,7 +136,18 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
-        for k, v in body.model_dump().items():
+        # Check barcode uniqueness against other active products
+        if body.codigo_barras:
+            conflict = db.query(Producto).filter(
+                Producto.codigo_barras == body.codigo_barras,
+                Producto.id != producto_id,
+                Producto.activo == True,
+            ).first()
+            if conflict:
+                raise HTTPException(status_code=400, detail=f"Código de barras ya en uso por '{conflict.nombre}'")
+        update_data = body.model_dump()
+        update_data.pop("stock", None)  # stock is managed via lotes/entradas, never via product edit
+        for k, v in update_data.items():
             setattr(p, k, v)
         db.commit()
         db.refresh(p)
