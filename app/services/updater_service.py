@@ -108,6 +108,7 @@ def _do_check() -> None:
 
 def download_and_install(progress_callback=None) -> tuple[bool, str]:
     st = get_status()
+    # Prefer browser_download_url (public, no auth); fall back to API asset URL
     url = st.get("url")
     if not url:
         return False, "No se encontró archivo de descarga en el release"
@@ -117,13 +118,13 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     extract_dir = tmp / "FarmaciaPOS_update_extracted"
     install_dir = Path(sys.executable).parent
 
+    # ── Download ──────────────────────────────────────────────────────────────
     try:
-        # For private repo assets, use API URL with Accept: octet-stream + auth
-        asset_api_url = st.get("asset_api_url")
-        download_url = asset_api_url if asset_api_url else url
-        dl_headers = _auth_headers()
-        dl_headers["Accept"] = "application/octet-stream"
-        req = urllib.request.Request(download_url, headers=dl_headers)
+        dl_headers = {"User-Agent": "FarmaciaPOS-Updater/1.0",
+                      "Accept": "application/octet-stream"}
+        if getattr(cfg, "GITHUB_TOKEN", ""):
+            dl_headers["Authorization"] = f"Bearer {cfg.GITHUB_TOKEN}"
+        req = urllib.request.Request(url, headers=dl_headers)
         with urllib.request.urlopen(req, timeout=300) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
             downloaded = 0
@@ -139,6 +140,7 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Error de descarga: {e}"
 
+    # ── Extract ───────────────────────────────────────────────────────────────
     try:
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
@@ -152,36 +154,57 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     contents = list(extract_dir.iterdir())
     source_dir = contents[0] if len(contents) == 1 and contents[0].is_dir() else extract_dir
 
-    ps_path = tmp / "farmacia_updater.ps1"
+    # ── Build self-elevating PowerShell updater ───────────────────────────────
+    # PS single-quoted strings: escape ' as ''
     src = str(source_dir).replace("'", "''")
     dst = str(install_dir).replace("'", "''")
     exe = str(install_dir / "FarmaciaPOS.exe").replace("'", "''")
     zp  = str(zip_path).replace("'", "''")
     xd  = str(extract_dir).replace("'", "''")
 
-    ps_path.write_text(
-        f"Start-Sleep -Seconds 2\n"
+    ps_script = (
+        "param()\n"
+        # Self-elevate: if not admin, relaunch as admin and exit
+        "if (-not ([Security.Principal.WindowsPrincipal]"
+        "[Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole("
+        "[Security.Principal.WindowsBuiltInRole]::Administrator)) {\n"
+        "    Start-Process PowerShell -Verb RunAs"
+        " -ArgumentList \"-NonInteractive -WindowStyle Hidden -File `\"$PSCommandPath`\"\""
+        " -Wait\n"
+        "    exit\n"
+        "}\n\n"
         f"$src = '{src}'\n"
         f"$dst = '{dst}'\n"
-        f"$exe = '{exe}'\n"
-        f"try {{\n"
-        f"    Copy-Item -Path \"$src\\*\" -Destination $dst -Recurse -Force -ErrorAction Stop\n"
-        f"    Start-Process -FilePath $exe\n"
-        f"}} catch {{\n"
-        f"    $cmd = \"Copy-Item -Path '$src\\*' -Destination '$dst' -Recurse -Force;"
-        f" Start-Process -FilePath '$exe'\"\n"
-        f"    Start-Process powershell -Verb RunAs"
-        f" -ArgumentList \"-NonInteractive -Command `\"$cmd`\"\" -Wait\n"
-        f"}}\n"
+        f"$exe = '{exe}'\n\n"
+        # Wait for the app process to fully exit (max 30 s)
+        "$deadline = (Get-Date).AddSeconds(30)\n"
+        "while ((Get-Process -Name 'FarmaciaPOS' -ErrorAction SilentlyContinue)"
+        " -and (Get-Date) -lt $deadline) {\n"
+        "    Start-Sleep -Milliseconds 500\n"
+        "}\n"
+        "Start-Sleep -Seconds 1\n\n"
+        # Copy new files over existing install
+        "Copy-Item -Path \"$src\\*\" -Destination \"$dst\" -Recurse -Force\n\n"
+        # Restart updated app
+        "Start-Process -FilePath \"$exe\"\n\n"
+        # Cleanup
         f"Remove-Item -Path '{zp}' -Force -ErrorAction SilentlyContinue\n"
         f"Remove-Item -Path '{xd}' -Recurse -Force -ErrorAction SilentlyContinue\n"
-        f"Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue\n",
-        encoding="utf-8",
+        "Start-Sleep -Milliseconds 500\n"
+        "Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue\n"
     )
 
+    ps_path = tmp / "farmacia_updater.ps1"
+    # UTF-8 with BOM so PowerShell 5.1 reads it correctly
+    ps_path.write_text(ps_script, encoding="utf-8-sig")
+
+    # CREATE_BREAKAWAY_FROM_JOB ensures PS survives when the Python process exits
+    flags = (subprocess.DETACHED_PROCESS
+             | subprocess.CREATE_NO_WINDOW
+             | subprocess.CREATE_BREAKAWAY_FROM_JOB)
     subprocess.Popen(
         ["powershell", "-NonInteractive", "-WindowStyle", "Hidden", "-File", str(ps_path)],
-        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
+        creationflags=flags,
         close_fds=True,
     )
 

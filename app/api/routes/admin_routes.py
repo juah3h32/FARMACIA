@@ -91,6 +91,14 @@ def update_progress(payload: dict = Depends(get_current_api_user)):
     return dict(_update_state)
 
 
+@router.post("/purgar-datos")
+def purgar_datos(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.sync_service import purgar_todos_los_datos
+    purgar_todos_los_datos()
+    return {"ok": True}
+
+
 @router.get("/endpoints")
 def list_endpoints(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)

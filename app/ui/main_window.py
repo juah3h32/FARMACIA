@@ -648,12 +648,34 @@ class MainWindow(ctk.CTkToplevel):
                 border_width=0, text_color="white",
                 font=ctk.CTkFont(size=11, weight="bold"),
             ))
+            if getattr(sys, "frozen", False):
+                self.after(0, self._auto_install_update)
+
+    def _auto_install_update(self):
+        """Descarga e instala la actualización sin intervención del usuario."""
+        st = updater_service.get_status()
+        if not st.get("available"):
+            return
+        version = st.get("version", "")
+        toast.show(f"Descargando actualización v{version}…", kind="warning", duration=60000)
+
+        def _do():
+            ok, err = updater_service.download_and_install()
+            if ok:
+                self.after(0, self._on_close)
+            else:
+                self.after(0, lambda: toast.show(
+                    f"Error al actualizar: {err}", kind="error", duration=6000))
+
+        threading.Thread(target=_do, daemon=True, name="AutoUpdater").start()
 
     def _show_update_dialog(self):
-        available, version, url = updater_service.get_status()
+        st = updater_service.get_status()
+        available = st.get("available")
+        version = st.get("version")
 
         # Si aún no se chequeó → checar ahora y mostrar "buscando"
-        if available is None:
+        if not st.get("checked"):
             self._update_btn.configure(state="disabled", text="Buscando...")
             def _recheck():
                 updater_service.check_for_update_async(self._on_recheck_done)

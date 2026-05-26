@@ -212,7 +212,145 @@ class SettingsScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=11), text_color="gray60").pack(
             padx=16, pady=(0, 12), anchor="w")
 
+        # ── Zona de Peligro (solo admin) ──────────────────────────────────────
+        from app.database.models import RolUsuario
+        if self.user.rol == RolUsuario.admin:
+            self._seccion(scroll, "⚠️ Zona de Peligro", row=11)
+            danger_frame = ctk.CTkFrame(
+                scroll, corner_radius=10,
+                fg_color=("#fff", "#2b2b2b"),
+                border_width=2, border_color="#EF4444",
+            )
+            danger_frame.grid(row=12, column=0, sticky="ew", pady=(0, 16))
+
+            # ── Botón 1: ventas + historial + cierres ─────────────────────────
+            ctk.CTkLabel(
+                danger_frame, text="Eliminar ventas, historial y cierres de caja",
+                font=ctk.CTkFont(size=13, weight="bold"), text_color="#EF4444",
+            ).pack(anchor="w", padx=16, pady=(14, 2))
+            ctk.CTkLabel(
+                danger_frame,
+                text="Borra ventas, movimientos de stock, auditoría y cortes de caja.\n"
+                     "Conserva productos, clientes, proveedores y categorías.",
+                font=ctk.CTkFont(size=11), text_color="gray60", justify="left",
+            ).pack(anchor="w", padx=16, pady=(0, 6))
+            ctk.CTkButton(
+                danger_frame, text="🗑  Eliminar ventas / historial / cierres",
+                height=34, fg_color="#F97316", hover_color="#C2410C", text_color="white",
+                command=lambda: self._dlg_pin(
+                    "Eliminar ventas, historial y cierres",
+                    "Se eliminarán ventas, movimientos, auditoría\ny cortes de caja (local + Turso).",
+                    self._ejecutar_purgar_ventas,
+                ),
+            ).pack(padx=16, pady=(0, 14), anchor="w")
+
+            # Separador
+            ctk.CTkFrame(danger_frame, height=1, fg_color="#EF4444").pack(fill="x", padx=16)
+
+            # ── Botón 2: borrar TODO ───────────────────────────────────────────
+            ctk.CTkLabel(
+                danger_frame, text="Eliminar TODOS los registros",
+                font=ctk.CTkFont(size=13, weight="bold"), text_color="#EF4444",
+            ).pack(anchor="w", padx=16, pady=(14, 2))
+            ctk.CTkLabel(
+                danger_frame,
+                text="Borra absolutamente todo: ventas, productos, clientes, proveedores,\n"
+                     "categorías, compras, movimientos, cortes y auditoría.\n"
+                     "Se conservan únicamente los usuarios. Local + Turso. IRREVERSIBLE.",
+                font=ctk.CTkFont(size=11), text_color="gray60", justify="left",
+            ).pack(anchor="w", padx=16, pady=(0, 6))
+            ctk.CTkButton(
+                danger_frame, text="💀  Eliminar TODO sin dejar nada",
+                height=34, fg_color="#EF4444", hover_color="#7F1D1D", text_color="white",
+                command=lambda: self._dlg_pin(
+                    "Eliminar TODOS los registros",
+                    "Se eliminará todo excepto usuarios.\nEsta acción es IRREVERSIBLE.",
+                    self._ejecutar_purgar_todo,
+                ),
+            ).pack(padx=16, pady=(0, 16), anchor="w")
+
         self._cargar_config()
+
+    _PIN_ADMIN = "171215"
+
+    def _dlg_pin(self, titulo: str, descripcion: str, on_confirm):
+        """Diálogo de confirmación con PIN de administrador."""
+        dlg = ctk.CTkToplevel(self)
+        dlg.title(f"⚠️ {titulo}")
+        dlg.geometry("420x280")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - 420) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 280) // 2
+        dlg.geometry(f"420x280+{x}+{y}")
+
+        ctk.CTkLabel(dlg, text=f"⚠️  {titulo}",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#EF4444", wraplength=380).pack(pady=(20, 6))
+        ctk.CTkLabel(dlg, text=descripcion,
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     wraplength=380, justify="center").pack(pady=(0, 12))
+        ctk.CTkLabel(dlg, text="Ingresa el PIN de administrador:",
+                     font=ctk.CTkFont(size=12)).pack(pady=(0, 4))
+
+        entry = ctk.CTkEntry(dlg, width=160, height=36, justify="center", show="●")
+        entry.pack(pady=(0, 4))
+        entry.focus()
+
+        lbl_err = ctk.CTkLabel(dlg, text="", text_color="#EF4444",
+                               font=ctk.CTkFont(size=11))
+        lbl_err.pack(pady=(0, 8))
+
+        def _ok(event=None):
+            if entry.get().strip() != self._PIN_ADMIN:
+                lbl_err.configure(text="PIN incorrecto")
+                entry.delete(0, "end")
+                return
+            dlg.destroy()
+            on_confirm()
+
+        entry.bind("<Return>", _ok)
+        ctk.CTkButton(dlg, text="Confirmar", height=34,
+                      fg_color="#EF4444", hover_color="#B91C1C", text_color="white",
+                      command=_ok).pack(pady=(0, 6))
+        ctk.CTkButton(dlg, text="Cancelar", height=32,
+                      fg_color="transparent", border_width=1, border_color="#ccc",
+                      command=dlg.destroy).pack()
+
+    def _ejecutar_purgar_ventas(self):
+        import threading
+        from app.database.sync_service import purgar_ventas_historial_cierres
+        from app.ui import toast
+
+        def _run():
+            try:
+                purgar_ventas_historial_cierres()
+                self.after(0, lambda: toast.show(
+                    "Ventas, historial y cierres eliminados", kind="success", duration=5000))
+            except Exception as exc:
+                self.after(0, lambda e=exc: toast.show(
+                    f"Error: {e}", kind="error", duration=7000))
+
+        toast.show("Eliminando ventas, historial y cierres…", kind="warning", duration=15000)
+        threading.Thread(target=_run, daemon=True, name="PurgarVentas").start()
+
+    def _ejecutar_purgar_todo(self):
+        import threading
+        from app.database.sync_service import purgar_todos_los_datos
+        from app.ui import toast
+
+        def _run():
+            try:
+                purgar_todos_los_datos()
+                self.after(0, lambda: toast.show(
+                    "Todos los registros eliminados", kind="success", duration=5000))
+            except Exception as exc:
+                self.after(0, lambda e=exc: toast.show(
+                    f"Error: {e}", kind="error", duration=7000))
+
+        toast.show("Eliminando todos los registros…", kind="warning", duration=15000)
+        threading.Thread(target=_run, daemon=True, name="PurgarTodo").start()
 
     def _seccion(self, parent, titulo: str, row: int):
         ctk.CTkLabel(parent, text=titulo, font=ctk.CTkFont(size=14, weight="bold")).grid(

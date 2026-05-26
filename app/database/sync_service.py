@@ -120,6 +120,51 @@ def _turso_read_table(table: str) -> tuple[list[str], list[tuple]]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+# Reverse FK order for safe deletion (children before parents)
+_PURGE_ORDER = [
+    "auditoria_log", "movimientos_stock", "cortes_caja",
+    "items_compra", "compras",
+    "items_venta", "ventas",
+    "lotes", "productos",
+    "clientes", "proveedores", "categorias",
+]
+
+
+# Tables for partial purge: ventas + historial + cierres (keeps products/clients/etc.)
+_PURGE_VENTAS = [
+    "auditoria_log", "movimientos_stock", "cortes_caja",
+    "items_venta", "ventas",
+]
+
+
+def _purge_tables(tables: list[str]) -> None:
+    lconn = _local_conn()
+    try:
+        lconn.execute("PRAGMA foreign_keys = OFF")
+        for table in tables:
+            lconn.execute(f"DELETE FROM {table}")
+        lconn.execute("PRAGMA foreign_keys = ON")
+        lconn.commit()
+    finally:
+        lconn.close()
+
+    stmts = [{"sql": f"DELETE FROM {t}", "args": []} for t in tables]
+    try:
+        _turso_batch(stmts)
+    except Exception as e:
+        print(f"[Purge] Turso error: {e}")
+
+
+def purgar_ventas_historial_cierres() -> None:
+    """Delete ventas, movimientos, auditoría and cortes de caja. Keeps products/clients."""
+    _purge_tables(_PURGE_VENTAS)
+
+
+def purgar_todos_los_datos() -> None:
+    """Delete ALL business data (keeps usuarios + configuracion). Local + Turso."""
+    _purge_tables(_PURGE_ORDER)
+
+
 def import_from_turso() -> bool:
     """
     One-time import: copy all Turso data into local SQLite.
