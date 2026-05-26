@@ -1,6 +1,6 @@
 ﻿#define AppName      "Farmacia Eben-Ezer POS"
 #define AppPublisher "Farmacia Eben-Ezer"
-#define AppVersion   "1.2.6"
+#define AppVersion   "1.2.7"
 #define AppExeName   "FarmaciaPOS.exe"
 #define AppDesc      "Sistema POS para farmacia â€” gestiÃ³n de ventas, inventario, clientes y reportes"
 #define SourceDir    "dist\FarmaciaPOS"
