@@ -212,16 +212,60 @@ class SettingsScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=11), text_color="gray60").pack(
             padx=16, pady=(0, 12), anchor="w")
 
-        # ── Zona de Peligro (solo admin) ──────────────────────────────────────
+        # ── Base de Datos + Zona de Peligro (solo admin) ──────────────────────
         from app.database.models import RolUsuario
         if self.user.rol == RolUsuario.admin:
-            self._seccion(scroll, "⚠️ Zona de Peligro", row=11)
+            self._seccion(scroll, "🗄️ Base de Datos", row=11)
+            db_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+            db_frame.grid(row=12, column=0, sticky="ew", pady=(0, 16))
+
+            ctk.CTkLabel(db_frame, text="Registros en base de datos local:",
+                         font=ctk.CTkFont(size=12, weight="bold")).pack(
+                anchor="w", padx=16, pady=(12, 4))
+
+            counts_frame = ctk.CTkFrame(db_frame, fg_color=("#f5f5f5", "#3b3b3b"), corner_radius=6)
+            counts_frame.pack(fill="x", padx=16, pady=(0, 8))
+            counts_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
+            _DISPLAY_TABLES = [
+                ("productos",   "Productos"),   ("lotes",      "Lotes"),
+                ("ventas",      "Ventas"),       ("items_venta","Items venta"),
+                ("compras",     "Compras"),      ("clientes",   "Clientes"),
+                ("proveedores", "Proveedores"),  ("categorias", "Categorías"),
+                ("cortes_caja", "Cortes caja"),  ("usuarios",   "Usuarios"),
+            ]
+            self._db_count_labels: dict[str, ctk.CTkLabel] = {}
+            for idx, (tbl, display) in enumerate(_DISPLAY_TABLES):
+                col = (idx % 2) * 2
+                row_n = idx // 2
+                ctk.CTkLabel(counts_frame, text=f"{display}:", anchor="e",
+                             font=ctk.CTkFont(size=11), text_color="gray60").grid(
+                    row=row_n, column=col, padx=(10, 4), pady=3, sticky="e")
+                lbl = ctk.CTkLabel(counts_frame, text="—", anchor="w",
+                                   font=ctk.CTkFont(size=11, weight="bold"))
+                lbl.grid(row=row_n, column=col + 1, padx=(0, 16), pady=3, sticky="w")
+                self._db_count_labels[tbl] = lbl
+
+            sync_row = ctk.CTkFrame(db_frame, fg_color="transparent")
+            sync_row.pack(fill="x", padx=16, pady=(4, 12))
+            self.lbl_sync_status = ctk.CTkLabel(
+                sync_row, text="", font=ctk.CTkFont(size=11), text_color="gray60")
+            self.lbl_sync_status.pack(side="right", padx=(8, 0))
+            ctk.CTkButton(
+                sync_row, text="☁  Sincronizar con Turso ahora", height=34,
+                fg_color="#2196F3", hover_color="#1565C0",
+                command=self._ejecutar_sync,
+            ).pack(side="left")
+
+            self._cargar_db_stats()
+
+            self._seccion(scroll, "⚠️ Zona de Peligro", row=13)
             danger_frame = ctk.CTkFrame(
                 scroll, corner_radius=10,
                 fg_color=("#fff", "#2b2b2b"),
                 border_width=2, border_color="#EF4444",
             )
-            danger_frame.grid(row=12, column=0, sticky="ew", pady=(0, 16))
+            danger_frame.grid(row=14, column=0, sticky="ew", pady=(0, 16))
 
             # ── Botón 1: ventas + historial + cierres ─────────────────────────
             ctk.CTkLabel(
@@ -317,6 +361,49 @@ class SettingsScreen(ctk.CTkFrame):
         ctk.CTkButton(dlg, text="Cancelar", height=32,
                       fg_color="transparent", border_width=1, border_color="#ccc",
                       command=dlg.destroy).pack()
+
+    def _cargar_db_stats(self):
+        import threading
+        from app.database.sync_service import get_db_stats
+
+        def _run():
+            try:
+                stats = get_db_stats()
+                def _apply():
+                    for tbl, lbl in self._db_count_labels.items():
+                        n = stats.get(tbl, -1)
+                        lbl.configure(text=str(n) if n >= 0 else "?")
+                self.after(0, _apply)
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True, name="DBStats").start()
+
+    def _ejecutar_sync(self):
+        import threading
+        from app.database.sync_service import force_sync
+        from app.ui import toast
+
+        def _run():
+            try:
+                self.after(0, lambda: self.lbl_sync_status.configure(
+                    text="Sincronizando…", text_color="#FF9800"))
+                stats = force_sync()
+                def _done():
+                    for tbl, lbl in self._db_count_labels.items():
+                        n = stats.get(tbl, -1)
+                        lbl.configure(text=str(n) if n >= 0 else "?")
+                    self.lbl_sync_status.configure(
+                        text="Sincronización completa", text_color="#4CAF50")
+                    toast.show("Sincronización con Turso completa", kind="success", duration=4000)
+                self.after(0, _done)
+            except Exception as exc:
+                self.after(0, lambda e=exc: (
+                    self.lbl_sync_status.configure(text=f"Error: {e}", text_color="#EF4444"),
+                    toast.show(f"Error de sync: {e}", kind="error", duration=7000),
+                ))
+
+        threading.Thread(target=_run, daemon=True, name="ForceSync").start()
 
     def _ejecutar_purgar_ventas(self):
         import threading
@@ -660,3 +747,5 @@ class SettingsScreen(ctk.CTkFrame):
 
     def on_show(self):
         self._cargar_config()
+        if hasattr(self, "_db_count_labels"):
+            self._cargar_db_stats()

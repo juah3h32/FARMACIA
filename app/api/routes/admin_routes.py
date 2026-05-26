@@ -99,6 +99,21 @@ def purgar_datos(payload: dict = Depends(get_current_api_user)):
     return {"ok": True}
 
 
+@router.get("/db-stats")
+def db_stats(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.sync_service import get_db_stats
+    return get_db_stats()
+
+
+@router.post("/db-sync")
+def db_sync(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.sync_service import force_sync
+    stats = force_sync()
+    return {"ok": True, "stats": stats}
+
+
 @router.get("/endpoints")
 def list_endpoints(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
@@ -121,4 +136,6 @@ def list_endpoints(payload: dict = Depends(get_current_api_user)):
         {"method": "POST", "path": "/api/empleados/",        "desc": "Crear empleado (admin)"},
         {"method": "GET",  "path": "/api/dashboard/stats",   "desc": "Estadísticas del dashboard"},
         {"method": "POST", "path": "/api/admin/generate-token","desc": "Generar token API (admin)"},
+        {"method": "GET",  "path": "/api/admin/db-stats",      "desc": "Conteo de filas por tabla (admin)"},
+        {"method": "POST", "path": "/api/admin/db-sync",       "desc": "Forzar sync local → Turso (admin)"},
     ]

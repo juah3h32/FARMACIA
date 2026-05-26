@@ -652,34 +652,104 @@ class MainWindow(ctk.CTkToplevel):
                 self.after(0, self._auto_install_update)
 
     def _auto_install_update(self):
-        """Descarga e instala la actualización sin intervención del usuario."""
         st = updater_service.get_status()
         if not st.get("available"):
             return
-        version = st.get("version", "")
-        toast.show(f"Descargando actualización v{version}…", kind="warning", duration=60000)
+        self._show_update_card(st.get("version", ""))
+
+    # ── Floating update progress card ─────────────────────────────────────────
+
+    def _show_update_card(self, version: str):
+        """Dark floating card bottom-right with download progress."""
+        CW, CH = 360, 130
+        self.update_idletasks()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        cx = sw - CW - 24
+        cy = sh - CH - 56   # above taskbar
+
+        card = ctk.CTkToplevel(self)
+        card.overrideredirect(True)
+        card.wm_attributes("-topmost", True)
+        card.geometry(f"{CW}x{CH}+{cx}+{cy}")
+        card.configure(fg_color="#0F172A")
+
+        inner = ctk.CTkFrame(card, fg_color="#1E293B", corner_radius=14,
+                             border_width=1, border_color="#334155")
+        inner.pack(fill="both", expand=True, padx=2, pady=2)
+
+        # Header row
+        hrow = ctk.CTkFrame(inner, fg_color="transparent")
+        hrow.pack(fill="x", padx=14, pady=(12, 4))
+
+        ctk.CTkLabel(hrow, text="⬆  Actualizando",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color="#F8FAFC").pack(side="left")
+        ctk.CTkLabel(hrow,
+                     text=f"v{cfg.VERSION} → v{version}" if version else "",
+                     font=ctk.CTkFont(size=11),
+                     text_color="#64748B").pack(side="right")
+
+        # Progress bar
+        prog = ctk.CTkProgressBar(inner, mode="determinate",
+                                  fg_color="#334155", progress_color="#3B82F6",
+                                  height=6, corner_radius=3)
+        prog.set(0)
+        prog.pack(fill="x", padx=14, pady=(0, 6))
+
+        lbl_status = ctk.CTkLabel(inner, text="Iniciando descarga…",
+                                  font=ctk.CTkFont(size=11),
+                                  text_color="#94A3B8", anchor="w")
+        lbl_status.pack(anchor="w", padx=14, pady=(0, 10))
+
+        def on_progress(pct):
+            def _upd():
+                prog.set(pct)
+                if pct < 0.85:
+                    lbl_status.configure(text=f"Descargando…  {pct*100:.0f}%")
+                elif pct < 0.92:
+                    lbl_status.configure(text="Extrayendo archivos…")
+                elif pct < 1.0:
+                    lbl_status.configure(text="Preparando instalación…")
+                else:
+                    lbl_status.configure(
+                        text="Instalando — cerrando app en un momento…",
+                        text_color="#22C55E")
+            self.after(0, _upd)
 
         def _do():
-            ok, err = updater_service.download_and_install()
+            ok, err = updater_service.download_and_install(on_progress)
             if ok:
-                self.after(0, self._on_close)
+                self.after(1500, self._on_close)
             else:
-                self.after(0, lambda: toast.show(
-                    f"Error al actualizar: {err}", kind="error", duration=6000))
+                def _show_err():
+                    prog.configure(progress_color="#EF4444")
+                    lbl_status.configure(
+                        text=f"Error: {err}", text_color="#EF4444")
+                    ctk.CTkButton(
+                        inner, text="Cerrar", height=26,
+                        fg_color="transparent", border_width=1,
+                        border_color="#475569", text_color="#94A3B8",
+                        corner_radius=6,
+                        command=card.destroy,
+                    ).pack(padx=14, pady=(0, 10), fill="x")
+                self.after(0, _show_err)
 
         threading.Thread(target=_do, daemon=True, name="AutoUpdater").start()
+        return card
 
     def _show_update_dialog(self):
         st = updater_service.get_status()
         available = st.get("available")
         version = st.get("version")
 
-        # Si aún no se chequeó → checar ahora y mostrar "buscando"
+        # Si aún no se chequeó → checar ahora
         if not st.get("checked"):
             self._update_btn.configure(state="disabled", text="Buscando...")
-            def _recheck():
-                updater_service.check_for_update_async(self._on_recheck_done)
-            threading.Thread(target=_recheck, daemon=True).start()
+            threading.Thread(
+                target=lambda: updater_service.check_for_update_async(self._on_recheck_done),
+                daemon=True,
+            ).start()
             return
 
         # Sin update disponible
@@ -703,81 +773,52 @@ class MainWindow(ctk.CTkToplevel):
                           command=dlg.destroy).pack(pady=16)
             return
 
-        # Update disponible → diálogo de descarga
+        # Update disponible → confirm dialog then launch card
         dlg = ctk.CTkToplevel(self)
         dlg.title("Actualización disponible")
-        dlg.geometry("420x290")
+        dlg.geometry("420x220")
         dlg.resizable(False, False)
         dlg.grab_set()
         dlg.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - 420) // 2
-        y = self.winfo_y() + (self.winfo_height() - 290) // 2
-        dlg.geometry(f"420x290+{x}+{y}")
+        y = self.winfo_y() + (self.winfo_height() - 220) // 2
+        dlg.geometry(f"420x220+{x}+{y}")
 
         ctk.CTkLabel(dlg, text="⬆  Nueva versión disponible",
                      font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=TEXT).pack(pady=(28, 4))
         ctk.CTkLabel(dlg, text=f"v{cfg.VERSION}  →  v{version}",
-                     font=ctk.CTkFont(size=13), text_color=MUTED).pack(pady=(0, 18))
+                     font=ctk.CTkFont(size=13), text_color=MUTED).pack(pady=(0, 6))
 
-        lbl_status = ctk.CTkLabel(dlg, text="",
-                                  font=ctk.CTkFont(size=11), text_color=MUTED)
-        lbl_status.pack(pady=(0, 2))
-
-        prog = ctk.CTkProgressBar(dlg, width=360, mode="determinate")
-        prog.set(0)
+        lbl_dev = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(size=11))
+        lbl_dev.pack()
+        if not getattr(sys, "frozen", False):
+            lbl_dev.configure(
+                text="Modo desarrollo: solo funciona en EXE instalado",
+                text_color="#F59E0B")
 
         btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
-        btn_frame.pack(pady=10)
+        btn_frame.pack(pady=18)
 
-        btn_cancel = ctk.CTkButton(
+        ctk.CTkButton(
             btn_frame, text="Cancelar",
             width=120, height=34, corner_radius=8,
             fg_color="transparent", border_width=1,
             border_color=BORDER, text_color=MUTED,
             hover_color="#FEE2E2", command=dlg.destroy,
-        )
-        btn_cancel.pack(side="left", padx=8)
+        ).pack(side="left", padx=8)
 
-        btn_install = ctk.CTkButton(
-            btn_frame, text="Descargar e instalar",
-            width=170, height=34, corner_radius=8,
-            fg_color=BLUE, text_color="white", hover_color="#1D4ED8",
-            command=lambda: _start_download(),
-        )
-        btn_install.pack(side="left", padx=8)
-
-        if not getattr(sys, "frozen", False):
-            lbl_status.configure(
-                text="Modo desarrollo: solo funciona en EXE instalado",
-                text_color="#F59E0B")
-            btn_install.configure(state="disabled")
-
-        def _start_download():
-            btn_install.configure(state="disabled")
-            btn_cancel.configure(state="disabled")
-            prog.pack(pady=(4, 0))
-            lbl_status.configure(text="Descargando...", text_color=MUTED)
-
-            def on_progress(pct):
-                self.after(0, lambda p=pct: prog.set(p))
-                self.after(0, lambda p=pct: lbl_status.configure(
-                    text=f"Descargando... {p*100:.0f}%"))
-
-            def do_install():
-                ok, err = updater_service.download_and_install(on_progress)
-                if ok:
-                    self.after(0, _finish)
-                else:
-                    self.after(0, lambda: lbl_status.configure(
-                        text=f"Error: {err}", text_color="#EF4444"))
-                    self.after(0, lambda: btn_cancel.configure(state="normal"))
-
-            threading.Thread(target=do_install, daemon=True).start()
-
-        def _finish():
+        def _start():
             dlg.destroy()
-            self._on_close()
+            self._show_update_card(version or "")
+
+        ctk.CTkButton(
+            btn_frame, text="Descargar e instalar",
+            width=180, height=34, corner_radius=8,
+            fg_color=BLUE, text_color="white", hover_color="#1D4ED8",
+            state="normal" if getattr(sys, "frozen", False) else "disabled",
+            command=_start,
+        ).pack(side="left", padx=8)
 
     def _on_recheck_done(self, available: bool, version: str):
         self.after(0, lambda: self._update_btn.configure(state="normal"))

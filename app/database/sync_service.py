@@ -217,7 +217,7 @@ def import_from_turso() -> bool:
 def sync_to_turso() -> None:
     """
     Push local SQLite data to Turso via batched HTTP pipeline.
-    Mutable tables: full INSERT OR REPLACE.
+    FULL_SYNC tables: upsert all rows + delete from Turso any IDs missing in local.
     Append-only tables: only rows with id > last watermark.
     """
     with _lock:
@@ -228,6 +228,30 @@ def sync_to_turso() -> None:
                 try:
                     if table in _FULL_SYNC:
                         rows = lconn.execute(f"SELECT * FROM {table}").fetchall()
+                        stmts: list[dict] = []
+
+                        if not rows:
+                            # Local table is empty — clear Turso too
+                            stmts.append({"sql": f"DELETE FROM {table}", "args": []})
+                        else:
+                            cols    = list(rows[0].keys())
+                            col_str = ", ".join(cols)
+                            ph_str  = ", ".join(["?" for _ in cols])
+                            upsert  = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+
+                            # Delete from Turso any IDs no longer in local
+                            ids_str = ", ".join(str(r["id"]) for r in rows)
+                            stmts.append({
+                                "sql": f"DELETE FROM {table} WHERE id NOT IN ({ids_str})",
+                                "args": [],
+                            })
+                            for row in rows:
+                                stmts.append({"sql": upsert,
+                                              "args": [_py_to_turso(v) for v in tuple(row)]})
+                            synced += len(rows)
+
+                        _turso_batch(stmts)
+
                     else:
                         last_id = _watermarks.get(table, 0)
                         rows = lconn.execute(
@@ -235,24 +259,19 @@ def sync_to_turso() -> None:
                             (last_id,),
                         ).fetchall()
 
-                    if not rows:
-                        continue
+                        if not rows:
+                            continue
 
-                    cols    = list(rows[0].keys())
-                    col_str = ", ".join(cols)
-                    ph_str  = ", ".join(["?" for _ in cols])
-                    sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
-
-                    stmts = [
-                        {"sql": sql, "args": [_py_to_turso(v) for v in tuple(row)]}
-                        for row in rows
-                    ]
-                    _turso_batch(stmts)
-
-                    if table not in _FULL_SYNC:
+                        cols    = list(rows[0].keys())
+                        col_str = ", ".join(cols)
+                        ph_str  = ", ".join(["?" for _ in cols])
+                        sql     = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+                        stmts   = [{"sql": sql, "args": [_py_to_turso(v) for v in tuple(row)]}
+                                   for row in rows]
+                        _turso_batch(stmts)
                         _watermarks[table] = max(row["id"] for row in rows)
+                        synced += len(rows)
 
-                    synced += len(rows)
                 except Exception as e:
                     print(f"[Sync] Warning — {table}: {e}")
 
@@ -260,6 +279,28 @@ def sync_to_turso() -> None:
                 print(f"[Sync] >> Turso: {synced} rows synced")
         finally:
             lconn.close()
+
+
+def force_sync() -> dict:
+    """Immediate sync local → Turso. Returns row counts per table."""
+    sync_to_turso()
+    return get_db_stats()
+
+
+def get_db_stats() -> dict:
+    """Row counts per table from local SQLite."""
+    lconn = _local_conn()
+    try:
+        stats = {}
+        for table in _TABLE_ORDER:
+            try:
+                n = lconn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                stats[table] = n
+            except Exception:
+                stats[table] = -1
+        return stats
+    finally:
+        lconn.close()
 
 
 def make_daily_backup() -> bool:
