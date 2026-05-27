@@ -314,6 +314,9 @@ class ProductoDialog(ctk.CTkToplevel):
         self.data = data or {}
         self.on_save = on_save
         self._build_ui()
+        # CTkToplevel fires internal after() callbacks that reset CTkEntry contents.
+        # Defer data population until after those callbacks complete.
+        self.after(50, self._populate_fields)
 
     def _build_ui(self):
         scroll = ctk.CTkScrollableFrame(self)
@@ -338,8 +341,6 @@ class ProductoDialog(ctk.CTkToplevel):
             )
             e = ctk.CTkEntry(scroll, height=34)
             e.grid(row=i, column=1, pady=5, sticky="ew")
-            if self.data.get(key) is not None:
-                e.insert(0, str(self.data[key]))
             self.entries[key] = e
 
         # Barcode auto-fill on Enter
@@ -361,29 +362,19 @@ class ProductoDialog(ctk.CTkToplevel):
         ctk.CTkLabel(scroll, text="Categoría:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
         self.opt_cat = ctk.CTkOptionMenu(scroll, values=cat_names if cat_names else ["Sin categorías"])
         self.opt_cat.grid(row=row, column=1, pady=5, sticky="ew")
-        if self.data.get("categoria_id"):
-            for name, cid in self._cat_map.items():
-                if cid == self.data["categoria_id"]:
-                    self.opt_cat.set(name)
-                    break
 
         row += 1
         ctk.CTkLabel(scroll, text="Proveedor:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
         self.opt_prov = ctk.CTkOptionMenu(scroll, values=prov_names if prov_names else ["Sin proveedores"])
         self.opt_prov.grid(row=row, column=1, pady=5, sticky="ew")
-        if self.data.get("proveedor_id"):
-            for name, pid in self._prov_map.items():
-                if pid == self.data["proveedor_id"]:
-                    self.opt_prov.set(name)
-                    break
 
         # Checkboxes
         row += 1
         checks_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         checks_frame.grid(row=row, column=0, columnspan=2, pady=8, sticky="w")
-        self.var_iva = tk.BooleanVar(value=self.data.get("aplica_iva", False))
-        self.var_receta = tk.BooleanVar(value=self.data.get("requiere_receta", False))
-        self.var_controlada = tk.BooleanVar(value=self.data.get("sustancia_controlada", False))
+        self.var_iva = tk.BooleanVar(value=False)
+        self.var_receta = tk.BooleanVar(value=False)
+        self.var_controlada = tk.BooleanVar(value=False)
         ctk.CTkCheckBox(checks_frame, text="Aplica IVA (16%)", variable=self.var_iva).pack(side="left", padx=8)
         ctk.CTkCheckBox(checks_frame, text="Requiere Receta", variable=self.var_receta).pack(side="left", padx=8)
         ctk.CTkCheckBox(checks_frame, text="Sust. Controlada", variable=self.var_controlada).pack(side="left", padx=8)
@@ -393,14 +384,40 @@ class ProductoDialog(ctk.CTkToplevel):
         ctk.CTkLabel(scroll, text="Descripción:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="ne")
         self.txt_desc = ctk.CTkTextbox(scroll, height=70)
         self.txt_desc.grid(row=row, column=1, pady=5, sticky="ew")
-        if self.data.get("descripcion"):
-            self.txt_desc.insert("1.0", self.data["descripcion"])
 
         # Boton guardar
         ctk.CTkButton(
             self, text="💾 Guardar", height=42, fg_color="#4CAF50", hover_color="#388E3C",
             command=self._guardar
         ).pack(fill="x", padx=16, pady=(0, 16))
+
+    def _populate_fields(self):
+        """Populate entry widgets with self.data AFTER CTkToplevel fully renders."""
+        for key, e in self.entries.items():
+            val = self.data.get(key)
+            if val is not None:
+                e.delete(0, "end")
+                e.insert(0, str(val))
+
+        if self.data.get("categoria_id"):
+            for name, cid in self._cat_map.items():
+                if cid == self.data["categoria_id"]:
+                    self.opt_cat.set(name)
+                    break
+
+        if self.data.get("proveedor_id"):
+            for name, pid in self._prov_map.items():
+                if pid == self.data["proveedor_id"]:
+                    self.opt_prov.set(name)
+                    break
+
+        self.var_iva.set(self.data.get("aplica_iva", False))
+        self.var_receta.set(self.data.get("requiere_receta", False))
+        self.var_controlada.set(self.data.get("sustancia_controlada", False))
+
+        if self.data.get("descripcion"):
+            self.txt_desc.delete("1.0", "end")
+            self.txt_desc.insert("1.0", self.data["descripcion"])
 
     def _guardar(self):
         nombre = self.entries["nombre"].get().strip()
