@@ -38,6 +38,8 @@ class ProductoResponse(BaseModel):
     nombre: str
     nombre_generico: Optional[str]
     marca: Optional[str]
+    categoria_id: Optional[int] = None
+    precio_compra: float = 0.0
     precio_venta: float
     stock: int
     stock_minimo: int
@@ -135,7 +137,7 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
-        for k, v in body.model_dump().items():
+        for k, v in body.model_dump(exclude={'stock'}).items():
             setattr(p, k, v)
         db.commit()
         db.refresh(p)

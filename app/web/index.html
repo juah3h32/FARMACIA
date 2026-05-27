@@ -2823,6 +2823,7 @@ async function openProductModal(id=null) {
       document.getElementById('pm-generico').value=p.nombre_generico||'';
       document.getElementById('pm-barcode').value=p.codigo_barras||'';
       document.getElementById('pm-marca').value=p.marca||'';
+      document.getElementById('pm-cat').value=p.categoria_id||'';
       document.getElementById('pm-pcompra').value=p.precio_compra||0;
       document.getElementById('pm-pventa').value=p.precio_venta||0;
       document.getElementById('pm-smin').value=p.stock_minimo||10;
