@@ -6,6 +6,16 @@ from app.database.models import Base, Categoria, Configuracion, Usuario, RolUsua
 import app.config as cfg
 
 
+def _on_local_commit(session):
+    """After any SQLAlchemy commit, signal the Turso sync thread to wake up."""
+    if cfg.TURSO_SYNC:
+        try:
+            from app.database.sync_service import mark_dirty
+            mark_dirty()
+        except Exception:
+            pass
+
+
 def _build_engine():
     if cfg.USE_TURSO:
         try:
@@ -43,6 +53,9 @@ def _build_engine():
 
 engine = _build_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Trigger Turso sync after every local write
+event.listen(SessionLocal, "after_commit", _on_local_commit)
 
 
 @contextmanager

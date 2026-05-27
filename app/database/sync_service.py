@@ -26,17 +26,22 @@ _TABLE_ORDER = [
 ]
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
-# lotes: cantidad cambia con cada venta/ajuste de stock
-# cortes_caja: monto_cierre/cerrado_en se llenan al cerrar turno (update, no insert)
+# ventas/compras: estado puede cambiar (completada→cancelada); watermark no capturaría eso
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
-    "productos", "lotes", "cortes_caja",
+    "productos", "lotes", "cortes_caja", "ventas", "compras",
 })
 
 # Watermark per table: last id synced to Turso (append-only tables only)
 _watermarks: dict[str, int] = {}
 
-_lock = threading.Lock()
+_lock  = threading.Lock()
+_dirty = threading.Event()   # set after any local write → immediate sync
+
+
+def mark_dirty() -> None:
+    """Call after any local SQLite write to trigger immediate Turso sync."""
+    _dirty.set()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -237,8 +242,9 @@ def sync_to_turso() -> None:
                         stmts: list[dict] = []
 
                         if not rows:
-                            # Local table is empty — clear Turso too
-                            stmts.append({"sql": f"DELETE FROM {table}", "args": []})
+                            # Skip — explicit purge functions handle clearing Turso.
+                            # Never auto-delete cloud data just because local is empty.
+                            continue
                         else:
                             cols    = list(rows[0].keys())
                             col_str = ", ".join(cols)
@@ -350,18 +356,24 @@ def make_daily_backup() -> bool:
 
 
 def start_background_sync(interval: int = 60) -> threading.Thread:
-    """Daemon thread: daily backup + sync local → Turso every `interval` seconds."""
+    """Daemon thread: daily backup + sync local → Turso.
+
+    Syncs immediately when mark_dirty() is called (after any local write),
+    or at most `interval` seconds after the last sync as a heartbeat.
+    """
     def _loop():
-        time.sleep(30)  # let app fully initialize first
+        time.sleep(10)   # let app fully initialize
         make_daily_backup()
         while True:
+            # Wake up when dirty (write happened) or after `interval` seconds
+            _dirty.wait(timeout=interval)
+            _dirty.clear()
             try:
                 sync_to_turso()
             except Exception as e:
                 print(f"[Sync] Background sync error: {e}")
-            time.sleep(interval)
 
     t = threading.Thread(target=_loop, daemon=True, name="TursoSync")
     t.start()
-    print(f"[Sync] Background sync started (every {interval}s)")
+    print(f"[Sync] Background sync started (immediate on write, heartbeat every {interval}s)")
     return t
