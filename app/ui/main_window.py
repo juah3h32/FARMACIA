@@ -652,31 +652,28 @@ class MainWindow(ctk.CTkToplevel):
                 border_width=0, text_color="white",
                 font=ctk.CTkFont(size=11, weight="bold"),
             ))
-            if getattr(sys, "frozen", False):
-                self.after(0, self._auto_install_update)
+            # Mostrar diálogo de confirmación (no auto-instalar silenciosamente)
+            self.after(1500, self._show_update_dialog)
 
-    def _auto_install_update(self):
-        st = updater_service.get_status()
-        if not st.get("available"):
-            return
-        self._show_update_card(st.get("version", ""))
-
-    # ── Floating update progress card ─────────────────────────────────────────
+    # ── Update progress card ──────────────────────────────────────────────────
 
     def _show_update_card(self, version: str):
-        """Dark floating card bottom-right with download progress."""
-        CW, CH = 360, 130
-        self.update_idletasks()
-        sw = self.winfo_screenwidth()
-        sh = self.winfo_screenheight()
-        cx = sw - CW - 24
-        cy = sh - CH - 56   # above taskbar
+        """Ventana de progreso de actualización — centrada, con barra de título."""
+        CW, CH = 400, 170
 
         card = ctk.CTkToplevel(self)
-        card.overrideredirect(True)
-        card.wm_attributes("-topmost", True)
-        card.geometry(f"{CW}x{CH}+{cx}+{cy}")
+        card.title("Actualizando FarmaciaPOS")
+        card.resizable(False, False)
+        # Centrar sobre la ventana principal
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width()  - CW) // 2
+        y = self.winfo_y() + (self.winfo_height() - CH) // 2
+        card.geometry(f"{CW}x{CH}+{x}+{y}")
         card.configure(fg_color="#0F172A")
+        try:
+            card.after(100, lambda: card.iconbitmap(str(cfg.ICON_PATH)))
+        except Exception:
+            pass
 
         inner = ctk.CTkFrame(card, fg_color="#1E293B", corner_radius=14,
                              border_width=1, border_color="#334155")
@@ -684,27 +681,40 @@ class MainWindow(ctk.CTkToplevel):
 
         # Header row
         hrow = ctk.CTkFrame(inner, fg_color="transparent")
-        hrow.pack(fill="x", padx=14, pady=(12, 4))
+        hrow.pack(fill="x", padx=14, pady=(14, 4))
 
         ctk.CTkLabel(hrow, text="⬆  Actualizando",
                      font=ctk.CTkFont(size=13, weight="bold"),
                      text_color="#F8FAFC").pack(side="left")
         ctk.CTkLabel(hrow,
-                     text=f"v{cfg.VERSION} → v{version}" if version else "",
+                     text=f"v{cfg.VERSION}  →  v{version}" if version else "",
                      font=ctk.CTkFont(size=11),
                      text_color="#64748B").pack(side="right")
 
         # Progress bar
         prog = ctk.CTkProgressBar(inner, mode="determinate",
                                   fg_color="#334155", progress_color="#3B82F6",
-                                  height=6, corner_radius=3)
+                                  height=8, corner_radius=4)
         prog.set(0)
-        prog.pack(fill="x", padx=14, pady=(0, 6))
+        prog.pack(fill="x", padx=14, pady=(8, 4))
 
         lbl_status = ctk.CTkLabel(inner, text="Iniciando descarga…",
                                   font=ctk.CTkFont(size=11),
                                   text_color="#94A3B8", anchor="w")
-        lbl_status.pack(anchor="w", padx=14, pady=(0, 10))
+        lbl_status.pack(anchor="w", padx=14, pady=(0, 14))
+
+        def _card_alive() -> bool:
+            try:
+                return bool(card.winfo_exists())
+            except Exception:
+                return False
+
+        def _safe(fn):
+            if _card_alive():
+                try:
+                    fn()
+                except Exception:
+                    pass
 
         def on_progress(pct):
             def _upd():
@@ -717,21 +727,24 @@ class MainWindow(ctk.CTkToplevel):
                     lbl_status.configure(text="Preparando instalación…")
                 else:
                     lbl_status.configure(
-                        text="Instalando — cerrando app en un momento…",
+                        text="Instalando — la app se cerrará en un momento…",
                         text_color="#22C55E")
-            self.after(0, _upd)
+            self.after(0, lambda: _safe(_upd))
 
         def _do():
             ok, err = updater_service.download_and_install(on_progress)
             if ok:
-                self.after(1500, self._on_close)
+                # Dar tiempo al instalador de iniciar antes de que cerremos
+                self.after(2500, self._on_close)
             else:
                 def _show_err():
+                    if not _card_alive():
+                        return
                     prog.configure(progress_color="#EF4444")
                     lbl_status.configure(
                         text=f"Error: {err}", text_color="#EF4444")
                     ctk.CTkButton(
-                        inner, text="Cerrar", height=26,
+                        inner, text="Cerrar", height=28,
                         fg_color="transparent", border_width=1,
                         border_color="#475569", text_color="#94A3B8",
                         corner_radius=6,

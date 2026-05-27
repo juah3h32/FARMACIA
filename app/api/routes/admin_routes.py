@@ -1,3 +1,4 @@
+import os
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -77,8 +78,8 @@ def install_update(payload: dict = Depends(get_current_api_user)):
         if ok:
             _update_state.update({"progress": 1.0, "done": True, "running": False})
             import time
-            time.sleep(1.5)
-            sys.exit(0)
+            time.sleep(2.0)
+            os._exit(0)
         else:
             _update_state.update({"error": err, "running": False})
 
@@ -96,6 +97,14 @@ def purgar_datos(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     from app.database.sync_service import purgar_todos_los_datos
     purgar_todos_los_datos()
+    return {"ok": True}
+
+
+@router.post("/factory-reset")
+def factory_reset_endpoint(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.sync_service import factory_reset
+    factory_reset()
     return {"ok": True}
 
 

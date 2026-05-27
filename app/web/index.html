@@ -1483,6 +1483,60 @@
           </div>
         </div>
 
+        <!-- Zona Peligrosa -->
+        <div class="rounded-2xl border overflow-hidden" style="border-color:#FCA5A5;box-shadow:0 2px 8px rgba(239,68,68,.08)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#FEE2E2;background:#FFF5F5">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEE2E2">
+              <i data-lucide="triangle-alert" style="width:20px;height:20px;color:#EF4444"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#7F1D1D">Zona Peligrosa</h2>
+              <p class="text-xs mt-0.5" style="color:#EF4444">Acciones irreversibles · requieren confirmación con PIN</p>
+            </div>
+            <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEE2E2;border:1px solid #FCA5A5">
+              <i data-lucide="shield-alert" style="width:13px;height:13px;color:#DC2626"></i>
+              <span class="text-[10px] font-bold" style="color:#DC2626">IRREVERSIBLE</span>
+            </div>
+          </div>
+          <div class="p-6 grid grid-cols-2 gap-4" style="background:#FFFAFA">
+            <!-- Reset ventas/cortes -->
+            <div class="rounded-xl p-5 border" style="border-color:#FEE2E2;background:#fff">
+              <div class="flex items-start gap-3 mb-4">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
+                  <i data-lucide="trash-2" style="width:17px;height:17px;color:#EF4444"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm" style="color:#0F172A">Limpiar historial</h3>
+                  <p class="text-xs mt-0.5" style="color:#64748B">Elimina ventas, cortes de caja y auditoría. Conserva productos, clientes y empleados.</p>
+                </div>
+              </div>
+              <button onclick="confirmPurgeVentas()"
+                      class="w-full h-10 rounded-xl text-sm font-semibold border-2 transition-all hover:opacity-80"
+                      style="border-color:#EF4444;color:#EF4444;background:transparent">
+                Limpiar ventas y cortes
+              </button>
+            </div>
+            <!-- Factory reset -->
+            <div class="rounded-xl p-5 border" style="border-color:#FEE2E2;background:#fff">
+              <div class="flex items-start gap-3 mb-4">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
+                  <i data-lucide="database-zap" style="width:17px;height:17px;color:#DC2626"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm" style="color:#0F172A">Formato completo (Factory Reset)</h3>
+                  <p class="text-xs mt-0.5" style="color:#64748B">Borra TODA la base de datos: ventas, productos, clientes, empleados, reportes y configuración. La app quedará como nueva.</p>
+                </div>
+              </div>
+              <button onclick="confirmFactoryReset()"
+                      class="w-full h-10 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-80"
+                      style="background:linear-gradient(135deg,#EF4444,#DC2626)">
+                Factory Reset Total
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </main>
@@ -1944,6 +1998,7 @@ function closeModal(id) {
 // UPDATE
 // ══════════════════════════════════════════════════════════
 let _updPollTimer = null;
+let _updDoneSeenAt = null;
 
 function openUpdateModal() {
   const m = document.getElementById('modal-update');
@@ -1995,6 +2050,7 @@ async function startUpdate() {
     }
     // Cierra modal — descarga en segundo plano
     closeUpdateModal();
+    _updDoneSeenAt = null;
     document.getElementById('update-banner').style.display = 'none';
     const dlBar = document.getElementById('update-dl-bar');
     dlBar.style.display = 'block';
@@ -2014,18 +2070,26 @@ async function _pollProgress() {
     const pct = Math.round((d.progress || 0) * 100);
     document.getElementById('dl-bar').style.width = pct + '%';
     document.getElementById('dl-pct').textContent = pct + '%';
-    if (d.done) {
+    if (d.done && !_updDoneSeenAt) {
+      _updDoneSeenAt = Date.now();
       clearInterval(_updPollTimer);
-      document.getElementById('dl-label').textContent = '✓ Instalado — el programa se reiniciará en instantes...';
+      document.getElementById('dl-label').textContent = '✓ Instalando — la aplicación se cerrará y reabrirá automáticamente...';
       document.getElementById('dl-bar').style.background = '#4ADE80';
       document.getElementById('dl-pct').textContent = '100%';
     }
     if (d.error) {
       clearInterval(_updPollTimer);
+      _updDoneSeenAt = null;
       document.getElementById('update-dl-bar').style.display = 'none';
       toast('Error al actualizar: ' + d.error, 'error', 'Actualización fallida');
     }
-  } catch {}
+  } catch(e) {
+    // Server died (app closed itself) — expected after done
+    if (_updDoneSeenAt && (Date.now() - _updDoneSeenAt) > 1500) {
+      clearInterval(_updPollTimer);
+      document.getElementById('dl-label').textContent = '✓ Cerrando — espera un momento...';
+    }
+  }
 }
 
 // Check for updates silently on login and show button if available

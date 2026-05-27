@@ -17,6 +17,7 @@ _status: dict = {
     "version": None,
     "url": None,
     "asset_api_url": None,
+    "is_installer": False,
 }
 _callbacks: list = []
 
@@ -31,7 +32,6 @@ def _parse_version(v: str) -> tuple:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def start_background_check() -> None:
-    """Check on startup, then re-check every 30 min so new releases are detected."""
     def _loop():
         while True:
             _do_check()
@@ -40,14 +40,12 @@ def start_background_check() -> None:
 
 
 def check_for_update_async(callback=None) -> None:
-    """Legacy helper used by CustomTkinter fallback UI."""
     if callback:
         _callbacks.append(callback)
     threading.Thread(target=_do_check, daemon=True).start()
 
 
 def force_check() -> dict:
-    """Synchronous check — blocks caller. Use only from API request handler."""
     _do_check()
     return get_status()
 
@@ -79,19 +77,31 @@ def _do_check() -> None:
         current = _parse_version(cfg.VERSION)
         available = latest > current
         version = tag.lstrip("v")
-        # For private repos: use the API asset URL (requires auth on download too)
-        url = None
-        asset_api_url = None
+
+        # Prefer .exe installer; fall back to .zip
+        exe_url = exe_api = zip_url = zip_api = None
         for asset in data.get("assets", []):
-            if asset.get("name", "").lower().endswith(".zip"):
-                url = asset.get("browser_download_url") or asset.get("url")
-                asset_api_url = asset.get("url")
-                break
+            name = asset.get("name", "").lower()
+            aurl = asset.get("browser_download_url") or asset.get("url")
+            aapi = asset.get("url")
+            if name.endswith(".exe") and not exe_url:
+                exe_url = aurl
+                exe_api = aapi
+            elif name.endswith(".zip") and not zip_url:
+                zip_url = aurl
+                zip_api = aapi
+
+        url = exe_url or zip_url
+        asset_api_url = exe_api or zip_api
+        is_installer = bool(exe_url)
 
         with _lock:
-            _status.update({"checked": True, "available": available,
-                            "version": version, "url": url,
-                            "asset_api_url": asset_api_url})
+            _status.update({
+                "checked": True, "available": available,
+                "version": version, "url": url,
+                "asset_api_url": asset_api_url,
+                "is_installer": is_installer,
+            })
     except Exception:
         with _lock:
             _status.update({"checked": True, "available": False})
@@ -107,17 +117,21 @@ def _do_check() -> None:
 
 def download_and_install(progress_callback=None) -> tuple[bool, str]:
     st = get_status()
-    # Prefer browser_download_url (public, no auth); fall back to API asset URL
     url = st.get("url")
     if not url:
         return False, "No se encontró archivo de descarga en el release"
 
+    is_installer = st.get("is_installer", False) or url.lower().endswith(".exe")
     tmp = Path(tempfile.gettempdir())
-    zip_path = tmp / "FarmaciaPOS_update.zip"
-    extract_dir = tmp / "FarmaciaPOS_update_extracted"
-    install_dir = Path(sys.executable).parent
 
-    # ── Download ──────────────────────────────────────────────────────────────
+    if is_installer:
+        return _install_via_exe(url, tmp, progress_callback)
+    else:
+        return _install_via_zip(url, tmp, progress_callback)
+
+
+def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float = 0.85) -> tuple[bool, str]:
+    """Download url → dest, reporting progress up to pct_max."""
     try:
         dl_headers = {"User-Agent": "FarmaciaPOS-Updater/1.0",
                       "Accept": "application/octet-stream"}
@@ -127,7 +141,7 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
         with urllib.request.urlopen(req, timeout=300) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
             downloaded = 0
-            with open(zip_path, "wb") as f:
+            with open(dest, "wb") as f:
                 while True:
                     chunk = resp.read(65536)
                     if not chunk:
@@ -135,11 +149,66 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
                     f.write(chunk)
                     downloaded += len(chunk)
                     if progress_callback and total:
-                        progress_callback(downloaded / total * 0.85)
+                        progress_callback(downloaded / total * pct_max)
+        return True, ""
     except Exception as e:
         return False, f"Error de descarga: {e}"
 
-    # ── Extract ───────────────────────────────────────────────────────────────
+
+def _launch_shellexecute(exe: str, args: str) -> tuple[bool, str]:
+    """Launch exe with runas (UAC elevation) via ShellExecuteW."""
+    try:
+        import ctypes
+        ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args, None, 0)
+        if ret <= 32:
+            return False, f"No se pudo lanzar (código {ret})"
+        return True, ""
+    except Exception as e:
+        return False, f"Error al lanzar: {e}"
+
+
+def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool, str]:
+    """Download Inno Setup installer and launch it directly (no PowerShell wrapper)."""
+    installer_path = tmp / "FarmaciaPOS_update_setup.exe"
+
+    ok, err = _download_file(url, installer_path, progress_callback, pct_max=0.95)
+    if not ok:
+        return False, err
+
+    if progress_callback:
+        progress_callback(1.0)
+
+    # Launch installer directly — its own manifest requests UAC elevation.
+    # No PowerShell = no black console window. The UAC prompt shows the app name/icon.
+    # /VERYSILENT    : zero UI
+    # /NORESTART     : no Windows reboot
+    # /CLOSEAPPLICATIONS : cierra la app si sigue abierta
+    # /SUPPRESSMSGBOXES  : sin popups de error
+    # The [Run] section in installer.iss (without skipifsilent) relaunches the app.
+    args = '/VERYSILENT /NORESTART /CLOSEAPPLICATIONS /SUPPRESSMSGBOXES'
+    try:
+        import ctypes
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None, "open", str(installer_path), args, None, 1
+        )
+        if ret <= 32:
+            return False, f"No se pudo lanzar el instalador (código {ret})"
+    except Exception as e:
+        return False, f"Error al lanzar instalador: {e}"
+
+    return True, ""
+
+
+def _install_via_zip(url: str, tmp: Path, progress_callback=None) -> tuple[bool, str]:
+    """Download ZIP, extract, replace app files via PS script."""
+    zip_path = tmp / "FarmaciaPOS_update.zip"
+    extract_dir = tmp / "FarmaciaPOS_update_extracted"
+    install_dir = Path(sys.executable).parent
+
+    ok, err = _download_file(url, zip_path, progress_callback, pct_max=0.85)
+    if not ok:
+        return False, err
+
     try:
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
@@ -153,8 +222,6 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     contents = list(extract_dir.iterdir())
     source_dir = contents[0] if len(contents) == 1 and contents[0].is_dir() else extract_dir
 
-    # ── Build PowerShell updater script ──────────────────────────────────────
-    # Escape paths for PS single-quoted strings (' → '')
     src = str(source_dir).replace("'", "''")
     dst = str(install_dir).replace("'", "''")
     exe = str(install_dir / "FarmaciaPOS.exe").replace("'", "''")
@@ -163,17 +230,14 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     xd  = str(extract_dir).replace("'", "''")
 
     ps_script = (
-        # No self-elevation — Python launches this already elevated via ShellExecuteW runas
         f"$src = '{src}'\n"
         f"$dst = '{dst}'\n"
         f"$exe = '{exe}'\n"
         f"$log = '{log}'\n\n"
-        # Wait for FarmaciaPOS to exit (max 30 s)
         "$deadline = (Get-Date).AddSeconds(30)\n"
         "while ((Get-Process -Name 'FarmaciaPOS' -ErrorAction SilentlyContinue)"
         " -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 400 }\n"
         "Start-Sleep -Seconds 1\n\n"
-        # Copy new files over existing install — log any errors
         "try {\n"
         "    Copy-Item -Path \"$src\\*\" -Destination \"$dst\" -Recurse -Force -ErrorAction Stop\n"
         "    \"OK $(Get-Date)\" | Out-File $log -Encoding utf8\n"
@@ -181,9 +245,7 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
         "    \"ERROR $_ $(Get-Date)\" | Out-File $log -Encoding utf8\n"
         "    exit 1\n"
         "}\n\n"
-        # Restart updated app
         "if (Test-Path \"$exe\") { Start-Process -FilePath \"$exe\" }\n\n"
-        # Cleanup
         f"Remove-Item -Path '{zp}' -Force -ErrorAction SilentlyContinue\n"
         f"Remove-Item -Path '{xd}' -Recurse -Force -ErrorAction SilentlyContinue\n"
         "Start-Sleep -Milliseconds 500\n"
@@ -196,25 +258,11 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
     if progress_callback:
         progress_callback(0.97)
 
-    # ── Launch via ShellExecuteW (runas) ──────────────────────────────────────
-    # ShellExecuteW creates a shell-owned process — survives parent Job Object
-    # destruction. runas = proper UAC elevation (shows consent dialog if needed).
-    try:
-        import ctypes
-        ps_exe = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-        ps_args = f'-ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File "{ps_path}"'
-        ret = ctypes.windll.shell32.ShellExecuteW(
-            None,      # hwnd
-            "runas",   # verb — triggers UAC elevation
-            ps_exe,    # file
-            ps_args,   # parameters
-            None,      # directory
-            0,         # SW_HIDE
-        )
-        if ret <= 32:
-            return False, f"No se pudo lanzar el actualizador (código {ret})"
-    except Exception as e:
-        return False, f"Error al lanzar actualizador: {e}"
+    ps_exe = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    ps_args = f'-ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File "{ps_path}"'
+    ok, err = _launch_shellexecute(ps_exe, ps_args)
+    if not ok:
+        return False, err
 
     if progress_callback:
         progress_callback(1.0)

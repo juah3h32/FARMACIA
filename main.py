@@ -83,7 +83,7 @@ def _start_ui(port: int) -> None:
             height=cfg.WINDOW_HEIGHT,
             resizable=True,
             min_size=(1000, 680),
-            fullscreen=True,
+            fullscreen=False,
         )
         webview.start(debug=False)
         return

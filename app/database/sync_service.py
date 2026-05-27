@@ -165,6 +165,12 @@ def purgar_todos_los_datos() -> None:
     _purge_tables(_PURGE_ORDER)
 
 
+def factory_reset() -> None:
+    """Delete EVERYTHING including usuarios and configuracion. Local + Turso."""
+    all_tables = list(reversed(_TABLE_ORDER))
+    _purge_tables(all_tables)
+
+
 def import_from_turso() -> bool:
     """
     One-time import: copy all Turso data into local SQLite.

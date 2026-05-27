@@ -49,3 +49,7 @@ data/
 generar_exe.bat
 generar_launcher.bat
 crear_instalador.bat
+
+# Build output (distribuir via GitHub Releases, no en repo)
+instalador/
+FarmaciaPOS_debug*.spec

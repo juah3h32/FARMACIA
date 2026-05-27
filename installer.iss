@@ -1,6 +1,6 @@
 #define AppName      "Farmacia Eben-Ezer POS"
 #define AppPublisher "Farmacia Eben-Ezer"
-#define AppVersion   "1.2.11"
+#define AppVersion   "1.2.12"
 #define AppExeName   "FarmaciaPOS.exe"
 #define AppDesc      "Sistema POS para farmacia â€” gestiÃ³n de ventas, inventario, clientes y reportes"
 #define SourceDir    "dist\FarmaciaPOS"
@@ -26,6 +26,8 @@ SolidCompression=yes
 WizardStyle=modern
 WizardResizable=no
 PrivilegesRequiredOverridesAllowed=dialog
+CloseApplications=yes
+RestartApplications=no
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
 VersionInfoVersion={#AppVersion}
@@ -50,7 +52,7 @@ Name: "{group}\Desinstalar {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\_internal\assets\icon.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "Iniciar {#AppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "Iniciar {#AppName}"; Flags: nowait postinstall
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
