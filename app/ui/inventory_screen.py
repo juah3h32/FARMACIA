@@ -314,9 +314,10 @@ class ProductoDialog(ctk.CTkToplevel):
         self.data = data or {}
         self.on_save = on_save
         self._build_ui()
-        # CTkToplevel fires internal after() callbacks that reset CTkEntry contents.
-        # Defer data population until after those callbacks complete.
-        self.after(50, self._populate_fields)
+        # <Map> fires once the window is fully visible and CTkToplevel has completed
+        # all internal initialization (appearance-mode passes, scaling callbacks, etc.)
+        # that otherwise clear CTkEntry contents. A fixed after() delay is unreliable.
+        self.bind("<Map>", self._on_first_map)
 
     def _build_ui(self):
         scroll = ctk.CTkScrollableFrame(self)
@@ -390,6 +391,10 @@ class ProductoDialog(ctk.CTkToplevel):
             self, text="💾 Guardar", height=42, fg_color="#4CAF50", hover_color="#388E3C",
             command=self._guardar
         ).pack(fill="x", padx=16, pady=(0, 16))
+
+    def _on_first_map(self, event=None):
+        self.unbind("<Map>")
+        self.after(30, self._populate_fields)
 
     def _populate_fields(self):
         """Populate entry widgets with self.data AFTER CTkToplevel fully renders."""
