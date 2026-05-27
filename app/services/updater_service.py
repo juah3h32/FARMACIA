@@ -4,7 +4,6 @@ import sys
 import tempfile
 import threading
 import time
-import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -68,9 +67,10 @@ def _do_check() -> None:
     if not cfg.GITHUB_RELEASES_URL:
         return
     try:
-        req = urllib.request.Request(cfg.GITHUB_RELEASES_URL, headers=_auth_headers())
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode())
+        import requests as _req
+        resp = _req.get(cfg.GITHUB_RELEASES_URL, headers=_auth_headers(), timeout=8)
+        resp.raise_for_status()
+        data = resp.json()
 
         tag = data.get("tag_name", "")
         latest = _parse_version(tag)
@@ -133,19 +133,18 @@ def download_and_install(progress_callback=None) -> tuple[bool, str]:
 def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float = 0.85) -> tuple[bool, str]:
     """Download url → dest, reporting progress up to pct_max."""
     try:
-        dl_headers = {"User-Agent": "FarmaciaPOS-Updater/1.0",
-                      "Accept": "application/octet-stream"}
+        import requests as _req
+        hdrs = {"User-Agent": "FarmaciaPOS-Updater/1.0", "Accept": "application/octet-stream"}
         if getattr(cfg, "GITHUB_TOKEN", ""):
-            dl_headers["Authorization"] = f"Bearer {cfg.GITHUB_TOKEN}"
-        req = urllib.request.Request(url, headers=dl_headers)
-        with urllib.request.urlopen(req, timeout=300) as resp:
+            hdrs["Authorization"] = f"Bearer {cfg.GITHUB_TOKEN}"
+        with _req.get(url, headers=hdrs, stream=True, timeout=300) as resp:
+            resp.raise_for_status()
             total = int(resp.headers.get("Content-Length") or 0)
             downloaded = 0
             with open(dest, "wb") as f:
-                while True:
-                    chunk = resp.read(65536)
+                for chunk in resp.iter_content(chunk_size=65536):
                     if not chunk:
-                        break
+                        continue
                     f.write(chunk)
                     downloaded += len(chunk)
                     if progress_callback and total:
