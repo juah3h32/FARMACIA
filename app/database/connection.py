@@ -82,6 +82,7 @@ def _migrate():
         ("productos", "concentracion", "VARCHAR(50)"),
         ("productos", "contenido",     "VARCHAR(50)"),
     ]
+    # Local SQLite
     with engine.connect() as conn:
         for table, col, col_type in new_cols:
             try:
@@ -89,6 +90,18 @@ def _migrate():
                 conn.commit()
             except Exception:
                 pass  # column already exists
+
+    # Turso cloud — keep schema in sync
+    if cfg.TURSO_SYNC:
+        try:
+            from app.database.sync_service import _turso_batch
+            stmts = [
+                {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}
+                for t, c, ct in new_cols
+            ]
+            _turso_batch(stmts)
+        except Exception:
+            pass  # columns already exist in Turso
 
 
 def init_db():
