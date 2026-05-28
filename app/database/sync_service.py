@@ -3,8 +3,10 @@ Sync service: local SQLite (primary) ↔ Turso (cloud backup).
 
 - import_from_turso(): Turso → local on first run (local is empty)
 - sync_to_turso(): local → Turso via batched HTTP pipeline calls
+- sync_from_turso(): Turso → local merge (runs every startup + heartbeat)
 - start_background_sync(interval): daemon thread for periodic sync
 """
+import json
 import shutil
 import sqlite3
 import threading
@@ -15,8 +17,9 @@ from datetime import datetime
 import requests as _requests
 import app.config as cfg
 
-BACKUP_DIR  = cfg.DATA_DIR / "backups"
-BACKUP_KEEP = 7  # days of local backups to retain
+BACKUP_DIR     = cfg.DATA_DIR / "backups"
+BACKUP_KEEP    = 7  # days of local backups to retain
+_WATERMARK_FILE = cfg.DATA_DIR / "watermarks.json"
 
 # FK-dependency order (import & sync must respect this)
 _TABLE_ORDER = [
@@ -32,10 +35,32 @@ _FULL_SYNC = frozenset({
     "productos", "lotes", "cortes_caja", "ventas", "compras",
 })
 
-# Watermark per table: last id synced to Turso (append-only tables only)
-_watermarks: dict[str, int] = {}
+# Tables that are shared across PCs — never delete rows from Turso by absence
+# (each PC may have a subset; deletions happen via soft-delete / purge only)
+_NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
+                               "compras", "items_compra", "cortes_caja"})
 
-_lock  = threading.Lock()
+# Watermark per table: last id synced to Turso (append-only tables only)
+# Persisted to disk so restarts don't re-send the entire history.
+def _load_watermarks() -> dict:
+    try:
+        if _WATERMARK_FILE.exists():
+            return json.loads(_WATERMARK_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+def _save_watermarks() -> None:
+    try:
+        _WATERMARK_FILE.write_text(json.dumps(_watermarks), encoding="utf-8")
+    except Exception as e:
+        print(f"[Sync] Could not persist watermarks: {e}")
+
+_watermarks: dict[str, int] = _load_watermarks()
+
+# RLock: reentrant so sync_to_turso and sync_from_turso can share one lock
+# without deadlocking when called sequentially from the same thread.
+_lock  = threading.RLock()
 _dirty = threading.Event()   # set after any local write → immediate sync
 
 
@@ -100,9 +125,14 @@ def _turso_batch(stmts: list[dict]) -> None:
         resp = _requests.post(url, headers=hdrs, json=payload, timeout=60)
         if not resp.ok:
             raise RuntimeError(f"Turso HTTP {resp.status_code}: {resp.text[:300]}")
-        for result in resp.json().get("results", []):
-            if result.get("type") == "error":
-                msg = result.get("error", {}).get("message", "unknown")
+        errors = [
+            r.get("error", {}).get("message", "unknown")
+            for r in resp.json().get("results", [])
+            if r.get("type") == "error"
+        ]
+        if errors:
+            # Log all errors but don't abort — partial sync is better than no sync
+            for msg in errors:
                 print(f"[Sync] Turso stmt error: {msg}")
 
 
@@ -143,21 +173,27 @@ _PURGE_VENTAS = [
 
 
 def _purge_tables(tables: list[str]) -> None:
-    lconn = _local_conn()
-    try:
-        lconn.execute("PRAGMA foreign_keys = OFF")
-        for table in tables:
-            lconn.execute(f"DELETE FROM {table}")
-        lconn.execute("PRAGMA foreign_keys = ON")
-        lconn.commit()
-    finally:
-        lconn.close()
+    with _lock:  # Block background sync during purge to avoid re-sync race
+        lconn = _local_conn()
+        try:
+            lconn.execute("PRAGMA foreign_keys = OFF")
+            for table in tables:
+                lconn.execute(f"DELETE FROM {table}")
+            lconn.execute("PRAGMA foreign_keys = ON")
+            lconn.commit()
+        finally:
+            lconn.close()
 
-    stmts = [{"sql": f"DELETE FROM {t}", "args": []} for t in tables]
-    try:
-        _turso_batch(stmts)
-    except Exception as e:
-        print(f"[Purge] Turso error: {e}")
+        # Reset watermarks for purged tables so they don't re-send deleted rows
+        for t in tables:
+            _watermarks.pop(t, None)
+        _save_watermarks()
+
+        stmts = [{"sql": f"DELETE FROM {t}", "args": []} for t in tables]
+        try:
+            _turso_batch(stmts)
+        except Exception as e:
+            print(f"[Purge] Turso error: {e}")
 
 
 def purgar_ventas_historial_cierres() -> None:
@@ -251,12 +287,16 @@ def sync_to_turso() -> None:
                             ph_str  = ", ".join(["?" for _ in cols])
                             upsert  = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
 
-                            # Delete from Turso any IDs no longer in local
-                            ids_str = ", ".join(str(r["id"]) for r in rows)
-                            stmts.append({
-                                "sql": f"DELETE FROM {table} WHERE id NOT IN ({ids_str})",
-                                "args": [],
-                            })
+                            # Only delete orphaned rows for reference tables (categorias,
+                            # usuarios, etc.). For distributed tables (productos, ventas,
+                            # lotes…) NEVER delete by absence — another PC may have rows
+                            # this PC hasn't pulled yet.
+                            if table not in _NO_TURSO_DELETE:
+                                ids_str = ", ".join(str(r["id"]) for r in rows)
+                                stmts.append({
+                                    "sql": f"DELETE FROM {table} WHERE id NOT IN ({ids_str})",
+                                    "args": [],
+                                })
                             for row in rows:
                                 stmts.append({"sql": upsert,
                                               "args": [_py_to_turso(v) for v in tuple(row)]})
@@ -289,6 +329,7 @@ def sync_to_turso() -> None:
 
             if synced:
                 print(f"[Sync] >> Turso: {synced} rows synced")
+                _save_watermarks()
         finally:
             lconn.close()
 
