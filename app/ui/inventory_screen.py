@@ -608,14 +608,15 @@ class EntradaStockDialog(ctk.CTkToplevel):
         fields = [
             ("Cantidad a ingresar:*", "cantidad"),
             ("N° de Lote:", "numero_lote"),
-            ("Fecha de Vencimiento\n(DD/MM/YYYY):", "fecha_vencimiento"),
+            ("Vencimiento (MM/AAAA):", "fecha_vencimiento"),
             ("Precio de Compra:", "precio_compra"),
         ]
+        _placeholders = {"fecha_vencimiento": "06/2027"}
         self.entries = {}
         for i, (label, key) in enumerate(fields):
             ctk.CTkLabel(frame, text=label, font=ctk.CTkFont(size=12), anchor="e").grid(
                 row=i, column=0, padx=(0, 8), pady=6, sticky="e")
-            e = ctk.CTkEntry(frame, height=34)
+            e = ctk.CTkEntry(frame, height=34, placeholder_text=_placeholders.get(key, ""))
             e.grid(row=i, column=1, pady=6, sticky="ew")
             self.entries[key] = e
 
@@ -635,12 +636,23 @@ class EntradaStockDialog(ctk.CTkToplevel):
         fecha_str = self.entries["fecha_vencimiento"].get().strip()
         fecha_venc = None
         if fecha_str:
-            try:
-                from datetime import datetime
-                fecha_venc = datetime.strptime(fecha_str, "%d/%m/%Y").date()
-            except ValueError:
-                messagebox.showwarning("Error", "Formato de fecha incorrecto (DD/MM/YYYY)")
+            import calendar as _cal
+            from datetime import datetime as _dt
+            parsed = None
+            for fmt in ("%m/%Y", "%d/%m/%Y", "%Y-%m-%d"):
+                try:
+                    parsed = _dt.strptime(fecha_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            if not parsed:
+                messagebox.showwarning("Error", "Formato de fecha incorrecto (MM/AAAA, ej: 06/2027)")
                 return
+            if fmt == "%m/%Y":
+                last = _cal.monthrange(parsed.year, parsed.month)[1]
+                fecha_venc = date(parsed.year, parsed.month, last)
+            else:
+                fecha_venc = parsed.date()
 
         db = get_db_session()
         try:

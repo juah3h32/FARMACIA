@@ -502,8 +502,9 @@
           <input id="en-lote" class="inp" placeholder="Opcional">
         </div>
         <div>
-          <label class="lbl">Vencimiento</label>
-          <input id="en-fecha" type="date" class="inp">
+          <label class="lbl">Vencimiento (MM/AAAA)</label>
+          <input id="en-fecha" type="text" class="inp" placeholder="06/2027" maxlength="7"
+                 oninput="fmtMesAnio(this)" inputmode="numeric">
         </div>
         <div class="col-span-2">
           <label class="lbl">Precio de Compra</label>
@@ -4348,6 +4349,13 @@ async function scanBarcode(barcode) {
       }
     }, 500);
   }
+}
+
+// Auto-format MM/AAAA while typing
+function fmtMesAnio(inp) {
+  let v = inp.value.replace(/\D/g, '').slice(0, 6);
+  if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+  inp.value = v;
 }
 
 // Populate the Entrada modal info card from a product object

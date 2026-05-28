@@ -115,9 +115,15 @@ def registrar_entrada(body: EntradaStockIn, bg: BackgroundTasks, payload: dict =
 
         fecha_venc = None
         if body.fecha_vencimiento:
-            for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+            import calendar as _cal
+            for fmt in ("%m/%Y", "%d/%m/%Y", "%Y-%m-%d"):
                 try:
-                    fecha_venc = datetime.strptime(body.fecha_vencimiento, fmt).date()
+                    parsed = datetime.strptime(body.fecha_vencimiento, fmt)
+                    if fmt == "%m/%Y":
+                        last = _cal.monthrange(parsed.year, parsed.month)[1]
+                        fecha_venc = date(parsed.year, parsed.month, last)
+                    else:
+                        fecha_venc = parsed.date()
                     break
                 except ValueError:
                     continue
