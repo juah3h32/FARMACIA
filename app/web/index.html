@@ -1641,17 +1641,16 @@
             <div>
               <label class="lbl" style="display:flex;align-items:center;gap:3px">
                 <i data-lucide="calendar-clock" style="width:11px;height:11px;color:#16A34A"></i>
-                Fecha caducidad *
+                Vencimiento (MM/AAAA) *
               </label>
-              <input id="pm-fechavenc" type="date" class="inp"
-                     style="border-color:#16A34A;border-width:2px"
-                     oninput="pmPreviewDias(this.value)">
+              <input id="pm-fechavenc" type="text" class="inp" placeholder="06/2027" maxlength="7"
+                     style="border-color:#16A34A;border-width:2px" inputmode="numeric"
+                     oninput="fmtMesAnio(this);pmPreviewDias(this.value)">
               <p id="pm-dias-preview" class="text-xs mt-0.5 font-semibold" style="min-height:14px"></p>
             </div>
             <div>
               <label class="lbl">N° de Lote <span style="color:#94A3B8;font-weight:400">(opcional)</span></label>
               <input id="pm-lote" class="inp" placeholder="Ej. LT-2025-001">
-              <p class="text-[10px] mt-0.5 leading-tight" style="color:#94A3B8">Solo mes/año → último día del mes</p>
             </div>
           </div>
         </div>
@@ -2893,15 +2892,21 @@ function openEntradaModalFromEdit() {
 function pmPreviewDias(val) {
   const el = document.getElementById('pm-dias-preview');
   if (!el || !val) { if(el) el.textContent=''; return; }
-  const [y,m,d] = val.split('-').map(Number);
+  // Parse MM/AAAA → last day of month
+  const parts = val.split('/');
+  if (parts.length !== 2 || parts[1].length < 4) { el.textContent=''; return; }
+  const m = parseInt(parts[0]), y = parseInt(parts[1]);
+  if (!m || m < 1 || m > 12 || !y) { el.textContent=''; return; }
+  const lastDay = new Date(y, m, 0).getDate();  // day 0 of next month = last day of this month
   const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const fv = new Date(y, m-1, d);
+  const fv = new Date(y, m-1, lastDay);
   const dias = Math.round((fv - hoy) / 86400000);
-  if (dias < 0)      { el.textContent=`⛔ Fecha ya vencida (hace ${-dias} día${-dias!==1?'s':''})`;    el.style.color='#EF4444'; }
-  else if (dias===0) { el.textContent='⚠️ Vence hoy';                                                   el.style.color='#EA580C'; }
-  else if (dias<=30) { el.textContent=`⚠️ Vence en ${dias} día${dias!==1?'s':''} (crítico)`;           el.style.color='#EA580C'; }
-  else if (dias<=90) { el.textContent=`🕐 Vence en ${dias} días (${fmtDate(val)})`;                    el.style.color='#CA8A04'; }
-  else               { el.textContent=`✓ Vigente — ${dias} días (${fmtDate(val)})`;                    el.style.color='#16A34A'; }
+  const label = String(m).padStart(2,'0') + '/' + y;
+  if (dias < 0)      { el.textContent=`⛔ Ya vencido (${label})`;                    el.style.color='#EF4444'; }
+  else if (dias===0) { el.textContent=`⚠️ Vence hoy (${label})`;                     el.style.color='#EA580C'; }
+  else if (dias<=30) { el.textContent=`⚠️ Vence en ${dias} días — ${label}`;         el.style.color='#EA580C'; }
+  else if (dias<=90) { el.textContent=`🕐 ${dias} días restantes — ${label}`;        el.style.color='#CA8A04'; }
+  else               { el.textContent=`✓ Vigente — ${label}`;                        el.style.color='#16A34A'; }
 }
 
 async function saveProduct() {
