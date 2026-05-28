@@ -321,13 +321,16 @@ class PosScreen(ctk.CTkFrame):
 
     def _buscar_producto(self):
         from app.database.models import RolUsuario
+        from sqlalchemy.orm import joinedload
         query = self.entry_barcode.get().strip()
         if not query:
             return
 
         db = get_db_session()
         try:
-            prod = db.query(Producto).filter(
+            prod = db.query(Producto).options(
+                joinedload(Producto.categoria)
+            ).filter(
                 Producto.codigo_barras == query,
                 Producto.activo == True
             ).first()
@@ -335,10 +338,12 @@ class PosScreen(ctk.CTkFrame):
             if prod:
                 self._agregar_al_carrito(prod.id, prod.nombre, prod.precio_venta, prod.aplica_iva)
                 self.entry_barcode.delete(0, "end")
-                self._limpiar_resultados()
+                self._mostrar_resultados([self._prod_to_dict(prod)], agregado=True)
                 return
 
-            productos = db.query(Producto).filter(
+            productos = db.query(Producto).options(
+                joinedload(Producto.categoria)
+            ).filter(
                 Producto.activo == True,
                 Producto.nombre.ilike(f"%{query}%") |
                 Producto.nombre_generico.ilike(f"%{query}%")
@@ -353,13 +358,27 @@ class PosScreen(ctk.CTkFrame):
                 self.on_unknown_barcode(query)
                 return
 
-            self._mostrar_resultados(
-                [(p.id, p.nombre, p.precio_venta, p.stock, p.aplica_iva) for p in productos]
-            )
+            self._mostrar_resultados([self._prod_to_dict(p) for p in productos])
         finally:
             db.close()
 
-    def _mostrar_resultados(self, productos: list):
+    def _prod_to_dict(self, p) -> dict:
+        parts = [x for x in (p.presentacion, p.concentracion, p.contenido) if x]
+        return {
+            "id": p.id,
+            "nombre": p.nombre,
+            "nombre_generico": p.nombre_generico or "",
+            "marca": p.marca or "",
+            "precio": p.precio_venta,
+            "stock": p.stock,
+            "aplica_iva": p.aplica_iva,
+            "presentacion": "  ·  ".join(parts),
+            "categoria": p.categoria.nombre if p.categoria else "",
+            "requiere_receta": p.requiere_receta,
+            "sustancia_controlada": p.sustancia_controlada,
+        }
+
+    def _mostrar_resultados(self, productos: list, agregado: bool = False):
         for w in self.search_frame.winfo_children():
             w.destroy()
 
@@ -369,39 +388,99 @@ class PosScreen(ctk.CTkFrame):
             return
 
         self.search_frame.grid_columnconfigure(0, weight=1)
-        for pid, nombre, precio, stock, aplica_iva in productos:
+        for d in productos:
+            pid, nombre, precio, stock, aplica_iva = (
+                d["id"], d["nombre"], d["precio"], d["stock"], d["aplica_iva"]
+            )
             stock_color = RED if stock <= 0 else ("#F59E0B" if stock <= 5 else GREEN)
+            stock_bg    = GREEN_L if stock > 5 else ("#FEF9C3" if stock > 0 else RED_L)
 
+            border_col = "#22C55E" if agregado else BORDER
             card = ctk.CTkFrame(self.search_frame, corner_radius=10,
                                 fg_color=SURF, border_width=1,
-                                border_color=BORDER, cursor="hand2")
+                                border_color=border_col,
+                                cursor="hand2" if not agregado else "arrow")
             card.pack(fill="x", padx=4, pady=3)
-            card.grid_columnconfigure(1, weight=1)
+            card.grid_columnconfigure(0, weight=1)
 
-            ctk.CTkLabel(card, text=nombre,
+            # ── Fila 0: nombre + badge "✓ Agregado" ──────────────────────────
+            top = ctk.CTkFrame(card, fg_color="transparent")
+            top.grid(row=0, column=0, sticky="ew", padx=12, pady=(8, 2))
+            top.grid_columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(top, text=nombre,
                          font=ctk.CTkFont(size=12, weight="bold"),
                          text_color=TEXT, anchor="w",
-                         ).grid(row=0, column=0, columnspan=3, padx=12, pady=(8, 2), sticky="w")
+                         ).grid(row=0, column=0, sticky="w")
 
-            ctk.CTkLabel(card,
-                         text=f"${precio:.2f}" + ("  +IVA" if aplica_iva else ""),
-                         font=ctk.CTkFont(size=12),
-                         text_color=BLUE).grid(row=1, column=0, padx=12, pady=(0, 8), sticky="w")
+            if agregado:
+                badge = ctk.CTkFrame(top, corner_radius=6, fg_color=GREEN_L)
+                badge.grid(row=0, column=1, padx=(8, 0), sticky="e")
+                ctk.CTkLabel(badge, text="  ✓ Agregado  ",
+                             font=ctk.CTkFont(size=10, weight="bold"),
+                             text_color=GREEN).pack()
 
-            stock_badge = ctk.CTkFrame(card, corner_radius=8, fg_color=GREEN_L if stock > 5 else RED_L)
-            stock_badge.grid(row=1, column=2, padx=(0, 12), pady=(0, 8), sticky="e")
+            # ── Fila 1: nombre genérico + marca ──────────────────────────────
+            sub_parts = [x for x in (d["nombre_generico"], d["marca"]) if x]
+            if sub_parts:
+                ctk.CTkLabel(card, text="  ·  ".join(sub_parts),
+                             font=ctk.CTkFont(size=11),
+                             text_color=MUTED, anchor="w",
+                             ).grid(row=1, column=0, padx=12, pady=(0, 2), sticky="w")
+
+            # ── Fila 2: presentación / concentración / contenido ──────────────
+            if d["presentacion"]:
+                ctk.CTkLabel(card, text=d["presentacion"],
+                             font=ctk.CTkFont(size=10),
+                             text_color=MUTED_L, anchor="w",
+                             ).grid(row=2, column=0, padx=12, pady=(0, 2), sticky="w")
+
+            # ── Fila 3: precio · categoría · badges receta/controlada ─────────
+            bot = ctk.CTkFrame(card, fg_color="transparent")
+            bot.grid(row=3, column=0, sticky="ew", padx=12, pady=(2, 8))
+
+            precio_txt = f"${precio:.2f}" + ("  +IVA" if aplica_iva else "")
+            ctk.CTkLabel(bot, text=precio_txt,
+                         font=ctk.CTkFont(size=12, weight="bold"),
+                         text_color=BLUE).pack(side="left")
+
+            if d["categoria"]:
+                ctk.CTkLabel(bot, text=f"  {d['categoria']}",
+                             font=ctk.CTkFont(size=10),
+                             text_color=MUTED).pack(side="left")
+
+            if d["requiere_receta"]:
+                rb = ctk.CTkFrame(bot, corner_radius=6, fg_color="#FEF3C7")
+                rb.pack(side="left", padx=(6, 0))
+                ctk.CTkLabel(rb, text="  Receta  ",
+                             font=ctk.CTkFont(size=9, weight="bold"),
+                             text_color="#B45309").pack()
+
+            if d["sustancia_controlada"]:
+                cb = ctk.CTkFrame(bot, corner_radius=6, fg_color=RED_L)
+                cb.pack(side="left", padx=(4, 0))
+                ctk.CTkLabel(cb, text="  Controlada  ",
+                             font=ctk.CTkFont(size=9, weight="bold"),
+                             text_color=RED).pack()
+
+            # stock badge (derecha)
+            stock_badge = ctk.CTkFrame(bot, corner_radius=8, fg_color=stock_bg)
+            stock_badge.pack(side="right")
             ctk.CTkLabel(stock_badge, text=f"  Stock: {stock}  ",
                          font=ctk.CTkFont(size=10, weight="bold"),
                          text_color=stock_color).pack()
 
-            def _add(p=pid, n=nombre, pr=precio, iv=aplica_iva):
-                self._agregar_al_carrito(p, n, pr, iv)
-                self._limpiar_resultados()
-                self.entry_barcode.delete(0, "end")
+            if not agregado:
+                def _add(p=pid, n=nombre, pr=precio, iv=aplica_iva):
+                    self._agregar_al_carrito(p, n, pr, iv)
+                    self._limpiar_resultados()
+                    self.entry_barcode.delete(0, "end")
 
-            card.bind("<Button-1>", lambda e, fn=_add: fn())
-            for child in card.winfo_children():
-                child.bind("<Button-1>", lambda e, fn=_add: fn())
+                card.bind("<Button-1>", lambda e, fn=_add: fn())
+                for child in card.winfo_children():
+                    child.bind("<Button-1>", lambda e, fn=_add: fn())
+                    for grandchild in child.winfo_children():
+                        grandchild.bind("<Button-1>", lambda e, fn=_add: fn())
 
     def _limpiar_resultados(self):
         for w in self.search_frame.winfo_children():
