@@ -478,8 +478,19 @@
       </button>
     </div>
     <div class="p-6 flex flex-col gap-4">
-      <p id="entrada-prod-name" class="text-sm font-semibold px-3 py-2 rounded-xl" style="background:#F0FDF4;color:#16A34A"></p>
-      <p id="entrada-stock-actual" class="text-xs" style="color:#64748B"></p>
+      <!-- Tarjeta del producto -->
+      <div class="rounded-xl p-3" style="background:#F0FDF4;border:1px solid #BBF7D0">
+        <p id="entrada-prod-name" class="font-bold text-sm" style="color:#0F172A;text-transform:uppercase;letter-spacing:.03em"></p>
+        <p id="entrada-prod-sub" class="text-xs mt-1 hidden" style="color:#64748B"></p>
+        <p id="entrada-prod-pres" class="text-xs mt-0.5 hidden" style="color:#94A3B8"></p>
+        <div id="entrada-prod-meta" class="flex flex-wrap items-center gap-2 mt-2">
+          <span id="entrada-prod-precio" class="text-xs font-bold hidden" style="color:#2563EB"></span>
+          <span id="entrada-stock-actual" class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:#DCFCE7;color:#16A34A"></span>
+          <span id="entrada-badge-receta" class="text-xs font-semibold px-2 py-0.5 rounded-full hidden" style="background:#FEF3C7;color:#B45309">Receta</span>
+          <span id="entrada-badge-ctrl"   class="text-xs font-semibold px-2 py-0.5 rounded-full hidden" style="background:#FEE2E2;color:#DC2626">Controlada</span>
+          <span id="entrada-prod-cat"     class="text-xs hidden" style="color:#94A3B8"></span>
+        </div>
+      </div>
       <div class="grid grid-cols-2 gap-4">
         <div class="col-span-2">
           <label class="lbl">Cantidad a ingresar *</label>
@@ -4339,15 +4350,58 @@ async function scanBarcode(barcode) {
   }
 }
 
+// Populate the Entrada modal info card from a product object
+function _fillEntradaCard(prod) {
+  document.getElementById('entrada-prod-name').textContent = (prod.nombre || '').toUpperCase();
+
+  const sub = [prod.nombre_generico, prod.marca].filter(Boolean).join('  ·  ');
+  const subEl = document.getElementById('entrada-prod-sub');
+  subEl.textContent = sub;
+  subEl.classList.toggle('hidden', !sub);
+
+  const pres = [prod.presentacion, prod.concentracion, prod.contenido].filter(Boolean).join('  ·  ');
+  const presEl = document.getElementById('entrada-prod-pres');
+  presEl.textContent = pres;
+  presEl.classList.toggle('hidden', !pres);
+
+  const precioEl = document.getElementById('entrada-prod-precio');
+  if (prod.precio_venta != null) {
+    precioEl.textContent = '$' + Number(prod.precio_venta).toFixed(2) + (prod.aplica_iva ? '  +IVA' : '');
+    precioEl.classList.remove('hidden');
+  } else {
+    precioEl.classList.add('hidden');
+  }
+
+  const stockEl = document.getElementById('entrada-stock-actual');
+  const s = prod.stock ?? 0;
+  stockEl.textContent = 'Stock: ' + s;
+  stockEl.style.background = s <= 0 ? '#FEE2E2' : s <= 5 ? '#FEF9C3' : '#DCFCE7';
+  stockEl.style.color      = s <= 0 ? '#DC2626' : s <= 5 ? '#B45309' : '#16A34A';
+
+  document.getElementById('entrada-badge-receta').classList.toggle('hidden', !prod.requiere_receta);
+  document.getElementById('entrada-badge-ctrl').classList.toggle('hidden', !prod.sustancia_controlada);
+
+  // Category name from the pm-cat select options (already loaded)
+  const catEl = document.getElementById('entrada-prod-cat');
+  const catId = prod.categoria_id;
+  if (catId) {
+    const sel = document.getElementById('pm-cat');
+    const opt = sel ? [...sel.options].find(o => Number(o.value) === catId) : null;
+    catEl.textContent = opt ? opt.text : '';
+    catEl.classList.toggle('hidden', !opt);
+  } else {
+    catEl.classList.add('hidden');
+  }
+}
+
 // Open Entrada de Stock modal for a product — fetch fresh stock first
 async function openEntradaModal(prod) {
   S._entradaProdId = prod.id;
-  document.getElementById('entrada-prod-name').textContent = prod.nombre;
-  document.getElementById('entrada-stock-actual').textContent = 'Stock actual: ' + prod.stock;
+  _fillEntradaCard(prod);
   document.getElementById('en-cantidad').value = '';
   document.getElementById('en-lote').value = '';
   document.getElementById('en-fecha').value = '';
-  document.getElementById('en-pcompra').value = '0';
+  document.getElementById('en-pcompra').value = prod.precio_compra != null ? prod.precio_compra : '0';
   openModal('modal-entrada');
   setTimeout(() => document.getElementById('en-cantidad').focus(), 120);
   // Refresh stock display in background
@@ -4355,7 +4409,7 @@ async function openEntradaModal(prod) {
     const r = await api('/productos/' + prod.id);
     if (r.ok) {
       const fresh = await r.json();
-      document.getElementById('entrada-stock-actual').textContent = 'Stock actual: ' + fresh.stock;
+      _fillEntradaCard(fresh);
     }
   } catch (_) {}
 }

@@ -45,6 +45,7 @@ class ProductoResponse(BaseModel):
     stock_minimo: int
     aplica_iva: bool
     requiere_receta: bool
+    sustancia_controlada: bool = False
     presentacion: Optional[str] = None
     concentracion: Optional[str] = None
     contenido: Optional[str] = None
