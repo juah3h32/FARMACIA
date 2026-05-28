@@ -293,9 +293,49 @@ def sync_to_turso() -> None:
             lconn.close()
 
 
+def sync_from_turso() -> int:
+    """
+    Pull all FULL_SYNC tables from Turso → local SQLite (INSERT OR REPLACE).
+    Runs on every startup so that products added on other PCs appear locally.
+    Returns total rows merged.
+    """
+    with _lock:
+        lconn = _local_conn()
+        try:
+            lconn.execute("PRAGMA foreign_keys = OFF")
+            total = 0
+            for table in _TABLE_ORDER:
+                if table not in _FULL_SYNC:
+                    continue
+                try:
+                    cols, rows = _turso_read_table(table)
+                    if not cols or not rows:
+                        continue
+                    col_str = ", ".join(cols)
+                    ph_str  = ", ".join(["?" for _ in cols])
+                    sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+                    lconn.executemany(sql, rows)
+                    total += len(rows)
+                    print(f"[Sync] ← Turso {table}: {len(rows)} rows")
+                except Exception as e:
+                    print(f"[Sync] sync_from_turso warning — {table}: {e}")
+            lconn.execute("PRAGMA foreign_keys = ON")
+            lconn.commit()
+            print(f"[Sync] Pull complete — {total} rows merged from Turso")
+            return total
+        except Exception as e:
+            lconn.rollback()
+            print(f"[Sync] sync_from_turso failed: {e}")
+            traceback.print_exc()
+            return 0
+        finally:
+            lconn.close()
+
+
 def force_sync() -> dict:
-    """Immediate sync local → Turso. Returns row counts per table."""
+    """Immediate bidirectional sync: push local → Turso, then pull Turso → local."""
     sync_to_turso()
+    sync_from_turso()
     return get_db_stats()
 
 
@@ -356,24 +396,36 @@ def make_daily_backup() -> bool:
 
 
 def start_background_sync(interval: int = 60) -> threading.Thread:
-    """Daemon thread: daily backup + sync local → Turso.
+    """Daemon thread: daily backup + bidirectional sync every cycle.
 
-    Syncs immediately when mark_dirty() is called (after any local write),
-    or at most `interval` seconds after the last sync as a heartbeat.
+    On write (mark_dirty): push local → Turso immediately, then pull Turso → local.
+    Heartbeat every `interval` seconds: pull Turso → local to pick up changes
+    made on other PCs.
     """
     def _loop():
         time.sleep(10)   # let app fully initialize
         make_daily_backup()
+        # Initial pull to catch anything added on other PCs while this PC was off
+        try:
+            sync_from_turso()
+        except Exception as e:
+            print(f"[Sync] Initial pull error: {e}")
+
         while True:
-            # Wake up when dirty (write happened) or after `interval` seconds
+            # Wake up when dirty (local write happened) or after `interval` seconds
             _dirty.wait(timeout=interval)
             _dirty.clear()
             try:
                 sync_to_turso()
             except Exception as e:
-                print(f"[Sync] Background sync error: {e}")
+                print(f"[Sync] Push error: {e}")
+            # Always pull after push (or on heartbeat) — catches remote changes
+            try:
+                sync_from_turso()
+            except Exception as e:
+                print(f"[Sync] Pull error: {e}")
 
     t = threading.Thread(target=_loop, daemon=True, name="TursoSync")
     t.start()
-    print(f"[Sync] Background sync started (immediate on write, heartbeat every {interval}s)")
+    print(f"[Sync] Background sync started (push on write + pull every {interval}s)")
     return t

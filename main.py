@@ -43,8 +43,9 @@ def main():
     init_db()
 
     if cfg.TURSO_SYNC:
-        from app.database.sync_service import import_from_turso, start_background_sync
-        import_from_turso()
+        from app.database.sync_service import import_from_turso, sync_from_turso, start_background_sync
+        import_from_turso()   # one-time seed when local is empty
+        sync_from_turso()     # always pull latest from Turso on every startup
         start_background_sync(interval=60)
 
     port = _find_free_port(cfg.API_PORT)
