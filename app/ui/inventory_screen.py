@@ -522,16 +522,84 @@ class EntradaStockDialog(ctk.CTkToplevel):
     def _build_ui(self):
         db = get_db_session()
         try:
-            prod = db.query(Producto).filter(Producto.id == self.producto_id).first()
-            nombre = prod.nombre if prod else "?"
-            stock_actual = prod.stock if prod else 0
+            from sqlalchemy.orm import joinedload
+            prod = db.query(Producto).options(
+                joinedload(Producto.categoria)
+            ).filter(Producto.id == self.producto_id).first()
+            nombre          = prod.nombre if prod else "?"
+            nombre_generico = (prod.nombre_generico or "") if prod else ""
+            marca           = (prod.marca or "") if prod else ""
+            stock_actual    = prod.stock if prod else 0
+            precio_venta    = prod.precio_venta if prod else 0.0
+            categoria       = prod.categoria.nombre if (prod and prod.categoria) else ""
+            partes = [x for x in (
+                getattr(prod, "presentacion", None),
+                getattr(prod, "concentracion", None),
+                getattr(prod, "contenido", None),
+            ) if x] if prod else []
+            presentacion    = "  ·  ".join(partes)
+            req_receta      = prod.requiere_receta if prod else False
+            controlada      = prod.sustancia_controlada if prod else False
         finally:
             db.close()
 
-        ctk.CTkLabel(self, text="📥 Entrada de Stock", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(16, 4))
-        ctk.CTkLabel(self, text=nombre, font=ctk.CTkFont(size=13, weight="bold"),
-                     text_color="#2196F3", wraplength=350).pack(pady=(0, 4))
-        ctk.CTkLabel(self, text=f"Stock actual: {stock_actual}", font=ctk.CTkFont(size=12)).pack()
+        ctk.CTkLabel(self, text="📥 Entrada de Stock",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(16, 4))
+
+        # ── Tarjeta del producto ──────────────────────────────────────────────
+        card = ctk.CTkFrame(self, corner_radius=10, fg_color="#F0F4F8",
+                            border_width=1, border_color="#E2E8F0")
+        card.pack(fill="x", padx=20, pady=(0, 10))
+
+        ctk.CTkLabel(card, text=nombre,
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color="#0F172A", anchor="w", wraplength=360,
+                     ).pack(anchor="w", padx=12, pady=(10, 2))
+
+        if nombre_generico or marca:
+            sub = "  ·  ".join(x for x in (nombre_generico, marca) if x)
+            ctk.CTkLabel(card, text=sub, font=ctk.CTkFont(size=11),
+                         text_color="#64748B", anchor="w",
+                         ).pack(anchor="w", padx=12, pady=(0, 2))
+
+        if presentacion:
+            ctk.CTkLabel(card, text=presentacion, font=ctk.CTkFont(size=10),
+                         text_color="#94A3B8", anchor="w",
+                         ).pack(anchor="w", padx=12, pady=(0, 2))
+
+        # Fila: precio · categoría · stock · badges
+        bot = ctk.CTkFrame(card, fg_color="transparent")
+        bot.pack(fill="x", padx=12, pady=(2, 10))
+
+        ctk.CTkLabel(bot, text=f"${precio_venta:.2f}",
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color="#2563EB").pack(side="left")
+
+        if categoria:
+            ctk.CTkLabel(bot, text=f"  {categoria}",
+                         font=ctk.CTkFont(size=10), text_color="#64748B").pack(side="left")
+
+        stock_color = "#DC2626" if stock_actual <= 0 else ("#F59E0B" if stock_actual <= 5 else "#16A34A")
+        stock_bg    = "#FEE2E2" if stock_actual <= 0 else ("#FEF9C3" if stock_actual <= 5 else "#DCFCE7")
+        sb = ctk.CTkFrame(bot, corner_radius=6, fg_color=stock_bg)
+        sb.pack(side="left", padx=(8, 0))
+        ctk.CTkLabel(sb, text=f"  Stock: {stock_actual}  ",
+                     font=ctk.CTkFont(size=10, weight="bold"),
+                     text_color=stock_color).pack()
+
+        if req_receta:
+            rb = ctk.CTkFrame(bot, corner_radius=6, fg_color="#FEF3C7")
+            rb.pack(side="left", padx=(4, 0))
+            ctk.CTkLabel(rb, text="  Receta  ",
+                         font=ctk.CTkFont(size=9, weight="bold"),
+                         text_color="#B45309").pack()
+
+        if controlada:
+            cb = ctk.CTkFrame(bot, corner_radius=6, fg_color="#FEE2E2")
+            cb.pack(side="left", padx=(4, 0))
+            ctk.CTkLabel(cb, text="  Controlada  ",
+                         font=ctk.CTkFont(size=9, weight="bold"),
+                         text_color="#DC2626").pack()
 
         frame = ctk.CTkFrame(self, fg_color="transparent")
         frame.pack(fill="x", padx=24, pady=12)
