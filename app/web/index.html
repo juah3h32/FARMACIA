@@ -1557,6 +1557,44 @@
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
 
+<!-- ═══════════ PURGAR HISTORIAL MODAL ═══════════ -->
+<div id="modal-purge-historial" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(4px)" onclick="closeModal('modal-purge-historial')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[420px]">
+    <div class="h-1 w-full rounded-t-2xl" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
+    <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#FEE2E2">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEE2E2">
+        <i data-lucide="shield-alert" style="width:20px;height:20px;color:#EF4444"></i>
+      </div>
+      <div>
+        <h2 class="font-bold" style="color:#7F1D1D">Eliminar Historial</h2>
+        <p class="text-xs mt-0.5" style="color:#EF4444">Acción irreversible — requiere clave de seguridad</p>
+      </div>
+    </div>
+    <div class="p-6 flex flex-col gap-4">
+      <div class="rounded-xl p-4" style="background:#FFF5F5;border:1px solid #FEE2E2">
+        <p class="text-sm font-semibold mb-1" style="color:#7F1D1D">⚠️ Se eliminarán permanentemente:</p>
+        <ul class="text-xs space-y-1 pl-4 list-disc" style="color:#B91C1C">
+          <li>Todas las ventas y sus ítems</li>
+          <li>Todos los cortes de caja</li>
+          <li>Movimientos de stock e historial de auditoría</li>
+        </ul>
+        <p class="text-xs mt-2 font-medium" style="color:#64748B">✓ Se conservan: productos, clientes, empleados, categorías.</p>
+      </div>
+      <div>
+        <label class="lbl">Clave de seguridad</label>
+        <input id="purge-clave" type="password" class="inp" placeholder="••••••"
+               onkeydown="if(event.key==='Enter')executePurgeHistorial()">
+      </div>
+      <p id="purge-error" class="text-xs font-semibold hidden" style="color:#EF4444"></p>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="closeModal('modal-purge-historial')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="executePurgeHistorial()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#EF4444,#DC2626)">🗑 Eliminar historial</button>
+    </div>
+  </div>
+</div>
+
 <!-- Product modal -->
 <div id="modal-product" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-product')"></div>
@@ -4455,6 +4493,48 @@ async function saveEntrada() {
   } catch (ex) {
     toast('Error de red: ' + ex.message, 'error');
   }
+}
+
+// ── Purgar Historial ─────────────────────────────────────────────────────────
+function confirmPurgeVentas() {
+  document.getElementById('purge-clave').value = '';
+  document.getElementById('purge-error').classList.add('hidden');
+  openModal('modal-purge-historial');
+  setTimeout(() => document.getElementById('purge-clave').focus(), 120);
+}
+
+async function executePurgeHistorial() {
+  const clave = document.getElementById('purge-clave').value;
+  if (!clave) { showPurgeError('Ingresa la clave de seguridad'); return; }
+  const errEl = document.getElementById('purge-error');
+  errEl.classList.add('hidden');
+  try {
+    const res = await api('/admin/purgar-historial', {
+      method: 'POST',
+      body: JSON.stringify({ clave }),
+    });
+    if (res.ok) {
+      closeModal('modal-purge-historial');
+      toast('✅ Historial eliminado correctamente', 'success');
+      // Refresh dashboard + reports data
+      if (typeof loadDashboard === 'function') loadDashboard();
+    } else {
+      const e = await res.json().catch(() => ({}));
+      showPurgeError(e.detail || 'Error al eliminar');
+    }
+  } catch (ex) {
+    showPurgeError('Error de red: ' + ex.message);
+  }
+}
+
+function showPurgeError(msg) {
+  const el = document.getElementById('purge-error');
+  el.textContent = '⛔ ' + msg;
+  el.classList.remove('hidden');
+}
+
+function confirmFactoryReset() {
+  toast('Factory Reset no disponible en esta versión', 'warning');
 }
 
 // Global HID scanner detection — works even when an input has focus

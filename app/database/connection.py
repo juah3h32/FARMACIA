@@ -135,6 +135,7 @@ def _seed_initial_data():
                 db.add(Categoria(nombre=nombre))
 
         # Configuraciones default
+        from app.auth.auth_service import hash_password as _hp
         configs_default = {
             "farmacia_nombre":          cfg.PHARMACY_NAME,
             "farmacia_direccion":       cfg.PHARMACY_ADDRESS,
@@ -146,6 +147,7 @@ def _seed_initial_data():
             "impresora_tipo":           "usb",
             "impresora_puerto":         "COM1",
             "api_activa":               "true",
+            "purge_password_hash":      _hp("171215"),
         }
         for clave, valor in configs_default.items():
             if not db.query(Configuracion).filter(Configuracion.clave == clave).first():

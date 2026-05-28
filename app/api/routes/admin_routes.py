@@ -92,6 +92,30 @@ def update_progress(payload: dict = Depends(get_current_api_user)):
     return dict(_update_state)
 
 
+class PurgarHistorialIn(BaseModel):
+    clave: str
+
+
+@router.post("/purgar-historial")
+def purgar_historial(body: PurgarHistorialIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    from app.auth.auth_service import verify_password
+    db = get_db_session()
+    try:
+        cfg_row = db.query(Configuracion).filter(
+            Configuracion.clave == "purge_password_hash"
+        ).first()
+        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
+            raise HTTPException(status_code=403, detail="Clave incorrecta")
+    finally:
+        db.close()
+    from app.database.sync_service import purgar_ventas_historial_cierres
+    purgar_ventas_historial_cierres()
+    return {"ok": True}
+
+
 @router.post("/purgar-datos")
 def purgar_datos(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
