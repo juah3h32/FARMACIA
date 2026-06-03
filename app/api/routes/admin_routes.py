@@ -58,11 +58,17 @@ def check_update(payload: dict = Depends(get_current_api_user)):
         "latest_version": st["version"] or "",
         "current_version": cfg.VERSION,
         "has_download": st["url"] is not None,
+        "releases": st.get("releases", []),
     }
 
 
+class InstallUpdateIn(BaseModel):
+    version_url: str | None = None
+    is_installer: bool | None = None
+
+
 @router.post("/update/install")
-def install_update(payload: dict = Depends(get_current_api_user)):
+def install_update(body: InstallUpdateIn | None = None, payload: dict = Depends(get_current_api_user)):
     if _update_state["running"]:
         raise HTTPException(status_code=409, detail="Instalación en progreso")
     if not getattr(sys, "frozen", False):
@@ -74,7 +80,11 @@ def install_update(payload: dict = Depends(get_current_api_user)):
         from app.services import updater_service
         def on_progress(pct):
             _update_state["progress"] = pct
-        ok, err = updater_service.download_and_install(on_progress)
+        
+        vurl = body.version_url if body else None
+        isin = body.is_installer if body else None
+        
+        ok, err = updater_service.download_and_install(on_progress, version_url=vurl, is_installer=isin)
         if ok:
             _update_state.update({"progress": 1.0, "done": True, "running": False})
             import time

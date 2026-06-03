@@ -17,6 +17,7 @@ _status: dict = {
     "url": None,
     "asset_api_url": None,
     "is_installer": False,
+    "releases": [],  # List of {tag, version, url, is_installer}
 }
 _callbacks: list = []
 
@@ -70,37 +71,58 @@ def _do_check() -> None:
         import requests as _req
         resp = _req.get(cfg.GITHUB_RELEASES_URL, headers=_auth_headers(), timeout=8)
         resp.raise_for_status()
-        data = resp.json()
+        releases_data = resp.json()
 
-        tag = data.get("tag_name", "")
-        latest = _parse_version(tag)
-        current = _parse_version(cfg.VERSION)
-        available = latest > current
-        version = tag.lstrip("v")
+        if not isinstance(releases_data, list):
+            # Might be a single release if URL still points to /latest
+            releases_data = [releases_data]
 
-        # Prefer .exe installer; fall back to .zip
-        exe_url = exe_api = zip_url = zip_api = None
-        for asset in data.get("assets", []):
-            name = asset.get("name", "").lower()
-            aurl = asset.get("browser_download_url") or asset.get("url")
-            aapi = asset.get("url")
-            if name.endswith(".exe") and not exe_url:
-                exe_url = aurl
-                exe_api = aapi
-            elif name.endswith(".zip") and not zip_url:
-                zip_url = aurl
-                zip_api = aapi
+        all_releases = []
+        for data in releases_data:
+            tag = data.get("tag_name", "")
+            version = tag.lstrip("v")
+            
+            exe_url = exe_api = zip_url = zip_api = None
+            for asset in data.get("assets", []):
+                name = asset.get("name", "").lower()
+                aurl = asset.get("browser_download_url") or asset.get("url")
+                aapi = asset.get("url")
+                if name.endswith(".exe") and not exe_url:
+                    exe_url = aurl
+                    exe_api = aapi
+                elif name.endswith(".zip") and not zip_url:
+                    zip_url = aurl
+                    zip_api = aapi
+            
+            url = exe_url or zip_url
+            if url:
+                all_releases.append({
+                    "tag": tag,
+                    "version": version,
+                    "url": url,
+                    "is_installer": bool(exe_url),
+                    "body": data.get("body", "")
+                })
 
-        url = exe_url or zip_url
-        asset_api_url = exe_api or zip_api
-        is_installer = bool(exe_url)
+        if not all_releases:
+            with _lock:
+                _status.update({"checked": True, "available": False})
+            return
+
+        # Latest is the first one in the list (usually)
+        latest_rel = all_releases[0]
+        latest_ver = _parse_version(latest_rel["tag"])
+        current_ver = _parse_version(cfg.VERSION)
+        available = latest_ver > current_ver
 
         with _lock:
             _status.update({
-                "checked": True, "available": available,
-                "version": version, "url": url,
-                "asset_api_url": asset_api_url,
-                "is_installer": is_installer,
+                "checked": True,
+                "available": available,
+                "version": latest_rel["version"],
+                "url": latest_rel["url"],
+                "is_installer": latest_rel["is_installer"],
+                "releases": all_releases,
             })
     except Exception:
         with _lock:
@@ -115,13 +137,15 @@ def _do_check() -> None:
 
 # ── Download & install ────────────────────────────────────────────────────────
 
-def download_and_install(progress_callback=None) -> tuple[bool, str]:
+def download_and_install(progress_callback=None, version_url=None, is_installer=None) -> tuple[bool, str]:
     st = get_status()
-    url = st.get("url")
+    url = version_url or st.get("url")
     if not url:
-        return False, "No se encontró archivo de descarga en el release"
+        return False, "No se encontró archivo de descarga"
 
-    is_installer = st.get("is_installer", False) or url.lower().endswith(".exe")
+    if is_installer is None:
+        is_installer = st.get("is_installer", False) or url.lower().endswith(".exe")
+    
     tmp = Path(tempfile.gettempdir())
 
     if is_installer:

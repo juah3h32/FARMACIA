@@ -93,6 +93,12 @@ async def serve_spa(path: str = ""):
     if path.startswith("api/"):
         from fastapi import HTTPException
         raise HTTPException(status_code=404)
+    
+    # Intenta servir archivo estático si existe
+    file_path = _WEB_DIR / path
+    if path and file_path.exists() and file_path.is_file():
+        return FileResponse(str(file_path))
+
     index = _WEB_DIR / "index.html"
     if index.exists():
         return FileResponse(str(index))

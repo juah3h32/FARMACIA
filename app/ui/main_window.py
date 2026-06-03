@@ -657,13 +657,17 @@ class MainWindow(ctk.CTkToplevel):
 
     # ── Update progress card ──────────────────────────────────────────────────
 
-    def _show_update_card(self, version: str):
+    def _show_update_card(self, release_data: dict):
         """Ventana de progreso de actualización — centrada, con barra de título."""
         CW, CH = 400, 170
+        version = release_data.get("version", "")
+        url = release_data.get("url")
+        is_inst = release_data.get("is_installer", False)
 
         card = ctk.CTkToplevel(self)
         card.title("Actualizando FarmaciaPOS")
         card.resizable(False, False)
+        card.grab_set()
         # Centrar sobre la ventana principal
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width()  - CW) // 2
@@ -732,7 +736,7 @@ class MainWindow(ctk.CTkToplevel):
             self.after(0, lambda: _safe(_upd))
 
         def _do():
-            ok, err = updater_service.download_and_install(on_progress)
+            ok, err = updater_service.download_and_install(on_progress, version_url=url, is_installer=is_inst)
             if ok:
                 # Dar tiempo al instalador de iniciar antes de que cerremos
                 self.after(2500, self._on_close)
@@ -757,9 +761,8 @@ class MainWindow(ctk.CTkToplevel):
 
     def _show_update_dialog(self):
         st = updater_service.get_status()
-        available = st.get("available")
-        version = st.get("version")
-
+        releases = st.get("releases", [])
+        
         # Si aún no se chequeó → checar ahora
         if not st.get("checked"):
             self._update_btn.configure(state="disabled", text="Buscando...")
@@ -769,8 +772,8 @@ class MainWindow(ctk.CTkToplevel):
             ).start()
             return
 
-        # Sin update disponible
-        if not available:
+        # Sin releases disponibles
+        if not releases:
             dlg = ctk.CTkToplevel(self)
             dlg.title("Actualizaciones")
             dlg.geometry("360x160")
@@ -790,22 +793,39 @@ class MainWindow(ctk.CTkToplevel):
                           command=dlg.destroy).pack(pady=16)
             return
 
-        # Update disponible → confirm dialog then launch card
+        # Update disponible o selección manual → confirm dialog then launch card
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Actualización disponible")
-        dlg.geometry("420x220")
+        dlg.title("Actualización de Sistema")
+        dlg.geometry("420x280")
         dlg.resizable(False, False)
         dlg.grab_set()
         dlg.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - 420) // 2
-        y = self.winfo_y() + (self.winfo_height() - 220) // 2
-        dlg.geometry(f"420x220+{x}+{y}")
+        y = self.winfo_y() + (self.winfo_height() - 280) // 2
+        dlg.geometry(f"420x280+{x}+{y}")
 
-        ctk.CTkLabel(dlg, text="⬆  Nueva versión disponible",
+        ctk.CTkLabel(dlg, text="⬆  Actualización disponible",
                      font=ctk.CTkFont(size=16, weight="bold"),
-                     text_color=TEXT).pack(pady=(28, 4))
-        ctk.CTkLabel(dlg, text=f"v{cfg.VERSION}  →  v{version}",
-                     font=ctk.CTkFont(size=13), text_color=MUTED).pack(pady=(0, 6))
+                     text_color=TEXT).pack(pady=(22, 4))
+        ctk.CTkLabel(dlg, text=f"Versión actual: v{cfg.VERSION}",
+                     font=ctk.CTkFont(size=12), text_color=MUTED).pack(pady=(0, 10))
+
+        # Selector de versiones
+        ctk.CTkLabel(dlg, text="Seleccionar versión a instalar:",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=SB_MUTED).pack(pady=(4, 2))
+        
+        ver_map = {f"v{r['version']}" + (" (Recomendada)" if i==0 else ""): r for i, r in enumerate(releases)}
+        ver_list = list(ver_map.keys())
+        
+        sel_var = tk.StringVar(value=ver_list[0])
+        selector = ctk.CTkOptionMenu(
+            dlg, values=ver_list, variable=sel_var,
+            width=240, height=32, corner_radius=8,
+            fg_color=SB_BRAND, text_color=TEXT,
+            button_color=BORDER, button_hover_color=SB_HOVER,
+        )
+        selector.pack(pady=(0, 10))
 
         lbl_dev = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(size=11))
         lbl_dev.pack()
@@ -826,8 +846,9 @@ class MainWindow(ctk.CTkToplevel):
         ).pack(side="left", padx=8)
 
         def _start():
+            rel = ver_map[sel_var.get()]
             dlg.destroy()
-            self._show_update_card(version or "")
+            self._show_update_card(rel)
 
         ctk.CTkButton(
             btn_frame, text="Descargar e instalar",
