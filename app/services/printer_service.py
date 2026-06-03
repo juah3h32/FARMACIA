@@ -38,14 +38,22 @@ class PrinterService:
 
     def connect(self, printer_type: str = "usb", port: str = None):
         self.printer_type = printer_type
+        _log(f"Intentando conectar: tipo={printer_type}, port={port}")
         try:
             if printer_type == "windows":
                 import win32print
                 all_printers = self.list_windows_printers()
+                _log(f"Impresoras encontradas en el sistema: {all_printers}")
                 
+                if not all_printers:
+                    _log("ERROR: No se detectaron impresoras instaladas en Windows.")
+                    self.connected = False
+                    return False
+
                 # 1. Intentar con el nombre exacto
                 name = port
                 if name and name in all_printers:
+                    _log(f"Conexión exitosa por nombre exacto: {name}")
                     self.printer_name = name
                     self.connected = True
                     return True
@@ -53,37 +61,45 @@ class PrinterService:
                 # 2. Buscar uno que parezca ticketera (ampliado)
                 keywords = [
                     "POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA", 
-                    "ZJIANG", "XPRINTER", "STAR", "BIXOLON", "TM-T", "SRP", "XP-"
+                    "ZJIANG", "XPRINTER", "STAR", "BIXOLON", "TM-T", "SRP", "XP-",
+                    "RECEIPT", "MINIPRINTER", "THERMAL"
                 ]
                 best_match = None
                 
-                for p in all_printers:
-                    p_upper = p.upper()
-                    # Prioridad 1: Si contiene el nombre original (ej: "POS-58 (Copy 1)" contiene "POS-58")
-                    if name and name.upper() in p_upper:
-                        best_match = p
-                        break
-                    # Prioridad 2: Si contiene palabras clave
-                    if any(k in p_upper for k in keywords):
-                        best_match = p
-                        # Seguimos buscando por si hay uno que coincida con el nombre original
+                # Primero buscar coincidencias que contengan el nombre original
+                if name:
+                    for p in all_printers:
+                        if name.upper() in p.upper() or p.upper() in name.upper():
+                            best_match = p
+                            _log(f"Coincidencia parcial con nombre original: {p}")
+                            break
+                
+                # Si no, buscar por palabras clave
+                if not best_match:
+                    for p in all_printers:
+                        p_upper = p.upper()
+                        if any(k in p_upper for k in keywords):
+                            best_match = p
+                            _log(f"Coincidencia por palabra clave: {p}")
+                            break
                 
                 if not best_match and not name:
                     try:
                         best_match = win32print.GetDefaultPrinter()
+                        _log(f"Usando impresora predeterminada de Windows: {best_match}")
                     except:
                         pass
                 
                 if best_match:
-                    _log(f"Auto-detectada impresora: {best_match} (era: {name})")
+                    _log(f"Auto-detectada impresora: {best_match} (configurada era: {name})")
                     self.printer_name = best_match
                     self.connected = True
                     
-                    # Guardar el nombre detectado para que sea el nuevo default
                     if best_match != name:
                         self._save_auto_detected_name(best_match)
                     return True
                 
+                _log("ERROR: No se encontró ninguna impresora que coincida con los criterios.")
                 self.connected = False
                 return False
 
