@@ -50,23 +50,25 @@ class PrinterService:
                     self.connected = True
                     return True
                 
-                # 2. Si no hay nombre o no existe, buscar uno que parezca ticketera
-                keywords = ["POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA"]
+                # 2. Buscar uno que parezca ticketera (ampliado)
+                keywords = [
+                    "POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA", 
+                    "ZJIANG", "XPRINTER", "STAR", "BIXOLON", "TM-T", "SRP", "XP-"
+                ]
                 best_match = None
                 
                 for p in all_printers:
                     p_upper = p.upper()
-                    # Si contiene el nombre original (ej: "POS-58 (Copy 1)" contiene "POS-58")
+                    # Prioridad 1: Si contiene el nombre original (ej: "POS-58 (Copy 1)" contiene "POS-58")
                     if name and name.upper() in p_upper:
                         best_match = p
                         break
-                    # Si contiene palabras clave
+                    # Prioridad 2: Si contiene palabras clave
                     if any(k in p_upper for k in keywords):
                         best_match = p
-                        # No paramos, seguimos buscando uno mejor o el primero que sirva
+                        # Seguimos buscando por si hay uno que coincida con el nombre original
                 
                 if not best_match and not name:
-                    # Si no hay nada, usar la predeterminada
                     try:
                         best_match = win32print.GetDefaultPrinter()
                     except:
@@ -76,6 +78,10 @@ class PrinterService:
                     _log(f"Auto-detectada impresora: {best_match} (era: {name})")
                     self.printer_name = best_match
                     self.connected = True
+                    
+                    # Guardar el nombre detectado para que sea el nuevo default
+                    if best_match != name:
+                        self._save_auto_detected_name(best_match)
                     return True
                 
                 self.connected = False
@@ -159,9 +165,10 @@ class PrinterService:
         w = farmacia_config.get("impresora_ancho", "32")
         self.width = int(w) if str(w).isdigit() else 32
 
+        tipo   = farmacia_config.get("impresora_tipo",   "windows")
+        puerto = farmacia_config.get("impresora_nombre") or farmacia_config.get("impresora_puerto", "")
+
         if not self.connected:
-            tipo   = farmacia_config.get("impresora_tipo",   "windows")
-            puerto = farmacia_config.get("impresora_nombre") or farmacia_config.get("impresora_puerto", "")
             _log(f"Auto-conectando: tipo={tipo} puerto={puerto}")
             self.connect(tipo, puerto or None)
             _log(f"connected={self.connected}")
@@ -175,15 +182,32 @@ class PrinterService:
             _log(f"Imprimiendo via tipo={self.printer_type} nombre={self.printer_name}")
             if self.printer_type == "windows":
                 result = self._print_windows(venta_data, farmacia_config)
-                _log(f"resultado: {result}")
+                if not result:
+                    # Reintento: forzar reconexión y volver a intentar
+                    _log("Fallo impresion Windows, reintentando con reconexion...")
+                    self.connected = False
+                    self.connect(tipo, puerto or None)
+                    result = self._print_windows(venta_data, farmacia_config)
+                
+                _log(f"resultado final: {result}")
                 return result
+                
             if not self.printer:
                 _log("ESC/POS: printer es None")
                 self._print_to_console(venta_data, farmacia_config)
                 return False
-            return self._print_escpos(venta_data, farmacia_config)
+            
+            try:
+                return self._print_escpos(venta_data, farmacia_config)
+            except Exception:
+                # Reintento ESC/POS
+                _log("Fallo ESC/POS, reintentando con reconexion...")
+                self.connected = False
+                self.connect(tipo, puerto or None)
+                return self._print_escpos(venta_data, farmacia_config)
+
         except Exception:
-            _log(f"EXCEPCION: {traceback.format_exc()}")
+            _log(f"EXCEPCION FINAL: {traceback.format_exc()}")
             return False
 
     # ── Construcción del ticket ───────────────────────────────────────────────
@@ -354,6 +378,32 @@ class PrinterService:
                 db.close()
         except Exception:
             return {}
+
+    def _save_auto_detected_name(self, name: str):
+        """Persiste el nombre auto-detectado en la base de datos."""
+        try:
+            from app.database.connection import get_db_session
+            from app.database.models import Configuracion
+            import threading
+            
+            def _save():
+                db = get_db_session()
+                try:
+                    c = db.query(Configuracion).filter(Configuracion.clave == "impresora_nombre").first()
+                    if c:
+                        c.valor = name
+                    else:
+                        db.add(Configuracion(clave="impresora_nombre", valor=name))
+                    db.commit()
+                except:
+                    db.rollback()
+                finally:
+                    db.close()
+            
+            # Ejecutar en hilo separado para no bloquear la impresion
+            threading.Thread(target=_save, daemon=True).start()
+        except:
+            pass
 
     def test_printer(self) -> bool:
         if not self.connected:
