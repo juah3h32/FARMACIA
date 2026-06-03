@@ -41,14 +41,94 @@ class PrinterService:
         try:
             if printer_type == "windows":
                 import win32print
-                name = port or win32print.GetDefaultPrinter()
-                self.printer_name = name
-                self.connected = True
-                return True
+                all_printers = self.list_windows_printers()
+                
+                # 1. Intentar con el nombre exacto
+                name = port
+                if name and name in all_printers:
+                    self.printer_name = name
+                    self.connected = True
+                    return True
+                
+                # 2. Si no hay nombre o no existe, buscar uno que parezca ticketera
+                keywords = ["POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA"]
+                best_match = None
+                
+                for p in all_printers:
+                    p_upper = p.upper()
+                    # Si contiene el nombre original (ej: "POS-58 (Copy 1)" contiene "POS-58")
+                    if name and name.upper() in p_upper:
+                        best_match = p
+                        break
+                    # Si contiene palabras clave
+                    if any(k in p_upper for k in keywords):
+                        best_match = p
+                        # No paramos, seguimos buscando uno mejor o el primero que sirva
+                
+                if not best_match and not name:
+                    # Si no hay nada, usar la predeterminada
+                    try:
+                        best_match = win32print.GetDefaultPrinter()
+                    except:
+                        pass
+                
+                if best_match:
+                    _log(f"Auto-detectada impresora: {best_match} (era: {name})")
+                    self.printer_name = best_match
+                    self.connected = True
+                    return True
+                
+                self.connected = False
+                return False
 
             from escpos import printer as ep
             if printer_type == "usb":
-                self.printer = ep.Usb(0x04b8, 0x0202)
+                # Lista de VIDs/PIDs comunes de impresoras POS
+                common_vids = [
+                    (0x04b8, 0x0202), # Epson
+                    (0x0416, 0x5011), # ZJiang / Generic
+                    (0x1fc9, 0x2016), # Generic
+                    (0x0fe6, 0x811e), # ZJiang
+                    (0x1ee1, 0x0001), # Xprinter
+                    (0x0483, 0x5740), # Xprinter / ST
+                    (0x0519, 0x0001), # Star
+                    (0x1504, 0x0001), # Bixolon
+                ]
+                
+                success = False
+                # 1. Intentar con el default/hardcoded primero
+                try:
+                    self.printer = ep.Usb(0x04b8, 0x0202)
+                    success = True
+                except:
+                    # 2. Intentar con otros comunes
+                    for vid, pid in common_vids:
+                        if vid == 0x04b8 and pid == 0x0202: continue # ya probado
+                        try:
+                            self.printer = ep.Usb(vid, pid)
+                            success = True
+                            _log(f"Auto-detectada impresora USB: VID={hex(vid)} PID={hex(pid)}")
+                            break
+                        except:
+                            continue
+                
+                if not success:
+                    # 3. Intentar buscar CUALQUIER impresora USB usando pyusb directamente si es posible
+                    try:
+                        import usb.core
+                        import usb.util
+                        # Buscar dispositivos de clase 7 (Printer)
+                        dev = usb.core.find(custom_match=lambda d: any(i.bInterfaceClass == 7 for c in d for i in c))
+                        if dev:
+                            self.printer = ep.Usb(dev.idVendor, dev.idProduct)
+                            success = True
+                            _log(f"Auto-detectada impresora USB por clase: VID={hex(dev.idVendor)} PID={hex(dev.idProduct)}")
+                    except:
+                        pass
+                
+                if not success:
+                    raise Exception("No se encontró ninguna impresora USB compatible")
+                    
             elif printer_type == "serial":
                 self.printer = ep.Serial(port or "COM1", baudrate=9600)
             elif printer_type == "network":
