@@ -736,25 +736,34 @@ class MainWindow(ctk.CTkToplevel):
             self.after(0, lambda: _safe(_upd))
 
         def _do():
-            ok, err = updater_service.download_and_install(on_progress, version_url=url, is_installer=is_inst)
-            if ok:
-                # Dar tiempo al instalador de iniciar antes de que cerremos
-                self.after(2500, self._on_close)
-            else:
-                def _show_err():
-                    if not _card_alive():
-                        return
-                    prog.configure(progress_color="#EF4444")
-                    lbl_status.configure(
-                        text=f"Error: {err}", text_color="#EF4444")
-                    ctk.CTkButton(
-                        inner, text="Cerrar", height=28,
-                        fg_color="transparent", border_width=1,
-                        border_color="#475569", text_color="#94A3B8",
-                        corner_radius=6,
-                        command=card.destroy,
-                    ).pack(padx=14, pady=(0, 10), fill="x")
-                self.after(0, _show_err)
+            max_retries = 10
+            retry_count = 0
+            while retry_count < max_retries:
+                ok, err = updater_service.download_and_install(on_progress, version_url=url, is_installer=is_inst) 
+                if ok:
+                    # Dar tiempo al instalador de iniciar antes de que cerremos
+                    self.after(2500, self._on_close)
+                    return
+                else:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        self.after(0, lambda: lbl_status.configure(text=f"Reintentando en 5s... ({retry_count}/{max_retries})", text_color="#F59E0B"))
+                        time.sleep(5)
+                    else:
+                        def _show_err():
+                            if not _card_alive():
+                                return
+                            prog.configure(progress_color="#EF4444")
+                            lbl_status.configure(
+                                text=f"Error final: {err}", text_color="#EF4444")
+                            ctk.CTkButton(
+                                inner, text="Cerrar", height=28,
+                                fg_color="transparent", border_width=1,
+                                border_color="#475569", text_color="#94A3B8",
+                                corner_radius=6,
+                                command=card.destroy,
+                            ).pack(padx=14, pady=(0, 10), fill="x")
+                        self.after(0, _show_err)
 
         threading.Thread(target=_do, daemon=True, name="AutoUpdater").start()
         return card

@@ -78,20 +78,31 @@ def install_update(body: InstallUpdateIn | None = None, payload: dict = Depends(
 
     def _run():
         from app.services import updater_service
+        import time
         def on_progress(pct):
             _update_state["progress"] = pct
         
         vurl = body.version_url if body else None
         isin = body.is_installer if body else None
         
-        ok, err = updater_service.download_and_install(on_progress, version_url=vurl, is_installer=isin)
-        if ok:
-            _update_state.update({"progress": 1.0, "done": True, "running": False})
-            import time
-            time.sleep(2.0)
-            os._exit(0)
-        else:
-            _update_state.update({"error": err, "running": False})
+        max_retries = 10
+        retry_count = 0
+        last_err = ""
+
+        while retry_count < max_retries:
+            ok, err = updater_service.download_and_install(on_progress, version_url=vurl, is_installer=isin)
+            if ok:
+                _update_state.update({"progress": 1.0, "done": True, "running": False})
+                time.sleep(2.0)
+                os._exit(0)
+                return
+            else:
+                last_err = err
+                retry_count += 1
+                if retry_count < max_retries:
+                    time.sleep(5) # Wait before retry
+                else:
+                    _update_state.update({"error": f"Error tras {max_retries} reintentos: {last_err}", "running": False})
 
     threading.Thread(target=_run, daemon=True).start()
     return {"started": True}

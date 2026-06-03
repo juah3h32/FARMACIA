@@ -155,17 +155,40 @@ def download_and_install(progress_callback=None, version_url=None, is_installer=
 
 
 def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float = 0.85) -> tuple[bool, str]:
-    """Download url → dest, reporting progress up to pct_max."""
+    """Download url → dest, reporting progress up to pct_max. Supports resuming."""
     try:
         import requests as _req
         hdrs = {"User-Agent": "FarmaciaPOS-Updater/1.0", "Accept": "application/octet-stream"}
         if getattr(cfg, "GITHUB_TOKEN", ""):
             hdrs["Authorization"] = f"Bearer {cfg.GITHUB_TOKEN}"
-        with _req.get(url, headers=hdrs, stream=True, timeout=300) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("Content-Length") or 0)
-            downloaded = 0
-            with open(dest, "wb") as f:
+        
+        # Resume support: check existing file size
+        existing_size = dest.stat().st_size if dest.exists() else 0
+        if existing_size > 0:
+            hdrs["Range"] = f"bytes={existing_size}-"
+
+        with _req.get(url, headers=hdrs, stream=True, timeout=60) as resp:
+            # Handle 206 Partial Content or 200 OK
+            if resp.status_code == 206:
+                # Partial content: we are resuming
+                total_content_range = resp.headers.get("Content-Range")
+                if total_content_range:
+                    # Content-Range: bytes 123-456/789
+                    total = int(total_content_range.split("/")[-1])
+                else:
+                    total = int(resp.headers.get("Content-Length") or 0) + existing_size
+            elif resp.status_code == 200:
+                # Server doesn't support range or file is new
+                existing_size = 0
+                total = int(resp.headers.get("Content-Length") or 0)
+            else:
+                resp.raise_for_status()
+                total = int(resp.headers.get("Content-Length") or 0)
+
+            downloaded = existing_size
+            mode = "ab" if existing_size > 0 else "wb"
+            
+            with open(dest, mode) as f:
                 for chunk in resp.iter_content(chunk_size=65536):
                     if not chunk:
                         continue
