@@ -325,11 +325,55 @@ class PrinterService:
     def _print_windows(self, venta_data: dict, farmacia_config: dict) -> bool:
         try:
             import win32print
+            import win32ui
+            import win32con
+
+            ticket = self._build_ticket(venta_data, farmacia_config)
+            
+            # Usar GDI para imprimir como texto estándar, más compatible que el modo RAW
+            hDC = win32ui.CreateDC()
+            hDC.CreatePrinterDC(self.printer_name)
+            
+            # Configuración de fuente básica para tickets (Courier para monoespaciado)
+            font_size = 10
+            if self.width > 40: # 80mm
+                font_size = 10
+            else: # 58mm
+                font_size = 8
+
+            hDC.StartDoc("Ticket Farmacia")
+            hDC.StartPage()
+            
+            font = win32ui.CreateFont({
+                "name": "Courier New",
+                "height": -int(font_size * 1.5), # Ajuste de tamaño de fuente
+                "weight": 400,
+            })
+            hDC.SelectObject(font)
+            
+            # Dibujar línea por línea
+            y = 10
+            for line in ticket.split("\n"):
+                hDC.TextOut(10, y, line)
+                y += int(font_size * 2) # Espaciado entre líneas
+            
+            hDC.EndPage()
+            hDC.EndDoc()
+            hDC.DeleteDC()
+            
+            return True
+        except Exception:
+            _log(f"EXCEPCION _print_windows: {traceback.format_exc()}")
+            # Fallback al modo RAW si GDI falla
+            return self._print_windows_raw(venta_data, farmacia_config)
+
+    def _print_windows_raw(self, venta_data: dict, farmacia_config: dict) -> bool:
+        try:
+            import win32print
             ESC = b'\x1b'
             GS  = b'\x1d'
 
             ticket = self._build_ticket(venta_data, farmacia_config)
-            # ASCII puro — no necesita codepage especial
             raw = (
                 ESC + b'@' +
                 ticket.encode("ascii", errors="replace") +
@@ -339,7 +383,7 @@ class PrinterService:
 
             hPrinter = win32print.OpenPrinter(self.printer_name)
             try:
-                hJob = win32print.StartDocPrinter(hPrinter, 1, ("Ticket Farmacia", None, "RAW"))
+                win32print.StartDocPrinter(hPrinter, 1, ("Ticket Farmacia", None, "RAW"))
                 try:
                     win32print.StartPagePrinter(hPrinter)
                     win32print.WritePrinter(hPrinter, raw)
@@ -350,7 +394,7 @@ class PrinterService:
                 win32print.ClosePrinter(hPrinter)
             return True
         except Exception:
-            _log(f"EXCEPCION _print_windows: {traceback.format_exc()}")
+            _log(f"EXCEPCION _print_windows_raw: {traceback.format_exc()}")
             return False
 
     def _print_escpos(self, venta_data: dict, farmacia_config: dict) -> bool:
