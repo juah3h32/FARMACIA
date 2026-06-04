@@ -39,140 +39,125 @@ class PrinterService:
     def connect(self, printer_type: str = "usb", port: str = None):
         self.printer_type = printer_type
         _log(f"Intentando conectar: tipo={printer_type}, port={port}")
+        
         try:
             if printer_type == "windows":
-                import win32print
-                all_printers = self.list_windows_printers()
-                _log(f"Impresoras encontradas en el sistema: {all_printers}")
-                
-                if not all_printers:
-                    _log("ERROR: No se detectaron impresoras instaladas en Windows.")
-                    self.connected = False
-                    return False
-
-                # 1. Intentar con el nombre exacto
-                name = port
-                if name and name in all_printers:
-                    _log(f"Conexión exitosa por nombre exacto: {name}")
-                    self.printer_name = name
-                    self.connected = True
-                    return True
-                
-                # 2. Buscar uno que parezca ticketera (ampliado)
-                keywords = [
-                    "POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA", 
-                    "ZJIANG", "XPRINTER", "STAR", "BIXOLON", "TM-T", "SRP", "XP-",
-                    "RECEIPT", "MINIPRINTER", "THERMAL", "RP80", "RP58", "GOOJPRT",
-                    "HOIN", "MUNBYN", "PANTUM", "GPRINTER", "TEXT"
-                ]
-                best_match = None
-                
-                # Primero buscar coincidencias que contengan el nombre original
-                if name:
-                    name_up = name.upper()
-                    for p in all_printers:
-                        p_up = p.upper()
-                        if name_up in p_up or p_up in name_up:
-                            best_match = p
-                            _log(f"Coincidencia parcial con nombre original: {p}")
-                            break
-                
-                # Si no, buscar por palabras clave
-                if not best_match:
-                    for p in all_printers:
-                        p_upper = p.upper()
-                        if any(k in p_upper for k in keywords):
-                            best_match = p
-                            _log(f"Coincidencia por palabra clave: {p}")
-                            break
-
-                # Si sigue sin haber match, usar difflib para el más parecido al configurado
-                if not best_match and name and all_printers:
-                    import difflib
-                    matches = difflib.get_close_matches(name, all_printers, n=1, cutoff=0.4)
-                    if matches:
-                        best_match = matches[0]
-                        _log(f"Coincidencia difusa (difflib): {best_match}")
-                
-                if not best_match and not name:
-                    try:
-                        best_match = win32print.GetDefaultPrinter()
-                        _log(f"Usando impresora predeterminada de Windows: {best_match}")
-                    except:
-                        pass
-                
-                if best_match:
-                    _log(f"Auto-detectada impresora: {best_match} (configurada era: {name})")
-                    self.printer_name = best_match
-                    self.connected = True
-                    
-                    if best_match != name:
-                        self._save_auto_detected_name(best_match)
-                    return True
-                
-                _log("ERROR: No se encontró ninguna impresora que coincida con los criterios.")
-                self.connected = False
-                return False
+                return self._connect_windows(port)
 
             from escpos import printer as ep
             if printer_type == "usb":
-                # Lista de VIDs/PIDs comunes de impresoras POS
-                common_vids = [
-                    (0x04b8, 0x0202), # Epson
-                    (0x0416, 0x5011), # ZJiang / Generic
-                    (0x1fc9, 0x2016), # Generic
-                    (0x0fe6, 0x811e), # ZJiang
-                    (0x1ee1, 0x0001), # Xprinter
-                    (0x0483, 0x5740), # Xprinter / ST
-                    (0x0519, 0x0001), # Star
-                    (0x1504, 0x0001), # Bixolon
-                ]
-                
-                success = False
-                # 1. Intentar con el default/hardcoded primero
                 try:
-                    self.printer = ep.Usb(0x04b8, 0x0202)
-                    success = True
-                except:
-                    # 2. Intentar con otros comunes
+                    # Lista de VIDs/PIDs comunes
+                    common_vids = [
+                        (0x04b8, 0x0202), (0x0416, 0x5011), (0x1fc9, 0x2016),
+                        (0x0fe6, 0x811e), (0x1ee1, 0x0001), (0x0483, 0x5740),
+                        (0x0519, 0x0001), (0x1504, 0x0001),
+                    ]
+                    
+                    success = False
                     for vid, pid in common_vids:
-                        if vid == 0x04b8 and pid == 0x0202: continue # ya probado
                         try:
                             self.printer = ep.Usb(vid, pid)
                             success = True
-                            _log(f"Auto-detectada impresora USB: VID={hex(vid)} PID={hex(pid)}")
+                            _log(f"Conectado USB: {hex(vid)}:{hex(pid)}")
                             break
-                        except:
-                            continue
-                
-                if not success:
-                    # 3. Intentar buscar CUALQUIER impresora USB usando pyusb directamente si es posible
-                    try:
-                        import usb.core
-                        import usb.util
-                        # Buscar dispositivos de clase 7 (Printer)
-                        dev = usb.core.find(custom_match=lambda d: any(i.bInterfaceClass == 7 for c in d for i in c))
-                        if dev:
-                            self.printer = ep.Usb(dev.idVendor, dev.idProduct)
-                            success = True
-                            _log(f"Auto-detectada impresora USB por clase: VID={hex(dev.idVendor)} PID={hex(dev.idProduct)}")
-                    except:
-                        pass
-                
-                if not success:
-                    raise Exception("No se encontró ninguna impresora USB compatible")
+                        except: continue
+                    
+                    if not success:
+                        # Fallback a windows si USB falla
+                        _log("USB falló, intentando fallback a modo Windows...")
+                        if self._connect_windows(port):
+                            self._save_auto_detected_config("windows", self.printer_name)
+                            return True
+                        raise Exception("No se encontró impresora USB compatible")
+                    
+                    self.connected = True
+                    return True
+                except Exception as e:
+                    _log(f"Error USB: {e}")
+                    # Último intento: fallback a windows
+                    if self._connect_windows(port):
+                        self._save_auto_detected_config("windows", self.printer_name)
+                        return True
+                    raise e
                     
             elif printer_type == "serial":
                 self.printer = ep.Serial(port or "COM1", baudrate=9600)
             elif printer_type == "network":
                 host, p = (port or "192.168.1.100:9100").split(":")
                 self.printer = ep.Network(host, int(p))
+            
             self.connected = True
             return True
         except Exception as e:
-            _log(f"Error conectando: {e}")
+            _log(f"Error crítico conectando: {e}")
             self.connected = False
             return False
+
+    def _connect_windows(self, name: str = None) -> bool:
+        try:
+            import win32print
+            all_printers = self.list_windows_printers()
+            if not all_printers: return False
+
+            # 1. Exact match
+            if name and name in all_printers:
+                self.printer_name = name
+                self.connected = True
+                self.printer_type = "windows"
+                return True
+            
+            # 2. Keymatch / Fuzzy
+            keywords = ["POS", "58", "80", "TICKET", "EPSON", "GENERIC", "XP-", "RP", "GOOJ", "IMPRESORA"]
+            best_match = None
+            
+            # Search by keyword
+            for p in all_printers:
+                p_up = p.upper()
+                if any(k in p_up for k in keywords):
+                    best_match = p
+                    break
+            
+            # Search by similarity
+            if not best_match and name:
+                import difflib
+                m = difflib.get_close_matches(name, all_printers, n=1, cutoff=0.4)
+                if m: best_match = m[0]
+
+            if not best_match:
+                try: best_match = win32print.GetDefaultPrinter()
+                except: pass
+
+            if best_match:
+                _log(f"Windows Auto-detect: {best_match}")
+                self.printer_name = best_match
+                self.connected = True
+                self.printer_type = "windows"
+                return True
+            
+            return False
+        except Exception as e:
+            _log(f"Error _connect_windows: {e}")
+            return False
+
+    def _save_auto_detected_config(self, tipo: str, name: str):
+        """Persiste tipo y nombre en la DB."""
+        try:
+            from app.database.connection import get_db_session
+            from app.database.models import Configuracion
+            import threading
+            def _save():
+                db = get_db_session()
+                try:
+                    for k, v in [("impresora_tipo", tipo), ("impresora_nombre", name)]:
+                        c = db.query(Configuracion).filter(Configuracion.clave == k).first()
+                        if c: c.valor = v
+                        else: db.add(Configuracion(clave=k, valor=v))
+                    db.commit()
+                except: db.rollback()
+                finally: db.close()
+            threading.Thread(target=_save, daemon=True).start()
+        except: pass
 
     @staticmethod
     def list_windows_printers() -> list:
