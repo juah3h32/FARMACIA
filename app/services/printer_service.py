@@ -62,14 +62,17 @@ class PrinterService:
                 keywords = [
                     "POS", "58", "80", "TICKET", "EPSON", "GENERIC", "IMPRESORA", 
                     "ZJIANG", "XPRINTER", "STAR", "BIXOLON", "TM-T", "SRP", "XP-",
-                    "RECEIPT", "MINIPRINTER", "THERMAL"
+                    "RECEIPT", "MINIPRINTER", "THERMAL", "RP80", "RP58", "GOOJPRT",
+                    "HOIN", "MUNBYN", "PANTUM", "GPRINTER", "TEXT"
                 ]
                 best_match = None
                 
                 # Primero buscar coincidencias que contengan el nombre original
                 if name:
+                    name_up = name.upper()
                     for p in all_printers:
-                        if name.upper() in p.upper() or p.upper() in name.upper():
+                        p_up = p.upper()
+                        if name_up in p_up or p_up in name_up:
                             best_match = p
                             _log(f"Coincidencia parcial con nombre original: {p}")
                             break
@@ -82,6 +85,14 @@ class PrinterService:
                             best_match = p
                             _log(f"Coincidencia por palabra clave: {p}")
                             break
+
+                # Si sigue sin haber match, usar difflib para el más parecido al configurado
+                if not best_match and name and all_printers:
+                    import difflib
+                    matches = difflib.get_close_matches(name, all_printers, n=1, cutoff=0.4)
+                    if matches:
+                        best_match = matches[0]
+                        _log(f"Coincidencia difusa (difflib): {best_match}")
                 
                 if not best_match and not name:
                     try:
