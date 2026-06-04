@@ -176,6 +176,7 @@ class PrinterService:
 
     @staticmethod
     def list_windows_printers() -> list:
+        all_found = []
         try:
             import win32print
             # Intento 1: Enumeración estándar amplia
@@ -183,25 +184,37 @@ class PrinterService:
                      win32print.PRINTER_ENUM_CONNECTIONS | 
                      win32print.PRINTER_ENUM_SHARED | 
                      win32print.PRINTER_ENUM_NETWORK)
-            printers = [p[2] for p in win32print.EnumPrinters(flags)]
+            try:
+                all_found.extend([p[2] for p in win32print.EnumPrinters(flags)])
+            except: pass
             
-            # Intento 2: Si no hay nada, intentar con PRINTER_ENUM_NAME (vacío para local)
-            if not printers:
-                printers = [p[2] for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_NAME, None, 1)]
+            # Intento 2: PRINTER_ENUM_NAME
+            try:
+                all_found.extend([p[2] for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_NAME, None, 1)])
+            except: pass
             
-            # Añadir la predeterminada por si acaso no salió en la lista
+            # Intento 3: PowerShell (muy fiable en Windows 10/11)
+            try:
+                import subprocess
+                cmd = ["powershell", "-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"]
+                res = subprocess.check_output(cmd, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                ps_names = [line.strip() for line in res.split("\n") if line.strip()]
+                all_found.extend(ps_names)
+            except Exception as e:
+                _log(f"Error en fallback PowerShell: {e}")
+
+            # Añadir la predeterminada
             try:
                 default = win32print.GetDefaultPrinter()
-                if default and default not in printers:
-                    printers.append(default)
-            except:
-                pass
+                if default: all_found.append(default)
+            except: pass
                 
-            _log(f"Lista final de impresoras detectadas: {printers}")
-            return list(set(printers)) # Eliminar duplicados
+            final_list = sorted(list(set(all_found)))
+            _log(f"Lista final de impresoras detectadas ({len(final_list)}): {final_list}")
+            return final_list
         except Exception as e:
-            _log(f"Error enumerando impresoras: {e}")
-            return []
+            _log(f"Error crítico enumerando impresoras: {e}")
+            return sorted(list(set(all_found))) if all_found else []
 
     # ── Impresión ─────────────────────────────────────────────────────────────
 
