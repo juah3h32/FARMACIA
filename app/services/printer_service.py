@@ -177,44 +177,50 @@ class PrinterService:
     @staticmethod
     def list_windows_printers() -> list:
         all_found = []
+        _log("Iniciando enumeración exhaustiva de impresoras...")
+        
+        # 1. win32print (Método estándar)
         try:
             import win32print
-            # Intento 1: Enumeración estándar amplia
-            flags = (win32print.PRINTER_ENUM_LOCAL | 
-                     win32print.PRINTER_ENUM_CONNECTIONS | 
-                     win32print.PRINTER_ENUM_SHARED | 
-                     win32print.PRINTER_ENUM_NETWORK)
-            try:
-                all_found.extend([p[2] for p in win32print.EnumPrinters(flags)])
-            except: pass
-            
-            # Intento 2: PRINTER_ENUM_NAME
-            try:
-                all_found.extend([p[2] for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_NAME, None, 1)])
-            except: pass
-            
-            # Intento 3: PowerShell (muy fiable en Windows 10/11)
-            try:
-                import subprocess
-                cmd = ["powershell", "-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"]
-                res = subprocess.check_output(cmd, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                ps_names = [line.strip() for line in res.split("\n") if line.strip()]
-                all_found.extend(ps_names)
-            except Exception as e:
-                _log(f"Error en fallback PowerShell: {e}")
-
-            # Añadir la predeterminada
-            try:
-                default = win32print.GetDefaultPrinter()
-                if default: all_found.append(default)
-            except: pass
-                
-            final_list = sorted(list(set(all_found)))
-            _log(f"Lista final de impresoras detectadas ({len(final_list)}): {final_list}")
-            return final_list
+            for flags in [win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS,
+                          win32print.PRINTER_ENUM_NAME]:
+                try:
+                    all_found.extend([p[2] for p in win32print.EnumPrinters(flags)])
+                except: pass
         except Exception as e:
-            _log(f"Error crítico enumerando impresoras: {e}")
-            return sorted(list(set(all_found))) if all_found else []
+            _log(f"Error cargando win32print: {e}")
+        
+        # 2. PowerShell (Muy fiable en Win10/11)
+        try:
+            import subprocess
+            cmd = ["powershell", "-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"]
+            res = subprocess.check_output(cmd, text=True, creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
+            ps_names = [line.strip() for line in res.splitlines() if line.strip()]
+            all_found.extend(ps_names)
+        except Exception as e:
+            _log(f"Error en PowerShell: {e}")
+
+        # 3. WMIC (Fallback para sistemas antiguos o restringidos)
+        try:
+            import subprocess
+            cmd = ["wmic", "printer", "get", "name"]
+            res = subprocess.check_output(cmd, text=True, creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
+            # El output de wmic suele tener headers y espacios extras
+            wmic_names = [line.strip() for line in res.splitlines() if line.strip() and line.strip().lower() != "name"]
+            all_found.extend(wmic_names)
+        except Exception as e:
+            _log(f"Error en WMIC: {e}")
+
+        # 4. Impresora predeterminada
+        try:
+            import win32print
+            default = win32print.GetDefaultPrinter()
+            if default: all_found.append(default)
+        except: pass
+            
+        final_list = sorted(list(set(all_found)))
+        _log(f"Enumeración completada. Encontradas ({len(final_list)}): {final_list}")
+        return final_list
 
     # ── Impresión ─────────────────────────────────────────────────────────────
 

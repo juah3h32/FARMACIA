@@ -79,14 +79,28 @@ class SettingsScreen(ctk.CTkFrame):
         self._row_win.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(self._row_win, text="Impresora:", anchor="e",
                      font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(0, 8), sticky="e")
-        self.opt_win_printer = ctk.CTkOptionMenu(self._row_win, values=["(cargando...)"])
+        
+        self.opt_win_printer = ctk.CTkOptionMenu(
+            self._row_win, values=["(cargando...)"],
+            command=self._on_win_printer_change
+        )
         self.opt_win_printer.grid(row=0, column=1, sticky="ew")
+        
         ctk.CTkButton(self._row_win, text="↺", width=36, height=34,
                       command=self._refresh_win_printers).grid(row=0, column=2, padx=(6, 0))
 
-        # Fila manual: puerto / IP
+        # Fila nombre manual (se muestra si eligen "Manual")
+        self._row_win_manual = ctk.CTkFrame(print_frame, fg_color="transparent")
+        self._row_win_manual.grid(row=3, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 4))
+        self._row_win_manual.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self._row_win_manual, text="Nombre manual:", anchor="e",
+                     font=ctk.CTkFont(size=11), text_color="gray60").grid(row=0, column=0, padx=(0, 8), sticky="e")
+        self.entry_win_manual = ctk.CTkEntry(self._row_win_manual, height=34, placeholder_text="Ej: XP-58")
+        self.entry_win_manual.grid(row=0, column=1, sticky="ew")
+
+        # Fila manual (USB/Serial/Net): puerto / IP
         self._row_port = ctk.CTkFrame(print_frame, fg_color="transparent")
-        self._row_port.grid(row=3, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 4))
+        self._row_port.grid(row=4, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 4))
         self._row_port.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(self._row_port, text="Puerto/IP:", anchor="e",
                      font=ctk.CTkFont(size=12)).grid(row=0, column=0, padx=(0, 8), sticky="e")
@@ -95,16 +109,19 @@ class SettingsScreen(ctk.CTkFrame):
         self.entry_puerto.grid(row=0, column=1, sticky="ew")
 
         btn_frame = ctk.CTkFrame(print_frame, fg_color="transparent")
-        btn_frame.grid(row=4, column=0, columnspan=2, padx=16, pady=(8, 8))
+        btn_frame.grid(row=5, column=0, columnspan=2, padx=16, pady=(8, 8))
         ctk.CTkButton(btn_frame, text="💾 Guardar", height=36, fg_color="#4CAF50",
                       command=self._guardar_impresora).pack(side="left", padx=(0, 8))
         ctk.CTkButton(btn_frame, text="🔌 Conectar y Probar", height=36,
                       fg_color="#2196F3", hover_color="#1976D2",
-                      command=self._probar_impresora).pack(side="left")
+                      command=self._probar_impresora).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_frame, text="🔍 Diagnóstico", height=36,
+                      fg_color="#9C27B0", hover_color="#7B1FA2",
+                      command=self._abrir_diag_impresora).pack(side="left")
 
         self.lbl_printer_status = ctk.CTkLabel(print_frame, text="Estado: Desconectada",
                                                 text_color="#F44336", font=ctk.CTkFont(size=12))
-        self.lbl_printer_status.grid(row=5, column=0, columnspan=2, padx=16, pady=(0, 12))
+        self.lbl_printer_status.grid(row=6, column=0, columnspan=2, padx=16, pady=(0, 12))
 
         # Seccion: API
         self._seccion(scroll, "🌐 API REST (Conexión con App)", row=5)
@@ -504,32 +521,60 @@ class SettingsScreen(ctk.CTkFrame):
     def _on_printer_type_change(self, tipo: str):
         if tipo == "windows":
             self._row_win.grid()
+            self._row_win_manual.grid_remove()
             self._row_port.grid_remove()
             self._refresh_win_printers()
         else:
             self._row_win.grid_remove()
+            self._row_win_manual.grid_remove()
             self._row_port.grid()
+
+    def _on_win_printer_change(self, val: str):
+        if val == "Escribir nombre manualmente...":
+            self._row_win_manual.grid()
+        else:
+            self._row_win_manual.grid_remove()
 
     def _refresh_win_printers(self):
         printers = PrinterService.list_windows_printers()
+        options = []
         if printers:
-            self.opt_win_printer.configure(values=printers)
-            current = self.opt_win_printer.get()
-            if current not in printers:
+            options.extend(printers)
+        
+        options.append("Escribir nombre manualmente...")
+        self.opt_win_printer.configure(values=options)
+        
+        current = self.opt_win_printer.get()
+        if current not in options:
+            if printers:
                 self.opt_win_printer.set(printers[0])
+            else:
+                self.opt_win_printer.set("Escribir nombre manualmente...")
+                self._row_win_manual.grid()
+        
+        if self.opt_win_printer.get() == "Escribir nombre manualmente...":
+            self._row_win_manual.grid()
         else:
-            self.opt_win_printer.configure(values=["(sin impresoras)"])
-            self.opt_win_printer.set("(sin impresoras)")
+            self._row_win_manual.grid_remove()
 
     def _guardar_impresora(self):
         tipo = self.opt_impresora.get()
         ancho = "48" if "80mm" in self.opt_ancho.get() else "32"
         if tipo == "windows":
-            puerto = self.opt_win_printer.get()
-            nombre_win = puerto
+            sel = self.opt_win_printer.get()
+            if sel == "Escribir nombre manualmente...":
+                nombre_win = self.entry_win_manual.get().strip()
+                puerto = nombre_win
+            else:
+                nombre_win = sel
+                puerto = sel
         else:
             puerto = self.entry_puerto.get().strip()
             nombre_win = ""
+
+        if tipo == "windows" and not nombre_win:
+            messagebox.showwarning("Atención", "Escribe el nombre de la impresora")
+            return
 
         db = get_db_session()
         try:
@@ -548,6 +593,44 @@ class SettingsScreen(ctk.CTkFrame):
             messagebox.showinfo("OK", "Configuración de impresora guardada")
         finally:
             db.close()
+
+    def _abrir_diag_impresora(self):
+        import traceback
+        win = ctk.CTkToplevel(self)
+        win.title("Diagnóstico de Impresora")
+        win.geometry("500x400")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text="🔎 Diagnóstico de Impresora",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(16, 4))
+        
+        log_box = tk.Text(win, height=15, width=60, font=("Consolas", 10), bg="#1e1e1e", fg="#d4d4d4")
+        log_box.pack(padx=20, pady=10, fill="both", expand=True)
+
+        def add_log(txt):
+            log_box.insert("end", f"{txt}\n")
+            log_box.see("end")
+
+        add_log("--- Iniciando Diagnóstico ---")
+        try:
+            printers = PrinterService.list_windows_printers()
+            add_log(f"Impresoras detectadas: {len(printers)}")
+            for p in printers:
+                add_log(f" - {p}")
+            
+            import win32print
+            try:
+                def_p = win32print.GetDefaultPrinter()
+                add_log(f"Predeterminada: {def_p}")
+            except:
+                add_log("Predeterminada: Error obteniendo")
+            
+        except Exception as e:
+            add_log(f"ERROR: {e}")
+            add_log(traceback.format_exc())
+
+        add_log("--- Fin del Diagnóstico ---")
+        ctk.CTkButton(win, text="Cerrar", command=win.destroy).pack(pady=10)
 
     def _probar_impresora(self):
         tipo = self.opt_impresora.get()
