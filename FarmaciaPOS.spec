@@ -7,6 +7,7 @@ a = Analysis(
     datas=[
         ('app/web', 'app/web'),
         ('assets', 'assets'),
+        ('C:/Users/Jereth/AppData/Local/Programs/Python/Python312/Lib/site-packages/escpos/capabilities.json', 'escpos'),
     ],
     hiddenimports=[
         'uvicorn', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto',
