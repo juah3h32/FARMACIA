@@ -381,32 +381,30 @@ class PrinterService:
 
             ticket = self._build_ticket(venta_data, farmacia_config)
             
-            # Usar GDI para imprimir como texto estándar, más compatible que el modo RAW
             hDC = win32ui.CreateDC()
             hDC.CreatePrinterDC(self.printer_name)
             
-            # Configuración de fuente básica para tickets (Courier para monoespaciado)
-            font_size = 10
-            if self.width > 40: # 80mm
-                font_size = 10
-            else: # 58mm
-                font_size = 8
+            # Tamaño de fuente más grande para asegurar visibilidad en térmicas
+            font_size = 12 if self.width > 40 else 10
 
             hDC.StartDoc("Ticket Farmacia")
             hDC.StartPage()
             
             font = win32ui.CreateFont({
                 "name": "Courier New",
-                "height": -int(font_size * 1.5), # Ajuste de tamaño de fuente
-                "weight": 400,
+                "height": -int(font_size * 2), # Aumentado para mayor legibilidad
+                "weight": 600, # Más negrita
             })
             hDC.SelectObject(font)
+            hDC.SetTextColor(0) # Forzar negro puro (RGB 0,0,0)
             
-            # Dibujar línea por línea
-            y = 10
+            y = 20
             for line in ticket.split("\n"):
-                hDC.TextOut(10, y, line)
-                y += int(font_size * 2) # Espaciado entre líneas
+                if not line.strip() and y > 20: 
+                    y += int(font_size * 1.5)
+                    continue
+                hDC.TextOut(5, y, line)
+                y += int(font_size * 2.5) # Más espaciado entre líneas
             
             hDC.EndPage()
             hDC.EndDoc()
@@ -415,37 +413,35 @@ class PrinterService:
             return True
         except Exception:
             _log(f"EXCEPCION _print_windows: {traceback.format_exc()}")
-            # Fallback al modo RAW si GDI falla
+            # Si GDI falla o sale en blanco, el modo RAW es el salvavidas
             return self._print_windows_raw(venta_data, farmacia_config)
 
     def _print_windows_raw(self, venta_data: dict, farmacia_config: dict) -> bool:
         try:
             import win32print
-            ESC = b'\x1b'
-            GS  = b'\x1d'
-
             ticket = self._build_ticket(venta_data, farmacia_config)
+            
+            # Comandos ESC/POS básicos para inicializar y cortar
+            ESC = b'\x1b'
             raw = (
-                ESC + b'@' +
+                ESC + b'@' + # Initialize
                 ticket.encode("ascii", errors="replace") +
-                b'\n\n\n' +
-                GS + b'V\x00'
+                b'\n\n\n\n\n' + # Espacio extra al final
+                ESC + b'm' # Corte parcial (algunas máquinas usan 'i' o 'V')
             )
 
             hPrinter = win32print.OpenPrinter(self.printer_name)
             try:
-                win32print.StartDocPrinter(hPrinter, 1, ("Ticket Farmacia", None, "RAW"))
-                try:
-                    win32print.StartPagePrinter(hPrinter)
-                    win32print.WritePrinter(hPrinter, raw)
-                    win32print.EndPagePrinter(hPrinter)
-                finally:
-                    win32print.EndDocPrinter(hPrinter)
+                win32print.StartDocPrinter(hPrinter, 1, ("Ticket RAW", None, "RAW"))
+                win32print.StartPagePrinter(hPrinter)
+                win32print.WritePrinter(hPrinter, raw)
+                win32print.EndPagePrinter(hPrinter)
+                win32print.EndDocPrinter(hPrinter)
             finally:
                 win32print.ClosePrinter(hPrinter)
             return True
         except Exception:
-            _log(f"EXCEPCION _print_windows_raw: {traceback.format_exc()}")
+            _log(f"FALLO TOTAL RAW: {traceback.format_exc()}")
             return False
 
     def _print_escpos(self, venta_data: dict, farmacia_config: dict) -> bool:
