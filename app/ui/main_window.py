@@ -61,6 +61,20 @@ STAT_DEFS = [
 
 class MainWindow(ctk.CTkToplevel):
     def __init__(self, user, on_logout=None):
+        # Performance / UI consistency
+        ctk.set_appearance_mode("System")
+        ctk.set_default_color_theme("blue")
+        
+        # High DPI Support
+        try:
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            try:
+                ctk.set_widget_scaling(1.0)
+                ctk.set_window_scaling(1.0)
+            except: pass
+
         super().__init__()
         self.user      = user
         self.on_logout = on_logout

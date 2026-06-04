@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Farmacia Eben-Ezer · POS</title>
+<style>
+  @font-face {
+    font-family: 'Inter';
+    src: url('/static/fonts/Inter-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('/static/fonts/Inter-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+  }
+</style>
 <script src="/static/tailwind.js"></script>
 <script src="/static/lucide.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
@@ -635,8 +649,8 @@
     <!-- content -->
     <div id="login-card" class="flex flex-col items-center relative z-10 px-12 text-center">
       <!-- logo directo, sin caja -->
-      <div class="mb-6">
-        <img src="/logo.svg" style="height:120px;object-fit:contain;display:block">
+      <div class="mb-6 flex justify-center">
+        <img src="/logo.svg" style="width:200px;height:120px;object-fit:contain;display:block">
       </div>
       <span class="text-sm font-medium" style="color:rgba(255,255,255,.7)">Sistema de Punto de Venta</span>
 
@@ -704,7 +718,7 @@
   <aside class="w-60 flex flex-col flex-shrink-0" style="background:#243366">
     <!-- Brand -->
     <div class="px-4 py-3 flex items-center justify-center" style="border-bottom:1px solid rgba(255,255,255,.08)">
-      <img src="/logo.svg" style="height:44px;object-fit:contain;display:block">
+      <img src="/logo.svg" style="width:160px;height:44px;object-fit:contain;display:block">
     </div>
 
     <!-- Nav -->
