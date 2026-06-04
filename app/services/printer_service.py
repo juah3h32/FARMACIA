@@ -265,10 +265,10 @@ class PrinterService:
 
     def _build_ticket(self, venta_data: dict, farmacia_config: dict) -> str:
         cfg_d = farmacia_config or {}
-        nombre    = _s(cfg_d.get("farmacia_nombre",    cfg.PHARMACY_NAME))
-        direccion = _s(cfg_d.get("farmacia_direccion", cfg.PHARMACY_ADDRESS))
-        telefono  = _s(cfg_d.get("farmacia_telefono",  cfg.PHARMACY_PHONE))
-        rfc       = _s(cfg_d.get("farmacia_rfc",       cfg.PHARMACY_RFC))
+        nombre    = _s(cfg_d.get("farmacia_nombre",    cfg.PHARMACY_NAME)).upper()
+        direccion = _s(cfg_d.get("farmacia_direccion", cfg.PHARMACY_ADDRESS)).upper()
+        telefono  = _s(cfg_d.get("farmacia_telefono",  cfg.PHARMACY_PHONE)).upper()
+        rfc       = _s(cfg_d.get("farmacia_rfc",       cfg.PHARMACY_RFC)).upper()
         W = self.width
 
         sep  = "=" * W
@@ -278,7 +278,11 @@ class PrinterService:
         PRICE_W = 9
 
         def ctr(txt):
-            return _s(str(txt)).center(W)
+            txt = str(txt).strip()
+            if len(txt) <= W:
+                return txt.center(W)
+            # Si es más largo que el ancho, intentar dividirlo o simplemente truncar/ajustar
+            return txt[:W]
 
         def money(amount):
             return f"${amount:,.2f}"
@@ -288,10 +292,26 @@ class PrinterService:
             lbl_w = W - PRICE_W
             return f"{label:>{lbl_w}}{val_str:>{PRICE_W}}"
 
-        # ── Encabezado ────────────────────────────────────────────────────────
-        lines = [sep, ctr(nombre)]
+        # ── Encabezado Centrado ──────────────────────────────────────────────
+        lines = [sep]
+        
+        # Nombre (puede ser largo)
+        lines.append(ctr(nombre))
+        
+        # Dirección (puede requerir múltiples líneas si es larga)
         if direccion:
-            lines.append(ctr(direccion))
+            # Dividir por palabras para no romper a la mitad
+            words = direccion.split()
+            current_line = ""
+            for word in words:
+                if len(current_line + word) + 1 <= W:
+                    current_line += (word + " ")
+                else:
+                    lines.append(ctr(current_line))
+                    current_line = word + " "
+            if current_line:
+                lines.append(ctr(current_line))
+        
         if telefono:
             lines.append(ctr(telefono))
         if rfc:
@@ -300,9 +320,9 @@ class PrinterService:
 
         # Cajero centrado
         cajero = _s(venta_data.get("cajero", "N/A")).upper()
-        lines.append(f"CAJERO: {cajero}".center(W))
+        lines.append(ctr(f"CAJERO: {cajero}"))
         if venta_data.get("cliente"):
-            lines.append(f"CLIENTE: {_s(venta_data['cliente']).upper()}".center(W))
+            lines.append(ctr(f"CLIENTE: {_s(venta_data['cliente']).upper()}"))
         lines.append(sep)
 
         # ── Tabla de productos (estilo Guadalajara) ───────────────────────────

@@ -3,9 +3,9 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.2.43"
+VERSION = "1.2.44"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
-PHARMACY_ADDRESS = "Dirección de la farmacia"
+PHARMACY_ADDRESS = "Esfuerzo #47A col. 13 de abril"
 PHARMACY_PHONE = "Tel: 000-000-0000"
 PHARMACY_RFC = "RFC: XXXX000000XX0"
 
