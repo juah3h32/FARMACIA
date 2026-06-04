@@ -178,9 +178,14 @@ class PrinterService:
     def list_windows_printers() -> list:
         try:
             import win32print
-            flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+            # Enumera locales, conexiones de red, compartidas y compartidas por otros
+            flags = (win32print.PRINTER_ENUM_LOCAL | 
+                     win32print.PRINTER_ENUM_CONNECTIONS | 
+                     win32print.PRINTER_ENUM_SHARED | 
+                     win32print.PRINTER_ENUM_NETWORK)
             return [p[2] for p in win32print.EnumPrinters(flags)]
-        except Exception:
+        except Exception as e:
+            _log(f"Error enumerando impresoras: {e}")
             return []
 
     # ── Impresión ─────────────────────────────────────────────────────────────
