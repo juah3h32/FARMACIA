@@ -178,12 +178,27 @@ class PrinterService:
     def list_windows_printers() -> list:
         try:
             import win32print
-            # Enumera locales, conexiones de red, compartidas y compartidas por otros
+            # Intento 1: Enumeración estándar amplia
             flags = (win32print.PRINTER_ENUM_LOCAL | 
                      win32print.PRINTER_ENUM_CONNECTIONS | 
                      win32print.PRINTER_ENUM_SHARED | 
                      win32print.PRINTER_ENUM_NETWORK)
-            return [p[2] for p in win32print.EnumPrinters(flags)]
+            printers = [p[2] for p in win32print.EnumPrinters(flags)]
+            
+            # Intento 2: Si no hay nada, intentar con PRINTER_ENUM_NAME (vacío para local)
+            if not printers:
+                printers = [p[2] for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_NAME, None, 1)]
+            
+            # Añadir la predeterminada por si acaso no salió en la lista
+            try:
+                default = win32print.GetDefaultPrinter()
+                if default and default not in printers:
+                    printers.append(default)
+            except:
+                pass
+                
+            _log(f"Lista final de impresoras detectadas: {printers}")
+            return list(set(printers)) # Eliminar duplicados
         except Exception as e:
             _log(f"Error enumerando impresoras: {e}")
             return []
@@ -486,27 +501,36 @@ class PrinterService:
             return False
         try:
             if self.printer_type == "windows":
-                import win32print
-                ESC = b'\x1b'
-                GS  = b'\x1d'
-                raw = ESC + b'@' + b"Test de impresion OK\n\n\n" + GS + b'V\x00'
-                hPrinter = win32print.OpenPrinter(self.printer_name)
-                try:
-                    hJob = win32print.StartDocPrinter(hPrinter, 1, ("Test", None, "RAW"))
-                    try:
-                        win32print.StartPagePrinter(hPrinter)
-                        win32print.WritePrinter(hPrinter, raw)
-                        win32print.EndPagePrinter(hPrinter)
-                    finally:
-                        win32print.EndDocPrinter(hPrinter)
-                finally:
-                    win32print.ClosePrinter(hPrinter)
+                # Usar GDI para el test (igual que el ticket real) porque RAW falla en muchos drivers
+                import win32ui
+                import win32con
+                
+                hDC = win32ui.CreateDC()
+                hDC.CreatePrinterDC(self.printer_name)
+                hDC.StartDoc("Test Farmacia")
+                hDC.StartPage()
+                
+                font = win32ui.CreateFont({"name": "Courier New", "height": -15, "weight": 400})
+                hDC.SelectObject(font)
+                
+                hDC.TextOut(10, 10, "================================")
+                hDC.TextOut(10, 40, "   TEST DE IMPRESION OK")
+                hDC.TextOut(10, 70, f"   IMPRESORA: {self.printer_name}")
+                hDC.TextOut(10, 100, f"   FECHA: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                hDC.TextOut(10, 130, "================================")
+                hDC.TextOut(10, 160, " ")
+                hDC.TextOut(10, 190, " ")
+                
+                hDC.EndPage()
+                hDC.EndDoc()
+                hDC.DeleteDC()
                 return True
+
             if self.printer:
                 self.printer.text("Test de impresion OK\n")
                 self.printer.cut()
                 return True
-        except Exception:
+        except Exception as e:
             _log(f"test_printer error: {traceback.format_exc()}")
         return False
 
