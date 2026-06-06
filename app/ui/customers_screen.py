@@ -54,13 +54,15 @@ class CustomersScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(table_frame, columns=cols, show="headings",
                                   style="Cli.Treeview", selectmode="browse")
         headers = {
-            "id": ("ID", 45), "nombre": ("Nombre", 200), "telefono": ("Teléfono", 110),
-            "email": ("Email", 160), "rfc": ("RFC", 120),
-            "credito": ("Límite Crédito", 110), "deuda": ("Deuda", 90),
+            "id": ("ID", 40), "nombre": ("Nombre", 180), "telefono": ("Teléfono", 100),
+            "email": ("Email", 140), "rfc": ("RFC", 100),
+            "credito": ("Límite Crédito", 100), "deuda": ("Deuda", 80),
         }
         for col, (heading, width) in headers.items():
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width, anchor="w" if col in ("nombre", "email") else "center")
+            self.tree.column(col, width=width, minwidth=width, 
+                             anchor="w" if col in ("nombre", "email") else "center",
+                             stretch=True if col == "nombre" else False)
 
         self.tree.tag_configure("deuda", foreground="#FF9800")
         scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
@@ -154,6 +156,14 @@ class ClienteDialog(ctk.CTkToplevel):
             if self.data.get(key) is not None:
                 e.insert(0, str(self.data[key]))
             self.entries[key] = e
+
+        # Enter key navigation
+        self.entries["nombre"].bind("<Return>", lambda e: self.entries["telefono"].focus_set())
+        self.entries["telefono"].bind("<Return>", lambda e: self.entries["email"].focus_set())
+        self.entries["email"].bind("<Return>", lambda e: self.entries["rfc"].focus_set())
+        self.entries["rfc"].bind("<Return>", lambda e: self.entries["direccion"].focus_set())
+        self.entries["direccion"].bind("<Return>", lambda e: self.entries["limite_credito"].focus_set())
+        self.entries["limite_credito"].bind("<Return>", lambda e: self._guardar())
 
         ctk.CTkButton(
             self, text="💾 Guardar", height=42, fg_color="#4CAF50", hover_color="#388E3C",

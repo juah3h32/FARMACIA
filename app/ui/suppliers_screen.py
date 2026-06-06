@@ -59,13 +59,15 @@ class SuppliersScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(table_frame, columns=cols, show="headings",
                                   style="Prov.Treeview", selectmode="browse")
         headers = {
-            "id": ("ID", 45), "nombre": ("Nombre", 200), "contacto": ("Contacto", 140),
-            "telefono": ("Teléfono", 110), "email": ("Email", 160),
-            "rfc": ("RFC", 120), "activo": ("Estado", 80),
+            "id": ("ID", 40), "nombre": ("Nombre", 180), "contacto": ("Contacto", 120),
+            "telefono": ("Teléfono", 100), "email": ("Email", 140),
+            "rfc": ("RFC", 100), "activo": ("Estado", 70),
         }
         for col, (heading, width) in headers.items():
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width)
+            self.tree.column(col, width=width, minwidth=width,
+                             anchor="w" if col == "nombre" else "center",
+                             stretch=True if col == "nombre" else False)
 
         self.tree.tag_configure("inactive", foreground="#94A3B8", background="#F8FAFF")
         scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)

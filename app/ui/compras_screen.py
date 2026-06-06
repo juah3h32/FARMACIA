@@ -153,19 +153,22 @@ class ComprasScreen(ctk.CTkFrame):
         _lbl("Costo unit.:")
         self.entry_costo = ctk.CTkEntry(bot, placeholder_text="0.00", width=90, height=34)
         self.entry_costo.pack(side="left", padx=(4, 10))
+        self.entry_costo.bind("<Return>", lambda e: self.entry_pventa.focus_set())
 
         _lbl("Precio venta:")
         self.entry_pventa = ctk.CTkEntry(bot, placeholder_text="0.00", width=90, height=34)
         self.entry_pventa.pack(side="left", padx=(4, 10))
+        self.entry_pventa.bind("<Return>", lambda e: self.entry_cantidad.focus_set())
 
         _lbl("Cantidad:")
         self.entry_cantidad = ctk.CTkEntry(bot, placeholder_text="1", width=70, height=34)
         self.entry_cantidad.pack(side="left", padx=(4, 10))
-        self.entry_cantidad.bind("<Return>", lambda e: self._agregar_item())
+        self.entry_cantidad.bind("<Return>", lambda e: self.entry_lote.focus_set())
 
         _lbl("N° Lote:")
         self.entry_lote = ctk.CTkEntry(bot, placeholder_text="Opcional", width=100, height=34)
         self.entry_lote.pack(side="left", padx=(4, 10))
+        self.entry_lote.bind("<Return>", lambda e: self.entry_venc.focus_set())
 
         _lbl("Vencimiento:")
         self.entry_venc = ctk.CTkEntry(bot, placeholder_text="DD/MM/AAAA", width=110, height=34)
@@ -186,18 +189,20 @@ class ComprasScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(frame, columns=cols, show="headings",
                                   style="Compra.Treeview", selectmode="browse")
         hdrs = {
-            "codigo":      ("Código",        110),
-            "producto":    ("Producto",       250),
-            "costo":       ("Costo Unit.",     90),
-            "pventa":      ("Precio Venta",    95),
-            "cantidad":    ("Cantidad",         70),
-            "subtotal":    ("Subtotal",         90),
-            "lote":        ("N° Lote",          90),
-            "vencimiento": ("Vencimiento",     100),
+            "codigo":      ("Código",        100),
+            "producto":    ("Producto",       210),
+            "costo":       ("Costo Unit.",     80),
+            "pventa":      ("Precio Venta",    90),
+            "cantidad":    ("Cant.",           60),
+            "subtotal":    ("Subtotal",         80),
+            "lote":        ("N° Lote",          80),
+            "vencimiento": ("Vencimiento",     90),
         }
         for col, (heading, width) in hdrs.items():
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width, anchor="w" if col == "producto" else "center")
+            self.tree.column(col, width=width, minwidth=width,
+                             anchor="w" if col == "producto" else "center",
+                             stretch=True if col == "producto" else False)
 
         sy = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
         sx = ttk.Scrollbar(frame, orient="horizontal", command=self.tree.xview)
@@ -279,18 +284,19 @@ class ComprasScreen(ctk.CTkFrame):
         self.tree_hist = ttk.Treeview(top_frame, columns=hcols, show="headings",
                                        style="Hist.Treeview", selectmode="browse")
         hhdrs = {
-            "folio":     ("Folio",       100),
-            "fecha":     ("Fecha",       130),
-            "proveedor": ("Proveedor",   180),
-            "articulos": ("Artículos",    70),
-            "total":     ("Total",        90),
-            "usuario":   ("Registró",    120),
-            "factura":   ("Factura/Notas",150),
+            "folio":     ("Folio",       80),
+            "fecha":     ("Fecha",       110),
+            "proveedor": ("Proveedor",   160),
+            "articulos": ("Arts.",        60),
+            "total":     ("Total",        80),
+            "usuario":   ("Registró",    100),
+            "factura":   ("Factura/Notas",140),
         }
         for col, (heading, width) in hhdrs.items():
             self.tree_hist.heading(col, text=heading)
-            self.tree_hist.column(col, width=width,
-                                   anchor="w" if col in ("proveedor", "factura", "usuario") else "center")
+            self.tree_hist.column(col, width=width, minwidth=width,
+                                   anchor="w" if col in ("proveedor", "factura", "usuario") else "center",
+                                   stretch=True if col == "proveedor" else False)
 
         shy = ttk.Scrollbar(top_frame, orient="vertical", command=self.tree_hist.yview)
         self.tree_hist.configure(yscrollcommand=shy.set)
@@ -584,7 +590,7 @@ class ComprasScreen(ctk.CTkFrame):
 
         db = get_db_session()
         try:
-            folio = f"C{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            folio = f"C{datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}"
             compra = Compra(
                 folio=folio,
                 proveedor_id=prov_id,
@@ -703,9 +709,11 @@ class CantidadDialog(ctk.CTkToplevel):
         self.entry_cant = _row(0, "Cantidad:", lambda: ctk.CTkEntry(frame, height=36,
                                                                       font=ctk.CTkFont(size=14)))
         self.entry_cant.insert(0, "1")
-        self.entry_cant.bind("<Return>", lambda e: self._confirmar())
+        self.entry_cant.bind("<Return>", lambda e: self.entry_lote.focus_set())
 
         self.entry_lote = _row(1, "N° Lote:", lambda: ctk.CTkEntry(frame, placeholder_text="Opcional", height=34))
+        self.entry_lote.bind("<Return>", lambda e: self.entry_venc.focus_set())
+
         self.entry_venc = _row(2, "Vencimiento:", lambda: ctk.CTkEntry(frame, placeholder_text="DD/MM/AAAA", height=34))
         self.entry_venc.bind("<Return>", lambda e: self._confirmar())
 

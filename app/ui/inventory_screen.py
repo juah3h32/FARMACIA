@@ -90,14 +90,16 @@ class InventoryScreen(ctk.CTkFrame):
                                   style="Inv.Treeview", selectmode="browse")
 
         headers = {
-            "id": ("ID", 40), "barcode": ("Código", 110), "nombre": ("Producto", 230),
-            "categoria": ("Categoría", 130), "precio": ("Precio", 80),
-            "stock": ("Stock", 65), "minimo": ("Mínimo", 65),
-            "vencimiento": ("Próx. Vencim.", 120), "estado": ("Estado", 100),
+            "id": ("ID", 40), "barcode": ("Código", 100), "nombre": ("Producto", 210),
+            "categoria": ("Categoría", 110), "precio": ("Precio", 70),
+            "stock": ("Stock", 55), "minimo": ("Mín.", 55),
+            "vencimiento": ("Vencimiento", 100), "estado": ("Estado", 90),
         }
         for col, (heading, width) in headers.items():
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width, anchor="center" if col not in ("nombre",) else "w")
+            self.tree.column(col, width=width, minwidth=width, 
+                             anchor="center" if col not in ("nombre",) else "w",
+                             stretch=True if col == "nombre" else False)
 
         self.tree.tag_configure("low_stock", foreground="#D97706", background="#FFFBEB")
         self.tree.tag_configure("expiring",  foreground="#DC2626", background="#FEF2F2")
@@ -333,6 +335,8 @@ class ProductoDialog(ctk.CTkToplevel):
             ("Precio de Compra:", "precio_compra", "entry"),
             ("Stock Actual:", "stock", "entry"),
             ("Stock Mínimo:", "stock_minimo", "entry"),
+            ("Concentración:", "concentracion", "entry"),
+            ("Contenido:", "contenido", "entry"),
         ]
 
         self.entries = {}
@@ -344,11 +348,32 @@ class ProductoDialog(ctk.CTkToplevel):
             e.grid(row=i, column=1, pady=5, sticky="ew")
             self.entries[key] = e
 
-        # Barcode auto-fill on Enter
+        # Enter key navigation
         self.entries["codigo_barras"].bind("<Return>", self._on_barcode_scan)
+        self.entries["nombre"].bind("<Return>", lambda e: self.entries["nombre_generico"].focus_set())
+        self.entries["nombre_generico"].bind("<Return>", lambda e: self.entries["marca"].focus_set())
+        self.entries["marca"].bind("<Return>", lambda e: self.entries["precio_venta"].focus_set())
+        self.entries["precio_venta"].bind("<Return>", lambda e: self.entries["precio_compra"].focus_set())
+        self.entries["precio_compra"].bind("<Return>", lambda e: self.entries["stock"].focus_set())
+        self.entries["stock"].bind("<Return>", lambda e: self.entries["stock_minimo"].focus_set())
+        self.entries["stock_minimo"].bind("<Return>", lambda e: self.entries["concentracion"].focus_set())
+        self.entries["concentracion"].bind("<Return>", lambda e: self.entries["contenido"].focus_set())
+        self.entries["contenido"].bind("<Return>", lambda e: self.opt_pres.focus_set())
+
+        # Presentación
+        row = len(fields)
+        ctk.CTkLabel(scroll, text="Presentación:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
+        self.opt_pres = ctk.CTkOptionMenu(scroll, values=[
+            "Tableta", "Comprimido", "Cápsula", "Jarabe", "Suspensión",
+            "Inyectable", "Ampolleta", "Crema", "Ungüento", "Gel",
+            "Óvulos", "Gotas", "Spray", "Supositorio", "Parche",
+            "Solución", "Polvo", "Otro"
+        ])
+        self.opt_pres.set("Tableta")
+        self.opt_pres.grid(row=row, column=1, pady=5, sticky="ew")
 
         # Categoria + Proveedor (single DB session)
-        row = len(fields)
+        row += 1
         db = get_db_session()
         try:
             cats = db.query(Categoria).all()
@@ -404,6 +429,9 @@ class ProductoDialog(ctk.CTkToplevel):
                 e.delete(0, "end")
                 e.insert(0, str(val))
 
+        if self.data.get("presentacion"):
+            self.opt_pres.set(self.data["presentacion"])
+
         if self.data.get("categoria_id"):
             for name, cid in self._cat_map.items():
                 if cid == self.data["categoria_id"]:
@@ -451,6 +479,9 @@ class ProductoDialog(ctk.CTkToplevel):
             prod.precio_compra = float(self.entries["precio_compra"].get().strip() or "0")
             prod.stock = int(self.entries["stock"].get().strip() or "0")
             prod.stock_minimo = int(self.entries["stock_minimo"].get().strip() or "10")
+            prod.concentracion = self.entries["concentracion"].get().strip() or None
+            prod.contenido = self.entries["contenido"].get().strip() or None
+            prod.presentacion = self.opt_pres.get()
             prod.aplica_iva = self.var_iva.get()
             prod.requiere_receta = self.var_receta.get()
             prod.sustancia_controlada = self.var_controlada.get()
@@ -488,11 +519,16 @@ class ProductoDialog(ctk.CTkToplevel):
                 ("nombre", prod.nombre), ("nombre_generico", prod.nombre_generico or ""),
                 ("marca", prod.marca or ""), ("precio_venta", prod.precio_venta),
                 ("precio_compra", prod.precio_compra), ("stock", prod.stock),
-                ("stock_minimo", prod.stock_minimo),
+                ("stock_minimo", prod.stock_minimo), ("concentracion", prod.concentracion or ""),
+                ("contenido", prod.contenido or ""),
             ]:
                 e = self.entries[key]
                 e.delete(0, "end")
                 e.insert(0, str(val) if val is not None else "")
+            
+            if prod.presentacion:
+                self.opt_pres.set(prod.presentacion)
+
             self.var_iva.set(prod.aplica_iva)
             self.var_receta.set(prod.requiere_receta)
             self.var_controlada.set(prod.sustancia_controlada)
@@ -503,6 +539,8 @@ class ProductoDialog(ctk.CTkToplevel):
                 self.opt_cat.set(prod.categoria.nombre)
             if prod.proveedor:
                 self.opt_prov.set(prod.proveedor.nombre)
+            
+            self.entries["nombre"].focus_set()
         finally:
             db.close()
 
@@ -619,6 +657,12 @@ class EntradaStockDialog(ctk.CTkToplevel):
             e = ctk.CTkEntry(frame, height=34, placeholder_text=_placeholders.get(key, ""))
             e.grid(row=i, column=1, pady=6, sticky="ew")
             self.entries[key] = e
+
+        # Enter key navigation
+        self.entries["cantidad"].bind("<Return>", lambda e: self.entries["numero_lote"].focus_set())
+        self.entries["numero_lote"].bind("<Return>", lambda e: self.entries["fecha_vencimiento"].focus_set())
+        self.entries["fecha_vencimiento"].bind("<Return>", lambda e: self.entries["precio_compra"].focus_set())
+        self.entries["precio_compra"].bind("<Return>", lambda e: self._guardar())
 
         ctk.CTkButton(self, text="✅ Registrar Entrada", height=42,
                       fg_color="#4CAF50", hover_color="#388E3C",

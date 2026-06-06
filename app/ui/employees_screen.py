@@ -56,13 +56,15 @@ class EmployeesScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(table_frame, columns=cols, show="headings",
                                   style="Emp.Treeview", selectmode="browse")
         headers = {
-            "id": ("ID", 45), "username": ("Usuario", 110), "nombre": ("Nombre Completo", 200),
-            "rol": ("Rol", 110), "telefono": ("Teléfono", 110),
-            "email": ("Email", 160), "activo": ("Estado", 80), "creado": ("Creado", 100),
+            "id": ("ID", 40), "username": ("Usuario", 100), "nombre": ("Nombre Completo", 170),
+            "rol": ("Rol", 90), "telefono": ("Teléfono", 100),
+            "email": ("Email", 140), "activo": ("Estado", 70), "creado": ("Creado", 90),
         }
         for col, (heading, width) in headers.items():
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width, anchor="w" if col in ("nombre", "email") else "center")
+            self.tree.column(col, width=width, minwidth=width,
+                             anchor="w" if col in ("nombre", "email") else "center",
+                             stretch=True if col == "nombre" else False)
 
         self.tree.tag_configure("inactive", foreground="#666666")
 
@@ -211,6 +213,16 @@ class EmpleadoDialog(ctk.CTkToplevel):
             if self.data.get(key):
                 e.insert(0, str(self.data[key]))
             self.entries[key] = e
+
+        # Enter key navigation
+        self.entries["username"].bind("<Return>", lambda e: self.entries["nombre"].focus_set())
+        self.entries["nombre"].bind("<Return>", lambda e: self.entries["telefono"].focus_set())
+        self.entries["telefono"].bind("<Return>", lambda e: self.entries["email"].focus_set())
+        if not editing:
+            self.entries["email"].bind("<Return>", lambda e: self.entries["password"].focus_set())
+            self.entries["password"].bind("<Return>", lambda e: self.opt_rol.focus_set())
+        else:
+            self.entries["email"].bind("<Return>", lambda e: self.opt_rol.focus_set())
 
         # Rol
         row = len(fields)
