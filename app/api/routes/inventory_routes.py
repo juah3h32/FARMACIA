@@ -420,7 +420,9 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
 
         productos = db.query(Producto).filter(Producto.activo == True).all()
         total_skus    = len(productos)
-        valor_total   = sum(p.stock * p.precio_venta for p in productos)
+        valor_venta   = sum(p.stock * p.precio_venta for p in productos)
+        valor_costo   = sum(p.stock * (p.precio_compra or 0) for p in productos)
+        ganancia_est  = valor_venta - valor_costo
         bajo_stock    = sum(1 for p in productos if p.stock <= p.stock_minimo)
         sin_stock     = sum(1 for p in productos if p.stock <= 0)
 
@@ -446,7 +448,9 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
             "sin_stock":   sin_stock,
         }
         if es_admin:
-            result["valor_total"]   = round(valor_total, 2)
+            result["valor_venta"]   = round(valor_venta, 2)
+            result["valor_costo"]   = round(valor_costo, 2)
+            result["ganancia_est"]  = round(ganancia_est, 2)
             result["valor_vencido"] = round(valor_vencido, 2)
             result["valor_critico"] = round(valor_critico, 2)
         return result

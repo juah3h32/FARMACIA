@@ -113,6 +113,14 @@ def update_progress(payload: dict = Depends(get_current_api_user)):
     return dict(_update_state)
 
 
+@router.post("/update/cancel")
+def cancel_update(payload: dict = Depends(get_current_api_user)):
+    from app.services import updater_service
+    updater_service.cancel_download()
+    _update_state.update({"running": False, "error": "Actualización cancelada", "done": False})
+    return {"cancelled": True}
+
+
 class PurgarHistorialIn(BaseModel):
     clave: str
 

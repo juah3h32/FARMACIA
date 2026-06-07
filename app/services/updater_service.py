@@ -154,8 +154,18 @@ def download_and_install(progress_callback=None, version_url=None, is_installer=
         return _install_via_zip(url, tmp, progress_callback)
 
 
+_cancel_requested = False
+
+def cancel_download():
+    global _cancel_requested
+    with _lock:
+        _cancel_requested = True
+
 def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float = 0.85) -> tuple[bool, str]:
     """Download url → dest, reporting progress up to pct_max. Supports resuming."""
+    global _cancel_requested
+    with _lock:
+        _cancel_requested = False
     try:
         import requests as _req
         hdrs = {"User-Agent": "FarmaciaPOS-Updater/1.0", "Accept": "application/octet-stream"}
@@ -190,6 +200,9 @@ def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float 
             
             with open(dest, mode) as f:
                 for chunk in resp.iter_content(chunk_size=65536):
+                    with _lock:
+                        if _cancel_requested:
+                            return False, "Actualización cancelada por el usuario"
                     if not chunk:
                         continue
                     f.write(chunk)

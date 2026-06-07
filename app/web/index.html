@@ -411,7 +411,7 @@
 <!-- ═══════════ UPDATE DOWNLOAD PROGRESS (background) ═══════════ -->
 <div id="update-dl-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
      background:#1a2a57;padding:10px 20px;box-shadow:0 -2px 16px rgba(0,0,0,.2)">
-  <div style="max-width:600px;margin:0 auto;display:flex;align-items:center;gap:14px">
+  <div style="max-width:800px;margin:0 auto;display:flex;align-items:center;gap:14px">
     <i data-lucide="download-cloud" style="width:18px;height:18px;color:#93C5FD;flex-shrink:0"></i>
     <div style="flex:1">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
@@ -422,7 +422,12 @@
         <div id="dl-bar" style="background:#60A5FA;height:4px;border-radius:4px;width:0%;transition:width .3s"></div>
       </div>
     </div>
+    <button onclick="cancelUpdate()" class="h-8 px-3 rounded-lg text-[10px] font-bold transition-all hover:bg-white/10"
+            style="color:#FCA5A5;border:1px solid rgba(252,165,165,.3)">
+      CANCELAR
+    </button>
   </div>
+</div>
 </div>
 <style>
 @keyframes slideUpIn {
@@ -2175,6 +2180,14 @@ async function startUpdate() {
   }
 }
 
+async function cancelUpdate() {
+  if (!confirm('¿Seguro que quieres cancelar la actualización?')) return;
+  try {
+    await api('/admin/update/cancel', { method:'POST' });
+    toast('Actualización cancelada', 'info');
+  } catch(e) {}
+}
+
 async function _pollProgress() {
   try {
     const d = await (await api('/admin/update/progress')).json();
@@ -2539,9 +2552,19 @@ async function loadDashboard() {
         invKpi.innerHTML = `
           ${isAdmin ? `
           <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#F0FDF4;border:1px solid #BBF7D0">
-            <i data-lucide="package" style="width:13px;height:13px;color:#16A34A"></i>
-            <span style="color:#64748B">Valor inventario</span>
-            <span class="font-black ml-auto" style="color:#16A34A">${fmt(inv.valor_total)}</span>
+            <i data-lucide="calculator" style="width:13px;height:13px;color:#16A34A"></i>
+            <span style="color:#64748B">Valor Venta</span>
+            <span class="font-black ml-auto" style="color:#16A34A">${fmt(inv.valor_venta)}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#EEF1F9;border:1px solid #C5CEDE">
+            <i data-lucide="shopping-bag" style="width:13px;height:13px;color:#243366"></i>
+            <span style="color:#64748B">Inversión (Costo)</span>
+            <span class="font-black ml-auto" style="color:#243366">${fmt(inv.valor_costo)}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#F5F3FF;border:1px solid #DDD6FE">
+            <i data-lucide="trending-up" style="width:13px;height:13px;color:#8B5CF6"></i>
+            <span style="color:#64748B">Utilidad Proyectada</span>
+            <span class="font-black ml-auto" style="color:#8B5CF6">${fmt(inv.ganancia_est)}</span>
           </div>` : ''}
           <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:${inv.sin_stock>0?'#FEF2F2':'#F8FAFF'};border:1px solid ${inv.sin_stock>0?'#FECACA':'#E2E8F0'}">
             <i data-lucide="alert-circle" style="width:13px;height:13px;color:${inv.sin_stock>0?'#EF4444':'#94A3B8'}"></i>
@@ -2557,7 +2580,7 @@ async function loadDashboard() {
           ${isAdmin && inv.valor_critico > 0 ? `
           <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#FFF7ED;border:1px solid #FED7AA">
             <i data-lucide="alarm-clock" style="width:13px;height:13px;color:#EA580C"></i>
-            <span style="color:#64748B">En riesgo ≤30d</span>
+            <span style="color:#64748B">Riesgo ≤30d</span>
             <span class="font-black ml-auto" style="color:#EA580C">${fmt(inv.valor_critico)}</span>
           </div>` : ''}`;
         icons();
