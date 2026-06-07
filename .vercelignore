@@ -1,4 +1,5 @@
 dist/
+build/
 data/
 instalador/
 assets/
@@ -7,3 +8,10 @@ version_info.txt
 scripts/
 FarmaciaPOS_debug2.spec
 LOGO.png
+__pycache__/
+*.pyc
+*.pyo
+debug_*.py
+test_*.py
+test_*.txt
+*.egg-info/
