@@ -191,6 +191,46 @@ def eliminar_producto(producto_id: int, bg: BackgroundTasks, payload: dict = Dep
         db.close()
 
 
+class AjusteStockIn(BaseModel):
+    nuevo_stock: int
+
+
+@router.post("/{producto_id}/ajustar-stock")
+def ajustar_stock(producto_id: int, body: AjusteStockIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    if body.nuevo_stock < 0:
+        raise HTTPException(status_code=400, detail="El stock no puede ser negativo")
+    db = get_db_session()
+    try:
+        p = db.query(Producto).filter(Producto.id == producto_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        stock_ant = p.stock
+        p.stock = body.nuevo_stock
+        # Log the adjustment
+        from app.database.models import MovimientoStock, TipoMovimiento
+        mov = MovimientoStock(
+            producto_id=p.id,
+            tipo=TipoMovimiento.ajuste,
+            cantidad=abs(body.nuevo_stock - stock_ant),
+            stock_anterior=stock_ant,
+            stock_nuevo=body.nuevo_stock,
+            usuario_id=int(payload["sub"]),
+            notas=f"Ajuste manual: {stock_ant} → {body.nuevo_stock}",
+        )
+        db.add(mov)
+        db.commit()
+        _sync_bg(bg)
+        return {"ok": True, "stock_anterior": stock_ant, "stock_nuevo": p.stock}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 @router.post("/{producto_id}/imagen")
 async def subir_imagen_producto(
     producto_id: int,

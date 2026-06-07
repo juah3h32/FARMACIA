@@ -1817,6 +1817,24 @@
 
         <!-- Lotes existentes (solo EDITAR) -->
         <div id="pm-section-editar" class="hidden">
+          <!-- Ajuste de stock manual -->
+          <div class="rounded-xl p-3 mb-2.5" style="background:#FFFBEB;border:2px solid #FDE68A">
+            <div class="flex items-center gap-1.5 mb-2">
+              <i data-lucide="sliders-horizontal" style="width:13px;height:13px;color:#D97706"></i>
+              <p class="text-xs font-bold" style="color:#92400E">Ajuste de stock</p>
+              <span id="pm-stock-actual-badge" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:#FEF3C7;color:#92400E">Stock actual: —</span>
+            </div>
+            <div class="flex gap-2 items-end">
+              <div class="flex-1">
+                <label class="lbl" style="color:#92400E">Nuevo stock total</label>
+                <input id="pm-nuevo-stock" type="number" min="0" class="inp" placeholder="Ej. 50" style="border-color:#FCD34D">
+              </div>
+              <button onclick="pmAjustarStock()" class="h-[38px] px-4 rounded-xl text-xs font-bold text-white flex-shrink-0" style="background:linear-gradient(135deg,#D97706,#B45309)">
+                Actualizar
+              </button>
+            </div>
+          </div>
+
           <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-bold" style="color:#374151">Lotes / Fechas de vencimiento</p>
@@ -3180,6 +3198,10 @@ async function openProductModal(id=null) {
       document.getElementById('pm-contenido').value=p.contenido||'';
       document.getElementById('pm-descripcion').value=p.descripcion||'';
       if (p.imagen_url) pmLoadImagePreview(p.imagen_url);
+      const badge = document.getElementById('pm-stock-actual-badge');
+      if (badge) badge.textContent = `Stock actual: ${p.stock ?? 0}`;
+      const nuevoStockEl = document.getElementById('pm-nuevo-stock');
+      if (nuevoStockEl) nuevoStockEl.value = '';
     }
     // Load lotes for this product
     _loadProdLotesInModal(id);
@@ -3250,6 +3272,23 @@ function pmPreviewDias(val) {
   else if (dias<=30) { el.textContent=`⚠️ Vence en ${dias} días — ${label}`;         el.style.color='#EA580C'; }
   else if (dias<=90) { el.textContent=`🕐 ${dias} días restantes — ${label}`;        el.style.color='#CA8A04'; }
   else               { el.textContent=`✓ Vigente — ${label}`;                        el.style.color='#16A34A'; }
+}
+
+async function pmAjustarStock() {
+  const nuevoStock = parseInt(document.getElementById('pm-nuevo-stock').value);
+  if (isNaN(nuevoStock) || nuevoStock < 0) { toast('Ingresa un número válido (≥ 0)','warning'); return; }
+  if (!S.prodEditId) return;
+  const res = await api(`/productos/${S.prodEditId}/ajustar-stock`, {
+    method: 'POST',
+    body: JSON.stringify({ nuevo_stock: nuevoStock }),
+  });
+  if (!res.ok) { const e = await res.json(); toast(e.detail||'Error al ajustar stock','error'); return; }
+  const data = await res.json();
+  toast(`Stock actualizado: ${data.stock_anterior} → ${data.stock_nuevo}`,'success');
+  const badge = document.getElementById('pm-stock-actual-badge');
+  if (badge) badge.textContent = `Stock actual: ${data.stock_nuevo}`;
+  document.getElementById('pm-nuevo-stock').value = '';
+  loadInventory();
 }
 
 async function saveProduct() {
