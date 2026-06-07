@@ -978,10 +978,10 @@
 
                 <div id="cambio-row" class="space-y-2">
                   <!-- Botones rápidos -->
-                  <div class="grid grid-cols-5 gap-1">
+                  <div class="grid grid-cols-5 gap-1.5">
                     ${[20,50,100,200,500].map(v => `
-                      <button onclick="addCash(${v})" class="h-8 rounded-lg text-[10px] font-bold border bg-white transition-all hover:bg-slate-50"
-                              style="color:#64748B;border-color:#E2E8F0">
+                      <button onclick="addCash(${v})" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95"
+                              style="color:#1E3A8A;border-color:#E2E8F0">
                         $${v}
                       </button>
                     `).join('')}
@@ -2692,16 +2692,16 @@ function renderPosGrid(prods) {
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
   g.innerHTML=prods.map(p=>`
     <button onclick="addToCart(${p.id})"
-      class="bg-white rounded-xl border p-3 text-left hover:border-blue-300 hover:shadow-md transition-all"
+      class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full"
       style="border-color:#E2E8F0">
-      <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2" style="background:#F0F7FF">
+      <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0" style="background:#F0F7FF">
         <i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>
       </div>
-      <p class="text-xs font-semibold truncate" style="color:#0F172A">${p.nombre}</p>
-      <p class="text-[10px] truncate" style="color:#64748B">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
-      <div class="flex items-center justify-between mt-1.5">
-        <span class="text-sm font-bold" style="color:#243366">${fmt(p.precio_venta)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+      <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
+      <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
+      <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
+        <span class="text-base font-black" style="color:#16A34A">${fmt(p.precio_venta)}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold"
               style="background:${p.stock<=0?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4'};
                      color:${p.stock<=0?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A'}">${p.stock}</span>
       </div>
