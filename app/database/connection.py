@@ -113,6 +113,21 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate()
     _seed_initial_data()
+    _normalizar_nombres_productos()
+
+
+def _normalizar_nombres_productos():
+    """One-time migration: uppercase nombre, nombre_generico, marca for all products."""
+    from app.database.models import Producto
+    with get_db() as db:
+        prods = db.query(Producto).all()
+        for p in prods:
+            if p.nombre:
+                p.nombre = p.nombre.strip().upper()
+            if p.nombre_generico:
+                p.nombre_generico = p.nombre_generico.strip().upper()
+            if p.marca:
+                p.marca = p.marca.strip().upper()
 
 
 def _seed_initial_data():

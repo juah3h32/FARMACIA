@@ -161,6 +161,35 @@ def factory_reset_endpoint(payload: dict = Depends(get_current_api_user)):
     return {"ok": True}
 
 
+@router.post("/normalizar-nombres")
+def normalizar_nombres(payload: dict = Depends(get_current_api_user)):
+    """Uppercase nombre, nombre_generico and marca for all active products."""
+    _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    db = get_db_session()
+    try:
+        prods = db.query(Producto).filter(Producto.activo == True).all()
+        updated = 0
+        for p in prods:
+            changed = False
+            if p.nombre and p.nombre != p.nombre.upper():
+                p.nombre = p.nombre.strip().upper()
+                changed = True
+            if p.nombre_generico and p.nombre_generico != p.nombre_generico.upper():
+                p.nombre_generico = p.nombre_generico.strip().upper()
+                changed = True
+            if p.marca and p.marca != p.marca.upper():
+                p.marca = p.marca.strip().upper()
+                changed = True
+            if changed:
+                updated += 1
+        db.commit()
+        return {"ok": True, "actualizados": updated, "total": len(prods)}
+    finally:
+        db.close()
+
+
 @router.get("/db-stats")
 def db_stats(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)

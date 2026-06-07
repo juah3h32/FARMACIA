@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 import os, tempfile
 from app.database.connection import get_db_session
@@ -20,6 +20,16 @@ class ProductoIn(BaseModel):
     nombre: str
     nombre_generico: Optional[str] = None
     marca: Optional[str] = None
+
+    @field_validator('nombre', mode='before')
+    @classmethod
+    def _upper_nombre(cls, v):
+        return v.strip().upper() if v else v
+
+    @field_validator('nombre_generico', 'marca', mode='before')
+    @classmethod
+    def _upper_optional(cls, v):
+        return v.strip().upper() if v else v
     categoria_id: Optional[int] = None
     precio_compra: float = 0.0
     precio_venta: float
