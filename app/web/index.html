@@ -963,24 +963,46 @@
                   <span>Total</span><span id="cart-total">$0.00</span>
                 </div>
               </div>
-              <!-- Payment -->
-              <div class="px-4 pb-4 flex flex-col gap-2">
-                <select id="cart-metodo" class="w-full h-9 px-3 rounded-xl text-xs border" style="border-color:#E2E8F0;background:#F8FAFF"
-                        onchange="toggleCambioRow()">
-                  <option value="efectivo">Efectivo</option>
-                  <option value="tarjeta">Tarjeta</option>
-                </select>
-                <div id="cambio-row">
-                  <input id="cart-pagado" type="number" placeholder="Monto recibido *"
-                         class="w-full h-9 px-3 rounded-xl text-xs border mb-1.5" style="border-color:#E2E8F0;background:#F8FAFF"
-                         oninput="updateCambio()">
-                  <div class="flex justify-between text-xs font-semibold px-1" style="color:#16A34A">
-                    <span>Cambio</span><span id="cart-cambio">$0.00</span>
+              <div class="px-4 pb-4 flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-2">
+                  <select id="cart-metodo" class="w-full h-10 px-3 rounded-xl text-xs border font-semibold" style="border-color:#E2E8F0;background:#F8FAFF"
+                          onchange="toggleCambioRow()">
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="tarjeta">💳 Tarjeta</option>
+                  </select>
+                  <button onclick="setExactAmount()" class="h-10 rounded-xl text-[10px] font-bold border transition-all hover:bg-blue-50"
+                          style="color:#243366;border-color:#CBD5E1;background:#fff">
+                    EXACTO
+                  </button>
+                </div>
+
+                <div id="cambio-row" class="space-y-2">
+                  <!-- Botones rápidos -->
+                  <div class="grid grid-cols-5 gap-1">
+                    ${[20,50,100,200,500].map(v => `
+                      <button onclick="addCash(${v})" class="h-8 rounded-lg text-[10px] font-bold border bg-white transition-all hover:bg-slate-50"
+                              style="color:#64748B;border-color:#E2E8F0">
+                        $${v}
+                      </button>
+                    `).join('')}
+                  </div>
+                  
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">$</span>
+                    <input id="cart-pagado" type="number" placeholder="Monto recibido *"
+                           class="w-full h-10 pl-6 pr-3 rounded-xl text-sm font-bold border" style="border-color:#E2E8F0;background:#F8FAFF"
+                           oninput="updateCambio()">
+                  </div>
+                  
+                  <div class="flex justify-between items-center bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Cambio</span>
+                    <span id="cart-cambio" class="text-lg font-black text-emerald-600">$0.00</span>
                   </div>
                 </div>
-                <button onclick="processSale()" class="w-full h-11 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90"
+
+                <button onclick="processSale()" class="w-full h-12 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg shadow-blue-900/10"
                         style="background:linear-gradient(135deg,#243366,#1a2a57)">
-                  <i data-lucide="credit-card" style="width:16px;height:16px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
+                  <i data-lucide="shopping-bag" style="width:18px;height:18px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
                 </button>
               </div>
             </div>
@@ -2772,6 +2794,24 @@ function toggleCambioRow() {
   if (metodo !== 'efectivo') {
     const inp = document.getElementById('cart-pagado');
     if (inp) inp.value = '';
+  }
+}
+
+function setExactAmount() {
+  const total=S.cart.reduce((s,i)=>s+i.precio_venta*i.cantidad*(i.aplica_iva?1.16:1),0);
+  const inp = document.getElementById('cart-pagado');
+  if (inp) {
+    inp.value = total.toFixed(2);
+    updateCambio();
+  }
+}
+
+function addCash(val) {
+  const inp = document.getElementById('cart-pagado');
+  if (inp) {
+    const cur = parseFloat(inp.value) || 0;
+    inp.value = (cur + val).toFixed(2);
+    updateCambio();
   }
 }
 
