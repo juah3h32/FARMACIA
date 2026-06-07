@@ -875,8 +875,12 @@
             <p id="kpi-inv-ganancia" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
             <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ganancia proyectada</p>
           </div>
-          <div id="kpi-card-vencido" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#dc2626,#b91c1c)">
+          <div id="kpi-card-vencido" onclick="openVencidosModal()" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden transition-all hover:scale-105 hover:shadow-xl" style="background:linear-gradient(135deg,#dc2626,#b91c1c);cursor:pointer">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+            <div class="absolute bottom-2 right-3 flex items-center gap-1 opacity-60">
+              <i data-lucide="chevron-right" style="width:12px;height:12px;color:#fff"></i>
+              <span class="text-[10px] font-semibold text-white">Ver detalle</span>
+            </div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="package-x" style="width:20px;height:20px;color:#fff"></i>
             </div>
@@ -1675,6 +1679,46 @@
 </div><!-- /app -->
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- ═══════════ MODAL VENCIDOS ═══════════ -->
+<div id="modal-vencidos" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(4px)" onclick="closeModal('modal-vencidos')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:620px;max-width:95vw;max-height:85vh">
+    <div class="h-1.5 w-full rounded-t-2xl" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style="border-color:#FEE2E2">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEE2E2">
+        <i data-lucide="package-x" style="width:20px;height:20px;color:#EF4444"></i>
+      </div>
+      <div>
+        <h2 class="font-bold" style="color:#7F1D1D">Productos Vencidos</h2>
+        <p id="venc-modal-sub" class="text-xs mt-0.5" style="color:#EF4444">Cargando...</p>
+      </div>
+      <button onclick="closeModal('modal-vencidos')" class="ml-auto w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <!-- Warning banner -->
+    <div class="mx-6 mt-4 flex-shrink-0 rounded-xl p-3 flex items-start gap-2" style="background:#FFF5F5;border:1px solid #FEE2E2">
+      <i data-lucide="triangle-alert" style="width:15px;height:15px;color:#EF4444;flex-shrink:0;margin-top:1px"></i>
+      <p class="text-xs" style="color:#7F1D1D">Estos productos han superado su fecha de vencimiento y <strong>no deben venderse</strong>. Puedes darlos de baja para actualizar el inventario y generar un registro de merma.</p>
+    </div>
+    <!-- Bulk action -->
+    <div id="venc-modal-bulk" class="hidden mx-6 mt-3 flex-shrink-0">
+      <button onclick="bajaTodasVencidas()" class="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2" style="background:linear-gradient(135deg,#EF4444,#DC2626)">
+        <i data-lucide="trash-2" style="width:15px;height:15px"></i> Dar de baja todos los vencidos
+      </button>
+    </div>
+    <!-- List -->
+    <div class="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2" id="venc-modal-list">
+      <p class="text-sm text-center py-8" style="color:#94A3B8">Cargando...</p>
+    </div>
+    <!-- Footer -->
+    <div class="px-6 py-3 flex-shrink-0 border-t" style="border-color:#FEE2E2;background:#FFFAFA">
+      <button onclick="closeModal('modal-vencidos')" class="h-9 px-5 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════ PURGAR HISTORIAL MODAL ═══════════ -->
 <div id="modal-purge-historial" class="fixed inset-0 z-50 hidden items-center justify-center">
@@ -3919,6 +3963,100 @@ async function loadVencimientos(filtro) {
 }
 
 function vencFilter(f) { loadVencimientos(f); }
+
+// ── Modal productos vencidos ───────────────────────────────────────────────
+function openVencidosModal() {
+  const items = (_cadData?.items || []).filter(i => i.estado === 'vencido');
+  const sub = document.getElementById('venc-modal-sub');
+  const list = document.getElementById('venc-modal-list');
+  const bulk = document.getElementById('venc-modal-bulk');
+  const fmt = v => '$' + Number(v||0).toLocaleString('es-MX', {minimumFractionDigits:2});
+
+  if (items.length === 0) {
+    sub.textContent = 'Sin productos vencidos';
+    bulk.classList.add('hidden');
+    list.innerHTML = `<div class="flex flex-col items-center py-10 gap-3"><i data-lucide="check-circle-2" style="width:40px;height:40px;color:#22C55E"></i><p class="text-sm font-semibold" style="color:#16A34A">No hay productos vencidos</p></div>`;
+    openModal('modal-vencidos');
+    icons();
+    return;
+  }
+
+  // Group by product
+  const byProd = {};
+  items.forEach(i => {
+    if (!byProd[i.producto_id]) byProd[i.producto_id] = { nombre: i.producto, lotes: [] };
+    byProd[i.producto_id].lotes.push(i);
+  });
+
+  sub.textContent = `${items.length} lote(s) vencido(s) en ${Object.keys(byProd).length} producto(s)`;
+  bulk.classList.remove('hidden');
+
+  list.innerHTML = Object.values(byProd).map(g => `
+    <div class="rounded-xl overflow-hidden border" style="border-color:#FEE2E2">
+      <div class="flex items-center gap-2 px-4 py-2.5" style="background:#FFF5F5">
+        <i data-lucide="package" style="width:14px;height:14px;color:#EF4444"></i>
+        <span class="font-bold text-sm" style="color:#7F1D1D">${g.nombre}</span>
+        <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style="background:#FEE2E2;color:#DC2626">${g.lotes.length} lote(s)</span>
+      </div>
+      ${g.lotes.map(l => `
+        <div class="flex items-center gap-3 px-4 py-3 border-t" style="border-color:#FEE2E2;background:#fff">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-semibold" style="color:#0F172A">Lote: ${l.numero_lote || 'S/N'}</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full font-bold" style="background:#FEE2E2;color:#EF4444">⛔ Venció ${Math.abs(l.dias_restantes)}d atrás</span>
+            </div>
+            <div class="flex items-center gap-3 mt-1">
+              <span class="text-xs" style="color:#64748B">Fecha: <strong>${fmtDate(l.fecha_vencimiento)}</strong></span>
+              <span class="text-xs" style="color:#64748B">Cantidad: <strong>${l.cantidad} uds</strong></span>
+            </div>
+          </div>
+          <button onclick="bajaLoteVencido(${l.lote_id},${l.cantidad},'${l.producto.replace(/'/g,"\\'")} (lote ${l.numero_lote||'S/N'})')"
+                  class="flex-shrink-0 h-8 px-3 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all hover:opacity-80"
+                  style="border-color:#EF4444;color:#EF4444;background:#FFF5F5">
+            <i data-lucide="trash-2" style="width:12px;height:12px"></i> Dar de baja
+          </button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  openModal('modal-vencidos');
+  icons();
+}
+
+async function bajaLoteVencido(loteId, cantidad, nombre) {
+  if (!confirm(`¿Dar de baja ${cantidad} unidad(es) de "${nombre}"?\nEsto registrará una merma por vencimiento.`)) return;
+  try {
+    const res = await api('/inventario/baja-lote', {
+      method: 'POST',
+      body: JSON.stringify({ lote_id: loteId, cantidad, motivo: 'vencimiento' }),
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.detail || 'Error al dar de baja', 'error'); return; }
+    toast(`Baja registrada — stock nuevo: ${data.stock_nuevo}`, 'success');
+    await loadAlertasCaducidad();
+    openVencidosModal(); // refresh modal
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function bajaTodasVencidas() {
+  const items = (_cadData?.items || []).filter(i => i.estado === 'vencido');
+  if (!items.length) return;
+  if (!confirm(`¿Dar de baja TODOS los lotes vencidos (${items.length})?\nSe registrará una merma por vencimiento para cada uno.`)) return;
+  let ok = 0, err = 0;
+  for (const l of items) {
+    try {
+      const res = await api('/inventario/baja-lote', {
+        method: 'POST',
+        body: JSON.stringify({ lote_id: l.lote_id, cantidad: l.cantidad, motivo: 'vencimiento' }),
+      });
+      if (res.ok) ok++; else err++;
+    } catch { err++; }
+  }
+  toast(`Baja masiva: ${ok} lote(s) procesados${err ? `, ${err} errores` : ''}`, ok > 0 ? 'success' : 'error');
+  await loadAlertasCaducidad();
+  openVencidosModal();
+}
 
 // ── Alertas de caducidad (notificación global) ─────────────────────────────
 let _cadData = null;
