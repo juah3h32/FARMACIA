@@ -2752,6 +2752,13 @@ async function loadPOS() {
   }
 }
 
+function cloudinaryThumb(url, w=200, h=200) {
+  if (!url) return url;
+  // Insert Cloudinary transform after /upload/
+  return url.replace(/\/upload\/(?!v\d)/, `/upload/w_${w},h_${h},c_fill,q_auto,f_webp/`)
+            .replace(/\/upload\/(v\d+\/)/, `/upload/w_${w},h_${h},c_fill,q_auto,f_webp/$1`);
+}
+
 function renderPosGrid(prods) {
   const g=document.getElementById('pos-grid');
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
@@ -2761,7 +2768,7 @@ function renderPosGrid(prods) {
       style="border-color:#E2E8F0">
       <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="background:#F0F7FF">
         ${p.imagen_url
-          ? `<img src="${p.imagen_url}" alt="" class="w-full h-full object-cover rounded-xl" onerror="this.parentElement.innerHTML='<i data-lucide=\\'pill\\' style=\\'width:28px;height:28px;color:#2e4a8a\\'></i>'">`
+          ? `<img src="${cloudinaryThumb(p.imagen_url)}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover rounded-xl" onerror="this.parentElement.innerHTML='<i data-lucide=\\'pill\\' style=\\'width:28px;height:28px;color:#2e4a8a\\'></i>'">`
           : `<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>`}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
