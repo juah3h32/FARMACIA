@@ -233,6 +233,7 @@ class InventoryScreen(ctk.CTkFrame):
                     "descripcion": prod.descripcion or "",
                     "categoria_id": prod.categoria_id,
                     "proveedor_id": prod.proveedor_id,
+                    "imagen_url": prod.imagen_url or "",
                 }
                 ProductoDialog(self, title="Editar Producto", data=data, on_save=self._load_products)
         finally:
@@ -311,10 +312,13 @@ class ProductoDialog(ctk.CTkToplevel):
     def __init__(self, parent, title: str, data: dict = None, on_save=None):
         super().__init__(parent)
         self.title(title)
-        self.geometry("560x700")
+        self.geometry("560x840")
         self.grab_set()
         self.data = data or {}
         self.on_save = on_save
+        self.imagen_url = self.data.get("imagen_url") or ""
+        self._pending_image_path = None
+        self._ctk_img = None
         self._build_ui()
         # <Map> fires once the window is fully visible and CTkToplevel has completed
         # all internal initialization (appearance-mode passes, scaling callbacks, etc.)
@@ -411,6 +415,44 @@ class ProductoDialog(ctk.CTkToplevel):
         self.txt_desc = ctk.CTkTextbox(scroll, height=70)
         self.txt_desc.grid(row=row, column=1, pady=5, sticky="ew")
 
+        # Imagen
+        row += 1
+        img_outer = ctk.CTkFrame(scroll, corner_radius=8,
+                                  fg_color=("#F8FAFC", "#1e1e1e"),
+                                  border_width=1, border_color=("#E2E8F0", "#3a3a3a"))
+        img_outer.grid(row=row, column=0, columnspan=2, pady=10, padx=2, sticky="ew")
+
+        ctk.CTkLabel(img_outer, text="Imagen del Producto",
+                     font=ctk.CTkFont(size=12, weight="bold"), anchor="w").pack(
+            anchor="w", padx=12, pady=(10, 4))
+
+        img_inner = ctk.CTkFrame(img_outer, fg_color="transparent")
+        img_inner.pack(fill="x", padx=12, pady=(0, 12))
+
+        self.img_preview = ctk.CTkLabel(
+            img_inner, text="📷\n\nSin imagen",
+            width=150, height=150,
+            fg_color=("#E2E8F0", "#2b2b2b"), corner_radius=8,
+            font=ctk.CTkFont(size=11), text_color="gray60",
+        )
+        self.img_preview.pack(side="left", padx=(0, 16))
+
+        img_ctrl = ctk.CTkFrame(img_inner, fg_color="transparent")
+        img_ctrl.pack(side="left", fill="y", pady=4)
+
+        ctk.CTkLabel(img_ctrl, text="Portada del medicamento (opcional)",
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     wraplength=280, anchor="w").pack(anchor="w", pady=(0, 8))
+        ctk.CTkButton(img_ctrl, text="📷 Seleccionar imagen", width=185, height=34,
+                      fg_color="#2196F3", hover_color="#1976D2",
+                      command=self._seleccionar_imagen).pack(anchor="w", pady=2)
+        self.btn_quitar_img = ctk.CTkButton(img_ctrl, text="🗑 Quitar imagen", width=140, height=28,
+                                             fg_color="#e74c3c", hover_color="#c0392b",
+                                             command=self._quitar_imagen)
+        self.lbl_img_status = ctk.CTkLabel(img_ctrl, text="",
+                                            font=ctk.CTkFont(size=10), text_color="gray60")
+        self.lbl_img_status.pack(anchor="w", pady=(6, 0))
+
         # Boton guardar
         ctk.CTkButton(
             self, text="💾 Guardar", height=42, fg_color="#4CAF50", hover_color="#388E3C",
@@ -452,6 +494,12 @@ class ProductoDialog(ctk.CTkToplevel):
             self.txt_desc.delete("1.0", "end")
             self.txt_desc.insert("1.0", self.data["descripcion"])
 
+        self.imagen_url = self.data.get("imagen_url") or ""
+        if self.imagen_url:
+            self.lbl_img_status.configure(text="Imagen actual desde Cloudinary")
+            self.btn_quitar_img.pack(anchor="w", pady=(4, 0))
+            self._load_image_from_url(self.imagen_url)
+
     def _guardar(self):
         nombre = self.entries["nombre"].get().strip()
         if not nombre:
@@ -488,8 +536,22 @@ class ProductoDialog(ctk.CTkToplevel):
             prod.descripcion = self.txt_desc.get("1.0", "end").strip() or None
             prod.categoria_id = self._cat_map.get(self.opt_cat.get())
             prod.proveedor_id = self._prov_map.get(self.opt_prov.get())
+            prod.imagen_url = self.imagen_url or None
 
             db.commit()
+            db.refresh(prod)
+
+            if self._pending_image_path:
+                try:
+                    self.lbl_img_status.configure(text="⏫ Subiendo imagen a Cloudinary...")
+                    self.update_idletasks()
+                    from app.services.cloudinary_service import upload_product_image
+                    url = upload_product_image(self._pending_image_path, prod.id)
+                    prod.imagen_url = url
+                    db.commit()
+                except Exception as e:
+                    messagebox.showwarning("Imagen", f"Producto guardado. Imagen no subida:\n{e}")
+
             registrar_accion("GUARDAR_PRODUCTO", "productos", prod.id, prod.nombre)
             if self.on_save:
                 self.on_save()
@@ -543,6 +605,57 @@ class ProductoDialog(ctk.CTkToplevel):
             self.entries["nombre"].focus_set()
         finally:
             db.close()
+
+
+    def _seleccionar_imagen(self):
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            title="Seleccionar imagen del producto",
+            filetypes=[("Imágenes", "*.jpg *.jpeg *.png *.webp *.bmp"), ("Todos", "*.*")],
+        )
+        if not path:
+            return
+        self._pending_image_path = path
+        self.lbl_img_status.configure(text="Imagen seleccionada — se subirá al guardar")
+        self._show_local_preview(path)
+        self.btn_quitar_img.pack(anchor="w", pady=(4, 0))
+
+    def _quitar_imagen(self):
+        self.imagen_url = ""
+        self._pending_image_path = None
+        self._ctk_img = None
+        self.img_preview.configure(image=None, text="📷\n\nSin imagen")
+        self.lbl_img_status.configure(text="")
+        self.btn_quitar_img.pack_forget()
+
+    def _show_local_preview(self, path: str):
+        try:
+            from PIL import Image
+            img = Image.open(path)
+            img.thumbnail((150, 150), Image.LANCZOS)
+            self._ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+            self.img_preview.configure(image=self._ctk_img, text="")
+        except Exception:
+            pass
+
+    def _load_image_from_url(self, url: str):
+        import threading
+
+        def _fetch():
+            try:
+                import requests
+                from PIL import Image
+                import io
+                resp = requests.get(url, timeout=8)
+                img = Image.open(io.BytesIO(resp.content))
+                img.thumbnail((150, 150), Image.LANCZOS)
+                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+                self._ctk_img = ctk_img
+                self.after(0, lambda: self.img_preview.configure(image=ctk_img, text=""))
+            except Exception:
+                pass
+
+        threading.Thread(target=_fetch, daemon=True).start()
 
 
 class EntradaStockDialog(ctk.CTkToplevel):

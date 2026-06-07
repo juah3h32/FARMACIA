@@ -636,6 +636,7 @@
   .inp:focus { border-color:#243366; }
   select.inp { appearance:auto; }
   textarea.inp { height:auto; padding:8px 11px; resize:vertical; }
+  #pm-img-wrap:hover .pm-img-hover { opacity:1 !important; }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-900 antialiased overflow-hidden h-screen">
@@ -1670,7 +1671,7 @@
 <!-- Product modal -->
 <div id="modal-product" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-product')"></div>
-  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[560px] max-h-[95vh] flex flex-col overflow-hidden">
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[760px] max-h-[95vh] flex flex-col overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
@@ -1683,101 +1684,149 @@
     </div>
 
     <!-- Body -->
-    <div class="px-5 pt-4 pb-2 flex flex-col gap-2.5 overflow-y-auto custom-scrollbar">
-      <!-- Fila 1: Nombre -->
-      <div><label class="lbl">Nombre *</label><input id="pm-nombre" class="inp" placeholder="Nombre del producto"></div>
+    <div class="px-5 pt-4 pb-2 overflow-y-auto custom-scrollbar">
+      <div class="flex gap-4">
 
-      <!-- Fila 2: Genérico | Barras | Marca -->
-      <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
-        <div><label class="lbl">Nombre genérico</label><input id="pm-generico" class="inp" placeholder="Genérico"></div>
-        <div><label class="lbl">Código de barras</label><input id="pm-barcode" class="inp" placeholder="EAN-13"></div>
-        <div><label class="lbl">Marca</label><input id="pm-marca" class="inp" placeholder="Marca"></div>
-      </div>
+        <!-- ── Columna izquierda: campos del formulario ── -->
+        <div class="flex flex-col gap-2.5 flex-1 min-w-0">
+          <!-- Nombre -->
+          <div><label class="lbl">Nombre *</label><input id="pm-nombre" class="inp" placeholder="Nombre del producto"></div>
 
-      <!-- Fila 3: Categoría | P.Compra | P.Venta -->
-      <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
-        <div><label class="lbl">Categoría</label>
-          <select id="pm-cat" class="inp"><option value="">Sin categoría</option></select>
-        </div>
-        <div><label class="lbl">Precio compra</label><input id="pm-pcompra" type="number" class="inp" placeholder="0.00"></div>
-        <div><label class="lbl">Precio venta *</label><input id="pm-pventa" type="number" class="inp" placeholder="0.00"></div>
-      </div>
-
-      <!-- Fila 4: Presentación | Concentración | Contenido -->
-      <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
-        <div>
-          <label class="lbl">Presentación</label>
-          <select id="pm-presentacion" class="inp">
-            <option value="">— Sin especificar —</option>
-            <option>Tableta</option><option>Comprimido</option><option>Cápsula</option><option>Jarabe</option>
-            <option>Suspensión</option><option>Inyectable</option><option>Ampolleta</option>
-            <option>Crema</option><option>Ungüento</option><option>Gel</option>
-            <option>Óvulos</option><option>Gotas</option><option>Spray</option><option>Supositorio</option>
-            <option>Parche</option><option>Solución</option><option>Polvo</option>
-            <option>Sobre</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        <div><label class="lbl">Concentración</label><input id="pm-concentracion" class="inp" placeholder="500mg, 10mg/ml…"></div>
-        <div><label class="lbl">Contenido / Piezas</label><input id="pm-contenido" class="inp" placeholder="30 tab, 120ml…"></div>
-      </div>
-
-      <!-- Fila 5: Stock mín | IVA | Receta -->
-      <div class="grid gap-2.5 items-end" style="grid-template-columns:1fr 1fr 1fr">
-        <div><label class="lbl">Stock mínimo</label><input id="pm-smin" type="number" class="inp" placeholder="10"></div>
-        <div class="flex items-center gap-2 h-[38px]">
-          <input id="pm-iva" type="checkbox" class="w-4 h-4 rounded accent-blue-600">
-          <label class="text-xs font-medium" style="color:#374151">Aplica IVA 16%</label>
-        </div>
-        <div class="flex items-center gap-2 h-[38px]">
-          <input id="pm-receta" type="checkbox" class="w-4 h-4 rounded accent-blue-600">
-          <label class="text-xs font-medium" style="color:#374151">Requiere receta</label>
-        </div>
-      </div>
-
-      <!-- ── Inventario inicial (solo CREAR) ── -->
-      <div id="pm-section-crear">
-        <div class="rounded-xl p-3" style="background:#F0FDF4;border:2px solid #BBF7D0">
-          <div class="flex items-center gap-1.5 mb-2.5">
-            <div class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style="background:#16A34A">
-              <i data-lucide="package-plus" style="width:11px;height:11px;color:#fff"></i>
-            </div>
-            <p class="text-xs font-bold" style="color:#15803D">Lote inicial — requerido al crear</p>
+          <!-- Genérico | Barras | Marca -->
+          <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
+            <div><label class="lbl">Nombre genérico</label><input id="pm-generico" class="inp" placeholder="Genérico"></div>
+            <div><label class="lbl">Código de barras</label><input id="pm-barcode" class="inp" placeholder="EAN-13"></div>
+            <div><label class="lbl">Marca</label><input id="pm-marca" class="inp" placeholder="Marca"></div>
           </div>
-          <div class="grid gap-2.5" style="grid-template-columns:100px 1fr 1fr">
-            <div>
-              <label class="lbl">Cantidad *</label>
-              <input id="pm-cantidad" type="number" min="1" class="inp" placeholder="0">
+
+          <!-- Categoría | P.Compra | P.Venta -->
+          <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
+            <div><label class="lbl">Categoría</label>
+              <select id="pm-cat" class="inp"><option value="">Sin categoría</option></select>
             </div>
+            <div><label class="lbl">Precio compra</label><input id="pm-pcompra" type="number" class="inp" placeholder="0.00"></div>
+            <div><label class="lbl">Precio venta *</label><input id="pm-pventa" type="number" class="inp" placeholder="0.00"></div>
+          </div>
+
+          <!-- Presentación | Concentración | Contenido -->
+          <div class="grid gap-2.5" style="grid-template-columns:1fr 1fr 1fr">
             <div>
-              <label class="lbl" style="display:flex;align-items:center;gap:3px">
-                <i data-lucide="calendar-clock" style="width:11px;height:11px;color:#16A34A"></i>
-                Vencimiento (MM/AAAA) *
-              </label>
-              <input id="pm-fechavenc" type="text" class="inp" placeholder="06/2027" maxlength="7"
-                     style="border-color:#16A34A;border-width:2px" inputmode="numeric"
-                     oninput="fmtMesAnio(this);pmPreviewDias(this.value)">
-              <p id="pm-dias-preview" class="text-xs mt-0.5 font-semibold" style="min-height:14px"></p>
+              <label class="lbl">Presentación</label>
+              <select id="pm-presentacion" class="inp">
+                <option value="">— Sin especificar —</option>
+                <option>Tableta</option><option>Comprimido</option><option>Cápsula</option><option>Jarabe</option>
+                <option>Suspensión</option><option>Inyectable</option><option>Ampolleta</option>
+                <option>Crema</option><option>Ungüento</option><option>Gel</option>
+                <option>Óvulos</option><option>Gotas</option><option>Spray</option><option>Supositorio</option>
+                <option>Parche</option><option>Solución</option><option>Polvo</option>
+                <option>Sobre</option><option>Otro</option>
+              </select>
             </div>
-            <div>
-              <label class="lbl">N° de Lote <span style="color:#94A3B8;font-weight:400">(opcional)</span></label>
-              <input id="pm-lote" class="inp" placeholder="Ej. LT-2025-001">
+            <div><label class="lbl">Concentración</label><input id="pm-concentracion" class="inp" placeholder="500mg, 10mg/ml…"></div>
+            <div><label class="lbl">Contenido / Piezas</label><input id="pm-contenido" class="inp" placeholder="30 tab, 120ml…"></div>
+          </div>
+
+          <!-- Stock mín | IVA | Receta -->
+          <div class="grid gap-2.5 items-end" style="grid-template-columns:1fr 1fr 1fr">
+            <div><label class="lbl">Stock mínimo</label><input id="pm-smin" type="number" class="inp" placeholder="10"></div>
+            <div class="flex items-center gap-2 h-[38px]">
+              <input id="pm-iva" type="checkbox" class="w-4 h-4 rounded accent-blue-600">
+              <label class="text-xs font-medium" style="color:#374151">Aplica IVA 16%</label>
+            </div>
+            <div class="flex items-center gap-2 h-[38px]">
+              <input id="pm-receta" type="checkbox" class="w-4 h-4 rounded accent-blue-600">
+              <label class="text-xs font-medium" style="color:#374151">Requiere receta</label>
             </div>
           </div>
         </div>
+
+        <!-- ── Columna derecha: imagen + descripción ── -->
+        <div class="flex flex-col gap-2 flex-shrink-0" style="width:195px">
+
+          <!-- Imagen clickable -->
+          <div>
+            <label class="lbl">Imagen <span style="color:#94A3B8;font-weight:400">(opcional)</span></label>
+            <div id="pm-img-wrap" onclick="pmSelectImage()" class="relative cursor-pointer rounded-xl overflow-hidden flex items-center justify-center"
+                 style="width:195px;height:195px;background:#F1F5F9;border:2px dashed #CBD5E1;transition:border-color .2s"
+                 onmouseenter="this.style.borderColor='#2196F3'" onmouseleave="this.style.borderColor=_pmImageFile||_pmImageUrl?'transparent':'#CBD5E1'">
+              <img id="pm-img-preview" src="" alt="" class="hidden absolute inset-0 w-full h-full object-cover">
+              <div id="pm-img-placeholder" class="flex flex-col items-center gap-2 pointer-events-none">
+                <i data-lucide="camera" style="width:36px;height:36px;color:#94A3B8"></i>
+                <p class="text-xs text-center font-medium" style="color:#94A3B8">Clic para<br>subir imagen</p>
+              </div>
+              <!-- hover overlay -->
+              <div class="pm-img-hover absolute inset-0 rounded-xl flex items-center justify-center opacity-0 pointer-events-none transition-opacity" style="background:rgba(33,150,243,.18)">
+                <i data-lucide="upload" style="width:28px;height:28px;color:#2196F3"></i>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+              <p id="pm-img-status" class="text-xs flex-1" style="color:#94A3B8;min-height:14px"></p>
+              <button type="button" id="pm-btn-quitar-img" onclick="pmClearImage()" class="hidden text-xs font-semibold" style="color:#EF4444">✕ quitar</button>
+            </div>
+            <input id="pm-img-input" type="file" accept="image/*" class="hidden" onchange="pmHandleImageSelect(event)">
+          </div>
+
+          <!-- Descripción -->
+          <div class="flex flex-col flex-1">
+            <div class="flex items-center justify-between mb-0.5">
+              <label class="lbl" style="margin-bottom:0">Descripción</label>
+              <button type="button" id="pm-btn-generar" onclick="pmGenerarDescripcion()" class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded" style="background:#6366F1;color:#fff;border:none;cursor:pointer" title="Generar descripción automática con IA">
+                <span id="pm-generar-icon">✨</span>
+                <span id="pm-generar-txt">Generar</span>
+              </button>
+            </div>
+            <textarea id="pm-descripcion" class="inp resize-none flex-1" style="min-height:110px" placeholder="Indicaciones, usos, contraindicaciones..."></textarea>
+          </div>
+
+        </div>
       </div>
 
-      <!-- ── Lotes existentes (solo EDITAR) ── -->
-      <div id="pm-section-editar" class="hidden">
-        <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-xs font-bold" style="color:#374151">Lotes / Fechas de vencimiento</p>
-            <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">
-              + Agregar entrada
-            </button>
+      <!-- ── Lotes (ancho completo, debajo de columnas) ── -->
+      <div class="mt-2.5 flex flex-col gap-2.5">
+        <!-- Inventario inicial (solo CREAR) -->
+        <div id="pm-section-crear">
+          <div class="rounded-xl p-3" style="background:#F0FDF4;border:2px solid #BBF7D0">
+            <div class="flex items-center gap-1.5 mb-2.5">
+              <div class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style="background:#16A34A">
+                <i data-lucide="package-plus" style="width:11px;height:11px;color:#fff"></i>
+              </div>
+              <p class="text-xs font-bold" style="color:#15803D">Lote inicial — requerido al crear</p>
+            </div>
+            <div class="grid gap-2.5" style="grid-template-columns:100px 1fr 1fr">
+              <div>
+                <label class="lbl">Cantidad *</label>
+                <input id="pm-cantidad" type="number" min="1" class="inp" placeholder="0">
+              </div>
+              <div>
+                <label class="lbl" style="display:flex;align-items:center;gap:3px">
+                  <i data-lucide="calendar-clock" style="width:11px;height:11px;color:#16A34A"></i>
+                  Vencimiento (MM/AAAA) *
+                </label>
+                <input id="pm-fechavenc" type="text" class="inp" placeholder="06/2027" maxlength="7"
+                       style="border-color:#16A34A;border-width:2px" inputmode="numeric"
+                       oninput="fmtMesAnio(this);pmPreviewDias(this.value)">
+                <p id="pm-dias-preview" class="text-xs mt-0.5 font-semibold" style="min-height:14px"></p>
+              </div>
+              <div>
+                <label class="lbl">N° de Lote <span style="color:#94A3B8;font-weight:400">(opcional)</span></label>
+                <input id="pm-lote" class="inp" placeholder="Ej. LT-2025-001">
+              </div>
+            </div>
           </div>
-          <div id="pm-lotes-list" class="text-xs space-y-1.5">
-            <p style="color:#94A3B8">Cargando lotes...</p>
+        </div>
+
+        <!-- Lotes existentes (solo EDITAR) -->
+        <div id="pm-section-editar" class="hidden">
+          <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-bold" style="color:#374151">Lotes / Fechas de vencimiento</p>
+              <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">
+                + Agregar entrada
+              </button>
+            </div>
+            <div id="pm-lotes-list" class="text-xs space-y-1.5">
+              <p style="color:#94A3B8">Cargando lotes...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -3054,6 +3103,8 @@ async function openProductModal(id=null) {
   document.getElementById('pm-cat').value='';
   document.getElementById('pm-presentacion').value='';
   document.getElementById('prod-modal-title').textContent=id?'Editar Producto':'Agregar Producto';
+  document.getElementById('pm-descripcion').value='';
+  pmClearImage();
 
   const secCrear = document.getElementById('pm-section-crear');
   const secEditar = document.getElementById('pm-section-editar');
@@ -3077,6 +3128,8 @@ async function openProductModal(id=null) {
       document.getElementById('pm-presentacion').value=p.presentacion||'';
       document.getElementById('pm-concentracion').value=p.concentracion||'';
       document.getElementById('pm-contenido').value=p.contenido||'';
+      document.getElementById('pm-descripcion').value=p.descripcion||'';
+      if (p.imagen_url) pmLoadImagePreview(p.imagen_url);
     }
     // Load lotes for this product
     _loadProdLotesInModal(id);
@@ -3178,6 +3231,7 @@ async function saveProduct() {
     presentacion:    document.getElementById('pm-presentacion').value||null,
     concentracion:   document.getElementById('pm-concentracion').value.trim()||null,
     contenido:       document.getElementById('pm-contenido').value.trim()||null,
+    descripcion:     document.getElementById('pm-descripcion').value.trim()||null,
   };
 
   const method = isEdit ? 'PUT' : 'POST';
@@ -3210,14 +3264,134 @@ async function saveProduct() {
     } else {
       toast('Producto creado con lote de vencimiento','success');
     }
+    if (_pmImageFile) await pmUploadImage(prodData.id);
   } else {
     toast('Producto actualizado','success');
+    if (_pmImageFile) await pmUploadImage(S.prodEditId);
   }
 
   _clearDraft(_DRAFT.product);
   closeModal('modal-product');
   loadInventory();
 }
+
+// ── Product image helpers ─────────────────────────────────────────────────
+let _pmImageFile = null;
+let _pmImageUrl  = '';
+
+function pmSelectImage() {
+  document.getElementById('pm-img-input').click();
+}
+
+function pmHandleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _pmImageFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById('pm-img-preview');
+    img.src = ev.target.result;
+    img.classList.remove('hidden');
+    document.getElementById('pm-img-placeholder').classList.add('hidden');
+    document.getElementById('pm-btn-quitar-img').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+  const st = document.getElementById('pm-img-status');
+  st.textContent = 'Imagen seleccionada — se subirá al guardar';
+  st.style.color = '#2196F3';
+  e.target.value = '';
+}
+
+function pmClearImage() {
+  _pmImageFile = null;
+  _pmImageUrl  = '';
+  const img = document.getElementById('pm-img-preview');
+  if (img) { img.src=''; img.classList.add('hidden'); }
+  const ph = document.getElementById('pm-img-placeholder');
+  if (ph) ph.classList.remove('hidden');
+  const btn = document.getElementById('pm-btn-quitar-img');
+  if (btn) btn.classList.add('hidden');
+  const st = document.getElementById('pm-img-status');
+  if (st) { st.textContent=''; st.style.color='#94A3B8'; }
+}
+
+function pmLoadImagePreview(url) {
+  if (!url) { pmClearImage(); return; }
+  _pmImageUrl = url;
+  _pmImageFile = null;
+  const img = document.getElementById('pm-img-preview');
+  img.src = url;
+  img.classList.remove('hidden');
+  document.getElementById('pm-img-placeholder').classList.add('hidden');
+  document.getElementById('pm-btn-quitar-img').classList.remove('hidden');
+  const st = document.getElementById('pm-img-status');
+  st.textContent = '✓ Imagen actual desde Cloudinary';
+  st.style.color = '#16A34A';
+}
+
+async function pmGenerarDescripcion() {
+  const nombre = (document.getElementById('pm-nombre')?.value||'').trim();
+  if (!nombre) { toast('Ingresa el nombre del producto primero','error'); return; }
+  const btn  = document.getElementById('pm-btn-generar');
+  const icon = document.getElementById('pm-generar-icon');
+  const txt  = document.getElementById('pm-generar-txt');
+  btn.disabled = true;
+  icon.textContent = '⏳';
+  txt.textContent  = 'Generando...';
+  try {
+    const body = {
+      nombre,
+      nombre_generico: document.getElementById('pm-generico')?.value||'',
+      marca:           document.getElementById('pm-marca')?.value||'',
+      presentacion:    document.getElementById('pm-presentacion')?.value||'',
+      concentracion:   document.getElementById('pm-concentracion')?.value||'',
+      contenido:       document.getElementById('pm-contenido')?.value||'',
+    };
+    const res  = await api('/ai/descripcion', { method:'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (res.ok && data?.descripcion) {
+      document.getElementById('pm-descripcion').value = data.descripcion;
+    } else {
+      toast(data?.detail||'No se pudo generar la descripción','error');
+    }
+  } catch(e) {
+    toast(e?.message||'Error al generar descripción','error');
+  } finally {
+    btn.disabled     = false;
+    icon.textContent = '✨';
+    txt.textContent  = 'Generar';
+  }
+}
+
+async function pmUploadImage(productId) {
+  if (!_pmImageFile) return;
+  const st = document.getElementById('pm-img-status');
+  st.textContent = '⏫ Subiendo imagen a Cloudinary...';
+  st.style.color = '#2196F3';
+  const formData = new FormData();
+  formData.append('file', _pmImageFile);
+  try {
+    const res = await fetch(`/api/productos/${productId}/imagen`, {
+      method: 'POST',
+      headers: S.token ? { Authorization: `Bearer ${S.token}` } : {},
+      body: formData,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      _pmImageUrl = data.imagen_url;
+      _pmImageFile = null;
+      st.textContent = '✓ Imagen subida correctamente';
+      st.style.color = '#16A34A';
+    } else {
+      st.textContent = '⚠ Producto guardado — imagen no subida';
+      st.style.color = '#EA580C';
+    }
+  } catch(e) {
+    st.textContent = '⚠ Error al subir imagen';
+    st.style.color = '#EA580C';
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function deleteProduct(id) {
   const prod = (S.allInv||[]).find(p=>p.id===id);

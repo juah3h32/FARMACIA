@@ -102,6 +102,7 @@ class Producto(Base):
     concentracion = Column(String(50))  # 500mg, 250mg/5ml, 10mg/ml…
     contenido = Column(String(50))      # 30 tab, 120ml, 10 amp…
     descripcion = Column(Text)
+    imagen_url = Column(String(500))
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())

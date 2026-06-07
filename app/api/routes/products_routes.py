@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+import os, tempfile
 from app.database.connection import get_db_session
 from app.database.models import Producto, Categoria
 from app.api.routes.auth_routes import get_current_api_user
@@ -30,6 +31,7 @@ class ProductoIn(BaseModel):
     concentracion: Optional[str] = None
     contenido: Optional[str] = None
     descripcion: Optional[str] = None
+    imagen_url: Optional[str] = None
 
 
 class ProductoResponse(BaseModel):
@@ -49,6 +51,8 @@ class ProductoResponse(BaseModel):
     presentacion: Optional[str] = None
     concentracion: Optional[str] = None
     contenido: Optional[str] = None
+    descripcion: Optional[str] = None
+    imagen_url: Optional[str] = None
     activo: bool
 
     class Config:
@@ -166,6 +170,39 @@ def eliminar_producto(producto_id: int, bg: BackgroundTasks, payload: dict = Dep
         db.commit()
         _sync_bg(bg)
         return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/{producto_id}/imagen")
+async def subir_imagen_producto(
+    producto_id: int,
+    file: UploadFile = File(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        prod = db.query(Producto).filter(Producto.id == producto_id).first()
+        if not prod:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        try:
+            from app.services.cloudinary_service import upload_product_image
+            url = upload_product_image(tmp_path, producto_id)
+            prod.imagen_url = url
+            db.commit()
+            return {"imagen_url": url}
+        finally:
+            os.unlink(tmp_path)
     except HTTPException:
         raise
     except Exception as e:

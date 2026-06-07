@@ -93,3 +93,17 @@ DEV_MODE = not getattr(sys, 'frozen', False) and not _ON_VERCEL
 GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
 GITHUB_TOKEN = ""
+
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "dcutrbbyw")
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "717952968559447")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "gufXKh1BIUTfsdwKNzz95or4SI4")
+
+def _load_anthropic_key() -> str:
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not key:
+        _kf = DATA_DIR / "anthropic.key"
+        if _kf.exists():
+            key = _kf.read_text(encoding="utf-8").strip()
+    return key
+
+ANTHROPIC_API_KEY = _load_anthropic_key()

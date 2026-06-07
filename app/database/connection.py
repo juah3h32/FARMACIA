@@ -81,6 +81,8 @@ def _migrate():
         ("productos", "presentacion",  "VARCHAR(50)"),
         ("productos", "concentracion", "VARCHAR(50)"),
         ("productos", "contenido",     "VARCHAR(50)"),
+        ("productos", "imagen_url",    "VARCHAR(500)"),
+        ("productos", "descripcion",   "TEXT"),
     ]
     # Local SQLite
     with engine.connect() as conn:
