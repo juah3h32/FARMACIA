@@ -2762,7 +2762,7 @@ function cloudinaryThumb(url, w=200, h=200) {
 function posProductThumb(imgUrl) {
   if (imgUrl) {
     const src = cloudinaryThumb(imgUrl);
-    return '<img src="' + src + '" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover rounded-xl" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:28px;height:28px;color:#2e4a8a&quot;></i>\'">';
+    return '<img src="' + src + '" alt="" loading="lazy" decoding="async" style="max-height:96px;width:auto;max-width:100%;object-fit:contain;padding:4px" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:28px;height:28px;color:#94A3B8&quot;></i>\'">';
   }
   return '<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>';
 }
@@ -2774,7 +2774,7 @@ function renderPosGrid(prods) {
     <button onclick="addToCart(${p.id})"
       class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full"
       style="border-color:#E2E8F0">
-      <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="background:#F0F7FF">
+      <div class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="height:100px;background:#fff;border:1px solid #F1F5F9">
         ${posProductThumb(p.imagen_url)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
