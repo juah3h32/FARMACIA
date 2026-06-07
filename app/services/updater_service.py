@@ -178,21 +178,42 @@ def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float 
             hdrs["Range"] = f"bytes={existing_size}-"
 
         with _req.get(url, headers=hdrs, stream=True, timeout=60) as resp:
+            # 416 = partial file is stale (new release replaced the asset) — restart fresh
+            if resp.status_code == 416:
+                if dest.exists():
+                    dest.unlink()
+                existing_size = 0
+                hdrs.pop("Range", None)
+                resp.close()
+            if resp.status_code == 416 or resp.status_code not in (200, 206):
+                # Re-request without Range header
+                with _req.get(url, headers=hdrs, stream=True, timeout=60) as resp2:
+                    resp2.raise_for_status()
+                    existing_size = 0
+                    total = int(resp2.headers.get("Content-Length") or 0)
+                    downloaded = 0
+                    with open(dest, "wb") as f:
+                        for chunk in resp2.iter_content(chunk_size=65536):
+                            with _lock:
+                                if _cancel_requested:
+                                    return False, "Actualización cancelada por el usuario"
+                            if not chunk:
+                                continue
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total and progress_callback:
+                                progress_callback(min(0.99, (downloaded / total) * pct_max))
+                    return True, ""
             # Handle 206 Partial Content or 200 OK
             if resp.status_code == 206:
-                # Partial content: we are resuming
                 total_content_range = resp.headers.get("Content-Range")
                 if total_content_range:
-                    # Content-Range: bytes 123-456/789
                     total = int(total_content_range.split("/")[-1])
                 else:
                     total = int(resp.headers.get("Content-Length") or 0) + existing_size
-            elif resp.status_code == 200:
-                # Server doesn't support range or file is new
-                existing_size = 0
-                total = int(resp.headers.get("Content-Length") or 0)
             else:
-                resp.raise_for_status()
+                # 200 OK: server doesn't support range or file is new
+                existing_size = 0
                 total = int(resp.headers.get("Content-Length") or 0)
 
             downloaded = existing_size
