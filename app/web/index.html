@@ -2759,6 +2759,14 @@ function cloudinaryThumb(url, w=200, h=200) {
             .replace(/\/upload\/(v\d+\/)/, `/upload/w_${w},h_${h},c_fill,q_auto,f_webp/$1`);
 }
 
+function posProductThumb(imgUrl) {
+  if (imgUrl) {
+    const src = cloudinaryThumb(imgUrl);
+    return '<img src="' + src + '" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover rounded-xl" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:28px;height:28px;color:#2e4a8a&quot;></i>\'">';
+  }
+  return '<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>';
+}
+
 function renderPosGrid(prods) {
   const g=document.getElementById('pos-grid');
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
@@ -2767,9 +2775,7 @@ function renderPosGrid(prods) {
       class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full"
       style="border-color:#E2E8F0">
       <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="background:#F0F7FF">
-        ${p.imagen_url
-          ? `<img src="${cloudinaryThumb(p.imagen_url)}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover rounded-xl" onerror="this.parentElement.innerHTML='<i data-lucide=\\'pill\\' style=\\'width:28px;height:28px;color:#2e4a8a\\'></i>'">`
-          : `<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>`}
+        ${posProductThumb(p.imagen_url)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
