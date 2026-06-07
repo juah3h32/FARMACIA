@@ -161,6 +161,7 @@ def _seed_initial_data():
             "Medicamentos Generales", "Antibióticos", "Vitaminas y Suplementos",
             "Cuidado Personal",       "Material de Curación", "Productos de Bebé",
             "Medicamentos Controlados", "Dermatología",       "Oftalmología",
+            "Anticonceptivos",
         ]
         for nombre in categorias_default:
             if not db.query(Categoria).filter(Categoria.nombre == nombre).first():
