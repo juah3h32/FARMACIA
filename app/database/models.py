@@ -107,6 +107,7 @@ class Producto(Base):
     unidades_por_caja = Column(Integer, default=1)
     precio_pieza = Column(Float, default=0.0)
     unidad_pieza = Column(String(30), default="pieza")
+    unidad_caja = Column(String(30), default="caja")
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())

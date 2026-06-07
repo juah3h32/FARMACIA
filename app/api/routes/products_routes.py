@@ -46,6 +46,7 @@ class ProductoIn(BaseModel):
     unidades_por_caja: int = 1
     precio_pieza: float = 0.0
     unidad_pieza: Optional[str] = "pieza"
+    unidad_caja: Optional[str] = "caja"
 
 
 class ProductoResponse(BaseModel):
@@ -71,6 +72,7 @@ class ProductoResponse(BaseModel):
     unidades_por_caja: int = 1
     precio_pieza: float = 0.0
     unidad_pieza: Optional[str] = "pieza"
+    unidad_caja: Optional[str] = "caja"
     activo: bool
 
     class Config:

@@ -1853,22 +1853,36 @@
               <label class="text-xs font-bold" style="color:#92400E">Venta por pieza (fraccionado)</label>
               <span class="text-[10px] ml-auto" style="color:#D97706">Ej: caja de condones vendida por pieza</span>
             </div>
-            <div id="pm-fraccionada-fields" class="hidden grid gap-2" style="grid-template-columns:1fr 1fr 1fr">
-              <div>
-                <label class="lbl" style="font-size:10px">Piezas por caja</label>
-                <input id="pm-uds-caja" type="number" min="1" class="inp" placeholder="12" oninput="pmCalcPrecioPieza()">
+            <div id="pm-fraccionada-fields" class="hidden flex flex-col gap-2">
+              <div class="grid gap-2" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div>
+                  <label class="lbl" style="font-size:10px">Piezas por caja</label>
+                  <input id="pm-uds-caja" type="number" min="1" class="inp" placeholder="12" oninput="pmCalcPrecioPieza()">
+                </div>
+                <div>
+                  <label class="lbl" style="font-size:10px">Nombre caja</label>
+                  <input id="pm-unidad-caja" class="inp" placeholder="caja, blíster, frasco…" maxlength="30">
+                </div>
+                <div>
+                  <label class="lbl" style="font-size:10px">Nombre pieza suelta</label>
+                  <input id="pm-unidad-pieza" class="inp" placeholder="tableta, cápsula, condón…" maxlength="30">
+                </div>
+                <div>
+                  <label class="lbl" style="font-size:10px">Precio pieza suelta</label>
+                  <input id="pm-precio-pieza" type="number" step="0.01" class="inp" placeholder="auto" oninput="this.dataset.manual=this.value?'1':''">
+                </div>
               </div>
-              <div>
-                <label class="lbl" style="font-size:10px">Nombre pieza</label>
-                <input id="pm-unidad-pieza" class="inp" placeholder="pieza, tableta, condón…" maxlength="30">
-              </div>
-              <div>
-                <label class="lbl" style="font-size:10px">Precio por pieza</label>
-                <input id="pm-precio-pieza" type="number" step="0.01" class="inp" placeholder="auto">
+              <div class="rounded-lg p-2 flex items-start gap-2" style="background:#FEF9C3;border:1px solid #FDE68A">
+                <span style="font-size:13px">💡</span>
+                <p class="text-[10px]" style="color:#92400E">
+                  <strong>Cómo funciona:</strong> El stock se guarda en <em>piezas sueltas</em>.<br>
+                  Ejemplo: compras 2 cajas de 28 tabletas → ingresa <strong>56</strong> al stock.<br>
+                  En el POS aparecen dos botones: <span style="color:#16A34A;font-weight:700">Caja (precio caja)</span> y <span style="color:#D97706;font-weight:700">Pieza suelta (precio pieza)</span>.
+                </p>
               </div>
             </div>
             <p id="pm-fraccionada-nota" class="hidden text-[10px] mt-1.5" style="color:#92400E">
-              ⚠️ El stock se registra en <strong>piezas</strong>. Al ingresar inventario, multiplica cajas × piezas/caja.
+              ⚠️ Stock en <strong>piezas</strong>. Vender 1 caja descuenta todas las piezas de esa caja.
             </p>
           </div>
         </div>
@@ -2949,7 +2963,7 @@ function renderPosGrid(prods) {
       <div class="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
         <button onclick="event.stopPropagation();addToCart(${p.id},false)"
           class="flex-1 h-7 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90"
-          style="background:#16A34A">Caja ${fmt(p.precio_venta)}</button>
+          style="background:#16A34A">${p.unidad_caja||'Caja'} ${fmt(p.precio_venta)}</button>
         <button onclick="event.stopPropagation();addToCart(${p.id},true)"
           class="flex-1 h-7 rounded-lg text-[10px] font-bold border-2 transition-all hover:opacity-90"
           style="border-color:#F59E0B;color:#92400E;background:#FEF3C7">
@@ -3013,7 +3027,7 @@ function addToCart(pid, esPieza=false) {
       _cartKey: cartKey,
       precio_venta: precio,
       _esPieza: esPieza,
-      _label: p.venta_fraccionada ? (esPieza ? (p.unidad_pieza||'pieza') : 'caja') : null,
+      _label: p.venta_fraccionada ? (esPieza ? (p.unidad_pieza||'pieza') : (p.unidad_caja||'caja')) : null,
       cantidad: 1,
     });
   }
@@ -3298,7 +3312,7 @@ const _DRAFT = {
 const _PM_TEXT   = ['pm-nombre','pm-generico','pm-barcode','pm-marca','pm-pcompra','pm-pventa',
                     'pm-smin','pm-cat','pm-presentacion','pm-concentracion','pm-contenido',
                     'pm-cantidad','pm-fechavenc','pm-lote',
-                    'pm-uds-caja','pm-unidad-pieza','pm-precio-pieza'];
+                    'pm-uds-caja','pm-unidad-caja','pm-unidad-pieza','pm-precio-pieza'];
 const _PM_CHECKS = ['pm-iva','pm-receta','pm-fraccionada'];
 const _EM_TEXT   = ['em-nombre','em-user','em-tel','em-email','em-rol'];
 
@@ -3358,7 +3372,8 @@ async function openProductModal(id=null) {
   document.getElementById('pm-receta').checked=false;
   document.getElementById('pm-fraccionada').checked=false;
   document.getElementById('pm-uds-caja').value='';
-  document.getElementById('pm-unidad-pieza').value='pieza';
+  document.getElementById('pm-unidad-caja').value='caja';
+  document.getElementById('pm-unidad-pieza').value='tableta';
   document.getElementById('pm-precio-pieza').value='';
   document.getElementById('pm-fraccionada-fields').classList.add('hidden');
   document.getElementById('pm-fraccionada-nota').classList.add('hidden');
@@ -3398,7 +3413,8 @@ async function openProductModal(id=null) {
       document.getElementById('pm-descripcion').value=p.descripcion||'';
       document.getElementById('pm-fraccionada').checked=!!p.venta_fraccionada;
       document.getElementById('pm-uds-caja').value=p.unidades_por_caja||1;
-      document.getElementById('pm-unidad-pieza').value=p.unidad_pieza||'pieza';
+      document.getElementById('pm-unidad-caja').value=p.unidad_caja||'caja';
+      document.getElementById('pm-unidad-pieza').value=p.unidad_pieza||'tableta';
       document.getElementById('pm-precio-pieza').value=p.precio_pieza||'';
       if (p.venta_fraccionada) {
         document.getElementById('pm-fraccionada-fields').classList.remove('hidden');
@@ -3543,7 +3559,8 @@ async function saveProduct() {
     venta_fraccionada: document.getElementById('pm-fraccionada').checked,
     unidades_por_caja: parseInt(document.getElementById('pm-uds-caja').value)||1,
     precio_pieza:    parseFloat(document.getElementById('pm-precio-pieza').value)||0,
-    unidad_pieza:    document.getElementById('pm-unidad-pieza').value.trim()||'pieza',
+    unidad_pieza:    document.getElementById('pm-unidad-pieza').value.trim()||'tableta',
+    unidad_caja:     document.getElementById('pm-unidad-caja').value.trim()||'caja',
   };
 
   const method = isEdit ? 'PUT' : 'POST';
