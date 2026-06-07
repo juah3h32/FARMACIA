@@ -937,9 +937,9 @@
             </div>
           </div>
           <!-- Right: Cart -->
-          <div class="w-80 flex flex-col gap-3">
-            <div class="bg-white rounded-2xl border flex flex-col flex-1" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-              <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color:#E2E8F0">
+          <div class="w-80 flex flex-col gap-3 h-full overflow-hidden">
+            <div class="bg-white rounded-2xl border flex flex-col flex-1 overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+              <div class="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style="border-color:#E2E8F0">
                 <div class="flex items-center gap-2">
                   <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#243366"></i>
                   <h2 class="font-semibold text-sm" style="color:#0F172A">Carrito</h2>
@@ -948,11 +948,11 @@
                   <i data-lucide="trash-2" style="width:12px;height:12px"></i> Limpiar
                 </button>
               </div>
-              <div id="cart-items" class="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2">
+              <div id="cart-items" class="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2 custom-scrollbar">
                 <p class="text-center py-8 text-xs" style="color:#94A3B8">Agrega productos al carrito</p>
               </div>
               <!-- Totals -->
-              <div class="border-t px-4 py-3" style="border-color:#E2E8F0">
+              <div class="border-t px-4 py-3 flex-shrink-0 bg-slate-50/50" style="border-color:#E2E8F0">
                 <div class="flex justify-between text-xs mb-1" style="color:#64748B">
                   <span>Subtotal</span><span id="cart-sub">$0.00</span>
                 </div>
@@ -963,7 +963,7 @@
                   <span>Total</span><span id="cart-total">$0.00</span>
                 </div>
               </div>
-              <div class="px-4 pb-4 flex flex-col gap-3">
+              <div class="px-4 pb-4 flex flex-col gap-3 flex-shrink-0">
                 <div class="grid grid-cols-2 gap-2">
                   <select id="cart-metodo" class="w-full h-10 px-3 rounded-xl text-xs border font-semibold" style="border-color:#E2E8F0;background:#F8FAFF"
                           onchange="toggleCambioRow()">
@@ -979,12 +979,11 @@
                 <div id="cambio-row" class="space-y-2">
                   <!-- Botones rápidos -->
                   <div class="grid grid-cols-5 gap-1.5">
-                    ${[20,50,100,200,500].map(v => `
-                      <button onclick="addCash(${v})" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95"
-                              style="color:#1E3A8A;border-color:#E2E8F0">
-                        $${v}
-                      </button>
-                    `).join('')}
+                    <button onclick="addCash(20)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$20</button>
+                    <button onclick="addCash(50)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$50</button>
+                    <button onclick="addCash(100)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$100</button>
+                    <button onclick="addCash(200)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$200</button>
+                    <button onclick="addCash(500)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$500</button>
                   </div>
                   
                   <div class="relative">
