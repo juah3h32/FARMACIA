@@ -53,3 +53,12 @@ crear_instalador.bat
 # Build output (distribuir via GitHub Releases, no en repo)
 instalador/
 FarmaciaPOS_debug*.spec
+
+.vercel
+debug_*.py
+fix_*.py
+check_*.py
+dbcheck.py
+test_print*.py
+test_print*.txt
+=1.36.0
