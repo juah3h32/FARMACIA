@@ -129,6 +129,18 @@ def _seed_initial_data():
             )
             db.add(admin)
 
+        # Cajero de prueba
+        cajero = db.query(Usuario).filter(Usuario.username == "cajero").first()
+        if not cajero:
+            from app.auth.auth_service import hash_password as _hp2
+            cajero = Usuario(
+                username="cajero",
+                password_hash=_hp2("cajero123"),
+                nombre="Cajero Prueba",
+                rol=RolUsuario.cajero,
+            )
+            db.add(cajero)
+
         # Categorias default
         categorias_default = [
             "Medicamentos Generales", "Antibióticos", "Vitaminas y Suplementos",

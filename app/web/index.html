@@ -1025,7 +1025,7 @@
                   </div>
                 </div>
 
-                <button onclick="processSale()" class="w-full h-12 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg shadow-blue-900/10"
+                <button id="btn-cobrar" onclick="processSale()" class="w-full h-12 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg shadow-blue-900/10"
                         style="background:linear-gradient(135deg,#243366,#1a2a57)">
                   <i data-lucide="shopping-bag" style="width:18px;height:18px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
                 </button>
@@ -2738,6 +2738,14 @@ async function loadDashboard() {
 // POS
 // ══════════════════════════════════════════════════════════
 async function loadPOS() {
+  // Visually disable Cobrar button for admin role
+  const cobrarBtn = document.getElementById('btn-cobrar');
+  if (cobrarBtn) {
+    const isAdmin = S.user?.rol === 'admin';
+    cobrarBtn.style.background = isAdmin ? '#94A3B8' : 'linear-gradient(135deg,#243366,#1a2a57)';
+    cobrarBtn.style.cursor = isAdmin ? 'not-allowed' : 'pointer';
+    cobrarBtn.title = isAdmin ? 'Solo cajeros pueden cobrar' : '';
+  }
   const res=await api('/productos/');
   if (!res.ok) return;
   S.allProducts=await res.json();
@@ -2908,6 +2916,7 @@ function updateCambio() {
 }
 
 async function processSale() {
+  if (S.user?.rol === 'admin') { toast('El administrador no puede realizar ventas. Inicia sesión como cajero.','error'); return; }
   if (!S.cart.length) { toast('El carrito está vacío','warning'); return; }
   const metodo=document.getElementById('cart-metodo').value;
   const total=S.cart.reduce((s,i)=>s+i.precio_venta*i.cantidad*(i.aplica_iva?1.16:1),0);
