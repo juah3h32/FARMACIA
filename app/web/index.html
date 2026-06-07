@@ -2840,20 +2840,27 @@ function renderCart() {
     el.innerHTML='<p class="text-center py-8 text-xs" style="color:#94A3B8">Agrega productos al carrito</p>';
   } else {
     el.innerHTML=S.cart.map(i=>`
-      <div class="border rounded-xl p-2.5 transition-all" style="border-color:#E2E8F0">
-        <div class="flex justify-between items-start mb-1.5">
-          <p class="text-xs font-medium leading-tight flex-1 mr-2" style="color:#0F172A">${i.nombre}</p>
-          <button onclick="removeFromCart(${i.id})" class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-red-50 transition-colors" style="color:#EF4444">
-            <i data-lucide="x" style="width:12px;height:12px"></i>
-          </button>
+      <div class="border rounded-xl p-2 transition-all flex gap-2" style="border-color:#E2E8F0">
+        <div class="flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center" style="width:44px;height:44px;background:#F8FAFC;border:1px solid #F1F5F9">
+          ${i.imagen_url
+            ? '<img src="'+cloudinaryThumb(i.imagen_url,80,80)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;padding:2px" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:18px;height:18px;color:#94A3B8&quot;></i>\'">'
+            : '<i data-lucide="pill" style="width:18px;height:18px;color:#94A3B8"></i>'}
         </div>
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1">
-            <button onclick="changeQty(${i.id},-1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">−</button>
-            <span class="w-8 text-center text-xs font-semibold">${i.cantidad}</span>
-            <button onclick="changeQty(${i.id},+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
+        <div class="flex-1 min-w-0">
+          <div class="flex justify-between items-start mb-1">
+            <p class="text-xs font-semibold leading-tight truncate flex-1 mr-1" style="color:#0F172A">${i.nombre}</p>
+            <button onclick="removeFromCart(${i.id})" class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-red-50 transition-colors" style="color:#EF4444">
+              <i data-lucide="x" style="width:12px;height:12px"></i>
+            </button>
           </div>
-          <span class="text-xs font-bold" style="color:#243366">${fmt(i.precio_venta*i.cantidad)}</span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1">
+              <button onclick="changeQty(${i.id},-1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">−</button>
+              <span class="w-7 text-center text-xs font-semibold">${i.cantidad}</span>
+              <button onclick="changeQty(${i.id},+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
+            </div>
+            <span class="text-xs font-bold" style="color:#243366">${fmt(i.precio_venta*i.cantidad)}</span>
+          </div>
         </div>
       </div>`).join('');
   }
