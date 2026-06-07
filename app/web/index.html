@@ -2759,8 +2759,10 @@ function renderPosGrid(prods) {
     <button onclick="addToCart(${p.id})"
       class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full"
       style="border-color:#E2E8F0">
-      <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0" style="background:#F0F7FF">
-        <i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>
+      <div class="w-full h-20 rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="background:#F0F7FF">
+        ${p.imagen_url
+          ? `<img src="${p.imagen_url}" alt="" class="w-full h-full object-cover rounded-xl" onerror="this.parentElement.innerHTML='<i data-lucide=\\'pill\\' style=\\'width:28px;height:28px;color:#2e4a8a\\'></i>'">`
+          : `<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>`}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
