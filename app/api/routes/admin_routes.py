@@ -200,4 +200,61 @@ def list_endpoints(payload: dict = Depends(get_current_api_user)):
         {"method": "POST", "path": "/api/admin/generate-token","desc": "Generar token API (admin)"},
         {"method": "GET",  "path": "/api/admin/db-stats",      "desc": "Conteo de filas por tabla (admin)"},
         {"method": "POST", "path": "/api/admin/db-sync",       "desc": "Forzar sync local → Turso (admin)"},
+        {"method": "GET",  "path": "/api/admin/backup",         "desc": "Descargar respaldo de la BD (admin)"},
+        {"method": "POST", "path": "/api/admin/restore",        "desc": "Restaurar BD desde archivo (admin)"},
     ]
+
+
+@router.get("/backup")
+def descargar_backup(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from fastapi.responses import FileResponse
+    if not cfg.DB_PATH.exists():
+        raise HTTPException(status_code=404, detail="Base de datos no encontrada")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"farmacia_backup_{ts}.db"
+    return FileResponse(
+        path=str(cfg.DB_PATH),
+        media_type="application/octet-stream",
+        filename=filename,
+    )
+
+
+@router.post("/restore")
+async def restaurar_backup(
+    payload: dict = Depends(get_current_api_user),
+):
+    """Restore DB from uploaded .db file. Requires multipart form upload."""
+    _require_admin(payload)
+    from fastapi import UploadFile, File
+    raise HTTPException(status_code=400, detail="Usa el endpoint /restore-upload con multipart/form-data")
+
+
+from fastapi import UploadFile, File
+import shutil, tempfile
+
+@router.post("/restore-upload")
+async def restaurar_backup_upload(
+    file: UploadFile = File(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    if not (file.filename or "").endswith(".db"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .db")
+    # Read upload into temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+    # Validate: check SQLite magic bytes
+    with open(tmp_path, "rb") as f:
+        magic = f.read(16)
+    if not magic.startswith(b"SQLite format 3"):
+        import os; os.unlink(tmp_path)
+        raise HTTPException(status_code=400, detail="El archivo no es una base de datos SQLite válida")
+    # Backup current DB before replacing
+    backup_path = cfg.DB_PATH.parent / f"farmacia_pre_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    if cfg.DB_PATH.exists():
+        shutil.copy2(str(cfg.DB_PATH), str(backup_path))
+    shutil.move(tmp_path, str(cfg.DB_PATH))
+    return {"ok": True, "mensaje": "Base de datos restaurada. Reinicia la aplicación para aplicar los cambios.", "backup_previo": backup_path.name}

@@ -1568,6 +1568,49 @@
           </div>
         </div>
 
+        <!-- Respaldo y Restauración -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#0EA5E9,#0284C7)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#E0F2FE">
+              <i data-lucide="database-backup" style="width:20px;height:20px;color:#0284C7"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Respaldo y Restauración</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Exporta la base de datos completa o importa un respaldo anterior</p>
+            </div>
+            <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEF3C7;border:1px solid #FDE68A">
+              <i data-lucide="shield-check" style="width:13px;height:13px;color:#D97706"></i>
+              <span class="text-[10px] font-bold" style="color:#D97706">SOLO ADMIN</span>
+            </div>
+          </div>
+          <div class="p-6 grid grid-cols-2 gap-6">
+            <!-- Exportar -->
+            <div class="rounded-xl p-5 flex flex-col gap-3" style="background:#F0F9FF;border:1px solid #BAE6FD">
+              <div class="flex items-center gap-2">
+                <i data-lucide="download" style="width:16px;height:16px;color:#0284C7"></i>
+                <p class="font-bold text-sm" style="color:#0C4A6E">Exportar respaldo</p>
+              </div>
+              <p class="text-xs" style="color:#64748B">Descarga el archivo <code>.db</code> con todos los datos: productos, ventas, clientes, empleados e inventario.</p>
+              <button onclick="descargarBackup()" class="mt-auto h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2" style="background:linear-gradient(135deg,#0284C7,#0369A1)">
+                <i data-lucide="download" style="width:15px;height:15px"></i> Descargar .db
+              </button>
+            </div>
+            <!-- Importar -->
+            <div class="rounded-xl p-5 flex flex-col gap-3" style="background:#FFFBEB;border:1px solid #FDE68A">
+              <div class="flex items-center gap-2">
+                <i data-lucide="upload" style="width:16px;height:16px;color:#D97706"></i>
+                <p class="font-bold text-sm" style="color:#92400E">Restaurar respaldo</p>
+              </div>
+              <p class="text-xs" style="color:#64748B">Importa un archivo <code>.db</code> exportado previamente. <strong>Reemplaza todos los datos actuales.</strong></p>
+              <input id="restore-file-input" type="file" accept=".db" class="hidden" onchange="restaurarBackup(event)">
+              <button onclick="document.getElementById('restore-file-input').click()" class="mt-auto h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border-2" style="border-color:#F59E0B;color:#92400E;background:#FEF3C7">
+                <i data-lucide="upload" style="width:15px;height:15px"></i> Seleccionar archivo .db
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Zona Peligrosa -->
         <div class="rounded-2xl border overflow-hidden" style="border-color:#FCA5A5;box-shadow:0 2px 8px rgba(239,68,68,.08)">
           <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
@@ -4701,6 +4744,46 @@ async function loadEndpoints() {
         </tbody>
       </table>
     </div>`;
+}
+
+async function descargarBackup() {
+  toast('Preparando respaldo...','info');
+  try {
+    const res = await api('/admin/backup');
+    if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al generar respaldo','error'); return; }
+    const blob = await res.blob();
+    const ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `farmacia_backup_${ts}.db`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('Respaldo descargado correctamente','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+async function restaurarBackup(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  if (!file.name.endsWith('.db')) { toast('Solo se aceptan archivos .db','error'); return; }
+  const confirm = window.confirm(
+    `¿Restaurar la base de datos desde "${file.name}"?\n\nESTO REEMPLAZARÁ TODOS LOS DATOS ACTUALES.\nSe guardará una copia de seguridad automática antes de restaurar.`
+  );
+  if (!confirm) return;
+  toast('Restaurando base de datos...','info');
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/admin/restore-upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${S.token}` },
+      body: form,
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.detail||'Error al restaurar','error'); return; }
+    toast(data.mensaje || 'Restaurado. Reinicia la app.','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 function initSettings() {
