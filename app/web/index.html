@@ -3135,8 +3135,13 @@ async function openProductModal(id=null) {
     // Edit mode
     secCrear.classList.add('hidden');
     secEditar.classList.remove('hidden');
-    const p=S.allInv.find(x=>x.id===id);
-    if (p) {
+    // Fetch fresh data to get latest imagen_url and descripcion
+    let p = S.allInv.find(x=>x.id===id) || {};
+    try {
+      const fr = await api(`/productos/${id}`);
+      if (fr.ok) p = await fr.json();
+    } catch(e) {}
+    if (p && p.nombre) {
       document.getElementById('pm-nombre').value=p.nombre||'';
       document.getElementById('pm-generico').value=p.nombre_generico||'';
       document.getElementById('pm-barcode').value=p.codigo_barras||'';

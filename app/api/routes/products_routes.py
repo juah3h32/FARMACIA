@@ -134,6 +134,18 @@ def crear_producto(body: ProductoIn, bg: BackgroundTasks, payload: dict = Depend
         db.close()
 
 
+@router.get("/{producto_id}", response_model=ProductoResponse)
+def obtener_producto(producto_id: int, payload: dict = Depends(get_current_api_user)):
+    db = get_db_session()
+    try:
+        p = db.query(Producto).filter(Producto.id == producto_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        return p
+    finally:
+        db.close()
+
+
 @router.put("/{producto_id}", response_model=ProductoResponse)
 def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
