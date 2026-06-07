@@ -5258,7 +5258,11 @@ async function posSearchKeydown(e) {
   e.preventDefault();
   const q = (document.getElementById('pos-search').value || '').trim();
   if (!q) return;
+
+  // 1. Exact barcode match (local cache)
   let exact = (S.allProducts || []).find(p => p.codigo_barras === q);
+
+  // 2. Barcode API lookup
   if (!exact) {
     try {
       const r = await api('/productos/barcode/' + encodeURIComponent(q));
@@ -5266,14 +5270,38 @@ async function posSearchKeydown(e) {
         exact = await r.json();
         if (exact && S.allProducts && !S.allProducts.find(p => p.id === exact.id))
           S.allProducts.push(exact);
+      } else if (r.status === 409) {
+        const err = await r.json().catch(()=>({}));
+        toast('⛔ ' + (err.detail || 'Producto VENCIDO'), 'error');
+        return;
       }
     } catch (_) {}
   }
+
+  // 3. Name search fallback (for products without barcode like cintas, curitas, etc.)
+  if (!exact) {
+    const f = q.toLowerCase();
+    const matches = (S.allProducts || []).filter(p =>
+      p.nombre.toLowerCase().includes(f) ||
+      (p.nombre_generico||'').toLowerCase().includes(f) ||
+      (p.codigo_barras||'').toLowerCase().includes(f)
+    );
+    if (matches.length === 1) {
+      // Unique match → add directly
+      exact = matches[0];
+    } else if (matches.length > 1) {
+      // Multiple → filter grid so cashier picks
+      renderPosGrid(matches);
+      toast(`${matches.length} productos encontrados — selecciona del listado`, 'info');
+      return;
+    }
+  }
+
   if (exact) {
     addToCart(exact.id);
     document.getElementById('pos-search').value = '';
     renderPosGrid(S.allProducts);
-    toast(exact.nombre + ' agregado al carrito', 'success');
+    toast(exact.nombre + ' agregado', 'success');
   } else {
     toast('Producto no encontrado: ' + q, 'warning');
   }
