@@ -1875,14 +1875,15 @@
               <div class="rounded-lg p-2 flex items-start gap-2" style="background:#FEF9C3;border:1px solid #FDE68A">
                 <span style="font-size:13px">💡</span>
                 <p class="text-[10px]" style="color:#92400E">
-                  <strong>Cómo funciona:</strong> El stock se guarda en <em>piezas sueltas</em>.<br>
-                  Ejemplo: compras 2 cajas de 28 tabletas → ingresa <strong>56</strong> al stock.<br>
-                  En el POS aparecen dos botones: <span style="color:#16A34A;font-weight:700">Caja (precio caja)</span> y <span style="color:#D97706;font-weight:700">Pieza suelta (precio pieza)</span>.
+                  <strong>Cómo funciona:</strong> El stock se guarda en <em>cajas</em> (lo que compras al proveedor).<br>
+                  Ejemplo: compras 2 cajas de 28 tabletas → ingresa <strong>2</strong> al stock.<br>
+                  Al vender piezas sueltas, el sistema abre cajas automáticamente y guarda las piezas sobrantes.<br>
+                  En el POS: <span style="color:#16A34A;font-weight:700">Caja (precio caja)</span> y <span style="color:#D97706;font-weight:700">Pieza suelta (precio pieza)</span>.
                 </p>
               </div>
             </div>
             <p id="pm-fraccionada-nota" class="hidden text-[10px] mt-1.5" style="color:#92400E">
-              ⚠️ Stock en <strong>piezas</strong>. Vender 1 caja descuenta todas las piezas de esa caja.
+              ⚠️ Stock en <strong>cajas</strong>. Al vender sueltas, el sistema abre cajas automáticamente y registra las piezas sobrantes.
             </p>
           </div>
         </div>
@@ -1973,8 +1974,12 @@
             </div>
             <div class="flex gap-2 items-end">
               <div class="flex-1">
-                <label class="lbl" style="color:#92400E">Nuevo stock total</label>
-                <input id="pm-nuevo-stock" type="number" min="0" class="inp" placeholder="Ej. 50" style="border-color:#FCD34D">
+                <label class="lbl" style="color:#92400E" id="pm-nuevo-stock-lbl">Nuevo stock (cajas)</label>
+                <input id="pm-nuevo-stock" type="number" min="0" class="inp" placeholder="Ej. 10" style="border-color:#FCD34D">
+              </div>
+              <div id="pm-piezas-ajuste-wrap" class="flex-1 hidden">
+                <label class="lbl" style="color:#92400E">Piezas sueltas</label>
+                <input id="pm-nuevo-piezas" type="number" min="0" class="inp" placeholder="Ej. 5" style="border-color:#FCD34D">
               </div>
               <button onclick="pmAjustarStock()" class="h-[38px] px-4 rounded-xl text-xs font-bold text-white flex-shrink-0" style="background:linear-gradient(135deg,#D97706,#B45309)">
                 Actualizar
@@ -2957,30 +2962,38 @@ function renderPosGrid(prods) {
   const g=document.getElementById('pos-grid');
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
   g.innerHTML=prods.map(p=>{
-    const stockColor = p.stock<=0?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A';
-    const stockBg    = p.stock<=0?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4';
+    // For fractional products: available = piezas_sueltas + stock*uds_caja
+    const totalPiezas = p.venta_fraccionada ? ((p.piezas_sueltas||0) + p.stock*(p.unidades_por_caja||1)) : p.stock;
+    const stockColor = p.stock<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A';
+    const stockBg    = p.stock<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4';
+    const noCajas    = p.venta_fraccionada && p.stock<=0;
+    const noPiezas   = p.venta_fraccionada && totalPiezas<=0;
+    const stockLabel = p.venta_fraccionada
+      ? `${p.stock} ${p.unidad_caja||'caja'} | ${p.piezas_sueltas||0} sueltas`
+      : `${p.stock}`;
     const fracBtns   = p.venta_fraccionada ? `
       <div class="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
         <button onclick="event.stopPropagation();addToCart(${p.id},false)"
           class="flex-1 h-7 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90"
-          style="background:#16A34A">${p.unidad_caja||'Caja'} ${fmt(p.precio_venta)}</button>
+          style="background:${noCajas?'#94A3B8':'#16A34A'}" ${noCajas?'disabled':''}>
+          ${p.unidad_caja||'Caja'} ${fmt(p.precio_venta)}</button>
         <button onclick="event.stopPropagation();addToCart(${p.id},true)"
           class="flex-1 h-7 rounded-lg text-[10px] font-bold border-2 transition-all hover:opacity-90"
-          style="border-color:#F59E0B;color:#92400E;background:#FEF3C7">
+          style="border-color:${noPiezas?'#CBD5E1':'#F59E0B'};color:${noPiezas?'#94A3B8':'#92400E'};background:${noPiezas?'#F8FAFC':'#FEF3C7'}" ${noPiezas?'disabled':''}>
           ${p.unidad_pieza||'Pieza'} ${fmt(p.precio_pieza)}
         </button>
       </div>` : '';
     return `
     <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full cursor-pointer"
       style="border-color:#E2E8F0" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
-      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'80':'100'}px;background:#fff;border:1px solid #F1F5F9">
+      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'76':'100'}px;background:#fff;border:1px solid #F1F5F9">
         ${posProductThumb(p.imagen_url)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
       <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
         <span class="text-base font-black" style="color:#16A34A">${fmt(p.precio_venta)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${p.stock}${p.venta_fraccionada?` ${p.unidad_pieza||'pzs'}`:''}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${stockLabel}</span>
       </div>
       ${fracBtns}
     </div>`;
@@ -3007,7 +3020,17 @@ function posSetCustomer(id) {
 function addToCart(pid, esPieza=false) {
   const p=S.allProducts.find(x=>x.id===pid);
   if (!p) return;
-  if (p.stock<=0) { toast('Sin stock disponible','warning'); return; }
+  // Availability check: fractional products check piezas+cajas separately
+  if (p.venta_fraccionada) {
+    if (esPieza) {
+      const totalPiezas = (p.piezas_sueltas||0) + p.stock*(p.unidades_por_caja||1);
+      if (totalPiezas<=0) { toast('Sin piezas disponibles','warning'); return; }
+    } else {
+      if (p.stock<=0) { toast(`Sin ${p.unidad_caja||'cajas'} disponibles`,'warning'); return; }
+    }
+  } else {
+    if (p.stock<=0) { toast('Sin stock disponible','warning'); return; }
+  }
   // Block if all stock is in expired lotes (sum of vencido quantities >= total stock)
   if (_cadData?.items) {
     const vLotes = _cadData.items.filter(l=>l.producto_id===pid && l.estado==='vencido');
@@ -3422,9 +3445,21 @@ async function openProductModal(id=null) {
       }
       if (p.imagen_url) pmLoadImagePreview(p.imagen_url);
       const badge = document.getElementById('pm-stock-actual-badge');
-      if (badge) badge.textContent = `Stock actual: ${p.stock ?? 0}`;
+      const piezasWrap = document.getElementById('pm-piezas-ajuste-wrap');
+      const stockLbl = document.getElementById('pm-nuevo-stock-lbl');
+      if (p.venta_fraccionada) {
+        if (badge) badge.textContent = `${p.stock??0} ${p.unidad_caja||'cajas'} | ${p.piezas_sueltas??0} sueltas`;
+        if (piezasWrap) piezasWrap.classList.remove('hidden');
+        if (stockLbl) stockLbl.textContent = `Nuevo stock (${p.unidad_caja||'cajas'})`;
+      } else {
+        if (badge) badge.textContent = `Stock actual: ${p.stock ?? 0}`;
+        if (piezasWrap) piezasWrap.classList.add('hidden');
+        if (stockLbl) stockLbl.textContent = 'Nuevo stock (cajas)';
+      }
       const nuevoStockEl = document.getElementById('pm-nuevo-stock');
       if (nuevoStockEl) nuevoStockEl.value = '';
+      const nuevoPs = document.getElementById('pm-nuevo-piezas');
+      if (nuevoPs) nuevoPs.value = '';
     }
     // Load lotes for this product
     _loadProdLotesInModal(id);
@@ -3513,16 +3548,30 @@ async function pmAjustarStock() {
   const nuevoStock = parseInt(document.getElementById('pm-nuevo-stock').value);
   if (isNaN(nuevoStock) || nuevoStock < 0) { toast('Ingresa un número válido (≥ 0)','warning'); return; }
   if (!S.prodEditId) return;
+  const p = S.allInv ? S.allInv.find(x=>x.id===S.prodEditId) : null;
+  const body = { nuevo_stock: nuevoStock };
+  const piezasEl = document.getElementById('pm-nuevo-piezas');
+  if (p?.venta_fraccionada && piezasEl && piezasEl.value !== '') {
+    const np = parseInt(piezasEl.value);
+    if (!isNaN(np) && np >= 0) body.nuevo_piezas_sueltas = np;
+  }
   const res = await api(`/productos/${S.prodEditId}/ajustar-stock`, {
     method: 'POST',
-    body: JSON.stringify({ nuevo_stock: nuevoStock }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) { const e = await res.json(); toast(e.detail||'Error al ajustar stock','error'); return; }
   const data = await res.json();
-  toast(`Stock actualizado: ${data.stock_anterior} → ${data.stock_nuevo}`,'success');
   const badge = document.getElementById('pm-stock-actual-badge');
-  if (badge) badge.textContent = `Stock actual: ${data.stock_nuevo}`;
+  if (p?.venta_fraccionada) {
+    const ps = data.piezas_sueltas ?? 0;
+    toast(`Stock: ${data.stock_anterior}→${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${ps} sueltas`,'success');
+    if (badge) badge.textContent = `${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${ps} sueltas`;
+  } else {
+    toast(`Stock actualizado: ${data.stock_anterior} → ${data.stock_nuevo}`,'success');
+    if (badge) badge.textContent = `Stock actual: ${data.stock_nuevo}`;
+  }
   document.getElementById('pm-nuevo-stock').value = '';
+  if (piezasEl) piezasEl.value = '';
   loadInventory();
 }
 

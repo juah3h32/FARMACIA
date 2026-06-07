@@ -47,6 +47,7 @@ class ProductoIn(BaseModel):
     precio_pieza: float = 0.0
     unidad_pieza: Optional[str] = "pieza"
     unidad_caja: Optional[str] = "caja"
+    piezas_sueltas: int = 0
 
 
 class ProductoResponse(BaseModel):
@@ -73,6 +74,7 @@ class ProductoResponse(BaseModel):
     precio_pieza: float = 0.0
     unidad_pieza: Optional[str] = "pieza"
     unidad_caja: Optional[str] = "caja"
+    piezas_sueltas: int = 0
     activo: bool
 
     class Config:
@@ -213,6 +215,7 @@ def eliminar_producto(producto_id: int, bg: BackgroundTasks, payload: dict = Dep
 
 class AjusteStockIn(BaseModel):
     nuevo_stock: int
+    nuevo_piezas_sueltas: Optional[int] = None
 
 
 @router.post("/{producto_id}/ajustar-stock")
@@ -227,21 +230,24 @@ def ajustar_stock(producto_id: int, body: AjusteStockIn, bg: BackgroundTasks, pa
             raise HTTPException(status_code=404, detail="No encontrado")
         stock_ant = p.stock
         p.stock = body.nuevo_stock
-        # Log the adjustment
+        if body.nuevo_piezas_sueltas is not None and p.venta_fraccionada:
+            p.piezas_sueltas = max(0, body.nuevo_piezas_sueltas)
         from app.database.models import MovimientoStock, TipoMovimiento
-        mov = MovimientoStock(
+        notas = f"Ajuste manual: {stock_ant} → {body.nuevo_stock}"
+        if body.nuevo_piezas_sueltas is not None and p.venta_fraccionada:
+            notas += f" | piezas sueltas: {p.piezas_sueltas}"
+        db.add(MovimientoStock(
             producto_id=p.id,
             tipo=TipoMovimiento.ajuste,
             cantidad=abs(body.nuevo_stock - stock_ant),
             stock_anterior=stock_ant,
             stock_nuevo=body.nuevo_stock,
             usuario_id=int(payload["sub"]),
-            notas=f"Ajuste manual: {stock_ant} → {body.nuevo_stock}",
-        )
-        db.add(mov)
+            notas=notas,
+        ))
         db.commit()
         _sync_bg(bg)
-        return {"ok": True, "stock_anterior": stock_ant, "stock_nuevo": p.stock}
+        return {"ok": True, "stock_anterior": stock_ant, "stock_nuevo": p.stock, "piezas_sueltas": p.piezas_sueltas}
     except HTTPException:
         raise
     except Exception as e:

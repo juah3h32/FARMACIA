@@ -88,6 +88,7 @@ def _migrate():
         ("productos", "precio_pieza",       "REAL DEFAULT 0.0"),
         ("productos", "unidad_pieza",       "VARCHAR(30) DEFAULT 'pieza'"),
         ("productos", "unidad_caja",        "VARCHAR(30) DEFAULT 'caja'"),
+        ("productos", "piezas_sueltas",     "INTEGER DEFAULT 0"),
     ]
     # Local SQLite
     with engine.connect() as conn:

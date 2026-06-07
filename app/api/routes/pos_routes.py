@@ -138,14 +138,42 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             ))
             prod = products[item.producto_id]
             stock_ant = prod.stock
-            # Fractional product sold as CAJA: deduct unidades_por_caja per unit sold
-            if prod.venta_fraccionada and not item.es_pieza:
-                stock_delta = item.cantidad * (prod.unidades_por_caja or 1)
-            else:
+            import math as _math
+
+            if prod.venta_fraccionada and item.es_pieza:
+                # ── Pieza suelta ────────────────────────────────────────────
+                # Descuenta de piezas_sueltas primero; si no alcanza, abre cajas.
+                necesarias = item.cantidad
+                if (prod.piezas_sueltas or 0) >= necesarias:
+                    prod.piezas_sueltas -= necesarias
+                    cajas_abiertas = 0
+                else:
+                    deficit = necesarias - (prod.piezas_sueltas or 0)
+                    cajas_abiertas = _math.ceil(deficit / (prod.unidades_por_caja or 1))
+                    prod.stock = max(0, prod.stock - cajas_abiertas)
+                    prod.piezas_sueltas = (
+                        (prod.piezas_sueltas or 0)
+                        + cajas_abiertas * (prod.unidades_por_caja or 1)
+                        - necesarias
+                    )
+                    _fefo_consume(db, item.producto_id, cajas_abiertas)
+                stock_delta = cajas_abiertas  # cajas consumidas para movimiento
+                notas_mov = f"Folio {folio} | {necesarias} {prod.unidad_pieza or 'pieza(s)'} sueltas"
+                if cajas_abiertas:
+                    notas_mov += f" (abrió {cajas_abiertas} {prod.unidad_caja or 'caja(s)'})"
+            elif prod.venta_fraccionada and not item.es_pieza:
+                # ── Caja completa ───────────────────────────────────────────
+                prod.stock = max(0, prod.stock - item.cantidad)
+                _fefo_consume(db, item.producto_id, item.cantidad)
                 stock_delta = item.cantidad
-            prod.stock = max(0, prod.stock - stock_delta)
-            # FEFO: decrement individual lot quantities (earliest-expiry first)
-            _fefo_consume(db, item.producto_id, stock_delta)
+                notas_mov = f"Folio {folio} | {item.cantidad} {prod.unidad_caja or 'caja(s)'}"
+            else:
+                # ── Producto normal ─────────────────────────────────────────
+                prod.stock = max(0, prod.stock - item.cantidad)
+                _fefo_consume(db, item.producto_id, item.cantidad)
+                stock_delta = item.cantidad
+                notas_mov = f"Folio {folio}"
+
             db.add(MovimientoStock(
                 producto_id=item.producto_id,
                 tipo=TipoMovimiento.salida,
@@ -155,7 +183,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 referencia_id=venta.id,
                 referencia_tipo="venta",
                 usuario_id=usuario_id,
-                notas=f"Folio {folio}",
+                notas=notas_mov,
             ))
 
         db.commit()
