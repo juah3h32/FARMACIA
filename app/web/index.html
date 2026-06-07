@@ -715,7 +715,7 @@
 <div id="app" class="hidden flex h-screen">
 
   <!-- ── Sidebar ───────────────────────────────────── -->
-  <aside class="w-60 flex flex-col flex-shrink-0" style="background:#243366">
+  <aside class="w-52 flex flex-col flex-shrink-0" style="background:#243366">
     <!-- Brand -->
     <div class="px-4 py-5 flex items-center justify-center" style="border-bottom:1px solid rgba(255,255,255,.08)">
       <img src="/logo.svg" style="max-width:100%; height:auto; max-height:60px; object-fit:contain; display:block">
@@ -789,7 +789,7 @@
     </header>
 
     <!-- Content -->
-    <main class="flex-1 overflow-auto p-6">
+    <main class="flex-1 overflow-auto p-4">
 
       <!-- ─── DASHBOARD ─────────────────────────────── -->
       <div data-page="dashboard" class="page" style="height:calc(100vh - 112px);overflow:hidden">
@@ -986,7 +986,7 @@
       <!-- ─── INVENTORY ─────────────────────────────── -->
       <div data-page="inventory" class="page">
         <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-5 py-4 border-b" style="border-color:#E2E8F0">
+          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="inv-search" type="text" placeholder="Buscar producto..."
@@ -1002,18 +1002,18 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+          <div class="overflow-x-auto lg:overflow-x-visible">
+            <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Código</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Stock</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Mín.</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Precio venta</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Próx. vencimiento</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Estado</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Código</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Stock</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Mín.</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Precio venta</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Próx. vencimiento</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Estado</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
                 </tr>
               </thead>
               <tbody id="inv-tbody"></tbody>
@@ -1025,7 +1025,7 @@
       <!-- ─── CUSTOMERS ─────────────────────────────── -->
       <div data-page="customers" class="page">
         <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-5 py-4 border-b" style="border-color:#E2E8F0">
+          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="cust-search" type="text" placeholder="Buscar cliente..."
@@ -1040,15 +1040,15 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+          <div class="overflow-x-auto lg:overflow-x-visible">
+            <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">RFC</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">RFC</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
                 </tr>
               </thead>
               <tbody id="cust-tbody"></tbody>
@@ -1186,23 +1186,23 @@
               </table>
             </div>
           </div>
-          <!-- Sales table -->
+        <!-- Detalle de ventas -->
           <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+            <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:#E2E8F0">
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
             </div>
             <div class="overflow-x-auto max-h-72 overflow-y-auto">
-              <table class="w-full text-xs">
+              <table class="w-full text-[11px]">
                 <thead class="sticky top-0" style="background:#F8FAFF">
                   <tr>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Folio</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Fecha</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Cajero</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Cliente</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Total</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Pago</th>
-                    <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Estado</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Folio</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Fecha</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Cajero</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Cliente</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Total</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Pago</th>
+                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Estado</th>
                   </tr>
                 </thead>
                 <tbody id="rep-tbody"></tbody>
@@ -1324,7 +1324,7 @@
       <!-- ─── EMPLOYEES ─────────────────────────────── -->
       <div data-page="employees" class="page">
         <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-5 py-4 border-b" style="border-color:#E2E8F0">
+          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
             <div class="flex items-center gap-2">
               <i data-lucide="users" style="width:16px;height:16px;color:#64748B"></i>
               <h2 class="font-semibold text-sm" style="color:#0F172A">Empleados</h2>
@@ -1337,16 +1337,16 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+          <div class="overflow-x-auto lg:overflow-x-visible">
+            <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Usuario</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Rol</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
-                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Usuario</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Rol</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
                 </tr>
               </thead>
               <tbody id="emp-tbody"></tbody>
@@ -2854,9 +2854,9 @@ function renderInvTable(prods) {
       ? `<span style="font-size:10px;background:#EEF1F9;color:#243366;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
       : '';
     const fechaFmt = fmtDate(info.fecha);
-    if (info.estado==='vencido')  return `<div style="font-size:11px"><span style="background:#FEF2F2;color:#EF4444;padding:2px 7px;border-radius:10px;font-weight:700">⛔ Vencido ${diasLabel}</span>${lotesBadge}</div>`;
-    if (info.estado==='critico')  return `<div style="font-size:11px"><span style="background:#FFF7ED;color:#EA580C;padding:2px 7px;border-radius:10px;font-weight:700">⚠️ ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
-    return `<div style="font-size:11px"><span style="background:#FEFCE8;color:#CA8A04;padding:2px 7px;border-radius:10px;font-weight:600">🕐 ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
+    if (info.estado==='vencido')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEF2F2;color:#EF4444;padding:2px 5px;border-radius:10px;font-weight:700">⛔ Vencido ${diasLabel}</span>${lotesBadge}</div>`;
+    if (info.estado==='critico')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FFF7ED;color:#EA580C;padding:2px 5px;border-radius:10px;font-weight:700">⚠️ ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
+    return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEFCE8;color:#CA8A04;padding:2px 5px;border-radius:10px;font-weight:600">🕐 ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
   };
 
   const tbody=document.getElementById('inv-tbody');
@@ -2864,41 +2864,41 @@ function renderInvTable(prods) {
     const expInfo = expiryMap[p.id] || null;
     return `
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
-      <td class="px-5 py-3">
-        <p class="text-sm font-medium" style="color:#0F172A">${p.nombre}</p>
-        ${p.nombre_generico?`<p class="text-xs" style="color:#94A3B8">${p.nombre_generico}</p>`:''}
-        ${(p.presentacion||p.concentracion||p.contenido)?`<p class="text-[11px] mt-0.5" style="color:#CBD5E1">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')}</p>`:''}
+      <td class="px-3 py-2.5">
+        <p class="text-sm font-medium leading-tight" style="color:#0F172A">${p.nombre}</p>
+        ${p.nombre_generico?`<p class="text-[10px] leading-tight" style="color:#94A3B8">${p.nombre_generico}</p>`:''}
+        ${(p.presentacion||p.concentracion||p.contenido)?`<p class="text-[10px] mt-0.5 leading-tight" style="color:#CBD5E1">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')}</p>`:''}
       </td>
-      <td class="px-5 py-3 font-mono text-xs" style="color:#64748B">${p.codigo_barras||'—'}</td>
-      <td class="px-5 py-3">
+      <td class="px-3 py-2.5 font-mono text-[10px] whitespace-nowrap" style="color:#64748B">${p.codigo_barras||'—'}</td>
+      <td class="px-3 py-2.5">
         <span class="font-bold text-sm ${p.stock<=0?'text-red-500':p.stock<=p.stock_minimo?'text-amber-500':'text-green-600'}">${p.stock}</span>
       </td>
-      <td class="px-5 py-3 text-xs" style="color:#64748B">${p.stock_minimo}</td>
-      <td class="px-5 py-3 font-semibold text-sm" style="color:#243366">${fmt(p.precio_venta)}</td>
-      <td class="px-5 py-3">${expBadge(expInfo)}</td>
-      <td class="px-5 py-3">
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+      <td class="px-3 py-2.5 text-xs" style="color:#64748B">${p.stock_minimo}</td>
+      <td class="px-3 py-2.5 font-semibold text-sm whitespace-nowrap" style="color:#243366">${fmt(p.precio_venta)}</td>
+      <td class="px-3 py-2.5">${expBadge(expInfo)}</td>
+      <td class="px-3 py-2.5">
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
               style="background:${p.activo?'#F0FDF4':'#F8FAFF'};color:${p.activo?'#16A34A':'#94A3B8'}">
           ${p.activo?'Activo':'Inactivo'}
         </span>
       </td>
-      <td class="px-5 py-3">
-        <div class="flex gap-1.5">
-          <button onclick="openLotesModal(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#F5F3FF;color:#8B5CF6">
+      <td class="px-3 py-2.5">
+        <div class="flex gap-1 flex-wrap lg:flex-nowrap">
+          <button onclick="openLotesModal(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" class="h-7 px-2 rounded-lg text-[10px] font-medium flex items-center gap-1 shrink-0" style="background:#F5F3FF;color:#8B5CF6">
             <i data-lucide="layers" style="width:11px;height:11px"></i> Lotes
           </button>
           ${S.user?.rol==='admin' ? `
-          <button onclick="openEntradaModal(S.allInv.find(x=>x.id===${p.id}))" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#F0FDF4;color:#16A34A">
+          <button onclick="openEntradaModal(S.allInv.find(x=>x.id===${p.id}))" class="h-7 px-2 rounded-lg text-[10px] font-medium flex items-center gap-1 shrink-0" style="background:#F0FDF4;color:#16A34A">
             <i data-lucide="package-plus" style="width:11px;height:11px"></i> Entrada
           </button>
-          <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico de inventario" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#F5F3FF;color:#7C3AED">
-            <i data-lucide="clipboard-check" style="width:11px;height:11px"></i>
+          <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico de inventario" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F5F3FF;color:#7C3AED">
+            <i data-lucide="clipboard-check" style="width:13px;height:13px"></i>
           </button>
-          <button onclick="openProductModal(${p.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#243366">
-            <i data-lucide="pencil" style="width:11px;height:11px"></i>
+          <button onclick="openProductModal(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#EEF1F9;color:#243366">
+            <i data-lucide="pencil" style="width:13px;height:13px"></i>
           </button>
-          <button onclick="deleteProduct(${p.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#FEF2F2;color:#EF4444">
-            <i data-lucide="trash-2" style="width:11px;height:11px"></i>
+          <button onclick="deleteProduct(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#FEF2F2;color:#EF4444">
+            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
           </button>` : ''}
         </div>
       </td>
