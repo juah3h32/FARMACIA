@@ -2939,6 +2939,20 @@ async function processSale() {
 
   // Tarjeta/transferencia: si no ingresó monto, se asume igual al total
   const pag = (!isNaN(pagInput) && pagInput > 0) ? pagInput : total;
+
+  // Usuario de prueba — simular venta sin afectar BD ni stock
+  if (S.user?.username === 'cajero') {
+    toast('MODO PRUEBA — venta simulada, sin cambios reales','warning');
+    document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
+    document.getElementById('pay-total').textContent=fmt(total);
+    document.getElementById('pay-cambio').textContent=fmt(Math.max(0,pag-total));
+    openModal('modal-payment');
+    S.cart=[]; renderCart();
+    document.getElementById('cart-pagado').value='';
+    updateCambio();
+    return;
+  }
+
   const body={
     cliente_id:  S.posCustomer?.id||null,
     items:       S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0})),
