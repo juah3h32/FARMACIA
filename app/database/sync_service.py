@@ -446,7 +446,13 @@ def start_background_sync(interval: int = 60) -> threading.Thread:
     def _loop():
         time.sleep(10)   # let app fully initialize
         make_daily_backup()
-        # Initial pull to catch anything added on other PCs while this PC was off
+        # Push local data first — preserves locally-set values (imagen_url, descripcion)
+        # before pulling from Turso which may have older null values
+        try:
+            sync_to_turso()
+        except Exception as e:
+            print(f"[Sync] Initial push error: {e}")
+        # Then pull to get changes from other PCs
         try:
             sync_from_turso()
         except Exception as e:
