@@ -179,9 +179,9 @@ def _purge_tables(tables: list[str]) -> None:
             lconn.execute("PRAGMA foreign_keys = OFF")
             for table in tables:
                 lconn.execute(f"DELETE FROM {table}")
-            lconn.execute("PRAGMA foreign_keys = ON")
             lconn.commit()
         finally:
+            lconn.execute("PRAGMA foreign_keys = ON")
             lconn.close()
 
         # Reset watermarks for purged tables so they don't re-send deleted rows

@@ -130,12 +130,13 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         if body.notas:
             c.notas = body.notas
 
+        apertura = c.monto_apertura  # cache before commit (object expires after commit)
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
-        diferencia = body.monto_cierre - (c.monto_apertura + ef)
+        diferencia = body.monto_cierre - (apertura + ef)
         return {
             "ok":           True,
             "num_ventas":   len(ventas),
@@ -143,9 +144,9 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             "efectivo":     ef,
             "tarjeta":      tj,
             "transferencia": tr,
-            "monto_apertura": c.monto_apertura,
+            "monto_apertura": apertura,
             "monto_cierre": body.monto_cierre,
-            "esperado":     c.monto_apertura + ef,
+            "esperado":     apertura + ef,
             "diferencia":   diferencia,
         }
     except HTTPException:

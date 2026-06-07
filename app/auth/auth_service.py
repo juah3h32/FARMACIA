@@ -89,6 +89,9 @@ def _registrar_auditoria(usuario_id: int, accion: str, tabla: str = None, regist
         )
         db.add(log)
         db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[Audit] Failed to log: {e}")
     finally:
         db.close()
 

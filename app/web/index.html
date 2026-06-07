@@ -236,7 +236,7 @@
           </tr>
         </thead>
         <tbody id="lotes-tbody">
-          <tr><td colspan="5" class="text-center py-6" style="color:#94A3B8">Cargando...</td></tr>
+          <tr><td colspan="6" class="text-center py-6" style="color:#94A3B8">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -582,8 +582,9 @@
 
   /* ── Page / nav ──────────────────────────────────────── */
   .page { display:none; }
-  .page.active { display:block; animation:pageIn .22s ease both; }
-  .page[data-page="dashboard"].active { display:flex; flex-direction:column; gap:0.75rem; }
+  .page.active { display:flex !important; flex-direction:column; height:calc(100vh - 88px); overflow:hidden; animation:pageIn .22s ease both; }
+  .page[data-page="dashboard"].active { gap:0.75rem; overflow-y:auto; }
+  .page[data-page="settings"].active { display:block !important; overflow-y:auto; overflow-x:hidden; }
   .nav-item { transition:background .15s,color .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
   .nav-item.active { background:#243366 !important; color:#fff !important; }
@@ -797,7 +798,7 @@
     <main class="flex-1 overflow-auto p-4">
 
       <!-- ─── DASHBOARD ─────────────────────────────── -->
-      <div data-page="dashboard" class="page" style="height:calc(100vh - 112px);overflow:hidden">
+      <div data-page="dashboard" class="page">
 
         <!-- Greeting -->
         <div class="flex items-center justify-between" style="flex-shrink:0">
@@ -812,50 +813,74 @@
           </button>
         </div>
 
-        <!-- KPI cards -->
+        <!-- KPI cards (fila 1 siempre + fila 2 admin) -->
         <div class="grid grid-cols-4 gap-4" style="flex-shrink:0">
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden"
-               style="background:linear-gradient(135deg,#2e4a8a,#243366)">
+          <!-- Fila 1: operacional -->
+          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#243366)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="absolute bottom-1 right-4 w-16 h-16 rounded-full" style="background:rgba(255,255,255,.05)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="shopping-cart" style="width:20px;height:20px;color:#fff"></i>
             </div>
             <p id="kpi-ventas" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
             <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ventas hoy</p>
           </div>
-
-          <div id="card-kpi-ingresos" class="kpi-card rounded-2xl p-4 relative overflow-hidden"
-               style="background:linear-gradient(135deg,#22C55E,#16A34A)">
+          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#22C55E,#16A34A)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="absolute bottom-1 right-4 w-16 h-16 rounded-full" style="background:rgba(255,255,255,.05)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="dollar-sign" style="width:20px;height:20px;color:#fff"></i>
             </div>
             <p id="kpi-ingresos" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
             <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ingresos hoy</p>
           </div>
-
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden"
-               style="background:linear-gradient(135deg,#F59E0B,#D97706)">
+          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="absolute bottom-1 right-4 w-16 h-16 rounded-full" style="background:rgba(255,255,255,.05)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#fff"></i>
             </div>
             <p id="kpi-stock" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
             <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Stock bajo</p>
           </div>
-
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden"
-               style="background:linear-gradient(135deg,#8B5CF6,#7C3AED)">
+          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="absolute bottom-1 right-4 w-16 h-16 rounded-full" style="background:rgba(255,255,255,.05)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="package-2" style="width:20px;height:20px;color:#fff"></i>
             </div>
             <p id="kpi-total" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
             <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Productos</p>
+          </div>
+
+          <!-- Fila 2: financiero — admin only, hidden por defecto -->
+          <div id="kpi-card-costo" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#1e3a8a,#1e40af)">
+            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+              <i data-lucide="package" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <p id="kpi-inv-costo" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Inversión en inventario</p>
+          </div>
+          <div id="kpi-card-venta" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#059669,#047857)">
+            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+              <i data-lucide="trending-up" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <p id="kpi-inv-venta" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor total en venta</p>
+          </div>
+          <div id="kpi-card-ganancia" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+              <i data-lucide="coins" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <p id="kpi-inv-ganancia" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ganancia proyectada</p>
+          </div>
+          <div id="kpi-card-vencido" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#dc2626,#b91c1c)">
+            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+              <i data-lucide="package-x" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <p id="kpi-inv-vencido" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor vencido</p>
           </div>
         </div>
 
@@ -915,7 +940,7 @@
 
       <!-- ─── POS ───────────────────────────────────── -->
       <div data-page="pos" class="page h-full">
-        <div class="flex gap-4 h-[calc(100vh-140px)]">
+        <div class="flex gap-4" style="height:calc(100vh - 88px)">
           <!-- Left: Products -->
           <div class="flex-1 flex flex-col gap-3">
             <div class="bg-white rounded-2xl border p-4 flex gap-2" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
@@ -1011,8 +1036,8 @@
 
       <!-- ─── INVENTORY ─────────────────────────────── -->
       <div data-page="inventory" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border flex flex-col flex-1 overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="inv-search" type="text" placeholder="Buscar producto..."
@@ -1028,7 +1053,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
@@ -1050,8 +1075,8 @@
 
       <!-- ─── CUSTOMERS ─────────────────────────────── -->
       <div data-page="customers" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border flex flex-col flex-1 overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="cust-search" type="text" placeholder="Buscar cliente..."
@@ -1066,7 +1091,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
@@ -1349,8 +1374,8 @@
 
       <!-- ─── EMPLOYEES ─────────────────────────────── -->
       <div data-page="employees" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border flex flex-col flex-1 overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="flex items-center gap-2">
               <i data-lucide="users" style="width:16px;height:16px;color:#64748B"></i>
               <h2 class="font-semibold text-sm" style="color:#0F172A">Empleados</h2>
@@ -1363,7 +1388,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
@@ -1689,6 +1714,7 @@
             <option>Crema</option><option>Ungüento</option><option>Gel</option>
             <option>Óvulos</option><option>Gotas</option><option>Spray</option><option>Supositorio</option>
             <option>Parche</option><option>Solución</option><option>Polvo</option>
+            <option>Sobre</option>
             <option>Otro</option>
           </select>
         </div>
@@ -2367,7 +2393,7 @@ function _applyAvatarPhoto(elemId, photo, initials, bg) {
     el.innerHTML = initials;
     el.style.background = bg;
     el.style.color = '#fff';
-    if (el.parentElement) el.parentElement.style.background = bg;
+    if (el.parentElement) el.parentElement.style.background = 'linear-gradient(135deg,#60A5FA,#A78BFA)';
   }
 }
 
@@ -2568,36 +2594,27 @@ async function loadDashboard() {
     const ir = await api('/inventario/resumen-inventario');
     if (ir.ok) {
       const inv = await ir.json();
+
+      // Big KPI cards fila 2 (admin only)
+      if (isAdmin && inv.valor_costo !== undefined) {
+        document.getElementById('kpi-inv-costo').textContent    = fmt(inv.valor_costo);
+        document.getElementById('kpi-inv-venta').textContent    = fmt(inv.valor_venta);
+        document.getElementById('kpi-inv-ganancia').textContent = fmt(inv.ganancia_est);
+        document.getElementById('kpi-inv-vencido').textContent  = fmt(inv.valor_vencido || 0);
+        ['kpi-card-costo','kpi-card-venta','kpi-card-ganancia','kpi-card-vencido'].forEach(id=>{
+          document.getElementById(id)?.classList.remove('hidden');
+        });
+        icons();
+      }
+
       const invKpi = document.getElementById('inv-kpi-bar');
       if (invKpi) {
         invKpi.innerHTML = `
-          ${isAdmin ? `
-          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#F0FDF4;border:1px solid #BBF7D0">
-            <i data-lucide="calculator" style="width:13px;height:13px;color:#16A34A"></i>
-            <span style="color:#64748B">Valor Venta</span>
-            <span class="font-black ml-auto" style="color:#16A34A">${fmt(inv.valor_venta)}</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#EEF1F9;border:1px solid #C5CEDE">
-            <i data-lucide="shopping-bag" style="width:13px;height:13px;color:#243366"></i>
-            <span style="color:#64748B">Inversión (Costo)</span>
-            <span class="font-black ml-auto" style="color:#243366">${fmt(inv.valor_costo)}</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#F5F3FF;border:1px solid #DDD6FE">
-            <i data-lucide="trending-up" style="width:13px;height:13px;color:#8B5CF6"></i>
-            <span style="color:#64748B">Utilidad Proyectada</span>
-            <span class="font-black ml-auto" style="color:#8B5CF6">${fmt(inv.ganancia_est)}</span>
-          </div>` : ''}
           <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:${inv.sin_stock>0?'#FEF2F2':'#F8FAFF'};border:1px solid ${inv.sin_stock>0?'#FECACA':'#E2E8F0'}">
             <i data-lucide="alert-circle" style="width:13px;height:13px;color:${inv.sin_stock>0?'#EF4444':'#94A3B8'}"></i>
             <span style="color:#64748B">Sin stock</span>
             <span class="font-black ml-auto" style="color:${inv.sin_stock>0?'#EF4444':'#374151'}">${inv.sin_stock} SKU</span>
           </div>
-          ${isAdmin && inv.valor_vencido > 0 ? `
-          <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#FEF2F2;border:1px solid #FECACA">
-            <i data-lucide="package-x" style="width:13px;height:13px;color:#EF4444"></i>
-            <span style="color:#64748B">Valor vencido</span>
-            <span class="font-black ml-auto" style="color:#EF4444">${fmt(inv.valor_vencido)}</span>
-          </div>` : ''}
           ${isAdmin && inv.valor_critico > 0 ? `
           <div class="flex items-center gap-2 text-xs px-3 py-2 rounded-xl" style="background:#FFF7ED;border:1px solid #FED7AA">
             <i data-lucide="alarm-clock" style="width:13px;height:13px;color:#EA580C"></i>
@@ -2808,8 +2825,7 @@ function setExactAmount() {
 function addCash(val) {
   const inp = document.getElementById('cart-pagado');
   if (inp) {
-    const cur = parseFloat(inp.value) || 0;
-    inp.value = (cur + val).toFixed(2);
+    inp.value = val.toFixed(2);
     updateCambio();
   }
 }
@@ -2858,6 +2874,7 @@ async function processSale() {
   openModal('modal-payment');
   S.cart=[]; renderCart();
   document.getElementById('cart-pagado').value='';
+  updateCambio();
   loadPOS();
   // Refresh dashboard stats silently after every sale
   loadDashboard();
@@ -2969,6 +2986,61 @@ function renderInvTable(prods) {
   icons();
 }
 
+// ── Draft / auto-save system ─────────────────────────────
+const _DRAFT = {
+  product:  'farmapos_draft_product',
+  employee: 'farmapos_draft_employee',
+};
+const _PM_TEXT   = ['pm-nombre','pm-generico','pm-barcode','pm-marca','pm-pcompra','pm-pventa',
+                    'pm-smin','pm-cat','pm-presentacion','pm-concentracion','pm-contenido',
+                    'pm-cantidad','pm-fechavenc','pm-lote'];
+const _PM_CHECKS = ['pm-iva','pm-receta'];
+const _EM_TEXT   = ['em-nombre','em-user','em-tel','em-email','em-rol'];
+
+function _saveDraft(key, textIds, checkIds=[]) {
+  const d = {};
+  textIds.forEach(id  => { const el=document.getElementById(id);  if(el) d[id]=el.value; });
+  checkIds.forEach(id => { const el=document.getElementById(id);  if(el) d[id]=el.checked; });
+  localStorage.setItem(key, JSON.stringify(d));
+}
+
+function _restoreDraft(key, textIds, checkIds=[]) {
+  try {
+    const d = JSON.parse(localStorage.getItem(key)||'null');
+    if (!d) return false;
+    let any = false;
+    textIds.forEach(id  => { const el=document.getElementById(id);  if(el && d[id]!=null && d[id]!=='') { el.value=d[id]; any=true; } });
+    checkIds.forEach(id => { const el=document.getElementById(id);  if(el && d[id]!=null) el.checked=d[id]; });
+    return any;
+  } catch { return false; }
+}
+
+function _clearDraft(key) { localStorage.removeItem(key); }
+
+function _attachDraftListeners(key, textIds, checkIds=[]) {
+  const save = () => _saveDraft(key, textIds, checkIds);
+  textIds.forEach(id  => document.getElementById(id)?.addEventListener('input', save));
+  checkIds.forEach(id => document.getElementById(id)?.addEventListener('change', save));
+}
+
+function _showDraftBanner(modalId, onDiscard) {
+  const existing = document.getElementById('draft-banner-'+modalId);
+  if (existing) existing.remove();
+  const pane = document.querySelector(`#${modalId} .modal-pane`);
+  if (!pane) return;
+  const banner = document.createElement('div');
+  banner.id = 'draft-banner-'+modalId;
+  banner.className = 'flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl mx-4 mt-3';
+  banner.style.cssText = 'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E';
+  banner.innerHTML = `<i data-lucide="clock" style="width:13px;height:13px;flex-shrink:0"></i>
+    <span class="flex-1">Borrador restaurado — continúa donde lo dejaste</span>
+    <button onclick="document.getElementById('draft-banner-${modalId}').remove();${onDiscard}"
+      class="ml-2 underline hover:no-underline" style="color:#B45309">Descartar</button>`;
+  pane.insertBefore(banner, pane.children[1]);
+  icons();
+}
+// ─────────────────────────────────────────────────────────
+
 async function openProductModal(id=null) {
   S.prodEditId=id;
   ['pm-nombre','pm-generico','pm-barcode','pm-marca','pm-lote','pm-concentracion','pm-contenido'].forEach(f=>document.getElementById(f).value='');
@@ -3012,6 +3084,12 @@ async function openProductModal(id=null) {
     // Create mode
     secCrear.classList.remove('hidden');
     secEditar.classList.add('hidden');
+    // Restore draft
+    const restored = _restoreDraft(_DRAFT.product, _PM_TEXT, _PM_CHECKS);
+    if (restored) _showDraftBanner('modal-product',
+      `_clearDraft('${_DRAFT.product}');['pm-nombre','pm-generico','pm-barcode','pm-marca','pm-lote','pm-concentracion','pm-contenido'].forEach(f=>{const e=document.getElementById(f);if(e)e.value='';});document.getElementById('pm-pcompra').value='0';document.getElementById('pm-pventa').value='0';document.getElementById('pm-cantidad').value='0';document.getElementById('pm-smin').value='10';document.getElementById('pm-iva').checked=false;document.getElementById('pm-receta').checked=false;document.getElementById('pm-cat').value='';document.getElementById('pm-presentacion').value='';document.getElementById('pm-fechavenc').value='';const dpv=document.getElementById('pm-dias-preview');if(dpv)dpv.textContent='';`
+    );
+    _attachDraftListeners(_DRAFT.product, _PM_TEXT, _PM_CHECKS);
   }
   openModal('modal-product');
 }
@@ -3136,6 +3214,7 @@ async function saveProduct() {
     toast('Producto actualizado','success');
   }
 
+  _clearDraft(_DRAFT.product);
   closeModal('modal-product');
   loadInventory();
 }
@@ -3329,6 +3408,8 @@ async function loadReports() {
         <tr class="hovrow border-b" style="border-color:#F1F5F9;background:${i%2?'#F8FAFF':'#fff'}">
           <td class="px-4 py-2 font-mono font-semibold" style="color:#243366">${v.folio||v.id}</td>
           <td class="px-4 py-2" style="color:#374151">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
+          <td class="px-4 py-2" style="color:#374151">${v.cajero||'—'}</td>
+          <td class="px-4 py-2" style="color:#64748B">${v.cliente_nombre||v.cliente||'Público general'}</td>
           <td class="px-4 py-2 font-semibold" style="color:#0F172A">${fmt(v.total)}</td>
           <td class="px-4 py-2" style="color:#64748B">${v.metodo_pago}</td>
           <td class="px-4 py-2">
@@ -3336,7 +3417,7 @@ async function loadReports() {
                   style="background:${v.estado==='completada'?'#F0FDF4':'#FEF2F2'};color:${v.estado==='completada'?'#16A34A':'#EF4444'}">${v.estado}</span>
           </td>
         </tr>`).join('')
-      : '<tr><td colspan="5" class="text-center py-6" style="color:#94A3B8">Sin resultados</td></tr>';
+      : '<tr><td colspan="7" class="text-center py-6" style="color:#94A3B8">Sin resultados</td></tr>';
   }
 }
 
@@ -3787,6 +3868,8 @@ async function openTurnoPanel() {
   if (d.abierto) {
     panelCerrado.classList.add('hidden');
     panelAbierto.classList.remove('hidden');
+    const fc = document.getElementById('turno-footer-cerrado');
+    if (fc) fc.classList.add('hidden');
     const fmt = t => t ? new Date(t).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}) : '—';
     const money = v => '$' + (v||0).toFixed(2);
     document.getElementById('tp-apertura-dt').textContent  = fmt(d.abierto_en);
@@ -3983,6 +4066,11 @@ async function loadEmployees() {
 function openEmpModal() {
   ['em-nombre','em-user','em-pass','em-tel','em-email'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('em-rol').value='cajero';
+  const restored = _restoreDraft(_DRAFT.employee, _EM_TEXT);
+  if (restored) _showDraftBanner('modal-employee',
+    `_clearDraft('${_DRAFT.employee}');['em-nombre','em-user','em-tel','em-email'].forEach(f=>{const e=document.getElementById(f);if(e)e.value='';});document.getElementById('em-rol').value='cajero';`
+  );
+  _attachDraftListeners(_DRAFT.employee, _EM_TEXT);
   openModal('modal-employee');
 }
 
@@ -3999,6 +4087,7 @@ async function saveEmployee() {
   };
   const res=await api('/empleados/',{method:'POST',body:JSON.stringify(body)});
   if (res.ok) {
+    _clearDraft(_DRAFT.employee);
     toast('Empleado creado exitosamente','success','¡Listo!');
     closeModal('modal-employee'); loadEmployees();
   } else {

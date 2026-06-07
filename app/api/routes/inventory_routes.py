@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date, timedelta, datetime
 from app.database.connection import get_db_session
+from sqlalchemy import func
 from app.database.models import Producto, Lote, MovimientoStock, TipoMovimiento
 from app.api.routes.auth_routes import get_current_api_user
 import app.config as cfg
@@ -418,30 +419,28 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
         critico = hoy + timedelta(days=30)
         proximo = hoy + timedelta(days=90)
 
-        # Base products query
-        productos_q = db.query(Producto).filter(Producto.activo == True)
-        total_skus = productos_q.count()
-        
-        # Calculate values using database aggregation for better accuracy
+        # Aggregation queries (each uses a fresh query — no shared Query object)
+        total_skus  = db.query(Producto).filter(Producto.activo == True).count()
+        bajo_stock  = db.query(Producto).filter(Producto.activo == True, Producto.stock <= Producto.stock_minimo).count()
+        sin_stock   = db.query(Producto).filter(Producto.activo == True, Producto.stock <= 0).count()
         valor_venta = db.query(func.sum(Producto.stock * Producto.precio_venta)).filter(Producto.activo == True).scalar() or 0.0
         valor_costo = db.query(func.sum(Producto.stock * func.coalesce(Producto.precio_compra, 0))).filter(Producto.activo == True).scalar() or 0.0
         ganancia_est = valor_venta - valor_costo
 
-        bajo_stock = productos_q.filter(Producto.stock <= Producto.stock_minimo).count()
-        sin_stock  = productos_q.filter(Producto.stock <= 0).count()
-
-        lotes_act = db.query(Lote).filter(
-            Lote.cantidad > 0, Lote.fecha_vencimiento != None
-        ).all()
-        
+        # Single query with joinedload — no N+1
+        from sqlalchemy.orm import joinedload as _jl
+        lotes_act = (
+            db.query(Lote)
+            .options(_jl(Lote.producto))
+            .filter(Lote.cantidad > 0, Lote.fecha_vencimiento != None)
+            .all()
+        )
         valor_vencido = 0.0
         valor_critico = 0.0
         for l in lotes_act:
-            # Re-fetch or join would be better, but for now we re-fetch to keep logic similar
-            prod = db.query(Producto).filter(Producto.id == l.producto_id).first()
-            if not prod:
+            if not l.producto:
                 continue
-            val = l.cantidad * prod.precio_venta
+            val = l.cantidad * l.producto.precio_venta
             if l.fecha_vencimiento < hoy:
                 valor_vencido += val
             elif l.fecha_vencimiento <= critico:

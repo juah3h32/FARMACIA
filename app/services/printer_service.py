@@ -312,10 +312,6 @@ class PrinterService:
             if current_line:
                 lines.append(ctr(current_line))
         
-        if telefono:
-            lines.append(ctr(telefono))
-        if rfc:
-            lines.append(ctr(rfc))
         lines.append(sep)
 
         # Cajero centrado

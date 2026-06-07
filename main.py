@@ -19,11 +19,9 @@ def _log_error(msg: str) -> None:
 
 
 def _find_free_port(start: int, attempts: int = 10) -> int | None:
-    for port in range(start, start + attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
-                return port
-    return None
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def _wait_for_api(port: int, timeout: int = 12) -> bool:

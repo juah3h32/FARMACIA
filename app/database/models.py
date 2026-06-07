@@ -104,7 +104,7 @@ class Producto(Base):
     descripcion = Column(Text)
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, server_default=func.now())
-    actualizado_en = Column(DateTime, onupdate=func.now())
+    actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     categoria = relationship("Categoria", back_populates="productos")
     proveedor = relationship("Proveedor", back_populates="productos")
@@ -277,4 +277,4 @@ class Configuracion(Base):
     id = Column(Integer, primary_key=True)
     clave = Column(String(100), unique=True, nullable=False)
     valor = Column(Text)
-    actualizado_en = Column(DateTime, onupdate=func.now())
+    actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())
