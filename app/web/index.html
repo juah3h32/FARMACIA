@@ -1921,7 +1921,7 @@
 <!-- Payment success modal -->
 <div id="modal-payment" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)"></div>
-  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[340px] p-7 text-center">
+  <div id="pay-modal-pane" class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[340px] p-7 text-center">
     <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style="background:#DCFCE7">
       <i data-lucide="check-circle-2" style="width:32px;height:32px;color:#16A34A"></i>
     </div>
@@ -1929,9 +1929,22 @@
     <p id="pay-folio" class="text-sm mb-2" style="color:#64748B"></p>
     <p class="text-xs font-semibold uppercase tracking-widest mb-0" style="color:#64748B">Total cobrado</p>
     <p id="pay-total" class="text-3xl font-extrabold mb-3" style="color:#16A34A"></p>
-    <div class="rounded-2xl py-4 px-5 mb-5" style="background:#EEF1F9;border:2px solid #243366">
+    <div class="rounded-2xl py-4 px-5 mb-4" style="background:#EEF1F9;border:2px solid #243366">
       <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#243366">CAMBIO A ENTREGAR</p>
       <p id="pay-cambio" class="text-5xl font-black" style="color:#1a2a57"></p>
+    </div>
+    <!-- Ticket preview (solo modo prueba) -->
+    <div id="pay-ticket-preview-wrap" class="hidden mb-4">
+      <div class="flex items-center justify-between mb-1">
+        <p class="text-xs font-bold" style="color:#374151">Vista previa del ticket</p>
+        <button onclick="pmImprimirTicketPrueba()" id="btn-imprimir-prueba"
+                class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1"
+                style="background:#243366;color:#fff">
+          <i data-lucide="printer" style="width:11px;height:11px"></i> Imprimir
+        </button>
+      </div>
+      <pre id="pay-ticket-texto" class="text-left overflow-x-auto rounded-xl p-3 text-[10px] leading-tight custom-scrollbar"
+           style="background:#0F172A;color:#E2E8F0;font-family:'Courier New',monospace;max-height:280px;white-space:pre"></pre>
     </div>
     <button onclick="closeModal('modal-payment')"
             class="w-full h-11 rounded-xl text-white font-semibold flex items-center justify-center gap-2"
@@ -2964,10 +2977,27 @@ async function processSale() {
     document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
     document.getElementById('pay-total').textContent=fmt(total);
     document.getElementById('pay-cambio').textContent=fmt(Math.max(0,pag-total));
+    // Guardar carrito para imprimir prueba antes de limpiar
+    S._pruebaItems = S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0}));
+    S._pruebaPag = pag; S._pruebaMetodo = metodo;
+    // Mostrar modal y solicitar ticket preview al backend
+    document.getElementById('pay-ticket-preview-wrap').classList.add('hidden');
+    document.getElementById('pay-ticket-texto').textContent='';
     openModal('modal-payment');
     S.cart=[]; renderCart();
     document.getElementById('cart-pagado').value='';
     updateCambio();
+    // Cargar preview del ticket en background
+    api('/pos/imprimir-prueba',{method:'POST',body:JSON.stringify({
+      items: S._pruebaItems, metodo_pago: S._pruebaMetodo, monto_pagado: S._pruebaPag
+    })}).then(async r=>{
+      if(!r.ok) return;
+      const d=await r.json();
+      if(d.ticket_texto){
+        document.getElementById('pay-ticket-texto').textContent=d.ticket_texto;
+        document.getElementById('pay-ticket-preview-wrap').classList.remove('hidden');
+      }
+    });
     return;
   }
 
@@ -3272,6 +3302,18 @@ function pmPreviewDias(val) {
   else if (dias<=30) { el.textContent=`⚠️ Vence en ${dias} días — ${label}`;         el.style.color='#EA580C'; }
   else if (dias<=90) { el.textContent=`🕐 ${dias} días restantes — ${label}`;        el.style.color='#CA8A04'; }
   else               { el.textContent=`✓ Vigente — ${label}`;                        el.style.color='#16A34A'; }
+}
+
+async function pmImprimirTicketPrueba() {
+  if (!S._pruebaItems?.length) { toast('Sin datos de venta de prueba','warning'); return; }
+  const btn = document.getElementById('btn-imprimir-prueba');
+  if (btn) { btn.textContent='Imprimiendo...'; btn.disabled=true; }
+  const r = await api('/pos/imprimir-prueba',{method:'POST',body:JSON.stringify({
+    items: S._pruebaItems, metodo_pago: S._pruebaMetodo||'efectivo', monto_pagado: S._pruebaPag||0
+  })});
+  if (btn) { btn.innerHTML='<i data-lucide="printer" style="width:11px;height:11px"></i> Imprimir'; btn.disabled=false; icons(); }
+  if (r.ok) toast('Ticket enviado a la impresora','success');
+  else { const e=await r.json(); toast(e.detail||'Error al imprimir','error'); }
 }
 
 async function pmAjustarStock() {

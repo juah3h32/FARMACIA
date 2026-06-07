@@ -193,3 +193,65 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+class ImprimirPruebaIn(BaseModel):
+    items: list[ItemVentaIn]
+    metodo_pago: str = "efectivo"
+    monto_pagado: float
+    descuento_global: float = 0.0
+
+
+@router.post("/imprimir-prueba")
+def imprimir_ticket_prueba(body: ImprimirPruebaIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Build and print a test ticket — no DB writes, no stock changes."""
+    db = get_db_session()
+    try:
+        producto_ids = [i.producto_id for i in body.items]
+        prods = {p.id: p for p in db.query(Producto).filter(Producto.id.in_(producto_ids)).all()}
+
+        subtotal = sum((i.precio_unitario * i.cantidad) - i.descuento for i in body.items)
+        iva_total = sum(
+            i.precio_unitario * i.cantidad * 0.16
+            for i in body.items
+            if prods.get(i.producto_id) and prods[i.producto_id].aplica_iva
+        )
+        total = subtotal + iva_total - body.descuento_global
+        cambio = max(0.0, body.monto_pagado - total)
+
+        from app.database.models import Usuario
+        cajero_obj = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+        cajero_nombre = cajero_obj.nombre if cajero_obj else "Cajero"
+
+        venta_data = {
+            "folio": "PRUEBA-000",
+            "cajero": cajero_nombre,
+            "cliente": None,
+            "items": [
+                {
+                    "nombre": prods[i.producto_id].nombre if i.producto_id in prods else f"Producto {i.producto_id}",
+                    "cantidad": i.cantidad,
+                    "subtotal": (i.precio_unitario * i.cantidad) - i.descuento,
+                }
+                for i in body.items
+            ],
+            "subtotal": subtotal,
+            "descuento": body.descuento_global,
+            "iva": iva_total,
+            "total": total,
+            "metodo_pago": body.metodo_pago,
+            "monto_pagado": body.monto_pagado,
+            "cambio": cambio,
+        }
+
+        from app.services.printer_service import printer_service
+        ticket_texto = printer_service._build_ticket(venta_data, printer_service._load_farmacia_config())
+        bg.add_task(printer_service.print_receipt, venta_data)
+
+        return {"ok": True, "folio": "PRUEBA-000", "total": total, "cambio": cambio, "ticket_texto": ticket_texto}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
