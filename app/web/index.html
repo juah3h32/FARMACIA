@@ -1845,6 +1845,32 @@
               <label class="text-xs font-medium" style="color:#374151">Requiere receta</label>
             </div>
           </div>
+
+          <!-- Venta por pieza -->
+          <div class="rounded-xl p-3" style="background:#FFF7ED;border:1px solid #FED7AA">
+            <div class="flex items-center gap-2 mb-2">
+              <input id="pm-fraccionada" type="checkbox" class="w-4 h-4 rounded accent-orange-500" onchange="pmToggleFraccionada()">
+              <label class="text-xs font-bold" style="color:#92400E">Venta por pieza (fraccionado)</label>
+              <span class="text-[10px] ml-auto" style="color:#D97706">Ej: caja de condones vendida por pieza</span>
+            </div>
+            <div id="pm-fraccionada-fields" class="hidden grid gap-2" style="grid-template-columns:1fr 1fr 1fr">
+              <div>
+                <label class="lbl" style="font-size:10px">Piezas por caja</label>
+                <input id="pm-uds-caja" type="number" min="1" class="inp" placeholder="12" oninput="pmCalcPrecioPieza()">
+              </div>
+              <div>
+                <label class="lbl" style="font-size:10px">Nombre pieza</label>
+                <input id="pm-unidad-pieza" class="inp" placeholder="pieza, tableta, condón…" maxlength="30">
+              </div>
+              <div>
+                <label class="lbl" style="font-size:10px">Precio por pieza</label>
+                <input id="pm-precio-pieza" type="number" step="0.01" class="inp" placeholder="auto">
+              </div>
+            </div>
+            <p id="pm-fraccionada-nota" class="hidden text-[10px] mt-1.5" style="color:#92400E">
+              ⚠️ El stock se registra en <strong>piezas</strong>. Al ingresar inventario, multiplica cajas × piezas/caja.
+            </p>
+          </div>
         </div>
 
         <!-- ── Columna derecha: imagen + descripción ── -->
@@ -2916,22 +2942,35 @@ function posProductThumb(imgUrl) {
 function renderPosGrid(prods) {
   const g=document.getElementById('pos-grid');
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
-  g.innerHTML=prods.map(p=>`
-    <button onclick="addToCart(${p.id})"
-      class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full"
-      style="border-color:#E2E8F0">
-      <div class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden" style="height:100px;background:#fff;border:1px solid #F1F5F9">
+  g.innerHTML=prods.map(p=>{
+    const stockColor = p.stock<=0?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A';
+    const stockBg    = p.stock<=0?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4';
+    const fracBtns   = p.venta_fraccionada ? `
+      <div class="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
+        <button onclick="event.stopPropagation();addToCart(${p.id},false)"
+          class="flex-1 h-7 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90"
+          style="background:#16A34A">Caja ${fmt(p.precio_venta)}</button>
+        <button onclick="event.stopPropagation();addToCart(${p.id},true)"
+          class="flex-1 h-7 rounded-lg text-[10px] font-bold border-2 transition-all hover:opacity-90"
+          style="border-color:#F59E0B;color:#92400E;background:#FEF3C7">
+          ${p.unidad_pieza||'Pieza'} ${fmt(p.precio_pieza)}
+        </button>
+      </div>` : '';
+    return `
+    <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full cursor-pointer"
+      style="border-color:#E2E8F0" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
+      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'80':'100'}px;background:#fff;border:1px solid #F1F5F9">
         ${posProductThumb(p.imagen_url)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
       <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
         <span class="text-base font-black" style="color:#16A34A">${fmt(p.precio_venta)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold"
-              style="background:${p.stock<=0?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4'};
-                     color:${p.stock<=0?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A'}">${p.stock}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${p.stock}${p.venta_fraccionada?` ${p.unidad_pieza||'pzs'}`:''}</span>
       </div>
-    </button>`).join('');
+      ${fracBtns}
+    </div>`;
+  }).join('');
   icons();
 }
 
@@ -2951,7 +2990,7 @@ function posSetCustomer(id) {
   S.posCustomer=id ? S.allCustomers.find(c=>c.id==id) : null;
 }
 
-function addToCart(pid) {
+function addToCart(pid, esPieza=false) {
   const p=S.allProducts.find(x=>x.id===pid);
   if (!p) return;
   if (p.stock<=0) { toast('Sin stock disponible','warning'); return; }
@@ -2964,15 +3003,27 @@ function addToCart(pid) {
       return;
     }
   }
-  const ex=S.cart.find(i=>i.id===pid);
-  if (ex) ex.cantidad++; else S.cart.push({...p, cantidad:1});
+  // Fractional: key includes es_pieza so box and piece coexist in cart
+  const cartKey = p.venta_fraccionada ? `${pid}_${esPieza?'pieza':'caja'}` : `${pid}`;
+  const precio = (p.venta_fraccionada && esPieza) ? (p.precio_pieza||0) : p.precio_venta;
+  const ex = S.cart.find(i=>i._cartKey===cartKey);
+  if (ex) { ex.cantidad++; } else {
+    S.cart.push({
+      ...p,
+      _cartKey: cartKey,
+      precio_venta: precio,
+      _esPieza: esPieza,
+      _label: p.venta_fraccionada ? (esPieza ? (p.unidad_pieza||'pieza') : 'caja') : null,
+      cantidad: 1,
+    });
+  }
   renderCart();
 }
 
-function removeFromCart(pid) { S.cart=S.cart.filter(i=>i.id!==pid); renderCart(); }
+function removeFromCart(key) { S.cart=S.cart.filter(i=>(i._cartKey||String(i.id))!==String(key)); renderCart(); }
 
-function changeQty(pid, delta) {
-  const i=S.cart.find(x=>x.id===pid);
+function changeQty(key, delta) {
+  const i=S.cart.find(x=>(x._cartKey||String(x.id))===String(key));
   if (!i) return;
   i.cantidad=Math.max(1,i.cantidad+delta);
   renderCart();
@@ -2985,7 +3036,10 @@ function renderCart() {
   if (!S.cart.length) {
     el.innerHTML='<p class="text-center py-8 text-xs" style="color:#94A3B8">Agrega productos al carrito</p>';
   } else {
-    el.innerHTML=S.cart.map(i=>`
+    el.innerHTML=S.cart.map(i=>{
+      const cartKey = i._cartKey||String(i.id);
+      const labelBadge = i._label ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-1" style="background:${i._esPieza?'#FEF3C7':'#DCFCE7'};color:${i._esPieza?'#92400E':'#166534'}">${i._label}</span>` : '';
+      return `
       <div class="border rounded-xl p-2 transition-all flex gap-2" style="border-color:#E2E8F0">
         <div class="flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center" style="width:44px;height:44px;background:#F8FAFC;border:1px solid #F1F5F9">
           ${i.imagen_url
@@ -2994,21 +3048,22 @@ function renderCart() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex justify-between items-start mb-1">
-            <p class="text-xs font-semibold leading-tight truncate flex-1 mr-1" style="color:#0F172A">${i.nombre}</p>
-            <button onclick="removeFromCart(${i.id})" class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-red-50 transition-colors" style="color:#EF4444">
+            <p class="text-xs font-semibold leading-tight truncate flex-1 mr-1" style="color:#0F172A">${i.nombre}${labelBadge}</p>
+            <button onclick="removeFromCart('${cartKey}')" class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-red-50 transition-colors" style="color:#EF4444">
               <i data-lucide="x" style="width:12px;height:12px"></i>
             </button>
           </div>
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-1">
-              <button onclick="changeQty(${i.id},-1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">−</button>
+              <button onclick="changeQty('${cartKey}',-1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">−</button>
               <span class="w-7 text-center text-xs font-semibold">${i.cantidad}</span>
-              <button onclick="changeQty(${i.id},+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
+              <button onclick="changeQty('${cartKey}',+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
             </div>
             <span class="text-xs font-bold" style="color:#243366">${fmt(i.precio_venta*i.cantidad)}</span>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
   const sub  =S.cart.reduce((s,i)=>s+i.precio_venta*i.cantidad,0);
   const iva  =S.cart.reduce((s,i)=>s+(i.aplica_iva?i.precio_venta*i.cantidad*.16:0),0);
@@ -3110,7 +3165,7 @@ async function processSale() {
 
   const body={
     cliente_id:  S.posCustomer?.id||null,
-    items:       S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0})),
+    items:       S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0,es_pieza:!!i._esPieza})),
     metodo_pago: metodo,
     monto_pagado:pag,
   };
@@ -3242,8 +3297,9 @@ const _DRAFT = {
 };
 const _PM_TEXT   = ['pm-nombre','pm-generico','pm-barcode','pm-marca','pm-pcompra','pm-pventa',
                     'pm-smin','pm-cat','pm-presentacion','pm-concentracion','pm-contenido',
-                    'pm-cantidad','pm-fechavenc','pm-lote'];
-const _PM_CHECKS = ['pm-iva','pm-receta'];
+                    'pm-cantidad','pm-fechavenc','pm-lote',
+                    'pm-uds-caja','pm-unidad-pieza','pm-precio-pieza'];
+const _PM_CHECKS = ['pm-iva','pm-receta','pm-fraccionada'];
 const _EM_TEXT   = ['em-nombre','em-user','em-tel','em-email','em-rol'];
 
 function _saveDraft(key, textIds, checkIds=[]) {
@@ -3300,6 +3356,12 @@ async function openProductModal(id=null) {
   document.getElementById('pm-smin').value='10';
   document.getElementById('pm-iva').checked=false;
   document.getElementById('pm-receta').checked=false;
+  document.getElementById('pm-fraccionada').checked=false;
+  document.getElementById('pm-uds-caja').value='';
+  document.getElementById('pm-unidad-pieza').value='pieza';
+  document.getElementById('pm-precio-pieza').value='';
+  document.getElementById('pm-fraccionada-fields').classList.add('hidden');
+  document.getElementById('pm-fraccionada-nota').classList.add('hidden');
   document.getElementById('pm-cat').value='';
   document.getElementById('pm-presentacion').value='';
   document.getElementById('prod-modal-title').textContent=id?'Editar Producto':'Agregar Producto';
@@ -3334,6 +3396,14 @@ async function openProductModal(id=null) {
       document.getElementById('pm-concentracion').value=p.concentracion||'';
       document.getElementById('pm-contenido').value=p.contenido||'';
       document.getElementById('pm-descripcion').value=p.descripcion||'';
+      document.getElementById('pm-fraccionada').checked=!!p.venta_fraccionada;
+      document.getElementById('pm-uds-caja').value=p.unidades_por_caja||1;
+      document.getElementById('pm-unidad-pieza').value=p.unidad_pieza||'pieza';
+      document.getElementById('pm-precio-pieza').value=p.precio_pieza||'';
+      if (p.venta_fraccionada) {
+        document.getElementById('pm-fraccionada-fields').classList.remove('hidden');
+        document.getElementById('pm-fraccionada-nota').classList.remove('hidden');
+      }
       if (p.imagen_url) pmLoadImagePreview(p.imagen_url);
       const badge = document.getElementById('pm-stock-actual-badge');
       if (badge) badge.textContent = `Stock actual: ${p.stock ?? 0}`;
@@ -3470,6 +3540,10 @@ async function saveProduct() {
     concentracion:   document.getElementById('pm-concentracion').value.trim()||null,
     contenido:       document.getElementById('pm-contenido').value.trim()||null,
     descripcion:     document.getElementById('pm-descripcion').value.trim()||null,
+    venta_fraccionada: document.getElementById('pm-fraccionada').checked,
+    unidades_por_caja: parseInt(document.getElementById('pm-uds-caja').value)||1,
+    precio_pieza:    parseFloat(document.getElementById('pm-precio-pieza').value)||0,
+    unidad_pieza:    document.getElementById('pm-unidad-pieza').value.trim()||'pieza',
   };
 
   const method = isEdit ? 'PUT' : 'POST';
@@ -3516,6 +3590,22 @@ async function saveProduct() {
 // ── Product image helpers ─────────────────────────────────────────────────
 let _pmImageFile = null;
 let _pmImageUrl  = '';
+
+function pmToggleFraccionada() {
+  const on = document.getElementById('pm-fraccionada').checked;
+  document.getElementById('pm-fraccionada-fields').classList.toggle('hidden', !on);
+  document.getElementById('pm-fraccionada-nota').classList.toggle('hidden', !on);
+  if (on) pmCalcPrecioPieza();
+}
+
+function pmCalcPrecioPieza() {
+  const uds = parseInt(document.getElementById('pm-uds-caja').value) || 0;
+  const pventa = parseFloat(document.getElementById('pm-pventa').value) || 0;
+  const piezaEl = document.getElementById('pm-precio-pieza');
+  if (uds > 0 && pventa > 0 && !piezaEl.dataset.manual) {
+    piezaEl.value = (pventa / uds).toFixed(2);
+  }
+}
 
 function pmSelectImage() {
   document.getElementById('pm-img-input').click();

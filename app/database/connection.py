@@ -78,11 +78,15 @@ def get_db_session() -> Session:
 def _migrate():
     """Add new columns to existing tables without dropping data."""
     new_cols = [
-        ("productos", "presentacion",  "VARCHAR(50)"),
-        ("productos", "concentracion", "VARCHAR(50)"),
-        ("productos", "contenido",     "VARCHAR(50)"),
-        ("productos", "imagen_url",    "VARCHAR(500)"),
-        ("productos", "descripcion",   "TEXT"),
+        ("productos", "presentacion",       "VARCHAR(50)"),
+        ("productos", "concentracion",      "VARCHAR(50)"),
+        ("productos", "contenido",          "VARCHAR(50)"),
+        ("productos", "imagen_url",         "VARCHAR(500)"),
+        ("productos", "descripcion",        "TEXT"),
+        ("productos", "venta_fraccionada",  "BOOLEAN DEFAULT 0"),
+        ("productos", "unidades_por_caja",  "INTEGER DEFAULT 1"),
+        ("productos", "precio_pieza",       "REAL DEFAULT 0.0"),
+        ("productos", "unidad_pieza",       "VARCHAR(30) DEFAULT 'pieza'"),
     ]
     # Local SQLite
     with engine.connect() as conn:

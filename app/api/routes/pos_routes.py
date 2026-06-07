@@ -15,6 +15,7 @@ class ItemVentaIn(BaseModel):
     cantidad: int
     precio_unitario: float
     descuento: float = 0.0
+    es_pieza: bool = False
 
 
 class CreateVentaIn(BaseModel):
@@ -137,13 +138,18 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             ))
             prod = products[item.producto_id]
             stock_ant = prod.stock
-            prod.stock = max(0, prod.stock - item.cantidad)
+            # Fractional product sold as CAJA: deduct unidades_por_caja per unit sold
+            if prod.venta_fraccionada and not item.es_pieza:
+                stock_delta = item.cantidad * (prod.unidades_por_caja or 1)
+            else:
+                stock_delta = item.cantidad
+            prod.stock = max(0, prod.stock - stock_delta)
             # FEFO: decrement individual lot quantities (earliest-expiry first)
-            _fefo_consume(db, item.producto_id, item.cantidad)
+            _fefo_consume(db, item.producto_id, stock_delta)
             db.add(MovimientoStock(
                 producto_id=item.producto_id,
                 tipo=TipoMovimiento.salida,
-                cantidad=item.cantidad,
+                cantidad=stock_delta,
                 stock_anterior=stock_ant,
                 stock_nuevo=prod.stock,
                 referencia_id=venta.id,

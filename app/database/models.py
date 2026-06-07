@@ -103,6 +103,10 @@ class Producto(Base):
     contenido = Column(String(50))      # 30 tab, 120ml, 10 amp…
     descripcion = Column(Text)
     imagen_url = Column(String(500))
+    venta_fraccionada = Column(Boolean, default=False)
+    unidades_por_caja = Column(Integer, default=1)
+    precio_pieza = Column(Float, default=0.0)
+    unidad_pieza = Column(String(30), default="pieza")
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())

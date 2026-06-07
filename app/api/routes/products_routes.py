@@ -42,6 +42,10 @@ class ProductoIn(BaseModel):
     contenido: Optional[str] = None
     descripcion: Optional[str] = None
     imagen_url: Optional[str] = None
+    venta_fraccionada: bool = False
+    unidades_por_caja: int = 1
+    precio_pieza: float = 0.0
+    unidad_pieza: Optional[str] = "pieza"
 
 
 class ProductoResponse(BaseModel):
@@ -63,6 +67,10 @@ class ProductoResponse(BaseModel):
     contenido: Optional[str] = None
     descripcion: Optional[str] = None
     imagen_url: Optional[str] = None
+    venta_fraccionada: bool = False
+    unidades_por_caja: int = 1
+    precio_pieza: float = 0.0
+    unidad_pieza: Optional[str] = "pieza"
     activo: bool
 
     class Config:
