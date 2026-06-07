@@ -205,6 +205,26 @@ def list_endpoints(payload: dict = Depends(get_current_api_user)):
     ]
 
 
+class BackupPathIn(BaseModel):
+    path: str
+
+
+@router.post("/backup-to-path")
+def backup_to_path(body: BackupPathIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    import shutil
+    from pathlib import Path as _Path
+    if not body.path:
+        raise HTTPException(status_code=400, detail="Ruta vacía")
+    dest = _Path(body.path)
+    if not dest.parent.exists():
+        raise HTTPException(status_code=400, detail="Carpeta de destino no existe")
+    if not cfg.DB_PATH.exists():
+        raise HTTPException(status_code=404, detail="Base de datos no encontrada")
+    shutil.copy2(str(cfg.DB_PATH), str(dest))
+    return {"ok": True, "filename": dest.name}
+
+
 @router.get("/backup")
 def descargar_backup(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)

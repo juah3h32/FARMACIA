@@ -1569,51 +1569,74 @@
         </div>
 
         <!-- Respaldo y Restauración -->
-        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#0EA5E9,#0284C7)"></div>
+        <div class="bg-white rounded-2xl overflow-hidden" style="border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(2,132,199,.08)">
+          <div class="h-1.5 w-full" style="background:linear-gradient(90deg,#0EA5E9,#0284C7)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#E0F2FE">
               <i data-lucide="database-backup" style="width:20px;height:20px;color:#0284C7"></i>
             </div>
             <div>
               <h2 class="font-bold" style="color:#0F172A">Respaldo y Restauración</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">Exporta la base de datos completa o importa un respaldo anterior</p>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Exporta o importa la base de datos completa</p>
             </div>
             <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEF3C7;border:1px solid #FDE68A">
               <i data-lucide="shield-check" style="width:13px;height:13px;color:#D97706"></i>
               <span class="text-[10px] font-bold" style="color:#D97706">SOLO ADMIN</span>
             </div>
           </div>
-          <div class="p-6 grid grid-cols-2 gap-6">
+          <div class="p-6 flex flex-col gap-3">
             <!-- Exportar -->
-            <div class="rounded-xl p-5 flex flex-col gap-3" style="background:#F0F9FF;border:1px solid #BAE6FD">
-              <div class="flex items-center gap-2">
-                <i data-lucide="download" style="width:16px;height:16px;color:#0284C7"></i>
-                <p class="font-bold text-sm" style="color:#0C4A6E">Exportar respaldo</p>
+            <div class="flex items-center gap-4 p-4 rounded-xl" style="background:#F0F9FF;border:1px solid #BAE6FD">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#0284C7">
+                <i data-lucide="download-cloud" style="width:20px;height:20px;color:white"></i>
               </div>
-              <p class="text-xs" style="color:#64748B">Descarga el archivo <code>.db</code> con todos los datos: productos, ventas, clientes, empleados e inventario.</p>
-              <button onclick="descargarBackup()" class="mt-auto h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2" style="background:linear-gradient(135deg,#0284C7,#0369A1)">
-                <i data-lucide="download" style="width:15px;height:15px"></i> Descargar .db
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-sm" style="color:#0C4A6E">Exportar respaldo</p>
+                <p class="text-xs mt-0.5" style="color:#64748B">Guarda el archivo <code class="px-1 rounded" style="background:#DBEAFE;color:#1E40AF">.db</code> con todos los datos — productos, ventas, clientes e inventario. Se abrirá un diálogo para elegir dónde guardar.</p>
+              </div>
+              <button onclick="descargarBackup()" class="flex-shrink-0 h-10 px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all hover:opacity-90" style="background:linear-gradient(135deg,#0284C7,#0369A1)">
+                <i data-lucide="download" style="width:14px;height:14px"></i> Guardar .db
               </button>
             </div>
             <!-- Importar -->
-            <div class="rounded-xl p-5 flex flex-col gap-3" style="background:#FFFBEB;border:1px solid #FDE68A">
-              <div class="flex items-center gap-2">
-                <i data-lucide="upload" style="width:16px;height:16px;color:#D97706"></i>
-                <p class="font-bold text-sm" style="color:#92400E">Restaurar respaldo</p>
+            <div class="flex items-center gap-4 p-4 rounded-xl" style="background:#FFFBEB;border:1px solid #FDE68A">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#D97706">
+                <i data-lucide="upload-cloud" style="width:20px;height:20px;color:white"></i>
               </div>
-              <p class="text-xs" style="color:#64748B">Importa un archivo <code>.db</code> exportado previamente. <strong>Reemplaza todos los datos actuales.</strong></p>
-              <input id="restore-file-input" type="file" accept=".db" class="hidden" onchange="restaurarBackup(event)">
-              <button onclick="document.getElementById('restore-file-input').click()" class="mt-auto h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border-2" style="border-color:#F59E0B;color:#92400E;background:#FEF3C7">
-                <i data-lucide="upload" style="width:15px;height:15px"></i> Seleccionar archivo .db
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-sm" style="color:#92400E">Restaurar respaldo</p>
+                <p class="text-xs mt-0.5" style="color:#64748B">Selecciona un archivo <code class="px-1 rounded" style="background:#FEF3C7;color:#92400E">.db</code> previamente exportado. <strong style="color:#B45309">Reemplaza todos los datos actuales.</strong></p>
+              </div>
+              <input id="restore-file-input" type="file" accept=".db" class="hidden" onchange="restaurarBackupConfirm(event)">
+              <button onclick="document.getElementById('restore-file-input').click()" class="flex-shrink-0 h-10 px-5 rounded-xl font-semibold text-sm flex items-center gap-2 border-2 transition-all hover:opacity-90" style="border-color:#D97706;color:#92400E;background:#FEF3C7">
+                <i data-lucide="upload" style="width:14px;height:14px"></i> Seleccionar .db
               </button>
+            </div>
+            <!-- Confirm restore row (hidden) -->
+            <div id="restore-confirm-row" class="hidden rounded-xl p-4 border-2" style="border-color:#EF4444;background:#FFF5F5">
+              <div class="flex items-start gap-3">
+                <i data-lucide="triangle-alert" style="width:20px;height:20px;color:#EF4444;flex-shrink:0;margin-top:2px"></i>
+                <div class="flex-1">
+                  <p class="font-bold text-sm" style="color:#7F1D1D">¿Confirmar restauración?</p>
+                  <p id="restore-confirm-filename" class="text-xs mt-0.5" style="color:#64748B">—</p>
+                  <p class="text-xs mt-1" style="color:#DC2626">Esto reemplazará TODOS los datos actuales. Se guardará un respaldo automático antes de restaurar.</p>
+                  <div class="flex gap-3 mt-3">
+                    <button onclick="doRestoreBackup()" class="h-9 px-4 rounded-xl font-semibold text-sm text-white flex items-center gap-2" style="background:#DC2626">
+                      <i data-lucide="check" style="width:14px;height:14px"></i> Sí, restaurar
+                    </button>
+                    <button onclick="cancelRestoreBackup()" class="h-9 px-4 rounded-xl font-semibold text-sm" style="background:#F1F5F9;color:#475569">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Zona Peligrosa -->
-        <div class="rounded-2xl border overflow-hidden" style="border-color:#FCA5A5;box-shadow:0 2px 8px rgba(239,68,68,.08)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
+        <div class="rounded-2xl overflow-hidden" style="border:1px solid #FCA5A5;box-shadow:0 2px 12px rgba(239,68,68,.08)">
+          <div class="h-1.5 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#FEE2E2;background:#FFF5F5">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEE2E2">
               <i data-lucide="triangle-alert" style="width:20px;height:20px;color:#EF4444"></i>
@@ -1628,21 +1651,18 @@
             </div>
           </div>
           <div class="p-6" style="background:#FFFAFA">
-            <!-- Solo limpiar ventas/historial — productos nunca se eliminan desde aquí -->
-            <div class="rounded-xl p-5 border max-w-sm" style="border-color:#FEE2E2;background:#fff">
-              <div class="flex items-start gap-3 mb-4">
-                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
-                  <i data-lucide="trash-2" style="width:17px;height:17px;color:#EF4444"></i>
-                </div>
-                <div>
-                  <h3 class="font-bold text-sm" style="color:#0F172A">Limpiar historial de ventas</h3>
-                  <p class="text-xs mt-0.5" style="color:#64748B">Elimina ventas, cortes de caja y auditoría. Conserva productos, clientes y empleados.</p>
-                </div>
+            <div class="flex items-center gap-4 p-4 rounded-xl border" style="border-color:#FEE2E2;background:#fff">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
+                <i data-lucide="trash-2" style="width:20px;height:20px;color:#EF4444"></i>
+              </div>
+              <div class="flex-1">
+                <p class="font-bold text-sm" style="color:#0F172A">Limpiar historial de ventas</p>
+                <p class="text-xs mt-0.5" style="color:#64748B">Elimina ventas, cortes de caja y auditoría. Conserva productos, clientes y empleados.</p>
               </div>
               <button onclick="confirmPurgeVentas()"
-                      class="w-full h-10 rounded-xl text-sm font-semibold border-2 transition-all hover:opacity-80"
+                      class="flex-shrink-0 h-10 px-5 rounded-xl text-sm font-semibold border-2 flex items-center gap-2 transition-all hover:bg-red-50"
                       style="border-color:#EF4444;color:#EF4444;background:transparent">
-                Limpiar ventas y cortes
+                <i data-lucide="trash-2" style="width:14px;height:14px"></i> Limpiar
               </button>
             </div>
           </div>
@@ -4730,31 +4750,66 @@ async function loadEndpoints() {
 }
 
 async function descargarBackup() {
-  toast('Preparando respaldo...','info');
+  const ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  const defaultName = `farmacia_backup_${ts}.db`;
+
+  // Desktop app: use native save dialog via pywebview JS API
+  if (window.pywebview?.api?.get_save_path) {
+    try {
+      const savePath = await window.pywebview.api.get_save_path(defaultName);
+      if (!savePath) return; // user cancelled
+      toast('Guardando respaldo...', 'info');
+      const res = await fetch('/api/admin/backup-to-path', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${S.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: savePath }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.detail || 'Error al guardar', 'error'); return; }
+      toast(`Respaldo guardado: ${data.filename}`, 'success');
+    } catch(e) { toast('Error: ' + e.message, 'error'); }
+    return;
+  }
+
+  // Fallback (browser): download blob
+  toast('Preparando respaldo...', 'info');
   try {
     const res = await api('/admin/backup');
-    if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al generar respaldo','error'); return; }
+    if (!res.ok) { const e = await res.json(); toast(e.detail || 'Error al generar respaldo', 'error'); return; }
     const blob = await res.blob();
-    const ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `farmacia_backup_${ts}.db`;
+    a.href = url; a.download = defaultName;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
-    toast('Respaldo descargado correctamente','success');
-  } catch(e) { toast('Error: '+e.message,'error'); }
+    toast(`Descargado: ${defaultName}`, 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-async function restaurarBackup(event) {
+let _restoreFile = null;
+
+function restaurarBackupConfirm(event) {
   const file = event.target.files?.[0];
   event.target.value = '';
   if (!file) return;
-  if (!file.name.endsWith('.db')) { toast('Solo se aceptan archivos .db','error'); return; }
-  const confirm = window.confirm(
-    `¿Restaurar la base de datos desde "${file.name}"?\n\nESTO REEMPLAZARÁ TODOS LOS DATOS ACTUALES.\nSe guardará una copia de seguridad automática antes de restaurar.`
-  );
-  if (!confirm) return;
-  toast('Restaurando base de datos...','info');
+  if (!file.name.endsWith('.db')) { toast('Solo se aceptan archivos .db', 'error'); return; }
+  _restoreFile = file;
+  document.getElementById('restore-confirm-filename').textContent = `Archivo: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  document.getElementById('restore-confirm-row').classList.remove('hidden');
+  document.getElementById('restore-confirm-row').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelRestoreBackup() {
+  _restoreFile = null;
+  document.getElementById('restore-confirm-row').classList.add('hidden');
+}
+
+async function doRestoreBackup() {
+  if (!_restoreFile) return;
+  const file = _restoreFile;
+  _restoreFile = null;
+  document.getElementById('restore-confirm-row').classList.add('hidden');
+  toast('Restaurando base de datos...', 'info');
   try {
     const form = new FormData();
     form.append('file', file);
@@ -4764,9 +4819,9 @@ async function restaurarBackup(event) {
       body: form,
     });
     const data = await res.json();
-    if (!res.ok) { toast(data.detail||'Error al restaurar','error'); return; }
-    toast(data.mensaje || 'Restaurado. Reinicia la app.','success');
-  } catch(e) { toast('Error: '+e.message,'error'); }
+    if (!res.ok) { toast(data.detail || 'Error al restaurar', 'error'); return; }
+    toast(data.mensaje || 'Restaurado. Reinicia la app.', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 function initSettings() {

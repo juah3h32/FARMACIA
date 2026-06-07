@@ -71,6 +71,29 @@ def main():
     _start_ui(port)
 
 
+class _PyWebViewApi:
+    """Exposes native desktop dialogs to the web UI via window.pywebview.api.*"""
+
+    def get_save_path(self, default_name: str) -> str:
+        """Open native Save-As dialog; return chosen path or empty string."""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            path = filedialog.asksaveasfilename(
+                defaultextension=".db",
+                filetypes=[("Base de datos SQLite", "*.db"), ("Todos los archivos", "*.*")],
+                initialfile=default_name,
+                title="Guardar respaldo de base de datos",
+            )
+            root.destroy()
+            return path or ""
+        except Exception:
+            return ""
+
+
 def _start_ui(port: int) -> None:
     try:
         import webview
@@ -82,6 +105,7 @@ def _start_ui(port: int) -> None:
             resizable=True,
             min_size=(1000, 680),
             fullscreen=False,
+            js_api=_PyWebViewApi(),
         )
         webview.start(debug=False)
         return
