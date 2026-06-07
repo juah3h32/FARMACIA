@@ -1627,15 +1627,15 @@
               <span class="text-[10px] font-bold" style="color:#DC2626">IRREVERSIBLE</span>
             </div>
           </div>
-          <div class="p-6 grid grid-cols-2 gap-4" style="background:#FFFAFA">
-            <!-- Reset ventas/cortes -->
-            <div class="rounded-xl p-5 border" style="border-color:#FEE2E2;background:#fff">
+          <div class="p-6" style="background:#FFFAFA">
+            <!-- Solo limpiar ventas/historial — productos nunca se eliminan desde aquí -->
+            <div class="rounded-xl p-5 border max-w-sm" style="border-color:#FEE2E2;background:#fff">
               <div class="flex items-start gap-3 mb-4">
                 <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
                   <i data-lucide="trash-2" style="width:17px;height:17px;color:#EF4444"></i>
                 </div>
                 <div>
-                  <h3 class="font-bold text-sm" style="color:#0F172A">Limpiar historial</h3>
+                  <h3 class="font-bold text-sm" style="color:#0F172A">Limpiar historial de ventas</h3>
                   <p class="text-xs mt-0.5" style="color:#64748B">Elimina ventas, cortes de caja y auditoría. Conserva productos, clientes y empleados.</p>
                 </div>
               </div>
@@ -1643,23 +1643,6 @@
                       class="w-full h-10 rounded-xl text-sm font-semibold border-2 transition-all hover:opacity-80"
                       style="border-color:#EF4444;color:#EF4444;background:transparent">
                 Limpiar ventas y cortes
-              </button>
-            </div>
-            <!-- Factory reset -->
-            <div class="rounded-xl p-5 border" style="border-color:#FEE2E2;background:#fff">
-              <div class="flex items-start gap-3 mb-4">
-                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2">
-                  <i data-lucide="database-zap" style="width:17px;height:17px;color:#DC2626"></i>
-                </div>
-                <div>
-                  <h3 class="font-bold text-sm" style="color:#0F172A">Formato completo (Factory Reset)</h3>
-                  <p class="text-xs mt-0.5" style="color:#64748B">Borra TODA la base de datos: ventas, productos, clientes, empleados, reportes y configuración. La app quedará como nueva.</p>
-                </div>
-              </div>
-              <button onclick="confirmFactoryReset()"
-                      class="w-full h-10 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-80"
-                      style="background:linear-gradient(135deg,#EF4444,#DC2626)">
-                Factory Reset Total
               </button>
             </div>
           </div>

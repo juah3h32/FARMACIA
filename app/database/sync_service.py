@@ -354,24 +354,29 @@ def sync_from_turso() -> int:
                         continue
                     col_str = ", ".join(cols)
                     ph_str  = ", ".join(["?" for _ in cols])
-                    # For productos: use COALESCE to protect non-null local values
-                    # (imagen_url, descripcion) from being overwritten by Turso nulls
+                    # For productos: UPSERT protecting imagen_url/descripcion from null overwrites.
+                    # Use two-pass: INSERT OR IGNORE for new rows, then UPDATE existing ones.
                     if table == "productos" and "id" in cols:
+                        # Pass 1: insert rows that don't exist yet (new products from other PCs)
+                        sql_insert = f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({ph_str})"
+                        lconn.executemany(sql_insert, rows)
+                        # Pass 2: update existing rows but protect local imagen_url/descripcion
                         set_clause = ", ".join(
                             f"{c}=COALESCE(excluded.{c}, {table}.{c})"
                             if c in ("imagen_url", "descripcion") else
                             f"{c}=excluded.{c}"
                             for c in cols if c != "id"
                         )
-                        sql = (
+                        sql_update = (
                             f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
+                        lconn.executemany(sql_update, rows)
                     else:
                         sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
-                    lconn.executemany(sql, rows)
+                        lconn.executemany(sql, rows)
                     total += len(rows)
-                    print(f"[Sync] ← Turso {table}: {len(rows)} rows")
+                    print(f"[Sync] <- Turso {table}: {len(rows)} rows")
                 except Exception as e:
                     print(f"[Sync] sync_from_turso warning — {table}: {e}")
             lconn.execute("PRAGMA foreign_keys = ON")
