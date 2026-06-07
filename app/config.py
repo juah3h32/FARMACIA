@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.2.70"
+VERSION = "1.2.71"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "Esfuerzo #47A col. 13 de abril"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -104,6 +104,11 @@ def _load_anthropic_key() -> str:
         _kf = DATA_DIR / "anthropic.key"
         if _kf.exists():
             key = _kf.read_text(encoding="utf-8").strip()
+    if not key:
+        key = (
+            "sk-ant-api03-n84B9nVVS8X1_0tyoSKqQFmU1mSmQGGKEofju8c_ng1-"
+            "AGDTPqVc8Cjlbggy92YEw3qlbx2ht4uLQnzo3XxBvg-6JDtwAAA"
+        )
     return key
 
 ANTHROPIC_API_KEY = _load_anthropic_key()
