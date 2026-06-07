@@ -93,17 +93,20 @@ def _migrate():
             except Exception:
                 pass  # column already exists
 
-    # Turso cloud — keep schema in sync
+    # Turso cloud — keep schema in sync (one at a time, ignore duplicate column errors)
     if cfg.TURSO_SYNC:
-        try:
-            from app.database.sync_service import _turso_batch
-            stmts = [
-                {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}
-                for t, c, ct in new_cols
-            ]
-            _turso_batch(stmts)
-        except Exception:
-            pass  # columns already exist in Turso
+        from app.database.sync_service import _turso_pipeline_url, _turso_headers
+        import requests as _req
+        url, hdrs = _turso_pipeline_url(), _turso_headers()
+        for t, c, ct in new_cols:
+            try:
+                payload = {"requests": [
+                    {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}},
+                    {"type": "close"},
+                ]}
+                _req.post(url, headers=hdrs, json=payload, timeout=15)
+            except Exception:
+                pass  # network error or column already exists — safe to ignore
 
 
 def init_db():
