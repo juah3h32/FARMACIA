@@ -2808,8 +2808,7 @@ function setExactAmount() {
 function addCash(val) {
   const inp = document.getElementById('cart-pagado');
   if (inp) {
-    const cur = parseFloat(inp.value) || 0;
-    inp.value = (cur + val).toFixed(2);
+    inp.value = val.toFixed(2);
     updateCambio();
   }
 }
