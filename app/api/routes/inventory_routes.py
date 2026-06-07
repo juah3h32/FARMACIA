@@ -418,21 +418,27 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
         critico = hoy + timedelta(days=30)
         proximo = hoy + timedelta(days=90)
 
-        productos = db.query(Producto).filter(Producto.activo == True).all()
-        total_skus    = len(productos)
-        valor_venta   = sum(p.stock * p.precio_venta for p in productos)
-        valor_costo   = sum(p.stock * (p.precio_compra or 0) for p in productos)
-        ganancia_est  = valor_venta - valor_costo
-        bajo_stock    = sum(1 for p in productos if p.stock <= p.stock_minimo)
-        sin_stock     = sum(1 for p in productos if p.stock <= 0)
+        # Base products query
+        productos_q = db.query(Producto).filter(Producto.activo == True)
+        total_skus = productos_q.count()
+        
+        # Calculate values using database aggregation for better accuracy
+        valor_venta = db.query(func.sum(Producto.stock * Producto.precio_venta)).filter(Producto.activo == True).scalar() or 0.0
+        valor_costo = db.query(func.sum(Producto.stock * func.coalesce(Producto.precio_compra, 0))).filter(Producto.activo == True).scalar() or 0.0
+        ganancia_est = valor_venta - valor_costo
+
+        bajo_stock = productos_q.filter(Producto.stock <= Producto.stock_minimo).count()
+        sin_stock  = productos_q.filter(Producto.stock <= 0).count()
 
         lotes_act = db.query(Lote).filter(
             Lote.cantidad > 0, Lote.fecha_vencimiento != None
         ).all()
+        
         valor_vencido = 0.0
         valor_critico = 0.0
         for l in lotes_act:
-            prod = next((p for p in productos if p.id == l.producto_id), None)
+            # Re-fetch or join would be better, but for now we re-fetch to keep logic similar
+            prod = db.query(Producto).filter(Producto.id == l.producto_id).first()
             if not prod:
                 continue
             val = l.cantidad * prod.precio_venta
