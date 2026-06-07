@@ -431,8 +431,9 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
         from sqlalchemy.orm import joinedload as _jl
         lotes_act = (
             db.query(Lote)
+            .join(Producto, Lote.producto_id == Producto.id)
             .options(_jl(Lote.producto))
-            .filter(Lote.cantidad > 0, Lote.fecha_vencimiento != None)
+            .filter(Lote.cantidad > 0, Lote.fecha_vencimiento != None, Producto.activo == True)
             .all()
         )
         valor_vencido = 0.0

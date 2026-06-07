@@ -3965,7 +3965,8 @@ async function loadVencimientos(filtro) {
 function vencFilter(f) { loadVencimientos(f); }
 
 // ── Modal productos vencidos ───────────────────────────────────────────────
-function openVencidosModal() {
+async function openVencidosModal() {
+  await loadAlertasCaducidad();
   const items = (_cadData?.items || []).filter(i => i.estado === 'vencido');
   const sub = document.getElementById('venc-modal-sub');
   const list = document.getElementById('venc-modal-list');
