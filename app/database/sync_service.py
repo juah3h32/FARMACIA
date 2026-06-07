@@ -354,7 +354,21 @@ def sync_from_turso() -> int:
                         continue
                     col_str = ", ".join(cols)
                     ph_str  = ", ".join(["?" for _ in cols])
-                    sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+                    # For productos: use COALESCE to protect non-null local values
+                    # (imagen_url, descripcion) from being overwritten by Turso nulls
+                    if table == "productos" and "id" in cols:
+                        set_clause = ", ".join(
+                            f"{c}=COALESCE(excluded.{c}, {table}.{c})"
+                            if c in ("imagen_url", "descripcion") else
+                            f"{c}=excluded.{c}"
+                            for c in cols if c != "id"
+                        )
+                        sql = (
+                            f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
+                            f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
+                        )
+                    else:
+                        sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
                     lconn.executemany(sql, rows)
                     total += len(rows)
                     print(f"[Sync] ← Turso {table}: {len(rows)} rows")

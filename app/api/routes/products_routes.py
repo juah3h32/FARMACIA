@@ -154,7 +154,7 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
-        for k, v in body.model_dump(exclude={'stock'}).items():
+        for k, v in body.model_dump(exclude={'stock', 'imagen_url'}).items():
             setattr(p, k, v)
         db.commit()
         db.refresh(p)
@@ -259,13 +259,4 @@ def buscar_por_barcode(codigo: str, payload: dict = Depends(get_current_api_user
         db.close()
 
 
-@router.get("/{producto_id}", response_model=ProductoResponse)
-def obtener_producto(producto_id: int, payload: dict = Depends(get_current_api_user)):
-    db = get_db_session()
-    try:
-        producto = db.query(Producto).filter(Producto.id == producto_id).first()
-        if not producto:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
-        return producto
-    finally:
-        db.close()
+
