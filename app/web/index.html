@@ -797,7 +797,7 @@
     <main class="flex-1 overflow-auto p-4">
 
       <!-- ─── DASHBOARD ─────────────────────────────── -->
-      <div data-page="dashboard" class="page" style="height:calc(100vh - 112px);overflow:hidden">
+      <div data-page="dashboard" class="page" style="height:calc(100vh - 105px);overflow:hidden">
 
         <!-- Greeting -->
         <div class="flex items-center justify-between" style="flex-shrink:0">
@@ -915,7 +915,7 @@
 
       <!-- ─── POS ───────────────────────────────────── -->
       <div data-page="pos" class="page h-full">
-        <div class="flex gap-4 h-[calc(100vh-140px)]">
+        <div class="flex gap-4 h-[calc(100vh-105px)]">
           <!-- Left: Products -->
           <div class="flex-1 flex flex-col gap-3">
             <div class="bg-white rounded-2xl border p-4 flex gap-2" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
@@ -1011,8 +1011,8 @@
 
       <!-- ─── INVENTORY ─────────────────────────────── -->
       <div data-page="inventory" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border h-[calc(100vh-105px)] flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="inv-search" type="text" placeholder="Buscar producto..."
@@ -1028,10 +1028,10 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
-            <table class="w-full text-sm table-auto">
-              <thead>
-                <tr style="background:#F8FAFF">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto custom-scrollbar">
+            <table class="w-full text-sm table-auto border-separate border-spacing-0">
+              <thead class="sticky top-0 z-10" style="background:#F8FAFF">
+                <tr>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Código</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Stock</th>
@@ -1050,8 +1050,8 @@
 
       <!-- ─── CUSTOMERS ─────────────────────────────── -->
       <div data-page="customers" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border h-[calc(100vh-105px)] flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
               <input id="cust-search" type="text" placeholder="Buscar cliente..."
@@ -1066,10 +1066,10 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
-            <table class="w-full text-sm table-auto">
-              <thead>
-                <tr style="background:#F8FAFF">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto custom-scrollbar">
+            <table class="w-full text-sm table-auto border-separate border-spacing-0">
+              <thead class="sticky top-0 z-10" style="background:#F8FAFF">
+                <tr>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
@@ -1085,6 +1085,7 @@
 
       <!-- ─── REPORTS ────────────────────────────────── -->
       <div data-page="reports" class="page space-y-3">
+        <div class="flex flex-col h-[calc(100vh-105px)] gap-3 overflow-hidden">
         <!-- Filter bar -->
         <div class="bg-white rounded-2xl border p-4 flex items-center gap-3 flex-wrap" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
           <div class="flex items-center gap-2">
@@ -1212,15 +1213,15 @@
               </table>
             </div>
           </div>
-        <!-- Detalle de ventas -->
-          <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+          <!-- Detalle de ventas -->
+          <div class="bg-white rounded-2xl border flex-1 flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+            <div class="px-4 py-3 border-b flex items-center gap-2 flex-shrink-0" style="border-color:#E2E8F0">
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
             </div>
-            <div class="overflow-x-auto max-h-72 overflow-y-auto">
-              <table class="w-full text-[11px]">
-                <thead class="sticky top-0" style="background:#F8FAFF">
+            <div class="overflow-x-auto flex-1 overflow-y-auto custom-scrollbar">
+              <table class="w-full text-[11px] border-separate border-spacing-0">
+                <thead class="sticky top-0 z-10" style="background:#F8FAFF">
                   <tr>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Folio</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Fecha</th>
@@ -1238,9 +1239,9 @@
         </div>
 
         <!-- ── TAB: CORTES DE CAJA ──────────────────────────────── -->
-        <div id="rep-tab-content-cortes" class="space-y-3 hidden">
+        <div id="rep-tab-content-cortes" class="space-y-3 flex-1 flex flex-col overflow-hidden hidden">
           <!-- Summary cards -->
-          <div class="grid grid-cols-5 gap-3">
+          <div class="grid grid-cols-5 gap-3 flex-shrink-0">
             <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <p class="text-xs font-medium mb-1" style="color:#64748B">Turnos</p>
               <p id="cc-turnos" class="text-2xl font-bold" style="color:#8B5CF6">—</p>
@@ -1263,15 +1264,15 @@
             </div>
           </div>
           <!-- Cortes table -->
-          <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+          <div class="bg-white rounded-2xl border flex-1 flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+            <div class="px-5 py-4 border-b flex items-center gap-2 flex-shrink-0" style="border-color:#E2E8F0">
               <i data-lucide="clock" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Historial de cortes</span>
               <span class="text-xs ml-2" style="color:#94A3B8">Clic en fila para ver detalle</span>
             </div>
-            <div class="overflow-x-auto max-h-96 overflow-y-auto">
-              <table class="w-full text-xs">
-                <thead class="sticky top-0" style="background:#F8FAFF">
+            <div class="overflow-x-auto flex-1 overflow-y-auto custom-scrollbar">
+              <table class="w-full text-xs border-separate border-spacing-0">
+                <thead class="sticky top-0 z-10" style="background:#F8FAFF">
                   <tr>
                     <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Cajero</th>
                     <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Apertura</th>
@@ -1297,9 +1298,9 @@
         </div>
 
         <!-- ── TAB: VENCIMIENTOS ────────────────────────────────── -->
-        <div id="rep-tab-content-vencimientos" class="space-y-3 hidden">
+        <div id="rep-tab-content-vencimientos" class="space-y-3 flex-1 flex flex-col overflow-hidden hidden">
           <!-- Filter -->
-          <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="bg-white rounded-2xl border p-4 flex items-center gap-3 flex-shrink-0" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
             <span class="text-xs font-semibold" style="color:#374151">Filtrar:</span>
             <div class="flex gap-1">
               <button onclick="vencFilter('todos')"      id="vf-todos"      class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#243366;color:#fff">Todos</button>
@@ -1310,14 +1311,14 @@
             <span id="venc-count" class="text-xs ml-auto" style="color:#94A3B8"></span>
           </div>
           <!-- Vencimientos table -->
-          <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+          <div class="bg-white rounded-2xl border flex-1 flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+            <div class="px-5 py-4 border-b flex items-center gap-2 flex-shrink-0" style="border-color:#E2E8F0">
               <i data-lucide="calendar-x" style="width:15px;height:15px;color:#EF4444"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Control de Vencimientos</span>
             </div>
-            <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
-              <table class="w-full text-xs">
-                <thead class="sticky top-0" style="background:#F8FAFF">
+            <div class="overflow-x-auto flex-1 overflow-y-auto custom-scrollbar">
+              <table class="w-full text-xs border-separate border-spacing-0">
+                <thead class="sticky top-0 z-10" style="background:#F8FAFF">
                   <tr>
                     <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Producto</th>
                     <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">N° Lote</th>
@@ -1338,7 +1339,7 @@
 
       <!-- ─── SUPPLIERS ─────────────────────────────── -->
       <div data-page="suppliers" class="page">
-        <div class="bg-white rounded-2xl border p-16 flex flex-col items-center justify-center" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+        <div class="bg-white rounded-2xl border h-[calc(100vh-105px)] flex flex-col items-center justify-center" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
           <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style="background:#EEF1F9">
             <i data-lucide="truck" style="width:36px;height:36px;color:#243366"></i>
           </div>
@@ -1349,8 +1350,8 @@
 
       <!-- ─── EMPLOYEES ─────────────────────────────── -->
       <div data-page="employees" class="page">
-        <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="flex items-center gap-3 px-4 py-3 border-b" style="border-color:#E2E8F0">
+        <div class="bg-white rounded-2xl border h-[calc(100vh-105px)] flex flex-col overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="flex items-center gap-2">
               <i data-lucide="users" style="width:16px;height:16px;color:#64748B"></i>
               <h2 class="font-semibold text-sm" style="color:#0F172A">Empleados</h2>
@@ -1363,10 +1364,10 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible">
-            <table class="w-full text-sm table-auto">
-              <thead>
-                <tr style="background:#F8FAFF">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto custom-scrollbar">
+            <table class="w-full text-sm table-auto border-separate border-spacing-0">
+              <thead class="sticky top-0 z-10" style="background:#F8FAFF">
+                <tr>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Usuario</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Rol</th>
