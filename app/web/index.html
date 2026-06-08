@@ -2963,37 +2963,47 @@ function renderPosGrid(prods) {
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
   g.innerHTML=prods.map(p=>{
     // For fractional products: available = piezas_sueltas + stock*uds_caja
-    const totalPiezas = p.venta_fraccionada ? ((p.piezas_sueltas||0) + p.stock*(p.unidades_por_caja||1)) : p.stock;
-    const stockColor = p.stock<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#EF4444':p.stock<=p.stock_minimo?'#F59E0B':'#16A34A';
-    const stockBg    = p.stock<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#FEF2F2':p.stock<=p.stock_minimo?'#FFFBEB':'#F0FDF4';
-    const noCajas    = p.venta_fraccionada && p.stock<=0;
+    const totalPiezas = p.venta_fraccionada ? ((p.piezas_sueltas||0) + (p.stock||0)*(p.unidades_por_caja||1)) : (p.stock||0);
+    const stockColor = (p.stock||0)<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#EF4444':(p.stock||0)<=p.stock_minimo?'#F59E0B':'#16A34A';
+    const stockBg    = (p.stock||0)<=0&&(!p.venta_fraccionada||totalPiezas<=0)?'#FEF2F2':(p.stock||0)<=p.stock_minimo?'#FFFBEB':'#F0FDF4';
+    const noCajas    = p.venta_fraccionada && (p.stock||0)<=0;
     const noPiezas   = p.venta_fraccionada && totalPiezas<=0;
-    const stockLabel = p.venta_fraccionada
-      ? `${p.stock} ${p.unidad_caja||'caja'} | ${p.piezas_sueltas||0} sueltas`
-      : `${p.stock}`;
-    const fracBtns   = p.venta_fraccionada ? `
+    // Truncate unit names to max 10 chars so buttons don't overflow
+    const cajaNom  = (p.unidad_caja||'Caja').slice(0,10);
+    const piezaNom = (p.unidad_pieza||'Pieza').slice(0,10);
+    // Fractional stock: two compact badges (cajas + sueltas)
+    const stockBadge = p.venta_fraccionada ? `
+      <div class="flex gap-1 flex-wrap justify-end">
+        <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold leading-tight" style="background:${stockBg};color:${stockColor}">${p.stock||0} ${cajaNom}</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold leading-tight" style="background:#FFF7ED;color:#C2410C">${p.piezas_sueltas||0} sueltas</span>
+      </div>`
+      : `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${p.stock||0}</span>`;
+    const fracBtns = p.venta_fraccionada ? `
       <div class="flex gap-1 mt-2 pt-1.5 border-t border-slate-100">
         <button onclick="event.stopPropagation();addToCart(${p.id},false)"
-          class="flex-1 h-7 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90"
+          class="flex-1 rounded-lg text-[10px] font-bold text-white transition-all hover:opacity-90 leading-tight py-1.5 px-1"
           style="background:${noCajas?'#94A3B8':'#16A34A'}" ${noCajas?'disabled':''}>
-          ${p.unidad_caja||'Caja'} ${fmt(p.precio_venta)}</button>
+          <span class="block truncate">${cajaNom}</span>
+          <span class="block">${fmt(p.precio_venta)}</span>
+        </button>
         <button onclick="event.stopPropagation();addToCart(${p.id},true)"
-          class="flex-1 h-7 rounded-lg text-[10px] font-bold border-2 transition-all hover:opacity-90"
+          class="flex-1 rounded-lg text-[10px] font-bold border-2 transition-all hover:opacity-90 leading-tight py-1.5 px-1"
           style="border-color:${noPiezas?'#CBD5E1':'#F59E0B'};color:${noPiezas?'#94A3B8':'#92400E'};background:${noPiezas?'#F8FAFC':'#FEF3C7'}" ${noPiezas?'disabled':''}>
-          ${p.unidad_pieza||'Pieza'} ${fmt(p.precio_pieza)}
+          <span class="block truncate">${piezaNom}</span>
+          <span class="block">${fmt((p.precio_pieza&&p.precio_pieza>0)?p.precio_pieza:(p.precio_venta/(p.unidades_por_caja||1)))}</span>
         </button>
       </div>` : '';
     return `
-    <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col h-full cursor-pointer"
+    <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col cursor-pointer"
       style="border-color:#E2E8F0" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
-      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'76':'100'}px;background:#fff;border:1px solid #F1F5F9">
+      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'64':'100'}px;background:#fff;border:1px solid #F1F5F9">
         ${posProductThumb(p.imagen_url)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
-      <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
-        <span class="text-base font-black" style="color:#16A34A">${fmt(p.precio_venta)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${stockLabel}</span>
+      <div class="flex items-center justify-between gap-1 mt-2 pt-2 border-t border-slate-50 flex-wrap">
+        <span class="text-base font-black flex-shrink-0" style="color:#16A34A">${fmt(p.precio_venta)}</span>
+        ${stockBadge}
       </div>
       ${fracBtns}
     </div>`;
