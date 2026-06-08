@@ -190,6 +190,18 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
+        if body.codigo_barras and body.codigo_barras != p.codigo_barras:
+            conflicto = db.query(Producto).filter(
+                Producto.codigo_barras == body.codigo_barras,
+                Producto.activo == True,
+                Producto.id != producto_id,
+            ).first()
+            if conflicto:
+                raise HTTPException(status_code=400, detail=f"Código de barras ya registrado en '{conflicto.nombre}'")
+            db.query(Producto).filter(
+                Producto.codigo_barras == body.codigo_barras,
+                Producto.activo == False,
+            ).update({"codigo_barras": None})
         was_fraccionada = p.venta_fraccionada
         for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
             setattr(p, k, v)
