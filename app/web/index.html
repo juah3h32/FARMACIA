@@ -2001,23 +2001,18 @@
 
         <!-- Lotes existentes (solo EDITAR) -->
         <div id="pm-section-editar" class="hidden">
-          <!-- Ajuste de stock manual -->
-          <div class="rounded-xl p-3 mb-2.5" style="background:#FFFBEB;border:2px solid #FDE68A">
-            <div class="flex items-center gap-1.5 mb-2">
-              <i data-lucide="sliders-horizontal" style="width:13px;height:13px;color:#D97706"></i>
-              <p class="text-xs font-bold" style="color:#92400E">Ajuste de stock</p>
-              <span id="pm-stock-actual-badge" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:#FEF3C7;color:#92400E">Stock actual: —</span>
-            </div>
-            <div class="flex gap-2 items-end">
-              <div class="flex-1">
-                <label class="lbl" style="color:#92400E" id="pm-nuevo-stock-lbl">Nuevo stock (cajas)</label>
-                <input id="pm-nuevo-stock" type="number" min="0" class="inp" placeholder="Ej. 10" style="border-color:#FCD34D">
+          <!-- Ajuste de stock manual — compact single row -->
+          <div class="rounded-lg px-2.5 py-1.5 mb-2 flex items-center gap-2" style="background:#FFFBEB;border:1px solid #FDE68A">
+            <i data-lucide="sliders-horizontal" style="width:11px;height:11px;color:#D97706;flex-shrink:0"></i>
+            <span class="text-[10px] font-bold whitespace-nowrap" style="color:#92400E">Stock</span>
+            <span id="pm-stock-actual-badge" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style="background:#FEF3C7;color:#92400E">—</span>
+            <label id="pm-nuevo-stock-lbl" class="hidden"></label>
+            <div class="flex gap-1 items-center ml-auto">
+              <input id="pm-nuevo-stock" type="number" min="0" class="h-7 rounded-lg border px-2 outline-none" placeholder="Nuevo stock" style="border-color:#FCD34D;font-size:11px;width:90px">
+              <div id="pm-piezas-ajuste-wrap" class="hidden">
+                <input id="pm-nuevo-piezas" type="number" min="0" class="h-7 rounded-lg border px-2 outline-none" placeholder="Piezas" style="border-color:#FCD34D;font-size:11px;width:72px">
               </div>
-              <div id="pm-piezas-ajuste-wrap" class="flex-1 hidden">
-                <label class="lbl" style="color:#92400E">Piezas sueltas</label>
-                <input id="pm-nuevo-piezas" type="number" min="0" class="inp" placeholder="Ej. 5" style="border-color:#FCD34D">
-              </div>
-              <button onclick="pmAjustarStock()" class="h-[38px] px-4 rounded-xl text-xs font-bold text-white flex-shrink-0" style="background:linear-gradient(135deg,#D97706,#B45309)">
+              <button onclick="pmAjustarStock()" class="h-7 px-3 rounded-lg text-[10px] font-bold text-white whitespace-nowrap flex-shrink-0" style="background:linear-gradient(135deg,#D97706,#B45309)">
                 Actualizar
               </button>
             </div>
