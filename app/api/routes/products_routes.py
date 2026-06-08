@@ -42,6 +42,7 @@ class ProductoIn(BaseModel):
     contenido: Optional[str] = None
     descripcion: Optional[str] = None
     imagen_url: Optional[str] = None
+    proveedor_id: Optional[int] = None
     venta_fraccionada: bool = False
     unidades_por_caja: int = 1
     precio_pieza: float = 0.0
@@ -57,6 +58,8 @@ class ProductoResponse(BaseModel):
     nombre_generico: Optional[str]
     marca: Optional[str]
     categoria_id: Optional[int] = None
+    proveedor_id: Optional[int] = None
+    proveedor_nombre: Optional[str] = None
     precio_compra: float = 0.0
     precio_venta: float
     stock: int
@@ -81,6 +84,12 @@ class ProductoResponse(BaseModel):
         from_attributes = True
 
 
+def _prod_dict(p: Producto) -> dict:
+    d = ProductoResponse.model_validate(p).model_dump()
+    d["proveedor_nombre"] = p.proveedor.nombre if p.proveedor else None
+    return d
+
+
 @router.get("/", response_model=list[ProductoResponse])
 def listar_productos(
     busqueda: Optional[str] = Query(None),
@@ -88,9 +97,10 @@ def listar_productos(
     solo_activos: bool = Query(True),
     payload: dict = Depends(get_current_api_user),
 ):
+    from sqlalchemy.orm import joinedload
     db = get_db_session()
     try:
-        q = db.query(Producto)
+        q = db.query(Producto).options(joinedload(Producto.proveedor))
         if solo_activos:
             q = q.filter(Producto.activo == True)
         if busqueda:
@@ -101,7 +111,7 @@ def listar_productos(
             )
         if categoria_id:
             q = q.filter(Producto.categoria_id == categoria_id)
-        return q.order_by(Producto.nombre).all()
+        return [_prod_dict(p) for p in q.order_by(Producto.nombre).all()]
     finally:
         db.close()
 
@@ -158,12 +168,13 @@ def crear_producto(body: ProductoIn, bg: BackgroundTasks, payload: dict = Depend
 
 @router.get("/{producto_id}", response_model=ProductoResponse)
 def obtener_producto(producto_id: int, payload: dict = Depends(get_current_api_user)):
+    from sqlalchemy.orm import joinedload
     db = get_db_session()
     try:
-        p = db.query(Producto).filter(Producto.id == producto_id).first()
+        p = db.query(Producto).options(joinedload(Producto.proveedor)).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
-        return p
+        return _prod_dict(p)
     finally:
         db.close()
 
@@ -176,7 +187,7 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
-        for k, v in body.model_dump(exclude={'stock', 'imagen_url'}).items():
+        for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
             setattr(p, k, v)
         db.commit()
         db.refresh(p)

@@ -1066,6 +1066,7 @@
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Código</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Stock</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Mín.</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Proveedor</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Precio venta</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Próx. vencimiento</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Estado</th>
@@ -1367,13 +1368,40 @@
       </div>
 
       <!-- ─── SUPPLIERS ─────────────────────────────── -->
-      <div data-page="suppliers" class="page">
-        <div class="bg-white rounded-2xl border p-16 flex flex-col items-center justify-center" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-          <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style="background:#EEF1F9">
-            <i data-lucide="truck" style="width:36px;height:36px;color:#243366"></i>
+      <div data-page="suppliers" class="page flex flex-col gap-4">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+              <i data-lucide="truck" style="width:20px;height:20px;color:#243366"></i>
+            </div>
+            <div>
+              <h2 class="font-bold text-base" style="color:#0F172A">Proveedores</h2>
+              <p class="text-xs" style="color:#64748B">Gestión de proveedores y asignación a productos</p>
+            </div>
           </div>
-          <h2 class="font-bold text-xl mb-2" style="color:#0F172A">Proveedores</h2>
-          <p class="text-sm" style="color:#64748B">Módulo disponible próximamente.</p>
+          <button onclick="openSupModal()" class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2" style="background:#243366">
+            <i data-lucide="plus" style="width:15px;height:15px"></i> Nuevo proveedor
+          </button>
+        </div>
+        <!-- Table -->
+        <div class="bg-white rounded-2xl border overflow-hidden flex flex-col flex-1" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="overflow-x-auto flex-1 overflow-y-auto">
+            <table class="w-full text-sm table-auto">
+              <thead>
+                <tr style="background:#F8FAFF">
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Contacto</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Teléfono</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Email</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">RFC</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Productos</th>
+                  <th class="text-left px-5 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="sup-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1833,6 +1861,14 @@
             <div><label class="lbl">Contenido / Piezas</label><input id="pm-contenido" class="inp" placeholder="30 tab, 120ml…"></div>
           </div>
 
+          <!-- Proveedor -->
+          <div>
+            <label class="lbl">Proveedor <span style="color:#94A3B8;font-weight:400">(opcional)</span></label>
+            <select id="pm-proveedor" class="inp">
+              <option value="">— Sin proveedor —</option>
+            </select>
+          </div>
+
           <!-- Stock mín | IVA | Receta -->
           <div class="grid gap-2.5 items-end" style="grid-template-columns:1fr 1fr 1fr">
             <div><label class="lbl">Stock mínimo</label><input id="pm-smin" type="number" class="inp" placeholder="10"></div>
@@ -2074,6 +2110,34 @@
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-employee')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
       <button id="em-save-btn" onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Crear empleado</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier modal -->
+<div id="modal-supplier" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-supplier')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[480px]">
+    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-2">
+        <i data-lucide="truck" style="width:18px;height:18px;color:#243366"></i>
+        <h2 id="sup-modal-title" class="font-bold" style="color:#0F172A">Nuevo Proveedor</h2>
+      </div>
+      <button onclick="closeModal('modal-supplier')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="p-6 grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="lbl">Nombre del proveedor *</label><input id="sup-nombre" class="inp" placeholder="Ej. GENE-SIM MAYOREO"></div>
+      <div><label class="lbl">Contacto</label><input id="sup-contacto" class="inp" placeholder="Nombre del contacto"></div>
+      <div><label class="lbl">Teléfono</label><input id="sup-tel" class="inp" placeholder="000-000-0000"></div>
+      <div><label class="lbl">Email</label><input id="sup-email" type="email" class="inp" placeholder="correo@proveedor.com"></div>
+      <div><label class="lbl">RFC</label><input id="sup-rfc" class="inp" placeholder="RFC del proveedor"></div>
+      <div class="col-span-2"><label class="lbl">Dirección</label><input id="sup-dir" class="inp" placeholder="Dirección del proveedor"></div>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="closeModal('modal-supplier')" class="flex-1 h-10 rounded-xl border text-sm font-medium hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button id="sup-save-btn" onclick="saveSupplier()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm hover:opacity-90" style="background:#243366">Crear proveedor</button>
     </div>
   </div>
 </div>
@@ -2587,6 +2651,7 @@ function launchApp() {
   loadTurnoStatus();
   loadAlertasCaducidad();
   setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
+  loadSuppliers();  // populate proveedor selects in product modal
   checkUpdateSilent();
   // Re-check every 30 min while app is open — shows banner without re-login
   setInterval(checkUpdateSilent, 30 * 60 * 1000);
@@ -2759,6 +2824,7 @@ function loadPage(page) {
   if (page==='inventory')  loadInventory();
   if (page==='customers')  loadCustomers();
   if (page==='employees')  loadEmployees();
+  if (page==='suppliers')  loadSuppliers();
   if (page==='reports')    initReports();
   if (page==='settings')   initSettings();
   icons();
@@ -3354,6 +3420,11 @@ function renderInvTable(prods) {
         <span class="font-bold text-sm ${p.stock<=0?'text-red-500':p.stock<=p.stock_minimo?'text-amber-500':'text-green-600'}">${p.stock}</span>
       </td>
       <td class="px-3 py-2.5 text-xs" style="color:#64748B">${p.stock_minimo}</td>
+      <td class="px-3 py-2.5">
+        ${p.proveedor_nombre
+          ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium whitespace-nowrap" style="background:#EEF1F9;color:#243366">${p.proveedor_nombre}</span>`
+          : '<span style="color:#CBD5E1">—</span>'}
+      </td>
       <td class="px-3 py-2.5 font-semibold text-sm whitespace-nowrap" style="color:#243366">${fmt(p.precio_venta)}</td>
       <td class="px-3 py-2.5">${expBadge(expInfo)}</td>
       <td class="px-3 py-2.5">
@@ -3383,7 +3454,7 @@ function renderInvTable(prods) {
         </div>
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="8" class="text-center py-8 text-xs" style="color:#94A3B8">Sin productos</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="text-center py-8 text-xs" style="color:#94A3B8">Sin productos</td></tr>';
   icons();
 }
 
@@ -3461,6 +3532,7 @@ async function openProductModal(id=null) {
   document.getElementById('pm-fraccionada-fields').classList.add('hidden');
   document.getElementById('pm-fraccionada-nota').classList.add('hidden');
   document.getElementById('pm-cat').value='';
+  document.getElementById('pm-proveedor').value='';
   document.getElementById('pm-presentacion').value='';
   document.getElementById('prod-modal-title').textContent=id?'Editar Producto':'Agregar Producto';
   document.getElementById('pm-descripcion').value='';
@@ -3494,6 +3566,7 @@ async function openProductModal(id=null) {
       document.getElementById('pm-concentracion').value=p.concentracion||'';
       document.getElementById('pm-contenido').value=p.contenido||'';
       document.getElementById('pm-descripcion').value=p.descripcion||'';
+      document.getElementById('pm-proveedor').value = p.proveedor_id||'';
       document.getElementById('pm-fraccionada').checked=!!p.venta_fraccionada;
       document.getElementById('pm-uds-caja').value=p.unidades_por_caja||1;
       document.getElementById('pm-unidad-caja').value=p.unidad_caja||'caja';
@@ -3665,6 +3738,7 @@ async function saveProduct() {
     concentracion:   document.getElementById('pm-concentracion').value.trim()||null,
     contenido:       document.getElementById('pm-contenido').value.trim()||null,
     descripcion:     document.getElementById('pm-descripcion').value.trim()||null,
+    proveedor_id:    parseInt(document.getElementById('pm-proveedor').value)||null,
     venta_fraccionada: document.getElementById('pm-fraccionada').checked,
     unidades_por_caja: parseInt(document.getElementById('pm-uds-caja').value)||1,
     precio_pieza:    parseFloat(document.getElementById('pm-precio-pieza').value)||0,
@@ -4884,6 +4958,139 @@ function confirmDeleteEmployee(id, nombre) {
       const res = await api(`/empleados/${id}`, {method:'DELETE'});
       if (res.ok) { toast('Empleado eliminado','success'); loadEmployees(); }
       else { const e=await res.json(); toast(e.detail||'Error','error'); }
+    }
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SUPPLIERS
+// ══════════════════════════════════════════════════════════
+let _supEditId = null;
+let _allSuppliers = [];
+
+async function loadSuppliers() {
+  const res = await api('/proveedores/');
+  if (!res.ok) return;
+  _allSuppliers = await res.json();
+  _renderSupTable(_allSuppliers);
+  _fillProveedorSelects();
+}
+
+function _renderSupTable(sups) {
+  const tbody = document.getElementById('sup-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = sups.length ? sups.map(s => `
+    <tr class="hovrow border-b" style="border-color:#F1F5F9">
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style="background:#243366">
+            ${(s.nombre||'?')[0]}
+          </div>
+          <span class="font-semibold text-sm" style="color:#0F172A">${s.nombre}</span>
+        </div>
+      </td>
+      <td class="px-5 py-3 text-sm" style="color:#64748B">${s.contacto||'—'}</td>
+      <td class="px-5 py-3 text-sm" style="color:#64748B">${s.telefono||'—'}</td>
+      <td class="px-5 py-3 text-sm" style="color:#64748B">${s.email||'—'}</td>
+      <td class="px-5 py-3 text-sm font-mono" style="color:#64748B">${s.rfc||'—'}</td>
+      <td class="px-5 py-3">
+        <button onclick="supAsignarTodos(${s.id},'${s.nombre.replace(/'/g,"\\'")}')"
+                class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-80"
+                style="background:#F0FDF4;color:#16A34A">
+          <i data-lucide="package-check" style="width:11px;height:11px"></i> Asignar a todos
+        </button>
+      </td>
+      <td class="px-5 py-3">
+        <div class="flex gap-1">
+          <button onclick="openEditSupModal(${s.id},'${s.nombre.replace(/'/g,"\\'")}','${(s.contacto||'').replace(/'/g,"\\'")}','${(s.telefono||'').replace(/'/g,"\\'")}','${(s.email||'').replace(/'/g,"\\'")}','${(s.rfc||'').replace(/'/g,"\\'")}','${(s.direccion||'').replace(/'/g,"\\'")}' )"
+                  class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-80"
+                  style="background:#EEF1F9;color:#243366">
+            <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
+          </button>
+          <button onclick="confirmDeleteSup(${s.id},'${s.nombre.replace(/'/g,"\\'")}')"
+                  class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-80"
+                  style="background:#FEF2F2;color:#EF4444">
+            <i data-lucide="trash-2" style="width:11px;height:11px"></i>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('') :
+    '<tr><td colspan="7" class="text-center py-8 text-xs" style="color:#94A3B8">Sin proveedores registrados</td></tr>';
+  icons();
+}
+
+function _fillProveedorSelects() {
+  const opts = '<option value="">— Sin proveedor —</option>' +
+    _allSuppliers.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  document.querySelectorAll('#pm-proveedor').forEach(el => el.innerHTML = opts);
+}
+
+function openSupModal() {
+  _supEditId = null;
+  ['sup-nombre','sup-contacto','sup-tel','sup-email','sup-rfc','sup-dir'].forEach(f=>{ const e=document.getElementById(f); if(e) e.value=''; });
+  document.getElementById('sup-modal-title').textContent = 'Nuevo Proveedor';
+  document.getElementById('sup-save-btn').textContent = 'Crear proveedor';
+  openModal('modal-supplier');
+}
+
+function openEditSupModal(id, nombre, contacto, tel, email, rfc, dir) {
+  _supEditId = id;
+  document.getElementById('sup-nombre').value   = nombre;
+  document.getElementById('sup-contacto').value = contacto;
+  document.getElementById('sup-tel').value      = tel;
+  document.getElementById('sup-email').value    = email;
+  document.getElementById('sup-rfc').value      = rfc;
+  document.getElementById('sup-dir').value      = dir;
+  document.getElementById('sup-modal-title').textContent = 'Editar Proveedor';
+  document.getElementById('sup-save-btn').textContent = 'Guardar cambios';
+  openModal('modal-supplier');
+}
+
+async function saveSupplier() {
+  const nombre = document.getElementById('sup-nombre').value.trim();
+  if (!nombre) { toast('El nombre es requerido','warning'); return; }
+  const body = {
+    nombre,
+    contacto:  document.getElementById('sup-contacto').value||null,
+    telefono:  document.getElementById('sup-tel').value||null,
+    email:     document.getElementById('sup-email').value||null,
+    rfc:       document.getElementById('sup-rfc').value||null,
+    direccion: document.getElementById('sup-dir').value||null,
+  };
+  const method = _supEditId ? 'PUT' : 'POST';
+  const path   = _supEditId ? `/proveedores/${_supEditId}` : '/proveedores/';
+  const res = await api(path, {method, body: JSON.stringify(body)});
+  if (res.ok) {
+    toast(_supEditId ? 'Proveedor actualizado' : 'Proveedor creado', 'success');
+    closeModal('modal-supplier');
+    loadSuppliers();
+  } else {
+    const e = await res.json(); toast(e.detail||'Error','error');
+  }
+}
+
+function confirmDeleteSup(id, nombre) {
+  openConfirmDel(`¿Eliminar proveedor ${nombre}?`,
+    'Los productos asignados quedarán sin proveedor.',
+    async () => {
+      const res = await api(`/proveedores/${id}`, {method:'DELETE'});
+      if (res.ok) { toast('Proveedor eliminado','success'); loadSuppliers(); }
+      else { const e=await res.json(); toast(e.detail||'Error','error'); }
+    }
+  );
+}
+
+function supAsignarTodos(id, nombre) {
+  openConfirmDel(
+    `¿Asignar "${nombre}" a TODOS los productos?`,
+    'Se sobreescribirá el proveedor de todos los productos activos.',
+    async () => {
+      const res = await api(`/proveedores/${id}/asignar-todos`, {method:'POST'});
+      if (res.ok) {
+        const d = await res.json();
+        toast(`${d.actualizados} productos asignados a ${nombre}`, 'success');
+        loadSuppliers();
+      } else { const e=await res.json(); toast(e.detail||'Error','error'); }
     }
   );
 }
