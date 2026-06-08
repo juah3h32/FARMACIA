@@ -3241,6 +3241,19 @@ async function processSale() {
   document.getElementById('pay-folio').textContent=`Folio: ${data.folio}`;
   document.getElementById('pay-total').textContent=fmt(data.total);
   document.getElementById('pay-cambio').textContent=fmt(data.cambio);
+  // Store for re-print button
+  S._pruebaItems  = body.items;
+  S._pruebaPag    = pag;
+  S._pruebaMetodo = metodo;
+  // Show ticket preview
+  const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
+  const ticketEl   = document.getElementById('pay-ticket-texto');
+  if (data.ticket_texto && ticketWrap && ticketEl) {
+    ticketEl.textContent = data.ticket_texto;
+    ticketWrap.classList.remove('hidden');
+  } else if (ticketWrap) {
+    ticketWrap.classList.add('hidden');
+  }
   openModal('modal-payment');
   // Refresh product stock in local cache for items sold (especially piezas_sueltas)
   const soldIds = [...new Set(body.items.map(i=>i.producto_id))];

@@ -215,11 +215,17 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         }
         bg.add_task(printer_service.print_receipt, venta_data)
 
+        ticket_texto = None
+        try:
+            ticket_texto = printer_service._build_ticket(venta_data, printer_service._load_farmacia_config())
+        except Exception:
+            pass
+
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
-        return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio}
+        return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio, "ticket_texto": ticket_texto}
     except HTTPException:
         raise
     except Exception as e:
