@@ -2896,13 +2896,18 @@ async function loadDashboard() {
   _animNum('kpi-total',    d.total_productos,  false);
 
   // Inventory KPIs — financial values admin-only
+  // Always enforce hidden state first — prevents cross-session leakage
+  ['kpi-card-costo','kpi-card-venta','kpi-card-ganancia','kpi-card-vencido'].forEach(id=>
+    document.getElementById(id)?.classList.add('hidden')
+  );
+  if (!isAdmin) { const b=document.getElementById('inv-kpi-bar'); if(b) b.innerHTML=''; }
   try {
-    const ir = await api('/inventario/resumen-inventario');
-    if (ir.ok) {
+    const ir = isAdmin ? await api('/inventario/resumen-inventario') : null;
+    if (ir && ir.ok) {
       const inv = await ir.json();
 
       // Big KPI cards fila 2 (admin only)
-      if (isAdmin && inv.valor_costo !== undefined) {
+      if (inv.valor_costo !== undefined) {
         document.getElementById('kpi-inv-costo').textContent    = fmt(inv.valor_costo);
         document.getElementById('kpi-inv-venta').textContent    = fmt(inv.valor_venta);
         document.getElementById('kpi-inv-ganancia').textContent = fmt(inv.ganancia_est);
