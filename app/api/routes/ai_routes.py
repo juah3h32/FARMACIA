@@ -26,7 +26,13 @@ def generar_descripcion(body: DescripcionRequest, payload: dict = Depends(get_cu
             detail="OPENAI_API_KEY no configurada. Agrégala como variable de entorno.",
         )
 
-    from openai import OpenAI
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Paquete 'openai' no instalado en el servidor.",
+        )
 
     client = OpenAI(api_key=cfg.OPENAI_API_KEY)
 
@@ -52,14 +58,16 @@ Usa lenguaje técnico-profesional en español. Máximo {CHAR_LIMIT} caracteres. 
 
 Descripción:"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error OpenAI: {str(e)[:200]}")
 
-    text = response.choices[0].message.content or ""
-    text = text.strip()
+    text = (response.choices[0].message.content or "").strip()
     if len(text) > CHAR_LIMIT:
         text = text[:CHAR_LIMIT].rsplit(" ", 1)[0] + "…"
 

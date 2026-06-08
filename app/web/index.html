@@ -3882,7 +3882,8 @@ async function pmGenerarDescripcion() {
       contenido:       document.getElementById('pm-contenido')?.value||'',
     };
     const res  = await api('/ai/descripcion', { method:'POST', body: JSON.stringify(body) });
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch(_) {}
     if (res.ok && data?.descripcion) {
       document.getElementById('pm-descripcion').value = data.descripcion;
     } else {
