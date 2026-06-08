@@ -3023,26 +3023,34 @@ function addToCart(pid, esPieza=false) {
   // Availability check: fractional products check piezas+cajas separately
   if (p.venta_fraccionada) {
     if (esPieza) {
-      const totalPiezas = (p.piezas_sueltas||0) + p.stock*(p.unidades_por_caja||1);
+      const totalPiezas = (p.piezas_sueltas||0) + (p.stock||0)*(p.unidades_por_caja||1);
       if (totalPiezas<=0) { toast('Sin piezas disponibles','warning'); return; }
     } else {
-      if (p.stock<=0) { toast(`Sin ${p.unidad_caja||'cajas'} disponibles`,'warning'); return; }
+      if ((p.stock||0)<=0) { toast(`Sin ${p.unidad_caja||'cajas'} disponibles`,'warning'); return; }
     }
   } else {
-    if (p.stock<=0) { toast('Sin stock disponible','warning'); return; }
-  }
-  // Block if all stock is in expired lotes (sum of vencido quantities >= total stock)
-  if (_cadData?.items) {
-    const vLotes = _cadData.items.filter(l=>l.producto_id===pid && l.estado==='vencido');
-    const cantVencida = vLotes.reduce((s,l)=>s+l.cantidad,0);
-    if (cantVencida>0 && cantVencida>=p.stock) {
-      toast('⛔ PRODUCTO VENCIDO — no se puede vender','error');
-      return;
+    if ((p.stock||0)<=0) { toast('Sin stock disponible','warning'); return; }
+    // Vencido check only for non-fractional (fractional: lote qty may differ from cajas units)
+    if (_cadData?.items) {
+      const vLotes = _cadData.items.filter(l=>l.producto_id===pid && l.estado==='vencido');
+      const cantVencida = vLotes.reduce((s,l)=>s+l.cantidad,0);
+      if (cantVencida>0 && cantVencida>=p.stock) {
+        toast('⛔ PRODUCTO VENCIDO — no se puede vender','error');
+        return;
+      }
     }
   }
   // Fractional: key includes es_pieza so box and piece coexist in cart
   const cartKey = p.venta_fraccionada ? `${pid}_${esPieza?'pieza':'caja'}` : `${pid}`;
-  const precio = (p.venta_fraccionada && esPieza) ? (p.precio_pieza||0) : p.precio_venta;
+  // precio_pieza fallback: auto-calculate from precio_venta / uds_caja if not set
+  let precio;
+  if (p.venta_fraccionada && esPieza) {
+    precio = (p.precio_pieza && p.precio_pieza > 0)
+      ? p.precio_pieza
+      : parseFloat((p.precio_venta / (p.unidades_por_caja || 1)).toFixed(2));
+  } else {
+    precio = p.precio_venta;
+  }
   const ex = S.cart.find(i=>i._cartKey===cartKey);
   if (ex) { ex.cantidad++; } else {
     S.cart.push({
@@ -3062,7 +3070,18 @@ function removeFromCart(key) { S.cart=S.cart.filter(i=>(i._cartKey||String(i.id)
 function changeQty(key, delta) {
   const i=S.cart.find(x=>(x._cartKey||String(x.id))===String(key));
   if (!i) return;
-  i.cantidad=Math.max(1,i.cantidad+delta);
+  const newQty = i.cantidad + delta;
+  if (newQty < 1) return;
+  if (delta > 0) {
+    const p = (S.allProducts||[]).find(x=>x.id===i.id);
+    if (p) {
+      const maxQty = i._esPieza
+        ? (p.piezas_sueltas||0) + (p.stock||0)*(p.unidades_por_caja||1)
+        : (p.stock||0);
+      if (newQty > maxQty) { toast(`Máximo disponible: ${maxQty}`,'warning'); return; }
+    }
+  }
+  i.cantidad = newQty;
   renderCart();
 }
 
@@ -3213,6 +3232,16 @@ async function processSale() {
   document.getElementById('pay-total').textContent=fmt(data.total);
   document.getElementById('pay-cambio').textContent=fmt(data.cambio);
   openModal('modal-payment');
+  // Refresh product stock in local cache for items sold (especially piezas_sueltas)
+  const soldIds = [...new Set(body.items.map(i=>i.producto_id))];
+  soldIds.forEach(id => {
+    api(`/productos/${id}`).then(r=>{ if(r.ok) r.json().then(fresh=>{
+      if (S.allProducts) {
+        const idx = S.allProducts.findIndex(p=>p.id===id);
+        if (idx>=0) S.allProducts[idx] = fresh; else S.allProducts.push(fresh);
+      }
+    }); });
+  });
   S.cart=[]; renderCart();
   document.getElementById('cart-pagado').value='';
   updateCambio();
