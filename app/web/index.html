@@ -556,6 +556,20 @@
   ::-webkit-scrollbar-track { background:#1E293B; }
   ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
 
+  /* POS grid — light scrollbar to match white card background */
+  #pos-grid { scrollbar-width:thin; scrollbar-color:#CBD5E1 transparent; }
+  #pos-grid::-webkit-scrollbar { width:6px; }
+  #pos-grid::-webkit-scrollbar-track { background:transparent; border-radius:10px; }
+  #pos-grid::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:10px; border:2px solid transparent; background-clip:padding-box; }
+  #pos-grid::-webkit-scrollbar-thumb:hover { background:#94A3B8; background-clip:padding-box; }
+
+  /* Light scrollbar utility for white panels */
+  .scroll-light { scrollbar-width:thin; scrollbar-color:#CBD5E1 transparent; }
+  .scroll-light::-webkit-scrollbar { width:5px; }
+  .scroll-light::-webkit-scrollbar-track { background:transparent; }
+  .scroll-light::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:6px; }
+  .scroll-light::-webkit-scrollbar-thumb:hover { background:#94A3B8; }
+
   /* ── Animations ─────────────────────────────────────── */
   @keyframes pageIn   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   @keyframes cardIn   { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
@@ -978,7 +992,7 @@
                   <i data-lucide="trash-2" style="width:12px;height:12px"></i> Limpiar
                 </button>
               </div>
-              <div id="cart-items" class="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2 custom-scrollbar">
+              <div id="cart-items" class="flex-1 overflow-y-auto scroll-light px-3 py-2 flex flex-col gap-2 custom-scrollbar">
                 <p class="text-center py-8 text-xs" style="color:#94A3B8">Agrega productos al carrito</p>
               </div>
               <!-- Totals -->
@@ -1058,7 +1072,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto scroll-light">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
@@ -1097,7 +1111,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto scroll-light">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
@@ -1421,7 +1435,7 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto">
+          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto scroll-light">
             <table class="w-full text-sm table-auto">
               <thead>
                 <tr style="background:#F8FAFF">
