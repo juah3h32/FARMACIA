@@ -152,6 +152,9 @@ def crear_producto(body: ProductoIn, bg: BackgroundTasks, payload: dict = Depend
                 Producto.activo == False,
             ).update({"codigo_barras": None})
         p = Producto(**body.model_dump())
+        if p.venta_fraccionada and (p.stock or 0) > 0 and (p.piezas_sueltas or 0) == 0:
+            p.piezas_sueltas = p.unidades_por_caja or 1
+            p.stock = max(0, p.stock - 1)
         db.add(p)
         db.commit()
         db.refresh(p)
@@ -187,8 +190,12 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         p = db.query(Producto).filter(Producto.id == producto_id).first()
         if not p:
             raise HTTPException(status_code=404, detail="No encontrado")
+        was_fraccionada = p.venta_fraccionada
         for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
             setattr(p, k, v)
+        if p.venta_fraccionada and not was_fraccionada and (p.stock or 0) > 0 and (p.piezas_sueltas or 0) == 0:
+            p.piezas_sueltas = p.unidades_por_caja or 1
+            p.stock = max(0, p.stock - 1)
         db.commit()
         db.refresh(p)
         _sync_bg(bg)

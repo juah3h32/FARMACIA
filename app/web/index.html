@@ -3045,11 +3045,13 @@ function renderPosGrid(prods) {
     // Truncate unit names to max 10 chars so buttons don't overflow
     const cajaNom  = (p.unidad_caja||'Caja').slice(0,10);
     const piezaNom = (p.unidad_pieza||'Pieza').slice(0,10);
-    // Fractional stock: two compact badges (cajas + sueltas)
+    // Fractional stock: two compact badges (cajas + total piezas disponibles)
+    const pzBadgeColor = totalPiezas<=0?'#EF4444':totalPiezas<=(p.unidades_por_caja||1)?'#D97706':'#D97706';
+    const pzBadgeBg    = totalPiezas<=0?'#FEF2F2':'#FFF7ED';
     const stockBadge = p.venta_fraccionada ? `
       <div class="flex gap-1 flex-wrap justify-end">
         <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold leading-tight" style="background:${stockBg};color:${stockColor}">${p.stock||0} ${cajaNom}</span>
-        <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold leading-tight" style="background:#FFF7ED;color:#C2410C">${p.piezas_sueltas||0} sueltas</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold leading-tight" style="background:${pzBadgeBg};color:${pzBadgeColor}">${totalPiezas} pzs</span>
       </div>`
       : `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold" style="background:${stockBg};color:${stockColor}">${p.stock||0}</span>`;
     const fracBtns = p.venta_fraccionada ? `
@@ -3581,7 +3583,8 @@ async function openProductModal(id=null) {
       const piezasWrap = document.getElementById('pm-piezas-ajuste-wrap');
       const stockLbl = document.getElementById('pm-nuevo-stock-lbl');
       if (p.venta_fraccionada) {
-        if (badge) badge.textContent = `${p.stock??0} ${p.unidad_caja||'cajas'} | ${p.piezas_sueltas??0} sueltas`;
+        const _totalPzModal = (p.piezas_sueltas??0) + (p.stock??0)*(p.unidades_por_caja||1);
+        if (badge) badge.textContent = `${p.stock??0} ${p.unidad_caja||'cajas'} | ${_totalPzModal} pzs total`;
         if (piezasWrap) piezasWrap.classList.remove('hidden');
         if (stockLbl) stockLbl.textContent = `Nuevo stock (${p.unidad_caja||'cajas'})`;
       } else {
@@ -3697,8 +3700,9 @@ async function pmAjustarStock() {
   const badge = document.getElementById('pm-stock-actual-badge');
   if (p?.venta_fraccionada) {
     const ps = data.piezas_sueltas ?? 0;
-    toast(`Stock: ${data.stock_anterior}→${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${ps} sueltas`,'success');
-    if (badge) badge.textContent = `${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${ps} sueltas`;
+    const totalPzAdj = ps + (data.stock_nuevo||0)*(p.unidades_por_caja||1);
+    toast(`Stock: ${data.stock_anterior}→${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${totalPzAdj} pzs total`,'success');
+    if (badge) badge.textContent = `${data.stock_nuevo} ${p.unidad_caja||'cajas'} | ${totalPzAdj} pzs total`;
   } else {
     toast(`Stock actualizado: ${data.stock_anterior} → ${data.stock_nuevo}`,'success');
     if (badge) badge.textContent = `Stock actual: ${data.stock_nuevo}`;
