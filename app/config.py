@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.2.82"
+VERSION = "1.2.83"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "Esfuerzo #47A col. 13 de abril"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -98,17 +98,17 @@ CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "dcutrbbyw")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "717952968559447")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "gufXKh1BIUTfsdwKNzz95or4SI4")
 
-def _load_anthropic_key() -> str:
-    key = os.getenv("ANTHROPIC_API_KEY", "")
+def _load_openai_key() -> str:
+    key = os.getenv("OPENAI_API_KEY", "")
     if not key:
-        _kf = DATA_DIR / "anthropic.key"
+        _kf = DATA_DIR / "openai.key"
         if _kf.exists():
             key = _kf.read_text(encoding="utf-8").strip()
     if not key:
         key = (
-            "sk-ant-api03-n84B9nVVS8X1_0tyoSKqQFmU1mSmQGGKEofju8c_ng1-"
-            "AGDTPqVc8Cjlbggy92YEw3qlbx2ht4uLQnzo3XxBvg-6JDtwAAA"
+            "sk-proj-o-sCpvcM43EdgHvTmNqp0Nu4UhtP7BJ49cPX4Rjl6fUhD4Ck3lAYCtP2WiDLO7sozt6nXIlz"
+            "vvT3BlbkFJi37ThLsQJav50n6MUnu6xMLhjT_Q8wNYqdgsRo3YIr0hD4-qTMLV04Sytx8zwVW6tLF0XHz7gA"
         )
     return key
 
-ANTHROPIC_API_KEY = _load_anthropic_key()
+OPENAI_API_KEY = _load_openai_key()

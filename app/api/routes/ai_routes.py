@@ -20,15 +20,15 @@ class DescripcionRequest(BaseModel):
 @router.post("/descripcion")
 def generar_descripcion(body: DescripcionRequest, payload: dict = Depends(get_current_api_user)):
     import app.config as cfg
-    if not cfg.ANTHROPIC_API_KEY:
+    if not cfg.OPENAI_API_KEY:
         raise HTTPException(
             status_code=400,
-            detail="ANTHROPIC_API_KEY no configurada. Agrégala como variable de entorno.",
+            detail="OPENAI_API_KEY no configurada. Agrégala como variable de entorno.",
         )
 
-    import anthropic
+    from openai import OpenAI
 
-    client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY)
+    client = OpenAI(api_key=cfg.OPENAI_API_KEY)
 
     partes = [f"Medicamento: {body.nombre}"]
     if body.nombre_generico:
@@ -52,13 +52,13 @@ Usa lenguaje técnico-profesional en español. Máximo {CHAR_LIMIT} caracteres. 
 
 Descripción:"""
 
-    response = client.messages.create(
-        model="claude-opus-4-8",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
 
-    text = next((b.text for b in response.content if b.type == "text"), "")
+    text = response.choices[0].message.content or ""
     text = text.strip()
     if len(text) > CHAR_LIMIT:
         text = text[:CHAR_LIMIT].rsplit(" ", 1)[0] + "…"
