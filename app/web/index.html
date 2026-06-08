@@ -2631,7 +2631,7 @@ async function doLogin() {
     } else {
       const data = await res.json();
       S.token = data.access_token;
-      S.user  = {id:data.user_id, username:data.username, nombre:data.nombre||data.username, rol:data.rol};
+      S.user  = {id:data.user_id, username:data.username, nombre:data.nombre||data.username, rol:data.rol, foto_url:data.foto_url||null};
       localStorage.setItem('token', S.token);
       localStorage.setItem('user', JSON.stringify(S.user));
       launchApp();
@@ -2700,7 +2700,7 @@ function updateUserCard() {
   document.getElementById('user-rol').textContent  = (u.rol||'').charAt(0).toUpperCase()+(u.rol||'').slice(1);
 
   // Apply photo or initials to sidebar avatar
-  const photo = localStorage.getItem('profile_photo');
+  const photo = u.foto_url || localStorage.getItem('profile_photo_' + u.id) || null;
   _applyAvatarPhoto('user-avatar', photo, initials, '#1E3A8A');
 }
 
@@ -2729,7 +2729,7 @@ function openProfileModal() {
   document.getElementById('profile-username').textContent   = displayName;
   document.getElementById('profile-rol-badge').textContent  = u.rol || '—';
 
-  const photo = localStorage.getItem('profile_photo');
+  const photo = u.foto_url || localStorage.getItem('profile_photo_' + u.id) || null;
   const prev  = document.getElementById('profile-photo-preview');
   if (photo) {
     prev.innerHTML        = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover">`;
@@ -2753,30 +2753,48 @@ function closeProfileModal() {
   m.classList.remove('flex');
 }
 
-function handlePhotoUpload(e) {
+async function handlePhotoUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { toast('Foto muy grande (máx 2 MB)', 'error'); return; }
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    const dataUrl = ev.target.result;
-    localStorage.setItem('profile_photo', dataUrl);
+  if (file.size > 4 * 1024 * 1024) { toast('Foto muy grande (máx 4 MB)', 'error'); return; }
+  toast('Subiendo foto…', 'info');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/api/empleados/${S.user.id}/foto`, {
+      method: 'POST',
+      headers: {'Authorization': 'Bearer ' + S.token},
+      body: fd,
+    });
+    if (!res.ok) { const err = await res.json().catch(()=>({})); toast(err.detail || 'Error al subir foto', 'error'); return; }
+    const data = await res.json();
+    S.user.foto_url = data.foto_url;
+    localStorage.setItem('user', JSON.stringify(S.user));
+    // Cache locally so it persists without re-login
+    localStorage.setItem('profile_photo_' + S.user.id, data.foto_url);
 
-    // Update preview inside modal
     const prev = document.getElementById('profile-photo-preview');
-    prev.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
+    prev.innerHTML = `<img src="${data.foto_url}" style="width:100%;height:100%;object-fit:cover">`;
     prev.style.background = 'transparent';
     document.getElementById('remove-photo-btn').classList.remove('hidden');
 
-    // Apply to app avatars
     updateUserCard();
     toast('Foto actualizada', 'success');
-  };
-  reader.readAsDataURL(file);
+  } catch(err) {
+    toast('Error de conexión', 'error');
+  }
 }
 
-function removeProfilePhoto() {
-  localStorage.removeItem('profile_photo');
+async function removeProfilePhoto() {
+  try {
+    await fetch(`/api/empleados/${S.user.id}/foto`, {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + S.token},
+    });
+  } catch(_) {}
+  S.user.foto_url = null;
+  localStorage.setItem('user', JSON.stringify(S.user));
+  localStorage.removeItem('profile_photo_' + S.user.id);
   const u = S.user;
   const displayName = u?.nombre || u?.username || '?';
   const initials    = displayName[0].toUpperCase();

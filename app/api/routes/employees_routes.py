@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+import os, tempfile
 from sqlalchemy.exc import IntegrityError
 from app.database.connection import get_db_session
 from app.database.models import Usuario, RolUsuario
@@ -32,7 +33,7 @@ def listar_empleados(payload: dict = Depends(get_current_api_user)):
         rows = db.query(Usuario).filter(Usuario.activo == True).order_by(Usuario.nombre).all()
         return [
             {"id": u.id, "username": u.username, "nombre": u.nombre,
-             "rol": u.rol.value, "telefono": u.telefono, "email": u.email}
+             "rol": u.rol.value, "telefono": u.telefono, "email": u.email, "foto_url": u.foto_url}
             for u in rows
         ]
     finally:
@@ -94,6 +95,70 @@ def actualizar_empleado(uid: int, body: EmpleadoIn, bg: BackgroundTasks, payload
             if len(body.password) < 4:
                 raise HTTPException(status_code=400, detail="Contraseña mínimo 4 caracteres")
             u.password_hash = hash_password(body.password)
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/{uid}/foto")
+async def subir_foto_empleado(
+    uid: int,
+    bg: BackgroundTasks,
+    file: UploadFile = File(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    if int(payload["sub"]) != uid and payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    db = get_db_session()
+    try:
+        u = db.query(Usuario).filter(Usuario.id == uid).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        try:
+            from app.services.cloudinary_service import upload_profile_photo
+            url = upload_profile_photo(tmp_path, uid)
+            u.foto_url = url
+            db.commit()
+            import app.config as _cfg
+            if _cfg.TURSO_SYNC:
+                from app.database.sync_service import sync_to_turso
+                bg.add_task(sync_to_turso)
+            return {"foto_url": url}
+        finally:
+            os.unlink(tmp_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/{uid}/foto")
+def eliminar_foto_empleado(uid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    if int(payload["sub"]) != uid and payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    db = get_db_session()
+    try:
+        u = db.query(Usuario).filter(Usuario.id == uid).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        u.foto_url = None
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:

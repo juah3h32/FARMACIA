@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from typing import Optional
 from app.database.connection import get_db_session
 from app.database.models import Usuario
 from app.auth.auth_service import verify_password, create_api_token, verify_api_token
@@ -40,6 +41,7 @@ class TokenResponse(BaseModel):
     username: str
     nombre: str = ""
     rol: str
+    foto_url: Optional[str] = None
 
 
 def get_current_api_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -70,6 +72,7 @@ def api_login(body: LoginRequest, request: Request):
             username=user.username,
             nombre=user.nombre,
             rol=user.rol.value,
+            foto_url=user.foto_url,
         )
     finally:
         db.close()
@@ -82,6 +85,6 @@ def api_me(payload: dict = Depends(get_current_api_user)):
         user = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
         if not user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        return {"id": user.id, "username": user.username, "nombre": user.nombre, "rol": user.rol.value}
+        return {"id": user.id, "username": user.username, "nombre": user.nombre, "rol": user.rol.value, "foto_url": user.foto_url}
     finally:
         db.close()

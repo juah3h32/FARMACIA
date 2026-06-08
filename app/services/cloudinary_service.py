@@ -24,6 +24,19 @@ def upload_product_image(file_path: str, product_id: int) -> str:
     return result["secure_url"]
 
 
+def upload_profile_photo(file_path: str, user_id: int) -> str:
+    _configure()
+    result = cloudinary.uploader.upload(
+        file_path,
+        folder="FARMACIA/FOTOS_PERFIL",
+        public_id=f"usuario_{user_id}",
+        overwrite=True,
+        resource_type="image",
+        transformation=[{"width": 300, "height": 300, "crop": "fill", "gravity": "face"}],
+    )
+    return result["secure_url"]
+
+
 def delete_product_image(product_id: int) -> None:
     _configure()
     try:

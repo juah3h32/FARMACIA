@@ -46,6 +46,7 @@ class Usuario(Base):
     telefono = Column(String(20))
     email = Column(String(100))
     activo = Column(Boolean, default=True)
+    foto_url = Column(String(500), nullable=True)
     creado_en = Column(DateTime, server_default=func.now())
 
     ventas = relationship("Venta", back_populates="usuario")
