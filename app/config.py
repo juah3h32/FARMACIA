@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.2.85"
+VERSION = "1.2.86"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "Esfuerzo #47A col. 13 de abril"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -106,8 +106,8 @@ def _load_openai_key() -> str:
             key = _kf.read_text(encoding="utf-8").strip()
     if not key:
         key = (
-            "sk-proj-o-sCpvcM43EdgHvTmNqp0Nu4UhtP7BJ49cPX4Rjl6fUhD4Ck3lAYCtP2WiDLO7sozt6nXIlz"
-            "vvT3BlbkFJi37ThLsQJav50n6MUnu6xMLhjT_Q8wNYqdgsRo3YIr0hD4-qTMLV04Sytx8zwVW6tLF0XHz7gA"
+            "sk-proj-Yoq_JrjHgsJ9RuPMb2BrJHP83mVweP9-ZBR-ZcKx8DoYZEUoupZc1lcRE6LHP4Ch1aZ8NXfGA"
+            "CT3BlbkFJg8p-I6iOthjveaONV4Luj8UDfuH4Do-gu7YQqWJI-2BdHU_6rtUd4F2xeE28LgumO63vq4XDcA"
         )
     return key
 
