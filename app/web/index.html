@@ -1045,8 +1045,8 @@
           <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
-              <input id="inv-search" type="text" placeholder="Buscar producto..."
-                     class="h-9 pl-9 pr-3 rounded-xl text-sm border w-64" style="border-color:#E2E8F0;background:#F8FAFF"
+              <input id="inv-search" type="text" placeholder="Nombre, genérico, código, marca..."
+                     class="h-9 pl-9 pr-3 rounded-xl text-sm border w-72" style="border-color:#E2E8F0;background:#F8FAFF"
                      oninput="invFilter(this.value)">
             </div>
             <span id="inv-count" class="text-xs" style="color:#64748B"></span>
@@ -3374,9 +3374,18 @@ async function loadInventory() {
 }
 
 function invFilter(q) {
+  if (!q.trim()) { renderInvTable(S.allInv); return; }
   const f=q.toLowerCase();
   renderInvTable(S.allInv.filter(p=>
-    p.nombre.toLowerCase().includes(f)||(p.codigo_barras||'').toLowerCase().includes(f)
+    p.nombre.toLowerCase().includes(f)||
+    (p.nombre_generico||'').toLowerCase().includes(f)||
+    (p.codigo_barras||'').toLowerCase().includes(f)||
+    (p.marca||'').toLowerCase().includes(f)||
+    (p.presentacion||'').toLowerCase().includes(f)||
+    (p.concentracion||'').toLowerCase().includes(f)||
+    (p.contenido||'').toLowerCase().includes(f)||
+    (p.proveedor_nombre||'').toLowerCase().includes(f)||
+    String(p.id)===q.trim()
   ));
 }
 
