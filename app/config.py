@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "1.2.78"
+VERSION = "1.2.79"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "Esfuerzo #47A col. 13 de abril"
 PHARMACY_PHONE = "Tel: 000-000-0000"
