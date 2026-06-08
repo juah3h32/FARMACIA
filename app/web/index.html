@@ -554,21 +554,24 @@
   * { font-family:'Inter',system-ui,sans-serif; }
   ::-webkit-scrollbar { width:5px; height:5px; }
   ::-webkit-scrollbar-track { background:#1E293B; }
-  ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+  ::-webkit-scrollbar-thumb { background:#334155; border-radius:99px; }
+  ::-webkit-scrollbar-button { display:none; height:0; width:0; }
 
-  /* POS grid — light scrollbar to match white card background */
-  #pos-grid { scrollbar-width:thin; scrollbar-color:#CBD5E1 transparent; }
-  #pos-grid::-webkit-scrollbar { width:6px; }
-  #pos-grid::-webkit-scrollbar-track { background:transparent; border-radius:10px; }
-  #pos-grid::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:10px; border:2px solid transparent; background-clip:padding-box; }
-  #pos-grid::-webkit-scrollbar-thumb:hover { background:#94A3B8; background-clip:padding-box; }
+  /* POS grid — slim light scrollbar, no arrows, no track */
+  #pos-grid { scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; }
+  #pos-grid::-webkit-scrollbar { width:5px; }
+  #pos-grid::-webkit-scrollbar-track { background:transparent; }
+  #pos-grid::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius:99px; }
+  #pos-grid::-webkit-scrollbar-thumb:hover { background:#9CA3AF; }
+  #pos-grid::-webkit-scrollbar-button { display:none; height:0; width:0; }
 
   /* Light scrollbar utility for white panels */
-  .scroll-light { scrollbar-width:thin; scrollbar-color:#CBD5E1 transparent; }
+  .scroll-light { scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; }
   .scroll-light::-webkit-scrollbar { width:5px; }
   .scroll-light::-webkit-scrollbar-track { background:transparent; }
-  .scroll-light::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:6px; }
-  .scroll-light::-webkit-scrollbar-thumb:hover { background:#94A3B8; }
+  .scroll-light::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius:99px; }
+  .scroll-light::-webkit-scrollbar-thumb:hover { background:#9CA3AF; }
+  .scroll-light::-webkit-scrollbar-button { display:none; height:0; width:0; }
 
   /* ── Animations ─────────────────────────────────────── */
   @keyframes pageIn   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
