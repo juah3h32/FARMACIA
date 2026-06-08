@@ -65,7 +65,13 @@ Descripción:"""
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error OpenAI: {str(e)[:200]}")
+        msg = str(e)
+        if "429" in msg or "quota" in msg.lower() or "billing" in msg.lower():
+            raise HTTPException(
+                status_code=402,
+                detail="Sin créditos en OpenAI. Agrega saldo en platform.openai.com/billing",
+            )
+        raise HTTPException(status_code=502, detail=f"Error OpenAI: {msg[:200]}")
 
     text = (response.choices[0].message.content or "").strip()
     if len(text) > CHAR_LIMIT:
