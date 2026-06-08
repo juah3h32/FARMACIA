@@ -2043,7 +2043,7 @@
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
         <i data-lucide="user-cog" style="width:18px;height:18px;color:#243366"></i>
-        <h2 class="font-bold" style="color:#0F172A">Nuevo Empleado</h2>
+        <h2 id="em-modal-title" class="font-bold" style="color:#0F172A">Nuevo Empleado</h2>
       </div>
       <button onclick="closeModal('modal-employee')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
         <i data-lucide="x" style="width:16px;height:16px"></i>
@@ -2051,8 +2051,16 @@
     </div>
     <div class="p-6 grid grid-cols-2 gap-4">
       <div class="col-span-2"><label class="lbl">Nombre completo *</label><input id="em-nombre" class="inp" placeholder="Nombre del empleado"></div>
-      <div><label class="lbl">Usuario *</label><input id="em-user" class="inp" placeholder="Nombre de usuario"></div>
-      <div><label class="lbl">Contraseña *</label><input id="em-pass" type="password" class="inp" placeholder="Contraseña"></div>
+      <div>
+        <label class="lbl">Usuario *</label>
+        <input id="em-user" class="inp" placeholder="Nombre de usuario">
+        <p id="em-user-hint" class="hidden text-[10px] mt-0.5" style="color:#94A3B8">No se puede cambiar el usuario</p>
+      </div>
+      <div>
+        <label class="lbl">Contraseña <span id="em-pass-req">*</span></label>
+        <input id="em-pass" type="password" class="inp" placeholder="Contraseña">
+        <p id="em-pass-hint" class="hidden text-[10px] mt-0.5" style="color:#94A3B8">Dejar vacío para no cambiar</p>
+      </div>
       <div><label class="lbl">Rol</label>
         <select id="em-rol" class="inp">
           <option value="cajero">Cajero</option>
@@ -2065,7 +2073,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-employee')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Crear empleado</button>
+      <button id="em-save-btn" onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Crear empleado</button>
     </div>
   </div>
 </div>
@@ -4767,20 +4775,38 @@ async function loadEmployees() {
       <td class="px-5 py-3 text-sm" style="color:#64748B">${e.telefono||'—'}</td>
       <td class="px-5 py-3 text-sm" style="color:#64748B">${e.email||'—'}</td>
       <td class="px-5 py-3">
-        ${S.user?.rol==='admin' && e.id!==S.user.id ? `
-        <button onclick="confirmDeleteEmployee(${e.id},'${e.nombre.replace(/'/g,"\\\'")}')"
-                class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors hover:opacity-80"
-                style="background:#FEF2F2;color:#EF4444">
-          <i data-lucide="trash-2" style="width:11px;height:11px"></i> Eliminar
-        </button>` : '<span class="text-xs" style="color:#CBD5E1">—</span>'}
+        ${S.user?.rol==='admin' ? `
+        <div class="flex gap-1">
+          <button onclick="openEditEmpModal(${e.id},'${e.nombre.replace(/'/g,"\\'")}','${e.username}','${e.rol}','${(e.telefono||'').replace(/'/g,"\\'")}','${(e.email||'').replace(/'/g,"\\'")}' )"
+                  class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors hover:opacity-80"
+                  style="background:#EEF1F9;color:#243366">
+            <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
+          </button>
+          ${e.id!==S.user.id?`
+          <button onclick="confirmDeleteEmployee(${e.id},'${e.nombre.replace(/'/g,"\\\'")}')"
+                  class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors hover:opacity-80"
+                  style="background:#FEF2F2;color:#EF4444">
+            <i data-lucide="trash-2" style="width:11px;height:11px"></i>
+          </button>`:''}
+        </div>` : '<span class="text-xs" style="color:#CBD5E1">—</span>'}
       </td>
     </tr>`).join(''):'<tr><td colspan="6" class="text-center py-8 text-xs" style="color:#94A3B8">Sin empleados</td></tr>';
   icons();
 }
 
+let _empEditId = null;
+
 function openEmpModal() {
+  _empEditId = null;
   ['em-nombre','em-user','em-pass','em-tel','em-email'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('em-rol').value='cajero';
+  document.getElementById('em-user').readOnly = false;
+  document.getElementById('em-user').style.background = '';
+  document.getElementById('em-user-hint').classList.add('hidden');
+  document.getElementById('em-pass-hint').classList.add('hidden');
+  document.getElementById('em-pass-req').textContent = '*';
+  document.getElementById('em-modal-title').textContent = 'Nuevo Empleado';
+  document.getElementById('em-save-btn').textContent = 'Crear empleado';
   const restored = _restoreDraft(_DRAFT.employee, _EM_TEXT);
   if (restored) _showDraftBanner('modal-employee',
     `_clearDraft('${_DRAFT.employee}');['em-nombre','em-user','em-tel','em-email'].forEach(f=>{const e=document.getElementById(f);if(e)e.value='';});document.getElementById('em-rol').value='cajero';`
@@ -4789,24 +4815,64 @@ function openEmpModal() {
   openModal('modal-employee');
 }
 
+function openEditEmpModal(id, nombre, username, rol, tel, email) {
+  _empEditId = id;
+  document.getElementById('em-nombre').value = nombre;
+  document.getElementById('em-user').value   = username;
+  document.getElementById('em-user').readOnly = true;
+  document.getElementById('em-user').style.background = '#F8FAFC';
+  document.getElementById('em-pass').value   = '';
+  document.getElementById('em-rol').value    = rol;
+  document.getElementById('em-tel').value    = tel;
+  document.getElementById('em-email').value  = email;
+  document.getElementById('em-user-hint').classList.remove('hidden');
+  document.getElementById('em-pass-hint').classList.remove('hidden');
+  document.getElementById('em-pass-req').textContent = '';
+  document.getElementById('em-modal-title').textContent = 'Editar Empleado';
+  document.getElementById('em-save-btn').textContent = 'Guardar cambios';
+  openModal('modal-employee');
+}
+
 async function saveEmployee() {
   const nombre=document.getElementById('em-nombre').value.trim();
   const user  =document.getElementById('em-user').value.trim();
   const pass  =document.getElementById('em-pass').value;
-  if (!nombre||!user||!pass) { toast('Nombre, usuario y contraseña son requeridos','warning'); return; }
-  const body={
-    nombre, username:user, password:pass,
-    rol:     document.getElementById('em-rol').value,
-    telefono:document.getElementById('em-tel').value||null,
-    email:   document.getElementById('em-email').value||null,
-  };
-  const res=await api('/empleados/',{method:'POST',body:JSON.stringify(body)});
-  if (res.ok) {
-    _clearDraft(_DRAFT.employee);
-    toast('Empleado creado exitosamente','success','¡Listo!');
-    closeModal('modal-employee'); loadEmployees();
+
+  if (_empEditId) {
+    // Edit mode: password optional
+    if (!nombre) { toast('El nombre es requerido','warning'); return; }
+    if (pass && pass.length < 4) { toast('Contraseña mínimo 4 caracteres','warning'); return; }
+    const body={
+      nombre, username: user,
+      rol:     document.getElementById('em-rol').value,
+      telefono:document.getElementById('em-tel').value||null,
+      email:   document.getElementById('em-email').value||null,
+      password: pass || null,
+    };
+    const res=await api(`/empleados/${_empEditId}`,{method:'PUT',body:JSON.stringify(body)});
+    if (res.ok) {
+      toast('Empleado actualizado','success');
+      closeModal('modal-employee'); loadEmployees();
+    } else {
+      const e=await res.json(); toast(e.detail||'Error al actualizar','error');
+    }
   } else {
-    const e=await res.json(); toast(e.detail||'Error al crear empleado','error','Error');
+    // Create mode: password required
+    if (!nombre||!user||!pass) { toast('Nombre, usuario y contraseña son requeridos','warning'); return; }
+    const body={
+      nombre, username:user, password:pass,
+      rol:     document.getElementById('em-rol').value,
+      telefono:document.getElementById('em-tel').value||null,
+      email:   document.getElementById('em-email').value||null,
+    };
+    const res=await api('/empleados/',{method:'POST',body:JSON.stringify(body)});
+    if (res.ok) {
+      _clearDraft(_DRAFT.employee);
+      toast('Empleado creado exitosamente','success');
+      closeModal('modal-employee'); loadEmployees();
+    } else {
+      const e=await res.json(); toast(e.detail||'Error al crear empleado','error');
+    }
   }
 }
 
