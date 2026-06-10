@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from typing import Optional, List
 from datetime import date, datetime
 from app.database.connection import get_db_session
 from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Usuario, Cliente
@@ -138,8 +138,9 @@ def eliminar_venta(venta_id: int, payload: dict = Depends(get_current_api_user))
 
         folio = venta.folio
 
-        # 1. Restore stock for each product sold in this sale
         from app.database.models import MovimientoStock, Producto
+
+        # 1. Restore stock from movements
         movements = (
             db.query(MovimientoStock)
             .filter(
@@ -154,10 +155,62 @@ def eliminar_venta(venta_id: int, payload: dict = Depends(get_current_api_user))
                 prod.stock += mov.cantidad
             db.delete(mov)
 
-        # 2. Delete sale (cascade removes ItemVenta)
+        # 2. Explicitly delete items (avoids FK constraint error with foreign_keys=ON)
+        db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
+            synchronize_session="fetch"
+        )
+
+        # 3. Delete sale
         db.delete(venta)
         db.commit()
         return {"ok": True, "folio": folio}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/eliminar-lote")
+def eliminar_ventas_lote(
+    ids: List[int] = Body(..., embed=True),
+    payload: dict = Depends(get_current_api_user),
+):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if not ids:
+        raise HTTPException(status_code=400, detail="Lista vacía")
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Máximo 200 por lote")
+    db = get_db_session()
+    try:
+        from app.database.models import MovimientoStock, Producto
+        deleted, folios = 0, []
+        for venta_id in ids:
+            venta = db.query(Venta).filter(Venta.id == venta_id).first()
+            if not venta:
+                continue
+            folios.append(venta.folio or str(venta_id))
+            movements = (
+                db.query(MovimientoStock)
+                .filter(MovimientoStock.referencia_id == venta_id,
+                        MovimientoStock.referencia_tipo == "venta")
+                .all()
+            )
+            for mov in movements:
+                prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
+                if prod and mov.cantidad and mov.cantidad > 0:
+                    prod.stock += mov.cantidad
+                db.delete(mov)
+            db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
+                synchronize_session="fetch"
+            )
+            db.delete(venta)
+            deleted += 1
+        db.commit()
+        return {"ok": True, "deleted": deleted, "folios": folios}
     except HTTPException:
         raise
     except Exception as e:

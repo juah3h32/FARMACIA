@@ -1066,6 +1066,25 @@
                      class="h-9 pl-9 pr-3 rounded-xl text-sm border w-72" style="border-color:#E2E8F0;background:#F8FAFF"
                      oninput="invFilter(this.value)">
             </div>
+            <!-- Sort -->
+            <select id="inv-sort" onchange="invApplyFilters()"
+                    class="h-9 px-3 rounded-xl text-xs border" style="border-color:#E2E8F0;color:#374151">
+              <option value="nombre_az">A → Z</option>
+              <option value="nombre_za">Z → A</option>
+              <option value="recientes">Más recientes</option>
+              <option value="stock_asc">Stock ↑</option>
+              <option value="stock_desc">Stock ↓</option>
+              <option value="precio_asc">Precio ↑</option>
+              <option value="precio_desc">Precio ↓</option>
+            </select>
+            <!-- Status filter -->
+            <select id="inv-status-filter" onchange="invApplyFilters()"
+                    class="h-9 px-3 rounded-xl text-xs border" style="border-color:#E2E8F0;color:#374151">
+              <option value="todos">Todos</option>
+              <option value="bajo_stock">Stock bajo</option>
+              <option value="sin_stock">Sin stock</option>
+              <option value="ok">Stock OK</option>
+            </select>
             <span id="inv-count" class="text-xs" style="color:#64748B"></span>
             <div class="ml-auto" id="inv-add-btn-wrap">
               <button onclick="openProductModal()"
@@ -1262,15 +1281,27 @@
           </div>
         <!-- Detalle de ventas -->
           <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+            <div class="px-4 py-3 border-b flex items-center gap-2 flex-wrap" style="border-color:#E2E8F0">
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
-              <span class="text-xs px-2 py-0.5 rounded-full ml-auto" style="background:#F1F5F9;color:#64748B" id="rep-count-badge">—</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background:#F1F5F9;color:#64748B" id="rep-count-badge">—</span>
+              <div class="ml-auto flex items-center gap-2">
+                <button id="rep-bulk-del-btn" onclick="repBulkDelete()"
+                        class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 border"
+                        style="border-color:#FECACA;color:#EF4444;background:#FEF2F2">
+                  <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+                  <span id="rep-bulk-del-label">Eliminar seleccionadas</span>
+                </button>
+              </div>
             </div>
             <div class="overflow-x-auto" style="max-height:480px;overflow-y:auto">
               <table class="w-full text-[11px]">
                 <thead class="sticky top-0" style="background:#F8FAFF;z-index:1">
                   <tr>
+                    <th class="px-3 py-2 w-8 rep-admin-col hidden">
+                      <input type="checkbox" id="rep-chk-all" onchange="repToggleAll(this.checked)"
+                             class="w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#243366">
+                    </th>
                     <th class="text-left px-3 py-2 font-semibold w-6" style="color:#64748B"></th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Folio</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Fecha</th>
@@ -3689,20 +3720,48 @@ async function loadInventory() {
   }
 }
 
-function invFilter(q) {
-  if (!q.trim()) { renderInvTable(S.allInv); return; }
-  const f=q.toLowerCase();
-  renderInvTable(S.allInv.filter(p=>
-    p.nombre.toLowerCase().includes(f)||
-    (p.nombre_generico||'').toLowerCase().includes(f)||
-    (p.codigo_barras||'').toLowerCase().includes(f)||
-    (p.marca||'').toLowerCase().includes(f)||
-    (p.presentacion||'').toLowerCase().includes(f)||
-    (p.concentracion||'').toLowerCase().includes(f)||
-    (p.contenido||'').toLowerCase().includes(f)||
-    (p.proveedor_nombre||'').toLowerCase().includes(f)||
-    String(p.id)===q.trim()
-  ));
+function invFilter(q) { invApplyFilters(); }
+
+function invApplyFilters() {
+  const q      = (document.getElementById('inv-search')?.value || '').trim().toLowerCase();
+  const sort   = document.getElementById('inv-sort')?.value || 'nombre_az';
+  const status = document.getElementById('inv-status-filter')?.value || 'todos';
+
+  let list = [...(S.allInv || [])];
+
+  // text search
+  if (q) {
+    list = list.filter(p =>
+      p.nombre.toLowerCase().includes(q) ||
+      (p.nombre_generico||'').toLowerCase().includes(q) ||
+      (p.codigo_barras||'').toLowerCase().includes(q) ||
+      (p.marca||'').toLowerCase().includes(q) ||
+      (p.presentacion||'').toLowerCase().includes(q) ||
+      (p.concentracion||'').toLowerCase().includes(q) ||
+      (p.contenido||'').toLowerCase().includes(q) ||
+      (p.proveedor_nombre||'').toLowerCase().includes(q) ||
+      String(p.id) === q
+    );
+  }
+
+  // status filter
+  if (status === 'bajo_stock') list = list.filter(p => p.stock > 0 && p.stock <= (p.stock_minimo||10));
+  if (status === 'sin_stock')  list = list.filter(p => p.stock <= 0);
+  if (status === 'ok')         list = list.filter(p => p.stock > (p.stock_minimo||10));
+
+  // sort
+  const sorters = {
+    nombre_az:   (a,b) => a.nombre.localeCompare(b.nombre, 'es'),
+    nombre_za:   (a,b) => b.nombre.localeCompare(a.nombre, 'es'),
+    recientes:   (a,b) => b.id - a.id,
+    stock_asc:   (a,b) => a.stock - b.stock,
+    stock_desc:  (a,b) => b.stock - a.stock,
+    precio_asc:  (a,b) => a.precio_venta - b.precio_venta,
+    precio_desc: (a,b) => b.precio_venta - a.precio_venta,
+  };
+  list.sort(sorters[sort] || sorters.nombre_az);
+
+  renderInvTable(list);
 }
 
 function renderInvTable(prods) {
@@ -4439,26 +4498,27 @@ async function loadReports() {
     const ventas = await ventasRes.json();
     const isAdmin = S.user?.rol === 'admin';
 
-    // Show/hide admin column
-    document.querySelectorAll('.rep-admin-col').forEach(el => {
-      el.classList.toggle('hidden', !isAdmin);
-    });
+    // Show/hide admin columns
+    document.querySelectorAll('.rep-admin-col').forEach(el => el.classList.toggle('hidden', !isAdmin));
+    const chkAll = document.getElementById('rep-chk-all');
+    if (chkAll) chkAll.checked = false;
+    document.getElementById('rep-bulk-del-btn').classList.add('hidden');
     document.getElementById('rep-count-badge').textContent = `${ventas.length} ventas`;
 
+    const COLS = isAdmin ? 10 : 8;
     const pagoIcon = { efectivo:'💵', tarjeta:'💳', transferencia:'🏦', mixto:'🔀' };
 
     if (!ventas.length) {
       document.getElementById('rep-tbody').innerHTML =
-        `<tr><td colspan="${isAdmin?9:8}" class="text-center py-6" style="color:#94A3B8">Sin resultados en el periodo</td></tr>`;
+        `<tr><td colspan="${COLS}" class="text-center py-6" style="color:#94A3B8">Sin resultados en el periodo</td></tr>`;
     } else {
       document.getElementById('rep-tbody').innerHTML = ventas.map((v,i) => {
         const bg = i%2 ? '#F8FAFF' : '#fff';
         const estadoBg    = v.estado==='completada' ? '#F0FDF4' : '#FEF2F2';
         const estadoColor = v.estado==='completada' ? '#16A34A' : '#EF4444';
-        const itemsSafe = JSON.stringify(v.items||[]).replace(/'/g,"\\'").replace(/"/g,'&quot;');
 
         const deleteBtn = isAdmin
-          ? `<button onclick="repDeleteVenta(${v.id},'${v.folio||v.id}')"
+          ? `<button onclick="event.stopPropagation();repDeleteVenta(${v.id},'${v.folio||v.id}')"
                     class="h-6 px-2 rounded text-[10px] font-semibold flex items-center gap-1 border transition-all"
                     style="border-color:#FECACA;color:#EF4444;background:#FEF2F2"
                     onmouseenter="this.style.background='#EF4444';this.style.color='#fff'"
@@ -4467,26 +4527,29 @@ async function loadReports() {
              </button>` : '';
 
         return `
-        <tr class="hovrow border-b cursor-pointer" id="rep-row-${v.id}"
-            style="border-color:#F1F5F9;background:${bg}"
-            onclick="repToggleDetail(${v.id})">
-          <td class="px-3 py-2 text-center">
+        <tr class="hovrow border-b" id="rep-row-${v.id}"
+            style="border-color:#F1F5F9;background:${bg}">
+          ${isAdmin ? `<td class="px-3 py-2 text-center rep-admin-col" onclick="event.stopPropagation()">
+            <input type="checkbox" class="rep-chk w-3.5 h-3.5 cursor-pointer rounded" data-id="${v.id}"
+                   style="accent-color:#243366" onchange="repUpdateBulk()">
+          </td>` : ''}
+          <td class="px-3 py-2 text-center cursor-pointer" onclick="repToggleDetail(${v.id})">
             <i data-lucide="chevron-right" id="rep-chevron-${v.id}" style="width:12px;height:12px;color:#94A3B8;transition:transform .15s"></i>
           </td>
-          <td class="px-3 py-2 font-mono font-bold" style="color:#243366">${v.folio||'#'+v.id}</td>
-          <td class="px-3 py-2" style="color:#374151">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
-          <td class="px-3 py-2 font-semibold" style="color:#7C3AED">${v.cajero||'—'}</td>
-          <td class="px-3 py-2" style="color:#64748B">${v.cliente_nombre||'Público general'}</td>
-          <td class="px-3 py-2 text-right font-bold" style="color:#0F172A">${fmt(v.total)}</td>
-          <td class="px-3 py-2" style="color:#64748B">${pagoIcon[v.metodo_pago]||''} ${v.metodo_pago}</td>
-          <td class="px-3 py-2">
+          <td class="px-3 py-2 font-mono font-bold cursor-pointer" style="color:#243366" onclick="repToggleDetail(${v.id})">${v.folio||'#'+v.id}</td>
+          <td class="px-3 py-2 cursor-pointer" style="color:#374151" onclick="repToggleDetail(${v.id})">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
+          <td class="px-3 py-2 font-semibold cursor-pointer" style="color:#7C3AED" onclick="repToggleDetail(${v.id})">${v.cajero||'—'}</td>
+          <td class="px-3 py-2 cursor-pointer" style="color:#64748B" onclick="repToggleDetail(${v.id})">${v.cliente_nombre||'Público general'}</td>
+          <td class="px-3 py-2 text-right font-bold cursor-pointer" style="color:#0F172A" onclick="repToggleDetail(${v.id})">${fmt(v.total)}</td>
+          <td class="px-3 py-2 cursor-pointer" style="color:#64748B" onclick="repToggleDetail(${v.id})">${pagoIcon[v.metodo_pago]||''} ${v.metodo_pago}</td>
+          <td class="px-3 py-2 cursor-pointer" onclick="repToggleDetail(${v.id})">
             <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
                   style="background:${estadoBg};color:${estadoColor}">${v.estado}</span>
           </td>
-          ${isAdmin ? `<td class="px-3 py-2 text-center rep-admin-col" onclick="event.stopPropagation()">${deleteBtn}</td>` : ''}
+          ${isAdmin ? `<td class="px-3 py-2 text-center rep-admin-col">${deleteBtn}</td>` : ''}
         </tr>
         <tr id="rep-detail-${v.id}" class="hidden" style="background:#FAFBFF">
-          <td colspan="${isAdmin?9:8}" class="px-4 pb-3 pt-1">
+          <td colspan="${COLS}" class="px-4 pb-3 pt-1">
             ${repItemsTable(v.items||[], v.descuento, v.iva)}
           </td>
         </tr>`;
@@ -4541,7 +4604,52 @@ async function repDeleteVenta(id, folio) {
         const err = await res.json().catch(()=>({detail:'Error desconocido'}));
         toast(err.detail || 'Error al eliminar', 'error'); return;
       }
-      toast(`Venta ${folio} eliminada y stock restaurado`, 'success');
+      toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
+      loadReports();
+    }
+  );
+}
+
+function repToggleAll(checked) {
+  document.querySelectorAll('.rep-chk').forEach(c => c.checked = checked);
+  repUpdateBulk();
+}
+
+function repUpdateBulk() {
+  const selected = document.querySelectorAll('.rep-chk:checked');
+  const btn = document.getElementById('rep-bulk-del-btn');
+  const lbl = document.getElementById('rep-bulk-del-label');
+  const chkAll = document.getElementById('rep-chk-all');
+  const total = document.querySelectorAll('.rep-chk').length;
+  if (selected.length > 0) {
+    btn.classList.remove('hidden');
+    lbl.textContent = `Eliminar ${selected.length} seleccionada${selected.length>1?'s':''}`;
+    if (chkAll) chkAll.indeterminate = selected.length > 0 && selected.length < total;
+    if (chkAll && selected.length === total) { chkAll.indeterminate = false; chkAll.checked = true; }
+  } else {
+    btn.classList.add('hidden');
+    if (chkAll) { chkAll.indeterminate = false; chkAll.checked = false; }
+  }
+}
+
+async function repBulkDelete() {
+  const checkboxes = document.querySelectorAll('.rep-chk:checked');
+  const ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id));
+  if (!ids.length) return;
+  openConfirmDel(
+    `¿Eliminar ${ids.length} venta${ids.length>1?'s':''}?`,
+    `Se eliminarán ${ids.length} ventas permanentemente. El stock se restaurará en todas las bases de datos.`,
+    async () => {
+      const res = await api('/ventas/eliminar-lote', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Error desconocido'}));
+        toast(err.detail || 'Error al eliminar', 'error'); return;
+      }
+      const data = await res.json();
+      toast(`${data.deleted} venta${data.deleted>1?'s':''} eliminada${data.deleted>1?'s':''} · stock restaurado`, 'success');
       loadReports();
     }
   );
