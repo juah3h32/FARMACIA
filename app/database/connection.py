@@ -90,6 +90,7 @@ def _migrate():
         ("productos", "unidad_caja",        "VARCHAR(30) DEFAULT 'caja'"),
         ("productos", "piezas_sueltas",     "INTEGER DEFAULT 0"),
         ("usuarios",  "foto_url",           "TEXT"),
+        ("pacientes", "cliente_id",         "INTEGER"),
     ]
     # Local SQLite
     with engine.connect() as conn:

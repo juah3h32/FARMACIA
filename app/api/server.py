@@ -5,6 +5,7 @@ from pathlib import Path
 from app.api.routes import auth_routes, products_routes, sales_routes, inventory_routes
 from app.api.routes import dashboard_routes, pos_routes, customers_routes, employees_routes
 from app.api.routes import admin_routes, reports_routes, cortes_routes, ai_routes, suppliers_routes
+from app.api.routes import historial_routes
 import uvicorn
 import app.config as cfg
 
@@ -48,6 +49,7 @@ app.include_router(reports_routes.router,   prefix="/api/reportes",   tags=["Rep
 app.include_router(cortes_routes.router,    prefix="/api/cortes",     tags=["Cortes"])
 app.include_router(ai_routes.router,        prefix="/api/ai",         tags=["AI"])
 app.include_router(suppliers_routes.router, prefix="/api/proveedores", tags=["Proveedores"])
+app.include_router(historial_routes.router, prefix="/api/historial",  tags=["Historial"])
 
 
 @app.get("/api/health")

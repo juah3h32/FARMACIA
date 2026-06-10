@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from datetime import date, datetime
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Usuario, Cliente
 from app.api.routes.auth_routes import get_current_api_user
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -27,17 +27,36 @@ def listar_ventas(
             q = q.filter(Venta.creado_en >= datetime.combine(fecha_inicio, datetime.min.time()))
         if fecha_fin:
             q = q.filter(Venta.creado_en <= datetime.combine(fecha_fin, datetime.max.time()))
-        ventas = (q.options(joinedload(Venta.items))
+        ventas = (q.options(joinedload(Venta.items).joinedload(ItemVenta.producto),
+                            joinedload(Venta.usuario),
+                            joinedload(Venta.cliente))
                    .order_by(Venta.creado_en.desc()).limit(limite).all())
         return [
             {
-                "id": v.id,
-                "folio": v.folio,
-                "total": v.total,
-                "metodo_pago": v.metodo_pago.value,
-                "estado": v.estado.value,
-                "creado_en": v.creado_en.isoformat() if v.creado_en else None,
-                "num_items": len(v.items),  # pre-loaded, no extra query
+                "id":            v.id,
+                "folio":         v.folio,
+                "total":         v.total,
+                "subtotal":      v.subtotal,
+                "descuento":     v.descuento,
+                "iva":           v.iva,
+                "metodo_pago":   v.metodo_pago.value,
+                "estado":        v.estado.value,
+                "creado_en":     v.creado_en.isoformat() if v.creado_en else None,
+                "cajero":        v.usuario.nombre if v.usuario else "—",
+                "cajero_user":   v.usuario.username if v.usuario else "—",
+                "cliente_nombre": v.cliente.nombre if v.cliente else "Público general",
+                "num_items":     len(v.items),
+                "items": [
+                    {
+                        "producto_id":    i.producto_id,
+                        "nombre":         i.producto.nombre if i.producto else "—",
+                        "cantidad":       i.cantidad,
+                        "precio_unitario": i.precio_unitario,
+                        "descuento":      i.descuento,
+                        "subtotal":       i.subtotal,
+                    }
+                    for i in v.items
+                ],
             }
             for v in ventas
         ]
@@ -103,5 +122,46 @@ def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
                 for i in venta.items
             ],
         }
+    finally:
+        db.close()
+
+
+@router.delete("/{venta_id}")
+def eliminar_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar ventas")
+    db = get_db_session()
+    try:
+        venta = db.query(Venta).filter(Venta.id == venta_id).first()
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+        folio = venta.folio
+
+        # 1. Restore stock for each product sold in this sale
+        from app.database.models import MovimientoStock, Producto
+        movements = (
+            db.query(MovimientoStock)
+            .filter(
+                MovimientoStock.referencia_id == venta_id,
+                MovimientoStock.referencia_tipo == "venta",
+            )
+            .all()
+        )
+        for mov in movements:
+            prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
+            if prod and mov.cantidad and mov.cantidad > 0:
+                prod.stock += mov.cantidad
+            db.delete(mov)
+
+        # 2. Delete sale (cascade removes ItemVenta)
+        db.delete(venta)
+        db.commit()
+        return {"ok": True, "folio": folio}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()

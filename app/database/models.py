@@ -286,3 +286,54 @@ class Configuracion(Base):
     clave = Column(String(100), unique=True, nullable=False)
     valor = Column(Text)
     actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class SexoPaciente(str, enum.Enum):
+    masculino = "masculino"
+    femenino = "femenino"
+    otro = "otro"
+
+
+class Paciente(Base):
+    __tablename__ = "pacientes"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(200), nullable=False, index=True)
+    fecha_nacimiento = Column(Date, nullable=True)
+    sexo = Column(SAEnum(SexoPaciente), nullable=True)
+    telefono = Column(String(20))
+    email = Column(String(100))
+    direccion = Column(Text)
+    alergias = Column(Text)
+    antecedentes = Column(Text)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    activo = Column(Boolean, default=True)
+    creado_en = Column(DateTime, server_default=func.now())
+
+    registros = relationship("RegistroClinico", back_populates="paciente", cascade="all, delete-orphan")
+    cliente = relationship("Cliente")
+
+
+class RegistroClinico(Base):
+    __tablename__ = "registros_clinicos"
+
+    id = Column(Integer, primary_key=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    fecha = Column(DateTime, server_default=func.now())
+    presion_sistolica = Column(Integer)
+    presion_diastolica = Column(Integer)
+    pulso = Column(Integer)
+    temperatura = Column(Float)
+    peso = Column(Float)
+    talla = Column(Float)
+    glucosa = Column(Float)
+    saturacion_o2 = Column(Float)
+    motivo = Column(Text)
+    diagnostico = Column(Text)
+    tratamiento = Column(Text)
+    notas = Column(Text)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    creado_en = Column(DateTime, server_default=func.now())
+
+    paciente = relationship("Paciente", back_populates="registros")
+    usuario = relationship("Usuario")

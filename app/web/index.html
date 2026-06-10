@@ -1265,18 +1265,21 @@
             <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:#E2E8F0">
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
+              <span class="text-xs px-2 py-0.5 rounded-full ml-auto" style="background:#F1F5F9;color:#64748B" id="rep-count-badge">—</span>
             </div>
-            <div class="overflow-x-auto max-h-72 overflow-y-auto">
+            <div class="overflow-x-auto" style="max-height:480px;overflow-y:auto">
               <table class="w-full text-[11px]">
-                <thead class="sticky top-0" style="background:#F8FAFF">
+                <thead class="sticky top-0" style="background:#F8FAFF;z-index:1">
                   <tr>
+                    <th class="text-left px-3 py-2 font-semibold w-6" style="color:#64748B"></th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Folio</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Fecha</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Cajero</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Cliente</th>
-                    <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Total</th>
+                    <th class="text-right px-3 py-2 font-semibold" style="color:#64748B">Total</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Pago</th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Estado</th>
+                    <th class="text-center px-3 py-2 font-semibold rep-admin-col hidden" style="color:#64748B">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="rep-tbody"></tbody>
@@ -1719,6 +1722,97 @@
 
       </div>
 
+      <!-- ─── HISTORIAL CLÍNICO ──────────────────── -->
+      <div data-page="historial" class="page flex gap-4 overflow-hidden" style="height:100%">
+
+        <!-- Left: patient list -->
+        <div class="flex flex-col bg-white rounded-2xl border overflow-hidden flex-shrink-0" style="width:280px;border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+          <div class="flex items-center gap-2 px-3 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2" style="width:13px;height:13px;color:#94A3B8"></i>
+              <input id="hist-search" type="text" placeholder="Buscar paciente..."
+                     class="h-8 pl-8 pr-2 rounded-lg text-xs border w-full" style="border-color:#E2E8F0;background:#F8FAFF"
+                     oninput="histSearch(this.value)">
+            </div>
+            <button onclick="openHistPacienteModal(null)" title="Nuevo paciente"
+                    class="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style="background:#243366;color:#fff">
+              <i data-lucide="user-plus" style="width:14px;height:14px"></i>
+            </button>
+          </div>
+          <div class="flex-1 overflow-y-auto scroll-light" id="hist-patient-list">
+            <p class="text-xs text-center py-8" style="color:#94A3B8">Cargando...</p>
+          </div>
+        </div>
+
+        <!-- Right: detail panel -->
+        <div class="flex-1 flex flex-col gap-3 overflow-y-auto scroll-light min-w-0">
+          <!-- Empty state -->
+          <div class="flex-1 flex flex-col items-center justify-center gap-3" id="hist-empty-state">
+            <div class="w-16 h-16 rounded-2xl flex items-center justify-center" style="background:#F0F9FF">
+              <i data-lucide="heart-pulse" style="width:28px;height:28px;color:#0EA5E9"></i>
+            </div>
+            <p class="text-sm font-semibold" style="color:#64748B">Selecciona un paciente</p>
+            <p class="text-xs" style="color:#94A3B8">para ver su historial clínico</p>
+          </div>
+          <!-- Detail content -->
+          <div class="hidden flex flex-col gap-3" id="hist-detail-content">
+            <!-- Patient header -->
+            <div class="bg-white rounded-2xl border p-4 flex items-start gap-4 flex-shrink-0" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" id="hist-avatar" style="background:linear-gradient(135deg,#0EA5E9,#0284C7)">
+                <i data-lucide="user" style="width:20px;height:20px;color:#fff"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <h2 class="font-black text-base leading-tight" style="color:#0F172A" id="hist-detail-nombre">—</h2>
+                    <p class="text-xs mt-0.5" style="color:#64748B" id="hist-detail-meta">—</p>
+                  </div>
+                  <div class="flex gap-2 flex-shrink-0">
+                    <button onclick="openHistPacienteModal(S.histPid)"
+                            class="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                            style="background:#F1F5F9;color:#475569">
+                      <i data-lucide="pencil" style="width:13px;height:13px"></i> Editar
+                    </button>
+                    <button onclick="openHistRegistroModal()"
+                            class="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white"
+                            style="background:#243366">
+                      <i data-lucide="plus" style="width:13px;height:13px"></i> Nuevo registro
+                    </button>
+                  </div>
+                </div>
+                <div class="flex gap-4 mt-2 flex-wrap" id="hist-detail-chips"></div>
+              </div>
+            </div>
+            <!-- Alergias / antecedentes -->
+            <div class="grid grid-cols-2 gap-3 flex-shrink-0" id="hist-detail-info-cards"></div>
+            <!-- Records list -->
+            <div class="bg-white rounded-2xl border overflow-hidden flex-shrink-0" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
+              <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
+                <i data-lucide="activity" style="width:16px;height:16px;color:#64748B"></i>
+                <span class="font-semibold text-sm" style="color:#0F172A">Registros clínicos</span>
+                <span class="ml-auto text-xs px-2 py-0.5 rounded-full font-semibold" style="background:#F0F9FF;color:#0EA5E9" id="hist-records-count">0</span>
+              </div>
+              <div id="hist-records-list" class="divide-y" style="border-color:#F1F5F9">
+                <p class="text-xs text-center py-8" style="color:#94A3B8">Sin registros</p>
+              </div>
+            </div>
+
+            <!-- Sales history -->
+            <div class="bg-white rounded-2xl border overflow-hidden flex-shrink-0" id="hist-ventas-section" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);display:none">
+              <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
+                <i data-lucide="shopping-bag" style="width:16px;height:16px;color:#64748B"></i>
+                <span class="font-semibold text-sm" style="color:#0F172A">Historial de compras</span>
+                <span class="ml-auto text-xs px-2 py-0.5 rounded-full font-semibold" style="background:#F0FDF4;color:#16A34A" id="hist-ventas-count">0</span>
+              </div>
+              <div id="hist-ventas-list" class="divide-y" style="border-color:#F1F5F9">
+                <p class="text-xs text-center py-8" style="color:#94A3B8">Sin compras registradas</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div><!-- /right panel -->
 </div><!-- /app -->
@@ -1799,6 +1893,186 @@
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-purge-historial')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
       <button onclick="executePurgeHistorial()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#EF4444,#DC2626)">🗑 Eliminar historial</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ HISTORIAL: MODAL PACIENTE ═══════════ -->
+<div id="modal-hist-paciente" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(4px)" onclick="closeModal('modal-hist-paciente')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl" style="width:500px;max-width:95vw">
+    <div class="h-1 w-full rounded-t-2xl" style="background:linear-gradient(90deg,#0EA5E9,#0284C7)"></div>
+    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+      <h3 class="font-black text-base" style="color:#0F172A" id="hist-pac-modal-title">Nuevo Paciente</h3>
+      <button onclick="closeModal('modal-hist-paciente')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100">
+        <i data-lucide="x" style="width:16px;height:16px;color:#64748B"></i>
+      </button>
+    </div>
+    <div class="px-6 py-4 space-y-3 overflow-y-auto" style="max-height:70vh">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="text-xs font-semibold" style="color:#374151">Nombre completo *</label>
+          <input id="hist-pac-nombre" type="text" placeholder="Nombre completo"
+                 class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Fecha de nacimiento</label>
+          <input id="hist-pac-dob" type="date"
+                 class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Sexo</label>
+          <select id="hist-pac-sexo" class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+            <option value="">— Seleccionar —</option>
+            <option value="masculino">Masculino</option>
+            <option value="femenino">Femenino</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Teléfono</label>
+          <input id="hist-pac-tel" type="text" placeholder="Teléfono"
+                 class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Email</label>
+          <input id="hist-pac-email" type="email" placeholder="Email"
+                 class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs font-semibold" style="color:#374151">Dirección</label>
+          <input id="hist-pac-dir" type="text" placeholder="Dirección"
+                 class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs font-semibold" style="color:#374151">Alergias conocidas</label>
+          <textarea id="hist-pac-alergias" rows="2" placeholder="Alergias conocidas..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs font-semibold" style="color:#374151">Antecedentes médicos</label>
+          <textarea id="hist-pac-antecedentes" rows="2" placeholder="Antecedentes relevantes (enfermedades crónicas, cirugías, etc.)..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+        <div class="col-span-2">
+          <label class="text-xs font-semibold" style="color:#374151">Vincular cliente de ventas
+            <span class="font-normal" style="color:#94A3B8">(opcional — para ver historial de compras)</span>
+          </label>
+          <div class="flex gap-2 mt-1">
+            <input id="hist-pac-cliente-search" type="text" placeholder="Buscar cliente..."
+                   class="flex-1 h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0"
+                   oninput="histSearchCliente(this.value)">
+            <input id="hist-pac-cliente-id" type="hidden" value="">
+          </div>
+          <div id="hist-pac-cliente-results" class="hidden mt-1 border rounded-xl overflow-hidden" style="border-color:#E2E8F0;max-height:140px;overflow-y:auto"></div>
+          <p id="hist-pac-cliente-sel" class="text-xs mt-1 font-semibold" style="color:#10B981"></p>
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-3 flex gap-2 border-t justify-end" style="border-color:#E2E8F0">
+      <button onclick="closeModal('modal-hist-paciente')" class="h-9 px-4 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cancelar</button>
+      <button onclick="saveHistPaciente()" class="h-9 px-5 rounded-xl text-sm font-semibold text-white" style="background:#243366">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ HISTORIAL: MODAL REGISTRO ═══════════ -->
+<div id="modal-hist-registro" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(4px)" onclick="closeModal('modal-hist-registro')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl" style="width:580px;max-width:95vw">
+    <div class="h-1 w-full rounded-t-2xl" style="background:linear-gradient(90deg,#10B981,#059669)"></div>
+    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-2">
+        <i data-lucide="heart-pulse" style="width:18px;height:18px;color:#10B981"></i>
+        <h3 class="font-black text-base" style="color:#0F172A">Nuevo Registro Clínico</h3>
+      </div>
+      <button onclick="closeModal('modal-hist-registro')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100">
+        <i data-lucide="x" style="width:16px;height:16px;color:#64748B"></i>
+      </button>
+    </div>
+    <div class="px-6 py-4 space-y-4 overflow-y-auto" style="max-height:75vh">
+      <div>
+        <label class="text-xs font-semibold" style="color:#374151">Fecha y hora</label>
+        <input id="hist-reg-fecha" type="datetime-local"
+               class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+      </div>
+      <!-- Signos vitales -->
+      <div>
+        <p class="text-xs font-bold mb-2 tracking-wide" style="color:#0EA5E9">SIGNOS VITALES</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2 rounded-xl p-3" style="background:#EFF6FF;border:1px solid #BFDBFE">
+            <p class="text-xs font-semibold mb-2" style="color:#1E40AF">Presión arterial (mmHg)</p>
+            <div class="flex items-center gap-2">
+              <input id="hist-reg-sistolica" type="number" placeholder="Sistólica (120)" min="50" max="300"
+                     class="flex-1 h-9 px-3 rounded-lg text-sm border" style="border-color:#BFDBFE"
+                     oninput="histUpdateBPPreview()">
+              <span class="text-base font-bold" style="color:#3B82F6">/</span>
+              <input id="hist-reg-diastolica" type="number" placeholder="Diastólica (80)" min="30" max="200"
+                     class="flex-1 h-9 px-3 rounded-lg text-sm border" style="border-color:#BFDBFE"
+                     oninput="histUpdateBPPreview()">
+              <span id="hist-bp-preview" class="text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0" style="background:#DBEAFE;color:#1E40AF;min-width:80px;text-align:center">—</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Pulso (lpm)</label>
+            <input id="hist-reg-pulso" type="number" placeholder="ej. 72" min="20" max="300"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Temperatura (°C)</label>
+            <input id="hist-reg-temp" type="number" placeholder="ej. 36.5" min="30" max="45" step="0.1"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Peso (kg)</label>
+            <input id="hist-reg-peso" type="number" placeholder="ej. 70" min="1" max="400" step="0.1"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Talla (cm)</label>
+            <input id="hist-reg-talla" type="number" placeholder="ej. 165" min="30" max="250"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Glucosa (mg/dL)</label>
+            <input id="hist-reg-glucosa" type="number" placeholder="ej. 90" min="20" max="800"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-semibold" style="color:#374151">Sat. O₂ (%)</label>
+            <input id="hist-reg-o2" type="number" placeholder="ej. 98" min="50" max="100" step="0.1"
+                   class="mt-1 w-full h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0">
+          </div>
+        </div>
+      </div>
+      <!-- Notas clínicas -->
+      <div class="space-y-3">
+        <p class="text-xs font-bold tracking-wide" style="color:#10B981">NOTAS CLÍNICAS</p>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Motivo de consulta</label>
+          <textarea id="hist-reg-motivo" rows="2" placeholder="Motivo de la visita..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Diagnóstico / Observaciones</label>
+          <textarea id="hist-reg-diagnostico" rows="2" placeholder="Diagnóstico u observaciones..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Tratamiento / Indicaciones</label>
+          <textarea id="hist-reg-tratamiento" rows="2" placeholder="Tratamiento indicado..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:#374151">Notas adicionales</label>
+          <textarea id="hist-reg-notas" rows="2" placeholder="Notas adicionales..."
+                    class="mt-1 w-full px-3 py-2 rounded-xl text-sm border resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-3 flex gap-2 border-t justify-end" style="border-color:#E2E8F0">
+      <button onclick="closeModal('modal-hist-registro')" class="h-9 px-4 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cancelar</button>
+      <button onclick="saveHistRegistro()" class="h-9 px-5 rounded-xl text-sm font-semibold text-white" style="background:#10B981">Guardar registro</button>
     </div>
   </div>
 </div>
@@ -2375,6 +2649,7 @@ const NAV = [
   { key:'suppliers', icon:'truck',            label:'Proveedores',   admin:true  },
   { key:'employees', icon:'user-cog',         label:'Empleados',     admin:true  },
   { key:'settings',  icon:'settings',         label:'Configuración', admin:true  },
+  { key:'historial', icon:'heart-pulse',      label:'Historial Clínico', admin:false },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -2824,7 +3099,7 @@ function tickClock() {
 const TITLES={
   dashboard:'Dashboard', pos:'Punto de Venta', inventory:'Inventario',
   customers:'Clientes', reports:'Reportes', suppliers:'Proveedores',
-  employees:'Empleados', settings:'Configuración'
+  employees:'Empleados', settings:'Configuración', historial:'Historial Clínico'
 };
 
 function navigate(page) {
@@ -2862,6 +3137,7 @@ function loadPage(page) {
   if (page==='suppliers')  loadSuppliers();
   if (page==='reports')    initReports();
   if (page==='settings')   initSettings();
+  if (page==='historial')  loadHistorial();
   icons();
 }
 
@@ -4161,22 +4437,114 @@ async function loadReports() {
 
   if (ventasRes.ok) {
     const ventas = await ventasRes.json();
-    document.getElementById('rep-tbody').innerHTML = ventas.length
-      ? ventas.map((v,i) => `
-        <tr class="hovrow border-b" style="border-color:#F1F5F9;background:${i%2?'#F8FAFF':'#fff'}">
-          <td class="px-4 py-2 font-mono font-semibold" style="color:#243366">${v.folio||v.id}</td>
-          <td class="px-4 py-2" style="color:#374151">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
-          <td class="px-4 py-2" style="color:#374151">${v.cajero||'—'}</td>
-          <td class="px-4 py-2" style="color:#64748B">${v.cliente_nombre||v.cliente||'Público general'}</td>
-          <td class="px-4 py-2 font-semibold" style="color:#0F172A">${fmt(v.total)}</td>
-          <td class="px-4 py-2" style="color:#64748B">${v.metodo_pago}</td>
-          <td class="px-4 py-2">
-            <span class="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                  style="background:${v.estado==='completada'?'#F0FDF4':'#FEF2F2'};color:${v.estado==='completada'?'#16A34A':'#EF4444'}">${v.estado}</span>
+    const isAdmin = S.user?.rol === 'admin';
+
+    // Show/hide admin column
+    document.querySelectorAll('.rep-admin-col').forEach(el => {
+      el.classList.toggle('hidden', !isAdmin);
+    });
+    document.getElementById('rep-count-badge').textContent = `${ventas.length} ventas`;
+
+    const pagoIcon = { efectivo:'💵', tarjeta:'💳', transferencia:'🏦', mixto:'🔀' };
+
+    if (!ventas.length) {
+      document.getElementById('rep-tbody').innerHTML =
+        `<tr><td colspan="${isAdmin?9:8}" class="text-center py-6" style="color:#94A3B8">Sin resultados en el periodo</td></tr>`;
+    } else {
+      document.getElementById('rep-tbody').innerHTML = ventas.map((v,i) => {
+        const bg = i%2 ? '#F8FAFF' : '#fff';
+        const estadoBg    = v.estado==='completada' ? '#F0FDF4' : '#FEF2F2';
+        const estadoColor = v.estado==='completada' ? '#16A34A' : '#EF4444';
+        const itemsSafe = JSON.stringify(v.items||[]).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+        const deleteBtn = isAdmin
+          ? `<button onclick="repDeleteVenta(${v.id},'${v.folio||v.id}')"
+                    class="h-6 px-2 rounded text-[10px] font-semibold flex items-center gap-1 border transition-all"
+                    style="border-color:#FECACA;color:#EF4444;background:#FEF2F2"
+                    onmouseenter="this.style.background='#EF4444';this.style.color='#fff'"
+                    onmouseleave="this.style.background='#FEF2F2';this.style.color='#EF4444'">
+               <i data-lucide="trash-2" style="width:10px;height:10px"></i> Eliminar
+             </button>` : '';
+
+        return `
+        <tr class="hovrow border-b cursor-pointer" id="rep-row-${v.id}"
+            style="border-color:#F1F5F9;background:${bg}"
+            onclick="repToggleDetail(${v.id})">
+          <td class="px-3 py-2 text-center">
+            <i data-lucide="chevron-right" id="rep-chevron-${v.id}" style="width:12px;height:12px;color:#94A3B8;transition:transform .15s"></i>
           </td>
-        </tr>`).join('')
-      : '<tr><td colspan="7" class="text-center py-6" style="color:#94A3B8">Sin resultados</td></tr>';
+          <td class="px-3 py-2 font-mono font-bold" style="color:#243366">${v.folio||'#'+v.id}</td>
+          <td class="px-3 py-2" style="color:#374151">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
+          <td class="px-3 py-2 font-semibold" style="color:#7C3AED">${v.cajero||'—'}</td>
+          <td class="px-3 py-2" style="color:#64748B">${v.cliente_nombre||'Público general'}</td>
+          <td class="px-3 py-2 text-right font-bold" style="color:#0F172A">${fmt(v.total)}</td>
+          <td class="px-3 py-2" style="color:#64748B">${pagoIcon[v.metodo_pago]||''} ${v.metodo_pago}</td>
+          <td class="px-3 py-2">
+            <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                  style="background:${estadoBg};color:${estadoColor}">${v.estado}</span>
+          </td>
+          ${isAdmin ? `<td class="px-3 py-2 text-center rep-admin-col" onclick="event.stopPropagation()">${deleteBtn}</td>` : ''}
+        </tr>
+        <tr id="rep-detail-${v.id}" class="hidden" style="background:#FAFBFF">
+          <td colspan="${isAdmin?9:8}" class="px-4 pb-3 pt-1">
+            ${repItemsTable(v.items||[], v.descuento, v.iva)}
+          </td>
+        </tr>`;
+      }).join('');
+    }
+    icons();
   }
+}
+
+function repItemsTable(items, descGlobal, iva) {
+  if (!items.length) return `<p class="text-xs py-2" style="color:#94A3B8">Sin detalle de productos</p>`;
+  const rows = items.map(i =>
+    `<tr class="border-b" style="border-color:#F1F5F9">
+      <td class="py-1.5 pr-4 text-xs" style="color:#374151">${i.nombre}</td>
+      <td class="py-1.5 px-3 text-xs text-center" style="color:#64748B">${i.cantidad}</td>
+      <td class="py-1.5 px-3 text-xs text-right" style="color:#64748B">${fmt(i.precio_unitario)}</td>
+      <td class="py-1.5 px-3 text-xs text-right" style="color:${i.descuento>0?'#F59E0B':'#64748B'}">${i.descuento>0?'−'+fmt(i.descuento):'—'}</td>
+      <td class="py-1.5 pl-3 text-xs text-right font-semibold" style="color:#0F172A">${fmt(i.subtotal)}</td>
+    </tr>`
+  ).join('');
+  const extras = [
+    descGlobal > 0 ? `<tr><td colspan="4" class="text-right pt-1 text-xs" style="color:#F59E0B">Descuento global</td><td class="pl-3 text-right text-xs font-semibold" style="color:#F59E0B">−${fmt(descGlobal)}</td></tr>` : '',
+    iva > 0        ? `<tr><td colspan="4" class="text-right pt-1 text-xs" style="color:#64748B">IVA</td><td class="pl-3 text-right text-xs" style="color:#64748B">+${fmt(iva)}</td></tr>` : '',
+  ].join('');
+  return `<table class="w-full" style="max-width:600px">
+    <thead><tr style="background:#F1F5F9">
+      <th class="text-left py-1 pr-4 text-[10px] font-semibold" style="color:#94A3B8">PRODUCTO</th>
+      <th class="text-center py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">CANT.</th>
+      <th class="text-right py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">P. UNIT.</th>
+      <th class="text-right py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">DESC.</th>
+      <th class="text-right py-1 pl-3 text-[10px] font-semibold" style="color:#94A3B8">SUBTOTAL</th>
+    </tr></thead>
+    <tbody>${rows}${extras}</tbody>
+  </table>`;
+}
+
+function repToggleDetail(id) {
+  const row = document.getElementById(`rep-detail-${id}`);
+  const chev = document.getElementById(`rep-chevron-${id}`);
+  if (!row) return;
+  const open = row.classList.toggle('hidden');
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+async function repDeleteVenta(id, folio) {
+  openConfirmDel(
+    `¿Eliminar venta ${folio}?`,
+    'Se eliminará de todas las bases de datos y se restaurará el stock. Esta acción no se puede deshacer.',
+    async () => {
+      const res = await api(`/ventas/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Error desconocido'}));
+        toast(err.detail || 'Error al eliminar', 'error'); return;
+      }
+      toast(`Venta ${folio} eliminada y stock restaurado`, 'success');
+      loadReports();
+    }
+  );
 }
 
 // ── Cortes de Caja ────────────────────────────────────────────────────────
@@ -5973,6 +6341,442 @@ function confirmFactoryReset() {
     }
   }, true); // capture phase — fires before input receives the key
 })();
+
+// ══════════════════════════════════════════════════════════
+// HISTORIAL CLÍNICO
+// ══════════════════════════════════════════════════════════
+S.histPid = null;
+S.histPacientes = [];
+
+function histBPClass(s, d) {
+  if (!s || !d) return null;
+  if (s > 180 || d > 120) return { label:'Crisis',          color:'#EF4444', bg:'#FEE2E2' };
+  if (s >= 140 || d >= 90) return { label:'Hipertensión II', color:'#EF4444', bg:'#FEE2E2' };
+  if (s >= 130 || d >= 80) return { label:'Hipertensión I',  color:'#F97316', bg:'#FFEDD5' };
+  if (s >= 120 && d < 80)  return { label:'Elevada',         color:'#F59E0B', bg:'#FEF3C7' };
+  return                          { label:'Normal',           color:'#10B981', bg:'#D1FAE5' };
+}
+
+function histUpdateBPPreview() {
+  const s = parseInt(document.getElementById('hist-reg-sistolica').value);
+  const d = parseInt(document.getElementById('hist-reg-diastolica').value);
+  const el = document.getElementById('hist-bp-preview');
+  const cls = histBPClass(s, d);
+  if (cls) { el.textContent = cls.label; el.style.background = cls.bg; el.style.color = cls.color; }
+  else     { el.textContent = '—'; el.style.background = '#DBEAFE'; el.style.color = '#1E40AF'; }
+}
+
+function calcAge(dob) {
+  if (!dob) return null;
+  const today = new Date(), birth = new Date(dob + 'T00:00:00');
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+async function loadHistorial() {
+  const res = await api('/historial/pacientes');
+  if (!res.ok) return;
+  S.histPacientes = await res.json();
+  renderHistPacientes(S.histPacientes);
+  if (S.histPid) openHistPaciente(S.histPid);
+}
+
+function renderHistPacientes(list) {
+  const el = document.getElementById('hist-patient-list');
+  if (!list.length) {
+    el.innerHTML = `<p class="text-xs text-center py-8" style="color:#94A3B8">Sin pacientes registrados</p>`;
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    const age = calcAge(p.fecha_nacimiento);
+    const ageStr = age !== null ? `${age} años` : '';
+    const sexIcon = p.sexo === 'femenino' ? '♀' : p.sexo === 'masculino' ? '♂' : '';
+    const isActive = S.histPid === p.id;
+    const avatarBg = p.sexo === 'femenino' ? '#EC4899' : p.sexo === 'masculino' ? '#0EA5E9' : '#8B5CF6';
+    return `<div class="px-3 py-2.5 cursor-pointer transition-colors flex items-center gap-2.5"
+                 style="background:${isActive?'#EFF6FF':'transparent'};border-left:3px solid ${isActive?'#0EA5E9':'transparent'}"
+                 onmouseenter="this.style.background='${isActive?'#EFF6FF':'#F8FAFF'}'"
+                 onmouseleave="this.style.background='${isActive?'#EFF6FF':'transparent'}'"
+                 onclick="openHistPaciente(${p.id})">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+           style="background:${avatarBg}">${(p.nombre||'?')[0].toUpperCase()}</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold truncate" style="color:#0F172A">${p.nombre}</p>
+        <p class="text-xs truncate" style="color:#94A3B8">${[ageStr, sexIcon, p.telefono].filter(Boolean).join(' · ')}</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function histSearch(q) {
+  if (!q) { renderHistPacientes(S.histPacientes); return; }
+  const lq = q.toLowerCase();
+  renderHistPacientes(S.histPacientes.filter(p =>
+    p.nombre.toLowerCase().includes(lq) || (p.telefono||'').includes(q)
+  ));
+}
+
+async function openHistPaciente(id) {
+  S.histPid = id;
+  histSearch(document.getElementById('hist-search').value);
+  const res = await api(`/historial/pacientes/${id}`);
+  if (!res.ok) { toast('Error al cargar paciente', 'error'); return; }
+  renderHistDetail(await res.json());
+}
+
+function renderHistDetail(p) {
+  document.getElementById('hist-empty-state').classList.add('hidden');
+  const content = document.getElementById('hist-detail-content');
+  content.classList.remove('hidden');
+  content.classList.add('flex', 'flex-col', 'gap-3');
+
+  document.getElementById('hist-detail-nombre').textContent = p.nombre;
+  const age = calcAge(p.fecha_nacimiento);
+  document.getElementById('hist-detail-meta').textContent = [
+    age !== null ? `${age} años` : null,
+    p.fecha_nacimiento ? fmtDate(p.fecha_nacimiento) : null,
+    p.sexo ? p.sexo.charAt(0).toUpperCase()+p.sexo.slice(1) : null,
+  ].filter(Boolean).join(' · ') || '—';
+
+  const avatarBg = p.sexo === 'femenino' ? 'linear-gradient(135deg,#EC4899,#BE185D)'
+                 : p.sexo === 'masculino' ? 'linear-gradient(135deg,#0EA5E9,#0284C7)'
+                 : 'linear-gradient(135deg,#8B5CF6,#7C3AED)';
+  const av = document.getElementById('hist-avatar');
+  if (av) av.style.background = avatarBg;
+
+  document.getElementById('hist-detail-chips').innerHTML = [
+    p.telefono  ? `<span class="flex items-center gap-1 text-xs" style="color:#64748B"><i data-lucide="phone" style="width:11px;height:11px"></i>${p.telefono}</span>` : '',
+    p.email     ? `<span class="flex items-center gap-1 text-xs" style="color:#64748B"><i data-lucide="mail" style="width:11px;height:11px"></i>${p.email}</span>` : '',
+    p.direccion ? `<span class="flex items-center gap-1 text-xs" style="color:#64748B"><i data-lucide="map-pin" style="width:11px;height:11px"></i>${p.direccion}</span>` : '',
+  ].join('');
+
+  const card = (icon, color, bg, title, text) => !text ? '' : `
+    <div class="bg-white rounded-xl border p-3" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-2 mb-1.5">
+        <div class="w-6 h-6 rounded-lg flex items-center justify-center" style="background:${bg}">
+          <i data-lucide="${icon}" style="width:12px;height:12px;color:${color}"></i>
+        </div>
+        <span class="text-xs font-bold uppercase tracking-wide" style="color:${color}">${title}</span>
+      </div>
+      <p class="text-xs leading-relaxed" style="color:#374151">${text}</p>
+    </div>`;
+  document.getElementById('hist-detail-info-cards').innerHTML =
+    card('alert-triangle','#F59E0B','#FEF3C7','Alergias', p.alergias) +
+    card('file-text','#8B5CF6','#F5F3FF','Antecedentes', p.antecedentes);
+
+  const records = p.registros || [];
+  document.getElementById('hist-records-count').textContent = records.length;
+  const rList = document.getElementById('hist-records-list');
+  rList.innerHTML = records.length
+    ? records.map(r => histRecordCard(r)).join('')
+    : `<p class="text-xs text-center py-8" style="color:#94A3B8">Sin registros clínicos aún</p>`;
+
+  // Load sales if linked to a cliente
+  const ventasSection = document.getElementById('hist-ventas-section');
+  if (p.cliente_id) {
+    ventasSection.style.display = '';
+    document.getElementById('hist-ventas-list').innerHTML =
+      `<p class="text-xs text-center py-6" style="color:#94A3B8">Cargando compras...</p>`;
+    api(`/historial/pacientes/${p.id}/ventas`).then(async res => {
+      if (!res.ok) return;
+      const ventas = await res.json();
+      document.getElementById('hist-ventas-count').textContent = ventas.length;
+      document.getElementById('hist-ventas-list').innerHTML = ventas.length
+        ? ventas.map(v => histVentaCard(v)).join('')
+        : `<p class="text-xs text-center py-8" style="color:#94A3B8">Sin compras registradas</p>`;
+      icons();
+    });
+  } else {
+    ventasSection.style.display = 'none';
+  }
+  icons();
+}
+
+function histRecordCard(r) {
+  const fecha = r.fecha
+    ? new Date(r.fecha).toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const bp = (r.presion_sistolica && r.presion_diastolica)
+    ? `${r.presion_sistolica}/${r.presion_diastolica} mmHg` : null;
+  const bpCls = histBPClass(r.presion_sistolica, r.presion_diastolica);
+
+  const vitals = [
+    bp ? `<span class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg" style="background:${bpCls?.bg||'#F1F5F9'};color:${bpCls?.color||'#475569'}"><i data-lucide="heart" style="width:10px;height:10px"></i>${bp}${bpCls?' · '+bpCls.label:''}</span>` : '',
+    r.pulso         ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#F0FDF4;color:#16A34A">${r.pulso} lpm</span>` : '',
+    r.temperatura   ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#FFF7ED;color:#EA580C">${r.temperatura}°C</span>` : '',
+    r.peso          ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#F5F3FF;color:#7C3AED">${r.peso} kg</span>` : '',
+    r.talla         ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#F0F9FF;color:#0284C7">${r.talla} cm</span>` : '',
+    r.glucosa       ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#FFF7ED;color:#D97706">${r.glucosa} mg/dL gluc.</span>` : '',
+    r.saturacion_o2 ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#EFF6FF;color:#2563EB">${r.saturacion_o2}% O₂</span>` : '',
+  ].filter(Boolean).join('');
+
+  const notes = [
+    r.motivo      ? `<p class="text-xs"><span class="font-semibold" style="color:#374151">Motivo:</span> <span style="color:#475569">${r.motivo}</span></p>` : '',
+    r.diagnostico ? `<p class="text-xs"><span class="font-semibold" style="color:#374151">Diagnóstico:</span> <span style="color:#475569">${r.diagnostico}</span></p>` : '',
+    r.tratamiento ? `<p class="text-xs"><span class="font-semibold" style="color:#374151">Tratamiento:</span> <span style="color:#475569">${r.tratamiento}</span></p>` : '',
+    r.notas       ? `<p class="text-xs"><span class="font-semibold" style="color:#374151">Notas:</span> <span style="color:#475569">${r.notas}</span></p>` : '',
+  ].filter(Boolean).join('');
+
+  return `<div class="px-4 py-3 hover:bg-slate-50 transition-colors">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0F9FF">
+          <i data-lucide="activity" style="width:13px;height:13px;color:#0EA5E9"></i>
+        </div>
+        <div>
+          <p class="text-xs font-bold" style="color:#0F172A">${fecha}</p>
+          ${r.usuario_nombre ? `<p class="text-xs" style="color:#94A3B8">${r.usuario_nombre}</p>` : ''}
+        </div>
+      </div>
+      <button onclick="deleteHistRegistro(${r.id})" title="Eliminar registro"
+              class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+              style="color:#CBD5E1" onmouseenter="this.style.background='#FEE2E2';this.style.color='#EF4444'"
+              onmouseleave="this.style.background='transparent';this.style.color='#CBD5E1'">
+        <i data-lucide="trash-2" style="width:12px;height:12px"></i>
+      </button>
+    </div>
+    ${vitals ? `<div class="flex flex-wrap gap-1.5 mb-2">${vitals}</div>` : ''}
+    ${notes  ? `<div class="space-y-0.5">${notes}</div>` : ''}
+  </div>`;
+}
+
+function histVentaCard(v) {
+  const fecha = v.creado_en
+    ? new Date(v.creado_en).toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const estadoBg    = v.estado === 'completada' ? '#F0FDF4' : '#FEF2F2';
+  const estadoColor = v.estado === 'completada' ? '#16A34A' : '#EF4444';
+  const pagoIcon    = { efectivo:'banknote', tarjeta:'credit-card', transferencia:'send', mixto:'layers' };
+
+  const itemsHtml = (v.items||[]).map(i => {
+    const desc = i.descuento > 0 ? ` <span style="color:#F59E0B">(−${fmt(i.descuento)})</span>` : '';
+    return `<tr>
+      <td class="py-0.5 pr-4 text-xs" style="color:#374151">${i.nombre}</td>
+      <td class="py-0.5 px-2 text-xs text-center" style="color:#64748B">${i.cantidad}</td>
+      <td class="py-0.5 px-2 text-xs text-right" style="color:#64748B">${fmt(i.precio_unitario)}</td>
+      <td class="py-0.5 pl-2 text-xs text-right font-semibold" style="color:#0F172A">${fmt(i.subtotal)}${desc}</td>
+    </tr>`;
+  }).join('');
+
+  const isAdmin = S.user?.rol === 'admin';
+  const delBtn = isAdmin
+    ? `<button onclick="deleteHistVenta(${v.id})" title="Eliminar venta (admin)"
+              class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+              style="color:#CBD5E1" onmouseenter="this.style.background='#FEE2E2';this.style.color='#EF4444'"
+              onmouseleave="this.style.background='transparent';this.style.color='#CBD5E1'">
+         <i data-lucide="trash-2" style="width:12px;height:12px"></i>
+       </button>` : '';
+
+  return `<div class="px-4 py-3 hover:bg-slate-50 transition-colors">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0FDF4">
+          <i data-lucide="shopping-bag" style="width:13px;height:13px;color:#16A34A"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <p class="text-xs font-bold font-mono" style="color:#243366">${v.folio||'#'+v.id}</p>
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style="background:${estadoBg};color:${estadoColor}">${v.estado}</span>
+          </div>
+          <p class="text-xs" style="color:#94A3B8">${fecha}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="text-right">
+          <p class="text-sm font-black" style="color:#0F172A">${fmt(v.total)}</p>
+          <div class="flex items-center gap-1 justify-end">
+            <i data-lucide="${pagoIcon[v.metodo_pago]||'wallet'}" style="width:10px;height:10px;color:#94A3B8"></i>
+            <span class="text-xs" style="color:#94A3B8">${v.metodo_pago}</span>
+          </div>
+        </div>
+        ${delBtn}
+      </div>
+    </div>
+    <!-- Cajero badge -->
+    <div class="flex items-center gap-1.5 mb-2">
+      <i data-lucide="user-check" style="width:11px;height:11px;color:#8B5CF6"></i>
+      <span class="text-xs font-semibold" style="color:#8B5CF6">Atendió:</span>
+      <span class="text-xs" style="color:#374151">${v.cajero||'—'}</span>
+      <span class="text-xs" style="color:#94A3B8">(${v.cajero_usuario||'—'})</span>
+    </div>
+    <!-- Products table -->
+    ${itemsHtml ? `<table class="w-full mb-1">
+      <thead><tr>
+        <th class="text-left text-[10px] font-semibold pb-1" style="color:#94A3B8">Producto</th>
+        <th class="text-center text-[10px] font-semibold pb-1 px-2" style="color:#94A3B8">Cant.</th>
+        <th class="text-right text-[10px] font-semibold pb-1 px-2" style="color:#94A3B8">P. Unit.</th>
+        <th class="text-right text-[10px] font-semibold pb-1 pl-2" style="color:#94A3B8">Subtotal</th>
+      </tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>` : ''}
+    ${v.descuento > 0 ? `<p class="text-xs text-right" style="color:#F59E0B">Descuento total: −${fmt(v.descuento)}</p>` : ''}
+  </div>`;
+}
+
+async function deleteHistVenta(id) {
+  if (S.user?.rol !== 'admin') return;
+  openConfirmDel(
+    '¿Eliminar esta venta?',
+    'Se eliminará permanentemente de la base de datos en todas las PCs sincronizadas. Esta acción no se puede deshacer.',
+    async () => {
+      const res = await api(`/ventas/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Error desconocido'}));
+        toast(err.detail || 'Error al eliminar venta', 'error');
+        return;
+      }
+      toast('Venta eliminada', 'success');
+      openHistPaciente(S.histPid);
+    }
+  );
+}
+
+// ─── cliente search for patient modal ──────────────
+let _histClienteTimer = null;
+async function histSearchCliente(q) {
+  clearTimeout(_histClienteTimer);
+  const resultsEl = document.getElementById('hist-pac-cliente-results');
+  if (!q || q.length < 2) { resultsEl.classList.add('hidden'); return; }
+  _histClienteTimer = setTimeout(async () => {
+    const res = await api(`/historial/clientes?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return;
+    const clientes = await res.json();
+    if (!clientes.length) { resultsEl.classList.add('hidden'); return; }
+    resultsEl.innerHTML = clientes.map(c =>
+      `<div class="px-3 py-2 text-xs cursor-pointer hover:bg-blue-50 border-b last:border-0" style="border-color:#F1F5F9;color:#0F172A"
+            onclick="histSelectCliente(${c.id}, '${c.nombre.replace(/'/g,"\\'")}')">
+        <span class="font-semibold">${c.nombre}</span>${c.telefono ? ` · ${c.telefono}` : ''}
+      </div>`
+    ).join('');
+    resultsEl.classList.remove('hidden');
+  }, 250);
+}
+
+function histSelectCliente(id, nombre) {
+  document.getElementById('hist-pac-cliente-id').value    = id;
+  document.getElementById('hist-pac-cliente-search').value = nombre;
+  document.getElementById('hist-pac-cliente-sel').textContent = `✓ Vinculado: ${nombre}`;
+  document.getElementById('hist-pac-cliente-results').classList.add('hidden');
+}
+
+function histClearClienteSearch() {
+  document.getElementById('hist-pac-cliente-id').value    = '';
+  document.getElementById('hist-pac-cliente-search').value = '';
+  document.getElementById('hist-pac-cliente-sel').textContent = '';
+  document.getElementById('hist-pac-cliente-results').classList.add('hidden');
+}
+
+function openHistPacienteModal(id) {
+  const isEdit = id != null;
+  document.getElementById('hist-pac-modal-title').textContent = isEdit ? 'Editar Paciente' : 'Nuevo Paciente';
+  ['nombre','dob','tel','email','dir','alergias','antecedentes'].forEach(f => {
+    const el = document.getElementById('hist-pac-'+f);
+    if (el) el.value = '';
+  });
+  document.getElementById('hist-pac-sexo').value = '';
+  histClearClienteSearch();
+
+  if (isEdit) {
+    const p = S.histPacientes.find(x => x.id === id) || {};
+    document.getElementById('hist-pac-nombre').value       = p.nombre || '';
+    document.getElementById('hist-pac-dob').value          = p.fecha_nacimiento || '';
+    document.getElementById('hist-pac-sexo').value         = p.sexo || '';
+    document.getElementById('hist-pac-tel').value          = p.telefono || '';
+    document.getElementById('hist-pac-email').value        = p.email || '';
+    document.getElementById('hist-pac-dir').value          = p.direccion || '';
+    document.getElementById('hist-pac-alergias').value     = p.alergias || '';
+    document.getElementById('hist-pac-antecedentes').value = p.antecedentes || '';
+    if (p.cliente_id && p.cliente_nombre) {
+      histSelectCliente(p.cliente_id, p.cliente_nombre);
+    }
+  }
+  document.getElementById('modal-hist-paciente').dataset.editId = id != null ? id : '';
+  const m = document.getElementById('modal-hist-paciente');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  icons();
+  setTimeout(() => document.getElementById('hist-pac-nombre').focus(), 50);
+}
+
+async function saveHistPaciente() {
+  const nombre = document.getElementById('hist-pac-nombre').value.trim();
+  if (!nombre) { toast('El nombre es requerido', 'error'); return; }
+  const clienteId = document.getElementById('hist-pac-cliente-id').value;
+  const body = {
+    nombre,
+    fecha_nacimiento: document.getElementById('hist-pac-dob').value || null,
+    sexo:             document.getElementById('hist-pac-sexo').value || null,
+    telefono:         document.getElementById('hist-pac-tel').value.trim() || null,
+    email:            document.getElementById('hist-pac-email').value.trim() || null,
+    direccion:        document.getElementById('hist-pac-dir').value.trim() || null,
+    alergias:         document.getElementById('hist-pac-alergias').value.trim() || null,
+    antecedentes:     document.getElementById('hist-pac-antecedentes').value.trim() || null,
+    cliente_id:       clienteId ? parseInt(clienteId) : null,
+  };
+  const editId = document.getElementById('modal-hist-paciente').dataset.editId;
+  const method = editId ? 'PUT' : 'POST';
+  const url    = editId ? `/historial/pacientes/${editId}` : '/historial/pacientes';
+  const res = await api(url, { method, body: JSON.stringify(body) });
+  if (!res.ok) { toast('Error al guardar paciente', 'error'); return; }
+  const saved = await res.json();
+  closeModal('modal-hist-paciente');
+  toast(editId ? 'Paciente actualizado' : 'Paciente registrado', 'success');
+  await loadHistorial();
+  openHistPaciente(editId ? parseInt(editId) : saved.id);
+}
+
+function openHistRegistroModal() {
+  if (!S.histPid) return;
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('hist-reg-fecha').value = now.toISOString().slice(0, 16);
+  ['sistolica','diastolica','pulso','temp','peso','talla','glucosa','o2'].forEach(id => {
+    document.getElementById('hist-reg-'+id).value = '';
+  });
+  ['motivo','diagnostico','tratamiento','notas'].forEach(id => {
+    document.getElementById('hist-reg-'+id).value = '';
+  });
+  histUpdateBPPreview();
+  const m = document.getElementById('modal-hist-registro');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  icons();
+}
+
+async function saveHistRegistro() {
+  if (!S.histPid) return;
+  const body = {
+    fecha:              document.getElementById('hist-reg-fecha').value || null,
+    presion_sistolica:  parseInt(document.getElementById('hist-reg-sistolica').value) || null,
+    presion_diastolica: parseInt(document.getElementById('hist-reg-diastolica').value) || null,
+    pulso:              parseInt(document.getElementById('hist-reg-pulso').value) || null,
+    temperatura:        parseFloat(document.getElementById('hist-reg-temp').value) || null,
+    peso:               parseFloat(document.getElementById('hist-reg-peso').value) || null,
+    talla:              parseFloat(document.getElementById('hist-reg-talla').value) || null,
+    glucosa:            parseFloat(document.getElementById('hist-reg-glucosa').value) || null,
+    saturacion_o2:      parseFloat(document.getElementById('hist-reg-o2').value) || null,
+    motivo:             document.getElementById('hist-reg-motivo').value.trim() || null,
+    diagnostico:        document.getElementById('hist-reg-diagnostico').value.trim() || null,
+    tratamiento:        document.getElementById('hist-reg-tratamiento').value.trim() || null,
+    notas:              document.getElementById('hist-reg-notas').value.trim() || null,
+  };
+  const res = await api(`/historial/pacientes/${S.histPid}/registros`, {
+    method: 'POST', body: JSON.stringify(body)
+  });
+  if (!res.ok) { toast('Error al guardar registro', 'error'); return; }
+  closeModal('modal-hist-registro');
+  toast('Registro guardado', 'success');
+  openHistPaciente(S.histPid);
+}
+
+async function deleteHistRegistro(id) {
+  openConfirmDel('¿Eliminar este registro?', 'Esta acción no se puede deshacer.', async () => {
+    const res = await api(`/historial/registros/${id}`, { method: 'DELETE' });
+    if (!res.ok) { toast('Error al eliminar', 'error'); return; }
+    toast('Registro eliminado', 'success');
+    openHistPaciente(S.histPid);
+  });
+}
 
 // ══════════════════════════════════════════════════════════
 // BOOT
