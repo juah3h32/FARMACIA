@@ -4563,26 +4563,30 @@ async function loadReports() {
 
 function repItemsTable(items, descGlobal, iva) {
   if (!items.length) return `<p class="text-xs py-2" style="color:#94A3B8">Sin detalle de productos</p>`;
-  const rows = items.map(i =>
-    `<tr class="border-b" style="border-color:#F1F5F9">
-      <td class="py-1.5 pr-4 text-xs" style="color:#374151">${i.nombre}</td>
-      <td class="py-1.5 px-3 text-xs text-center" style="color:#64748B">${i.cantidad}</td>
-      <td class="py-1.5 px-3 text-xs text-right" style="color:#64748B">${fmt(i.precio_unitario)}</td>
-      <td class="py-1.5 px-3 text-xs text-right" style="color:${i.descuento>0?'#F59E0B':'#64748B'}">${i.descuento>0?'−'+fmt(i.descuento):'—'}</td>
-      <td class="py-1.5 pl-3 text-xs text-right font-semibold" style="color:#0F172A">${fmt(i.subtotal)}</td>
-    </tr>`
-  ).join('');
+  const rows = items.map(i => {
+    const sub = [i.presentacion, i.concentracion, i.contenido, i.marca].filter(Boolean).join(' · ');
+    return `<tr class="border-b" style="border-color:#F1F5F9">
+      <td class="py-2 pr-4">
+        <p class="text-xs font-semibold" style="color:#0F172A">${i.nombre}</p>
+        ${sub ? `<p class="text-[10px] mt-0.5" style="color:#94A3B8">${sub}</p>` : ''}
+      </td>
+      <td class="py-2 px-3 text-xs text-center font-semibold" style="color:#243366">${i.cantidad}</td>
+      <td class="py-2 px-3 text-xs text-right" style="color:#64748B">${fmt(i.precio_unitario)}</td>
+      <td class="py-2 px-3 text-xs text-right" style="color:${i.descuento>0?'#F59E0B':'#64748B'}">${i.descuento>0?'−'+fmt(i.descuento):'—'}</td>
+      <td class="py-2 pl-3 text-xs text-right font-bold" style="color:#0F172A">${fmt(i.subtotal)}</td>
+    </tr>`;
+  }).join('');
   const extras = [
     descGlobal > 0 ? `<tr><td colspan="4" class="text-right pt-1 text-xs" style="color:#F59E0B">Descuento global</td><td class="pl-3 text-right text-xs font-semibold" style="color:#F59E0B">−${fmt(descGlobal)}</td></tr>` : '',
     iva > 0        ? `<tr><td colspan="4" class="text-right pt-1 text-xs" style="color:#64748B">IVA</td><td class="pl-3 text-right text-xs" style="color:#64748B">+${fmt(iva)}</td></tr>` : '',
   ].join('');
-  return `<table class="w-full" style="max-width:600px">
+  return `<table class="w-full" style="max-width:680px">
     <thead><tr style="background:#F1F5F9">
-      <th class="text-left py-1 pr-4 text-[10px] font-semibold" style="color:#94A3B8">PRODUCTO</th>
-      <th class="text-center py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">CANT.</th>
-      <th class="text-right py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">P. UNIT.</th>
-      <th class="text-right py-1 px-3 text-[10px] font-semibold" style="color:#94A3B8">DESC.</th>
-      <th class="text-right py-1 pl-3 text-[10px] font-semibold" style="color:#94A3B8">SUBTOTAL</th>
+      <th class="text-left py-1.5 pr-4 text-[10px] font-semibold" style="color:#94A3B8">MEDICAMENTO</th>
+      <th class="text-center py-1.5 px-3 text-[10px] font-semibold" style="color:#94A3B8">CANT.</th>
+      <th class="text-right py-1.5 px-3 text-[10px] font-semibold" style="color:#94A3B8">P. UNIT.</th>
+      <th class="text-right py-1.5 px-3 text-[10px] font-semibold" style="color:#94A3B8">DESCUENTO</th>
+      <th class="text-right py-1.5 pl-3 text-[10px] font-semibold" style="color:#94A3B8">SUBTOTAL</th>
     </tr></thead>
     <tbody>${rows}${extras}</tbody>
   </table>`;

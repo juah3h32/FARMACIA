@@ -50,6 +50,10 @@ def listar_ventas(
                     {
                         "producto_id":    i.producto_id,
                         "nombre":         i.producto.nombre if i.producto else "—",
+                        "presentacion":   i.producto.presentacion if i.producto else None,
+                        "concentracion":  i.producto.concentracion if i.producto else None,
+                        "contenido":      i.producto.contenido if i.producto else None,
+                        "marca":          i.producto.marca if i.producto else None,
                         "cantidad":       i.cantidad,
                         "precio_unitario": i.precio_unitario,
                         "descuento":      i.descuento,
