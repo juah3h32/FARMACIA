@@ -196,6 +196,95 @@ def _purge_tables(tables: list[str]) -> None:
             print(f"[Purge] Turso error: {e}")
 
 
+def eliminar_venta(venta_id: int) -> dict:
+    """
+    Soft-delete a single sale: restore stock, delete movements+items locally and
+    in Turso, mark eliminado=1 in both. Safe even when the product no longer exists.
+    Returns {"ok": True, "folio": "..."}.
+    """
+    from app.database.connection import get_db_session
+    from app.database.models import Venta, ItemVenta, MovimientoStock, Producto
+    from datetime import datetime as _dt
+
+    db = get_db_session()
+    try:
+        venta = (db.query(Venta)
+                 .filter(Venta.id == venta_id, Venta.eliminado.is_not(True))
+                 .first())
+        if not venta:
+            raise ValueError(f"Venta {venta_id} no encontrada o ya eliminada")
+
+        folio = venta.folio or str(venta_id)
+
+        # 1. Restore stock via MovimientoStock records
+        movements = (db.query(MovimientoStock)
+                     .filter(MovimientoStock.referencia_id == venta_id,
+                             MovimientoStock.referencia_tipo == "venta")
+                     .all())
+        restored = False
+        for mov in movements:
+            prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
+            if prod and mov.cantidad and mov.cantidad > 0:
+                prod.stock += mov.cantidad
+                restored = True
+            db.delete(mov)
+
+        # 2. Fallback: restore from items when no movements exist
+        if not restored:
+            items = db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).all()
+            for item in items:
+                prod = db.query(Producto).filter(Producto.id == item.producto_id).first()
+                if prod and item.cantidad and item.cantidad > 0:
+                    prod.stock += item.cantidad
+
+        # 3. Delete items locally
+        db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
+            synchronize_session="fetch"
+        )
+
+        # 4. Soft-delete the sale
+        now_str = _dt.utcnow().isoformat()
+        venta.eliminado = True
+        venta.eliminado_en = _dt.utcnow()
+
+        db.commit()
+
+        # 5. Propagate to Turso immediately
+        if cfg.TURSO_SYNC:
+            stmts = [
+                {
+                    "sql": (
+                        "DELETE FROM movimientos_stock "
+                        "WHERE referencia_id = ? AND referencia_tipo = 'venta'"
+                    ),
+                    "args": [{"type": "integer", "value": str(venta_id)}],
+                },
+                {
+                    "sql": "DELETE FROM items_venta WHERE venta_id = ?",
+                    "args": [{"type": "integer", "value": str(venta_id)}],
+                },
+                {
+                    "sql": "UPDATE ventas SET eliminado = 1, eliminado_en = ? WHERE id = ?",
+                    "args": [
+                        {"type": "text",    "value": now_str},
+                        {"type": "integer", "value": str(venta_id)},
+                    ],
+                },
+            ]
+            try:
+                _turso_batch(stmts)
+            except Exception as e:
+                print(f"[EliminarVenta] Turso error: {e}")
+            mark_dirty()
+
+        return {"ok": True, "folio": folio}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def purgar_ventas_historial_cierres() -> None:
     """Delete ventas, movimientos, auditoría and cortes de caja. Keeps products/clients."""
     _purge_tables(_PURGE_VENTAS)
@@ -285,7 +374,21 @@ def sync_to_turso() -> None:
                             cols    = list(rows[0].keys())
                             col_str = ", ".join(cols)
                             ph_str  = ", ".join(["?" for _ in cols])
-                            upsert  = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+
+                            # ventas: monotonic upsert — eliminado=1 can never go back to 0
+                            if table == "ventas" and "eliminado" in cols:
+                                set_parts = [
+                                    "eliminado = MAX(excluded.eliminado, ventas.eliminado)"
+                                    if c == "eliminado"
+                                    else f"{c} = excluded.{c}"
+                                    for c in cols if c != "id"
+                                ]
+                                upsert = (
+                                    f"INSERT INTO ventas ({col_str}) VALUES ({ph_str}) "
+                                    f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
+                                )
+                            else:
+                                upsert = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
 
                             # Only delete orphaned rows for reference tables (categorias,
                             # usuarios, etc.). For distributed tables (productos, ventas,
@@ -372,6 +475,19 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql_update, rows)
+                    elif table == "ventas" and "eliminado" in cols:
+                        # Monotonic: eliminado=1 can never go back to 0
+                        set_clause = ", ".join(
+                            "eliminado = MAX(excluded.eliminado, ventas.eliminado)"
+                            if c == "eliminado"
+                            else f"{c} = excluded.{c}"
+                            for c in cols if c != "id"
+                        )
+                        sql = (
+                            f"INSERT INTO ventas ({col_str}) VALUES ({ph_str}) "
+                            f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
+                        )
+                        lconn.executemany(sql, rows)
                     else:
                         sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql, rows)

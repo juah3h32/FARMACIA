@@ -20,7 +20,7 @@ def listar_ventas(
     limite = min(max(1, limite), 500)
     db = get_db_session()
     try:
-        q = db.query(Venta)
+        q = db.query(Venta).filter(Venta.eliminado.is_not(True))
         if payload.get("rol") != "admin":
             q = q.filter(Venta.usuario_id == int(payload["sub"]))
         if fecha_inicio:
@@ -98,7 +98,7 @@ def resumen_ventas(
 def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
-        venta = db.query(Venta).filter(Venta.id == venta_id).first()
+        venta = db.query(Venta).filter(Venta.id == venta_id, Venta.eliminado.is_not(True)).first()
         if not venta:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
         return {
@@ -127,50 +127,17 @@ def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
 
 
 @router.delete("/{venta_id}")
-def eliminar_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_venta_endpoint(venta_id: int, payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar ventas")
-    db = get_db_session()
     try:
-        venta = db.query(Venta).filter(Venta.id == venta_id).first()
-        if not venta:
-            raise HTTPException(status_code=404, detail="Venta no encontrada")
-
-        folio = venta.folio
-
-        from app.database.models import MovimientoStock, Producto
-
-        # 1. Restore stock from movements
-        movements = (
-            db.query(MovimientoStock)
-            .filter(
-                MovimientoStock.referencia_id == venta_id,
-                MovimientoStock.referencia_tipo == "venta",
-            )
-            .all()
-        )
-        for mov in movements:
-            prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
-            if prod and mov.cantidad and mov.cantidad > 0:
-                prod.stock += mov.cantidad
-            db.delete(mov)
-
-        # 2. Explicitly delete items (avoids FK constraint error with foreign_keys=ON)
-        db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
-            synchronize_session="fetch"
-        )
-
-        # 3. Delete sale
-        db.delete(venta)
-        db.commit()
-        return {"ok": True, "folio": folio}
-    except HTTPException:
-        raise
+        from app.database.sync_service import eliminar_venta
+        result = eliminar_venta(venta_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.post("/eliminar-lote")
@@ -184,37 +151,18 @@ def eliminar_ventas_lote(
         raise HTTPException(status_code=400, detail="Lista vacía")
     if len(ids) > 200:
         raise HTTPException(status_code=400, detail="Máximo 200 por lote")
-    db = get_db_session()
     try:
-        from app.database.models import MovimientoStock, Producto
+        from app.database.sync_service import eliminar_venta
         deleted, folios = 0, []
         for venta_id in ids:
-            venta = db.query(Venta).filter(Venta.id == venta_id).first()
-            if not venta:
-                continue
-            folios.append(venta.folio or str(venta_id))
-            movements = (
-                db.query(MovimientoStock)
-                .filter(MovimientoStock.referencia_id == venta_id,
-                        MovimientoStock.referencia_tipo == "venta")
-                .all()
-            )
-            for mov in movements:
-                prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
-                if prod and mov.cantidad and mov.cantidad > 0:
-                    prod.stock += mov.cantidad
-                db.delete(mov)
-            db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
-                synchronize_session="fetch"
-            )
-            db.delete(venta)
-            deleted += 1
-        db.commit()
+            try:
+                result = eliminar_venta(venta_id)
+                folios.append(result["folio"])
+                deleted += 1
+            except ValueError:
+                pass  # not found or already deleted
         return {"ok": True, "deleted": deleted, "folios": folios}
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()

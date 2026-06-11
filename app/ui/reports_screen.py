@@ -252,7 +252,21 @@ class ReportsScreen(ctk.CTkFrame):
     def _build_ventas_tab(self):
         tab = self.tabs.tab("Ventas Detalle")
         tab.grid_columnconfigure(0, weight=1)
-        tab.grid_rowconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=1)
+
+        # Admin toolbar
+        if self.user.rol == RolUsuario.admin:
+            tb = ctk.CTkFrame(tab, fg_color="transparent")
+            tb.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+            ctk.CTkButton(
+                tb,
+                text="🗑  Eliminar seleccionada",
+                width=190, height=28, corner_radius=8,
+                fg_color="#FEF2F2", hover_color="#FEE2E2", text_color="#EF4444",
+                border_width=1, border_color="#FECACA",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                command=self._eliminar_venta_seleccionada,
+            ).pack(side="right", padx=4)
 
         sty = self._make_tree_style("V")
         cols = ("folio", "fecha", "cajero", "cliente", "subtotal", "iva", "total", "pago", "estado")
@@ -273,8 +287,11 @@ class ReportsScreen(ctk.CTkFrame):
 
         scroll = ttk.Scrollbar(tab, orient="vertical", command=self.ventas_tree.yview)
         self.ventas_tree.configure(yscrollcommand=scroll.set)
-        self.ventas_tree.grid(row=0, column=0, sticky="nsew")
-        scroll.grid(row=0, column=1, sticky="ns")
+        self.ventas_tree.grid(row=1, column=0, sticky="nsew")
+        scroll.grid(row=1, column=1, sticky="ns")
+
+        if self.user.rol == RolUsuario.admin:
+            self.ventas_tree.bind("<Button-3>", self._ctx_menu_venta)
 
     def _build_productos_tab(self):
         tab = self.tabs.tab("Productos Top")
@@ -492,6 +509,7 @@ class ReportsScreen(ctk.CTkFrame):
             ventas = db.query(Venta).filter(
                 Venta.creado_en >= desde,
                 Venta.creado_en <= hasta,
+                Venta.eliminado.is_not(True),
             ).order_by(Venta.creado_en.desc()).all()
 
             completadas = [v for v in ventas if v.estado == EstadoVenta.completada]
@@ -518,7 +536,7 @@ class ReportsScreen(ctk.CTkFrame):
                 self.ventas_tree.delete(row)
             for idx, v in enumerate(ventas):
                 tag = "even" if idx % 2 == 0 else "odd"
-                self.ventas_tree.insert("", "end", tags=(tag,), values=(
+                self.ventas_tree.insert("", "end", iid=str(v.id), tags=(tag,), values=(
                     v.folio or v.id,
                     v.creado_en.strftime("%d/%m/%Y %H:%M") if v.creado_en else "",
                     v.usuario.nombre if v.usuario else "",
@@ -646,7 +664,8 @@ class ReportsScreen(ctk.CTkFrame):
             db = get_db_session()
             try:
                 ventas = db.query(Venta).filter(
-                    Venta.creado_en >= desde, Venta.creado_en <= hasta
+                    Venta.creado_en >= desde, Venta.creado_en <= hasta,
+                    Venta.eliminado.is_not(True),
                 ).order_by(Venta.creado_en.desc()).all()
 
                 for row, v in enumerate(ventas, 4):
@@ -945,6 +964,91 @@ class ReportsScreen(ctk.CTkFrame):
 
         toast.show("Eliminando todos los registros…", kind="warning", duration=15000)
         threading.Thread(target=_run, daemon=True, name="PurgarTodoR").start()
+
+    # ── Individual sale delete (admin only) ──────────────────────────────────
+
+    def _ctx_menu_venta(self, event):
+        iid = self.ventas_tree.identify_row(event.y)
+        if not iid:
+            return
+        self.ventas_tree.selection_set(iid)
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="🗑  Eliminar venta", command=self._eliminar_venta_seleccionada)
+        try:
+            menu.post(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _eliminar_venta_seleccionada(self):
+        sel = self.ventas_tree.selection()
+        if not sel:
+            messagebox.showwarning("Sin selección", "Selecciona una venta de la lista primero.")
+            return
+        venta_id = int(sel[0])
+        vals = self.ventas_tree.item(sel[0], "values")
+        folio = vals[0] if vals else str(venta_id)
+        self._pedir_pin_eliminar_venta(venta_id, folio)
+
+    def _pedir_pin_eliminar_venta(self, venta_id: int, folio: str):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Eliminar venta")
+        dlg.geometry("400x250")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width()  - 400) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 250) // 2
+        dlg.geometry(f"400x250+{x}+{y}")
+
+        ctk.CTkLabel(dlg, text=f"Eliminar venta {folio}",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#EF4444").pack(pady=(20, 4))
+        ctk.CTkLabel(dlg,
+                     text="El inventario se restaurará automáticamente.\nIngresa el PIN de administrador:",
+                     font=ctk.CTkFont(size=11), text_color=MUTED,
+                     justify="center").pack(pady=(0, 8))
+
+        entry = ctk.CTkEntry(dlg, width=140, height=36, justify="center", show="●")
+        entry.pack(pady=(0, 4))
+        entry.focus()
+
+        lbl_err = ctk.CTkLabel(dlg, text="", text_color="#EF4444",
+                               font=ctk.CTkFont(size=11))
+        lbl_err.pack(pady=(0, 6))
+
+        def _ok(event=None):
+            if entry.get().strip() != _PIN_ADMIN:
+                lbl_err.configure(text="PIN incorrecto")
+                entry.delete(0, "end")
+                return
+            dlg.destroy()
+            self._do_eliminar_venta(venta_id)
+
+        entry.bind("<Return>", _ok)
+        ctk.CTkButton(dlg, text="Confirmar", height=34,
+                      fg_color="#EF4444", hover_color="#B91C1C", text_color="white",
+                      command=_ok).pack(pady=(0, 6))
+        ctk.CTkButton(dlg, text="Cancelar", height=30,
+                      fg_color="transparent", border_width=1, border_color=BORDER,
+                      text_color=MUTED, command=dlg.destroy).pack()
+
+    def _do_eliminar_venta(self, venta_id: int):
+        import threading
+        from app.database.sync_service import eliminar_venta
+        from app.ui import toast
+
+        def _run():
+            try:
+                result = eliminar_venta(venta_id)
+                folio = result.get("folio", str(venta_id))
+                self.after(0, lambda: (
+                    toast.show(f"Venta {folio} eliminada — stock restaurado", kind="success", duration=4000),
+                    self._generar(),
+                ))
+            except Exception as exc:
+                self.after(0, lambda e=exc: toast.show(f"Error al eliminar: {e}", kind="error", duration=7000))
+
+        threading.Thread(target=_run, daemon=True, name="EliminarVenta").start()
 
     def on_show(self):
         self._generar()

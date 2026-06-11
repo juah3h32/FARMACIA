@@ -91,6 +91,8 @@ def _migrate():
         ("productos", "piezas_sueltas",     "INTEGER DEFAULT 0"),
         ("usuarios",  "foto_url",           "TEXT"),
         ("pacientes", "cliente_id",         "INTEGER"),
+        ("ventas",    "eliminado",          "INTEGER NOT NULL DEFAULT 0"),
+        ("ventas",    "eliminado_en",       "TEXT"),
     ]
     # Local SQLite
     with engine.connect() as conn:

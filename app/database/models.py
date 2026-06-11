@@ -171,6 +171,8 @@ class Venta(Base):
     estado = Column(SAEnum(EstadoVenta), default=EstadoVenta.completada)
     notas = Column(Text)
     creado_en = Column(DateTime, server_default=func.now())
+    eliminado = Column(Boolean, default=False)
+    eliminado_en = Column(DateTime, nullable=True)
 
     usuario = relationship("Usuario", back_populates="ventas")
     cliente = relationship("Cliente", back_populates="ventas")
