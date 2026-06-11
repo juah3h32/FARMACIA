@@ -79,6 +79,7 @@ def resumen_ventas(
             Venta.creado_en >= inicio,
             Venta.creado_en <= fin,
             Venta.estado == EstadoVenta.completada,
+            Venta.eliminado.is_not(True),
         ).all()
 
         total = sum(v.total for v in ventas)

@@ -38,7 +38,8 @@ def resumen(
         ventas = (
             db.query(Venta)
             .filter(Venta.creado_en >= fi, Venta.creado_en <= ff,
-                    Venta.estado == EstadoVenta.completada)
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True))
             .all()
         )
         total = sum(v.total for v in ventas)
@@ -90,6 +91,7 @@ def top_productos(
                 Venta.creado_en >= fi,
                 Venta.creado_en <= ff,
                 Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
             )
             .group_by(Producto.id, Producto.nombre)
             .order_by(func.sum(ItemVenta.cantidad).desc())
