@@ -132,6 +132,24 @@ def init_db():
     _migrate()
     _seed_initial_data()
     _normalizar_nombres_productos()
+    _actualizar_info_farmacia_v2()
+
+
+def _actualizar_info_farmacia_v2():
+    """One-time: push corrected pharmacy address/name to existing DBs."""
+    with get_db() as db:
+        if db.query(Configuracion).filter(
+            Configuracion.clave == "farmacia_info_v2"
+        ).first():
+            return
+        for clave, valor in [
+            ("farmacia_nombre",    cfg.PHARMACY_NAME),
+            ("farmacia_direccion", cfg.PHARMACY_ADDRESS),
+        ]:
+            row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+            if row:
+                row.valor = valor
+        db.add(Configuracion(clave="farmacia_info_v2", valor="1"))
 
 
 def _normalizar_nombres_productos():

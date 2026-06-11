@@ -92,7 +92,7 @@ class ReportsScreen(ctk.CTkFrame):
         # Quick-period chips
         chips = ctk.CTkFrame(ff, fg_color="transparent")
         chips.pack(side="left")
-        for lbl, days in [("Hoy", 0), ("7 días", 7), ("Este mes", -1), ("Mes ant.", -2)]:
+        for lbl, days in [("Hoy", 0), ("7 días", 7), ("Este mes", -1), ("Mes ant.", -2), ("Todas", -99)]:
             ctk.CTkButton(
                 chips, text=lbl, width=74, height=30, corner_radius=8,
                 fg_color=BLUE_L, hover_color="#DBEAFE", text_color=BLUE,
@@ -254,6 +254,8 @@ class ReportsScreen(ctk.CTkFrame):
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
 
+        self._venta_ids: dict = {}  # tree iid → venta.id
+
         # Admin toolbar
         if self.user.rol == RolUsuario.admin:
             tb = ctk.CTkFrame(tab, fg_color="transparent")
@@ -290,6 +292,7 @@ class ReportsScreen(ctk.CTkFrame):
         self.ventas_tree.grid(row=1, column=0, sticky="nsew")
         scroll.grid(row=1, column=1, sticky="ns")
 
+        self.ventas_tree.bind("<Double-1>", self._ver_detalle_venta)
         if self.user.rol == RolUsuario.admin:
             self.ventas_tree.bind("<Button-3>", self._ctx_menu_venta)
 
@@ -465,6 +468,16 @@ class ReportsScreen(ctk.CTkFrame):
 
     def _set_periodo(self, days: int):
         hoy = date.today()
+        if days == -99:
+            # Todas: fetch from 2020-01-01 to today
+            desde = date(2020, 1, 1)
+            hasta = hoy
+            self.entry_desde.delete(0, "end")
+            self.entry_desde.insert(0, desde.strftime("%d/%m/%Y"))
+            self.entry_hasta.delete(0, "end")
+            self.entry_hasta.insert(0, hasta.strftime("%d/%m/%Y"))
+            self._generar()
+            return
         if days == 0:
             desde = hasta = hoy
         elif days == -1:
@@ -534,9 +547,10 @@ class ReportsScreen(ctk.CTkFrame):
 
             for row in self.ventas_tree.get_children():
                 self.ventas_tree.delete(row)
+            self._venta_ids.clear()
             for idx, v in enumerate(ventas):
                 tag = "even" if idx % 2 == 0 else "odd"
-                self.ventas_tree.insert("", "end", iid=str(v.id), tags=(tag,), values=(
+                iid = self.ventas_tree.insert("", "end", tags=(tag,), values=(
                     v.folio or v.id,
                     v.creado_en.strftime("%d/%m/%Y %H:%M") if v.creado_en else "",
                     v.usuario.nombre if v.usuario else "",
@@ -544,6 +558,7 @@ class ReportsScreen(ctk.CTkFrame):
                     f"${v.subtotal:.2f}", f"${v.iva:.2f}", f"${v.total:.2f}",
                     v.metodo_pago.value.capitalize(), v.estado.value.capitalize(),
                 ))
+                self._venta_ids[iid] = v.id
 
             conteo: dict = {}
             for v in completadas:
@@ -973,6 +988,7 @@ class ReportsScreen(ctk.CTkFrame):
             return
         self.ventas_tree.selection_set(iid)
         menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="👁  Ver detalle", command=lambda: self._ver_detalle_venta(None))
         menu.add_command(label="🗑  Eliminar venta", command=self._eliminar_venta_seleccionada)
         try:
             menu.post(event.x_root, event.y_root)
@@ -984,7 +1000,9 @@ class ReportsScreen(ctk.CTkFrame):
         if not sel:
             messagebox.showwarning("Sin selección", "Selecciona una venta de la lista primero.")
             return
-        venta_id = int(sel[0])
+        venta_id = self._venta_ids.get(sel[0])
+        if not venta_id:
+            return
         vals = self.ventas_tree.item(sel[0], "values")
         folio = vals[0] if vals else str(venta_id)
         self._pedir_pin_eliminar_venta(venta_id, folio)
@@ -1049,6 +1067,155 @@ class ReportsScreen(ctk.CTkFrame):
                 self.after(0, lambda e=exc: toast.show(f"Error al eliminar: {e}", kind="error", duration=7000))
 
         threading.Thread(target=_run, daemon=True, name="EliminarVenta").start()
+
+    def _ver_detalle_venta(self, event=None):
+        sel = self.ventas_tree.selection()
+        if not sel:
+            return
+        venta_id = self._venta_ids.get(sel[0])
+        if not venta_id:
+            return
+
+        # Eagerly load all data before closing DB
+        db = get_db_session()
+        try:
+            v = db.query(Venta).filter(
+                Venta.id == venta_id, Venta.eliminado.is_not(True)
+            ).first()
+            if not v:
+                messagebox.showwarning("Error", "Venta no encontrada.")
+                return
+            folio       = v.folio or str(venta_id)
+            fecha_str   = v.creado_en.strftime("%d/%m/%Y %H:%M") if v.creado_en else ""
+            cajero      = v.usuario.nombre if v.usuario else "—"
+            cliente     = v.cliente.nombre if v.cliente else "Público General"
+            metodo      = v.metodo_pago.value.capitalize()
+            estado_str  = v.estado.value.capitalize()
+            subtotal    = v.subtotal
+            iva         = v.iva
+            total       = v.total
+            items_data  = [
+                (
+                    item.producto.nombre if item.producto else f"(Producto #{item.producto_id})",
+                    item.cantidad,
+                    item.precio_unitario,
+                    item.subtotal,
+                )
+                for item in v.items
+            ]
+        finally:
+            db.close()
+
+        win = ctk.CTkToplevel(self)
+        win.title(f"Detalle Venta — {folio}")
+        win.geometry("580x540")
+        win.resizable(False, True)
+        win.grab_set()
+        win.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width()  - 580) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 540) // 2
+        win.geometry(f"580x540+{x}+{y}")
+
+        # ── Header ────────────────────────────────────────────────────────────
+        ctk.CTkLabel(win, text=f"🧾  Venta {folio}",
+                     font=ctk.CTkFont(size=16, weight="bold"),
+                     text_color=TEXT).pack(pady=(18, 2))
+        ctk.CTkLabel(win, text=fecha_str,
+                     font=ctk.CTkFont(size=11), text_color=MUTED).pack()
+
+        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+
+        # ── Info rows ─────────────────────────────────────────────────────────
+        def info_row(label, value, color=TEXT):
+            f = ctk.CTkFrame(win, fg_color="transparent")
+            f.pack(fill="x", padx=28, pady=2)
+            ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=11),
+                         text_color=MUTED, anchor="w", width=160).pack(side="left")
+            ctk.CTkLabel(f, text=value, font=ctk.CTkFont(size=11, weight="bold"),
+                         text_color=color, anchor="w").pack(side="left")
+
+        info_row("Cajero:", cajero)
+        info_row("Cliente:", cliente)
+        info_row("Método de pago:", metodo, BLUE)
+        info_row("Estado:", estado_str, GREEN)
+
+        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(win, text="Productos vendidos",
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=TEXT, anchor="w").pack(fill="x", padx=28, pady=(0, 6))
+
+        # ── Items treeview ────────────────────────────────────────────────────
+        tree_frame = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=8,
+                                   border_width=1, border_color=BORDER)
+        tree_frame.pack(fill="both", expand=True, padx=20, pady=(0, 8))
+        tree_frame.grid_columnconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(0, weight=1)
+
+        sty = self._make_tree_style("Det")
+        item_cols = ("producto", "cantidad", "precio", "subtotal")
+        items_tree = ttk.Treeview(tree_frame, columns=item_cols,
+                                   show="headings", style=sty, height=6)
+        for col, heading, width, anchor in [
+            ("producto",  "Producto",  280, "w"),
+            ("cantidad",  "Cantidad",   70, "center"),
+            ("precio",    "Precio",     90, "e"),
+            ("subtotal",  "Subtotal",   90, "e"),
+        ]:
+            items_tree.heading(col, text=heading)
+            items_tree.column(col, width=width, anchor=anchor)
+        items_tree.tag_configure("even", background="#F8FAFF")
+        items_tree.tag_configure("odd",  background="#FFFFFF")
+
+        sc = ttk.Scrollbar(tree_frame, orient="vertical", command=items_tree.yview)
+        items_tree.configure(yscrollcommand=sc.set)
+        items_tree.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
+        sc.grid(row=0, column=1, sticky="ns", pady=4)
+
+        for idx, (nombre, qty, precio, sub) in enumerate(items_data):
+            tag = "even" if idx % 2 == 0 else "odd"
+            items_tree.insert("", "end", tags=(tag,), values=(
+                nombre, qty, f"${precio:.2f}", f"${sub:.2f}"
+            ))
+
+        # ── Totals ────────────────────────────────────────────────────────────
+        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=(4, 4))
+        tf = ctk.CTkFrame(win, fg_color="transparent")
+        tf.pack(fill="x", padx=28)
+
+        def total_row(label, value, color=TEXT, bold=False):
+            f = ctk.CTkFrame(tf, fg_color="transparent")
+            f.pack(fill="x", pady=1)
+            ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=11),
+                         text_color=MUTED, anchor="w").pack(side="left")
+            ctk.CTkLabel(f, text=value,
+                         font=ctk.CTkFont(size=13 if bold else 11, weight="bold"),
+                         text_color=color, anchor="e").pack(side="right")
+
+        total_row("Subtotal:", f"${subtotal:.2f}")
+        total_row("IVA:", f"${iva:.2f}")
+        total_row("Total:", f"${total:.2f}", BLUE, bold=True)
+
+        # ── Buttons ───────────────────────────────────────────────────────────
+        bf = ctk.CTkFrame(win, fg_color="transparent")
+        bf.pack(fill="x", padx=20, pady=(8, 16))
+
+        if self.user.rol == RolUsuario.admin:
+            def _eliminar():
+                win.destroy()
+                self._pedir_pin_eliminar_venta(venta_id, folio)
+            ctk.CTkButton(
+                bf, text="🗑  Eliminar venta", width=160, height=34, corner_radius=8,
+                fg_color="#FEF2F2", hover_color="#FEE2E2", text_color="#EF4444",
+                border_width=1, border_color="#FECACA",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                command=_eliminar,
+            ).pack(side="left", padx=(0, 8))
+
+        ctk.CTkButton(
+            bf, text="Cerrar", width=90, height=34, corner_radius=8,
+            fg_color="transparent", border_width=1, border_color=BORDER,
+            text_color=MUTED, command=win.destroy,
+        ).pack(side="right")
 
     def on_show(self):
         self._generar()

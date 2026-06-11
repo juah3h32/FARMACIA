@@ -273,16 +273,11 @@ class PrinterService:
 
         sep  = "=" * W
         sep2 = "-" * W
-
-        # Precio derecho: $1,234.56 → máx 9 chars
         PRICE_W = 9
 
         def ctr(txt):
             txt = str(txt).strip()
-            if len(txt) <= W:
-                return txt.center(W)
-            # Si es más largo que el ancho, intentar dividirlo o simplemente truncar/ajustar
-            return txt[:W]
+            return txt.center(W) if len(txt) <= W else txt[:W]
 
         def money(amount):
             return f"${amount:,.2f}"
@@ -292,38 +287,38 @@ class PrinterService:
             lbl_w = W - PRICE_W
             return f"{label:>{lbl_w}}{val_str:>{PRICE_W}}"
 
-        # ── Encabezado Centrado ──────────────────────────────────────────────
-        lines = [sep]
-        
-        # Nombre (puede ser largo)
-        lines.append(ctr(nombre))
-        
-        # Dirección (puede requerir múltiples líneas si es larga)
-        if direccion:
-            # Dividir por palabras para no romper a la mitad
-            words = direccion.split()
-            current_line = ""
+        def wrap_center(text):
+            """Word-wrap text and center each line."""
+            if not text:
+                return []
+            words = text.split()
+            result = []
+            line = ""
             for word in words:
-                if len(current_line + word) + 1 <= W:
-                    current_line += (word + " ")
+                candidate = (line + " " + word).strip() if line else word
+                if len(candidate) <= W:
+                    line = candidate
                 else:
-                    lines.append(ctr(current_line))
-                    current_line = word + " "
-            if current_line:
-                lines.append(ctr(current_line))
-        
+                    result.append(ctr(line))
+                    line = word
+            if line:
+                result.append(ctr(line))
+            return result
+
+        # ── Header ────────────────────────────────────────────────────────────
+        lines = [sep]
+        lines.append(ctr(nombre))
+        lines.extend(wrap_center(direccion))
         lines.append(sep)
 
-        # Cajero centrado
+        # Cajero / cliente
         cajero = _s(venta_data.get("cajero", "N/A")).upper()
         lines.append(ctr(f"CAJERO: {cajero}"))
         if venta_data.get("cliente"):
             lines.append(ctr(f"CLIENTE: {_s(venta_data['cliente']).upper()}"))
         lines.append(sep)
 
-        # ── Tabla de productos (estilo Guadalajara) ───────────────────────────
-        # CANT  DESCRIPCION        PRECIO
-        # Columnas: qty_prefix(6) + name(W-6-PRICE_W) + price(PRICE_W)
+        # ── Items table ───────────────────────────────────────────────────────
         NAME_W = W - 6 - PRICE_W
         lines.append(f"{'CANT':<6}{'DESCRIPCION':<{NAME_W}}{'PRECIO':>{PRICE_W}}")
         lines.append(sep2)
@@ -332,29 +327,24 @@ class PrinterService:
         for item in venta_data.get("items", []):
             cant      = item["cantidad"]
             sub       = item["subtotal"]
-            pu        = sub / cant if cant else 0
             num_articulos += cant
             prod_full = _s(item["nombre"]).upper()
-
-            qty_prefix = f"{cant:>2} PZ "          # "  1 PZ " — 6 chars
+            qty_prefix = f"{cant:>2} PZ "
             price_str  = money(sub)
 
-            # Nombre encaja en una línea
             if len(prod_full) <= NAME_W:
                 lines.append(f"{qty_prefix}{prod_full:<{NAME_W}}{price_str:>{PRICE_W}}")
             else:
-                # Primera línea: cantidad + inicio del nombre + precio
                 lines.append(f"{qty_prefix}{prod_full[:NAME_W]:<{NAME_W}}{price_str:>{PRICE_W}}")
-                # Líneas de continuación (sin precio)
                 resto = prod_full[NAME_W:]
                 while resto:
                     chunk = resto[:NAME_W]
-                    resto  = resto[NAME_W:]
+                    resto = resto[NAME_W:]
                     lines.append(f"{'':6}{chunk}")
 
-        # ── Totales ───────────────────────────────────────────────────────────
+        # ── Totals ────────────────────────────────────────────────────────────
         lines.append(sep)
-        subtotal = venta_data.get("subtotal", 0.0)
+        subtotal  = venta_data.get("subtotal", 0.0)
         descuento = venta_data.get("descuento", 0.0)
         iva       = venta_data.get("iva", 0.0)
         total     = venta_data.get("total", 0.0)
@@ -373,15 +363,17 @@ class PrinterService:
         lines.append(sep2)
         lines.append(tot("CAMBIO", cambio))
         lines.append(sep)
-        lines.append(f"NUMERO DE ARTICULOS: {num_articulos}")
-        lines.append(f"FOLIO: {venta_data.get('folio', 'N/A')}")
-        lines.append(f"FECHA: {datetime.now().strftime('%d/%m/%Y  %H:%M')}")
 
-        # ── Pie ───────────────────────────────────────────────────────────────
+        # Bottom info — left-aligned
+        lines.append(f"ARTICULOS: {num_articulos}")
+        lines.append(f"FOLIO: {venta_data.get('folio', 'N/A')}")
+        lines.append(f"FECHA: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+        # ── Footer ────────────────────────────────────────────────────────────
         lines += [
             sep,
-            "!GRACIAS POR SU COMPRA!".center(W),
-            "CONSERVE SU TICKET".center(W),
+            ctr("!GRACIAS POR SU COMPRA!"),
+            ctr("CONSERVE SU TICKET"),
             sep,
             "", "", "",
         ]
