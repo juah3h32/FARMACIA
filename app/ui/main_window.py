@@ -1,4 +1,5 @@
 import sys
+import time
 import threading
 import tkinter as tk
 import customtkinter as ctk
@@ -85,6 +86,8 @@ class MainWindow(ctk.CTkToplevel):
         self._scan_buf   = ""
         self._scan_timer = None
 
+        self._stats_last_refresh = 0.0  # throttle: refresh at most once per 60s
+
         self.configure(fg_color=CONT_BG)
         self.title("Farmacia Eben-Ezer — POS")
         self.geometry(f"{cfg.WINDOW_WIDTH}x{cfg.WINDOW_HEIGHT}")
@@ -99,7 +102,6 @@ class MainWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         toast.init(self)
-        self._load_stats()
         self._bind_shortcuts()
         self._init_scanner_service()
         updater_service.check_for_update_async(self._on_update_check)
@@ -342,32 +344,32 @@ class MainWindow(ctk.CTkToplevel):
             try:
                 from app.database.connection import get_db
                 from app.database.models import Venta, Producto, EstadoVenta
-                from sqlalchemy import func
+                from sqlalchemy import func, case
                 now = datetime.now()
                 day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
                 day_end   = now.replace(hour=23, minute=59, second=59)
 
                 with get_db() as db:
-                    sales = db.query(func.count(Venta.id)).filter(
+                    # Single query: count + sum in one pass
+                    row = db.query(
+                        func.count(Venta.id),
+                        func.coalesce(func.sum(Venta.total), 0.0),
+                    ).filter(
                         Venta.creado_en >= day_start,
                         Venta.creado_en <= day_end,
                         Venta.estado == EstadoVenta.completada,
-                    ).scalar() or 0
+                        Venta.eliminado.is_not(True),
+                    ).first()
+                    sales   = row[0] or 0
+                    revenue = float(row[1] or 0.0)
 
-                    revenue = db.query(func.sum(Venta.total)).filter(
-                        Venta.creado_en >= day_start,
-                        Venta.creado_en <= day_end,
-                        Venta.estado == EstadoVenta.completada,
-                    ).scalar() or 0.0
-
-                    low = db.query(func.count(Producto.id)).filter(
-                        Producto.stock <= Producto.stock_minimo,
-                        Producto.activo.is_(True),
-                    ).scalar() or 0
-
-                    total_p = db.query(func.count(Producto.id)).filter(
-                        Producto.activo.is_(True),
-                    ).scalar() or 0
+                    # Single query: low stock count + total products in one pass
+                    prod_row = db.query(
+                        func.count(Producto.id),
+                        func.sum(case((Producto.stock <= Producto.stock_minimo, 1), else_=0)),
+                    ).filter(Producto.activo.is_(True)).first()
+                    total_p = prod_row[0] or 0
+                    low     = int(prod_row[1] or 0)
 
                 return sales, revenue, low, total_p
             except Exception:
@@ -427,8 +429,11 @@ class MainWindow(ctk.CTkToplevel):
         if hasattr(self.current_screen, "on_show"):
             self.current_screen.on_show()
 
-        # Refresh stats on every screen switch
-        self._load_stats()
+        # Throttle stats: auto-refresh at most once per 60s on screen switches
+        now = time.time()
+        if now - self._stats_last_refresh >= 60:
+            self._stats_last_refresh = now
+            self._load_stats()
 
     def _create_screen(self, key: str):
         p = self.content

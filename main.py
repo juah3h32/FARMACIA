@@ -40,17 +40,17 @@ def _wait_for_api(port: int, timeout: int = 12) -> bool:
 def main():
     init_db()
 
-    if cfg.TURSO_SYNC:
-        from app.database.sync_service import import_from_turso, start_background_sync
-        import_from_turso()           # one-time seed when local is empty
-        start_background_sync(interval=60)  # pulls from Turso immediately on start
-
     port = _find_free_port(cfg.API_PORT)
     if not port:
         print("[FarmaciaPOS] No se pudo encontrar puerto libre para la API")
         sys.exit(1)
-
     cfg.API_PORT = port
+
+    # Turso sync in background — never blocks startup
+    if cfg.TURSO_SYNC:
+        from app.database.sync_service import import_from_turso, start_background_sync
+        threading.Thread(target=import_from_turso, daemon=True, name="TursoImport").start()
+        start_background_sync(interval=60)
 
     def _api_with_log():
         try:
@@ -58,12 +58,7 @@ def main():
         except Exception as e:
             _log_error(f"API thread crash: {e}\n" + traceback.format_exc())
 
-    api_thread = threading.Thread(target=_api_with_log, daemon=True, name="APIServer")
-    api_thread.start()
-
-    if not _wait_for_api(port):
-        _log_error("El servidor API no respondió a tiempo")
-        sys.exit(1)
+    threading.Thread(target=_api_with_log, daemon=True, name="APIServer").start()
 
     from app.services import updater_service
     updater_service.start_background_check()
@@ -97,6 +92,10 @@ class _PyWebViewApi:
 def _start_ui(port: int) -> None:
     try:
         import webview
+        # webview renders the web SPA — must wait for API to be ready
+        if not _wait_for_api(port):
+            _log_error("El servidor API no respondió a tiempo")
+            raise RuntimeError("API timeout")
         window = webview.create_window(
             title="Farmacia Eben-Ezer — POS",
             url=f"http://127.0.0.1:{port}",
@@ -113,7 +112,7 @@ def _start_ui(port: int) -> None:
         _log_error(f"pywebview falló ({type(e).__name__}: {e}) — usando CustomTkinter\n"
                    + traceback.format_exc())
 
-    # Fallback: CustomTkinter
+    # CTK fallback — uses SQLAlchemy directly, no API wait needed
     try:
         import customtkinter as ctk
         ctk.set_appearance_mode("Light")

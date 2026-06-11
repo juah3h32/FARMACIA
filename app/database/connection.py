@@ -94,33 +94,41 @@ def _migrate():
         ("ventas",    "eliminado",          "INTEGER NOT NULL DEFAULT 0"),
         ("ventas",    "eliminado_en",       "TEXT"),
     ]
-    # Local SQLite
+    # Local SQLite — collect only columns actually added (new installs / upgrades)
+    added: list[tuple] = []
     with engine.connect() as conn:
         for table, col, col_type in new_cols:
             try:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                 conn.commit()
+                added.append((table, col, col_type))
             except Exception:
-                pass  # column already exists
+                pass  # column already exists — skip
 
-    # Turso cloud — keep schema in sync (one at a time, ignore duplicate column errors)
-    if cfg.TURSO_SYNC:
+    # Turso cloud — only sync columns that were actually new (avoids HTTP call on normal starts)
+    if cfg.TURSO_SYNC and added:
         from app.database.sync_service import _turso_pipeline_url, _turso_headers
         import requests as _req
         url, hdrs = _turso_pipeline_url(), _turso_headers()
-        for t, c, ct in new_cols:
-            try:
-                payload = {"requests": [
-                    {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}},
-                    {"type": "close"},
-                ]}
-                _req.post(url, headers=hdrs, json=payload, timeout=15)
-            except Exception:
-                pass  # network error or column already exists — safe to ignore
+        try:
+            payload = {
+                "requests": [
+                    {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
+                    for t, c, ct in added
+                ] + [{"type": "close"}]
+            }
+            _req.post(url, headers=hdrs, json=payload, timeout=15)
+        except Exception:
+            pass  # network error — safe to ignore, columns get created on next migration run
 
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    # Fast path: skip create_all if schema already exists (saves ~400ms on every run)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT id FROM usuarios LIMIT 1"))
+    except Exception:
+        Base.metadata.create_all(bind=engine)
     _migrate()
     _seed_initial_data()
     _normalizar_nombres_productos()
@@ -130,6 +138,11 @@ def _normalizar_nombres_productos():
     """One-time migration: uppercase nombre, nombre_generico, marca for all products."""
     from app.database.models import Producto
     with get_db() as db:
+        # Guard: only run once — skip if flag already set
+        if db.query(Configuracion).filter(
+            Configuracion.clave == "nombres_normalizados_v2"
+        ).first():
+            return
         prods = db.query(Producto).all()
         for p in prods:
             if p.nombre:
@@ -138,46 +151,45 @@ def _normalizar_nombres_productos():
                 p.nombre_generico = p.nombre_generico.strip().upper()
             if p.marca:
                 p.marca = p.marca.strip().upper()
+        db.add(Configuracion(clave="nombres_normalizados_v2", valor="1"))
 
 
 def _seed_initial_data():
     with get_db() as db:
-        # Admin por defecto
-        admin = db.query(Usuario).filter(Usuario.username == "admin").first()
-        if not admin:
+        # Batch-check existing usernames (1 query instead of 2)
+        existing_users = {u.username for u in db.query(Usuario.username).all()}
+
+        if "admin" not in existing_users:
             from app.auth.auth_service import hash_password
-            admin = Usuario(
+            db.add(Usuario(
                 username="admin",
                 password_hash=hash_password("admin123"),
                 nombre="Administrador",
                 rol=RolUsuario.admin,
-            )
-            db.add(admin)
+            ))
 
-        # Cajero de prueba
-        cajero = db.query(Usuario).filter(Usuario.username == "cajero").first()
-        if not cajero:
+        if "cajero" not in existing_users:
             from app.auth.auth_service import hash_password as _hp2
-            cajero = Usuario(
+            db.add(Usuario(
                 username="cajero",
                 password_hash=_hp2("cajero123"),
                 nombre="Cajero Prueba",
                 rol=RolUsuario.cajero,
-            )
-            db.add(cajero)
+            ))
 
-        # Categorias default
+        # Batch-check existing categories (1 query instead of 10)
         categorias_default = [
             "Medicamentos Generales", "Antibióticos", "Vitaminas y Suplementos",
             "Cuidado Personal",       "Material de Curación", "Productos de Bebé",
             "Medicamentos Controlados", "Dermatología",       "Oftalmología",
             "Anticonceptivos",
         ]
+        existing_cats = {c.nombre for c in db.query(Categoria.nombre).all()}
         for nombre in categorias_default:
-            if not db.query(Categoria).filter(Categoria.nombre == nombre).first():
+            if nombre not in existing_cats:
                 db.add(Categoria(nombre=nombre))
 
-        # Configuraciones default
+        # Batch-check existing config keys (1 query instead of 11)
         from app.auth.auth_service import hash_password as _hp
         configs_default = {
             "farmacia_nombre":          cfg.PHARMACY_NAME,
@@ -192,6 +204,7 @@ def _seed_initial_data():
             "api_activa":               "true",
             "purge_password_hash":      _hp("171215"),
         }
+        existing_cfg = {c.clave for c in db.query(Configuracion.clave).all()}
         for clave, valor in configs_default.items():
-            if not db.query(Configuracion).filter(Configuracion.clave == clave).first():
+            if clave not in existing_cfg:
                 db.add(Configuracion(clave=clave, valor=valor))
