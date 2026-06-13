@@ -235,6 +235,7 @@ def _seed_initial_data():
             "dias_vencimiento_alerta":  str(cfg.EXPIRY_ALERT_DAYS),
             "impresora_tipo":           "usb",
             "impresora_puerto":         "COM1",
+            "impresora_ancho":          "32",
             "api_activa":               "true",
             "purge_password_hash":      _hp("171215"),
             "turno_auto_activo":        "true",

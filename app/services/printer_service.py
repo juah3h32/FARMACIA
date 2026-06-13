@@ -229,29 +229,31 @@ class PrinterService:
             self._print_to_console(venta_data, farmacia_config)
             return False
 
+        # Abrir cajón para pagos en efectivo o mixto
+        metodo_pago = venta_data.get("metodo_pago", "")
+        if metodo_pago in ("efectivo", "mixto"):
+            self.open_cash_drawer()
+
         try:
             _log(f"Imprimiendo via tipo={self.printer_type} nombre={self.printer_name}")
             if self.printer_type == "windows":
                 result = self._print_windows(venta_data, farmacia_config)
                 if not result:
-                    # Reintento: forzar reconexión y volver a intentar
                     _log("Fallo impresion Windows, reintentando con reconexion...")
                     self.connected = False
                     self.connect(tipo, puerto or None)
                     result = self._print_windows(venta_data, farmacia_config)
-                
                 _log(f"resultado final: {result}")
                 return result
-                
+
             if not self.printer:
                 _log("ESC/POS: printer es None")
                 self._print_to_console(venta_data, farmacia_config)
                 return False
-            
+
             try:
                 return self._print_escpos(venta_data, farmacia_config)
             except Exception:
-                # Reintento ESC/POS
                 _log("Fallo ESC/POS, reintentando con reconexion...")
                 self.connected = False
                 self.connect(tipo, puerto or None)
@@ -261,7 +263,70 @@ class PrinterService:
             _log(f"EXCEPCION FINAL: {traceback.format_exc()}")
             return False
 
-    # ── Construcción del ticket ───────────────────────────────────────────────
+    # ── Helpers de texto ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _word_wrap(text: str, width: int) -> list[str]:
+        """Word-wrap text into lines of at most `width` chars."""
+        if not text:
+            return []
+        words = str(text).split()
+        result, line = [], ""
+        for word in words:
+            candidate = (line + " " + word).strip() if line else word
+            if len(candidate) <= width:
+                line = candidate
+            else:
+                if line:
+                    result.append(line)
+                # Hard-break word if single word longer than width
+                while len(word) > width:
+                    result.append(word[:width])
+                    word = word[width:]
+                line = word
+        if line:
+            result.append(line)
+        return result
+
+    def _ctr(self, txt: str) -> str:
+        """Center text; word-wrap if longer than width (never silently truncate)."""
+        lines = self._word_wrap(str(txt).strip(), self.width)
+        return "\n".join(l.center(self.width) for l in lines) if lines else ""
+
+    def _left(self, label: str, value: str) -> str:
+        """Left label + right-aligned value, same row."""
+        val  = str(value)
+        room = self.width - len(val)
+        if room < 1:
+            return (label + " " + val)[:self.width]
+        return f"{label:<{room}}{val}"
+
+    # ── Cajón de dinero ───────────────────────────────────────────────────────
+
+    def open_cash_drawer(self) -> bool:
+        """Send ESC/POS cash-drawer kick pulse."""
+        ESC_P = b'\x1b\x70\x00\x19\xfa'   # ESC p 0 25 250
+        try:
+            if self.printer_type == "windows" and self.connected:
+                import win32print
+                hP = win32print.OpenPrinter(self.printer_name)
+                try:
+                    win32print.StartDocPrinter(hP, 1, ("Cajon", None, "RAW"))
+                    win32print.StartPagePrinter(hP)
+                    win32print.WritePrinter(hP, ESC_P)
+                    win32print.EndPagePrinter(hP)
+                    win32print.EndDocPrinter(hP)
+                finally:
+                    win32print.ClosePrinter(hP)
+                return True
+            elif self.printer:
+                self.printer._raw(ESC_P)
+                return True
+        except Exception:
+            _log(f"open_cash_drawer: {traceback.format_exc()}")
+        return False
+
+    # ── Construcción del ticket de venta ─────────────────────────────────────
 
     def _build_ticket(self, venta_data: dict, farmacia_config: dict) -> str:
         cfg_d = farmacia_config or {}
@@ -274,110 +339,194 @@ class PrinterService:
         sep  = "=" * W
         sep2 = "-" * W
         PRICE_W = 9
+        NAME_W  = max(10, W - 6 - PRICE_W)
 
-        def ctr(txt):
-            txt = str(txt).strip()
-            return txt.center(W) if len(txt) <= W else txt[:W]
-
-        def money(amount):
-            return f"${amount:,.2f}"
+        def money(v):
+            return f"${float(v or 0):,.2f}"
 
         def tot(label, value):
-            val_str = money(value) if isinstance(value, float) else str(value)
-            lbl_w = W - PRICE_W
-            return f"{label:>{lbl_w}}{val_str:>{PRICE_W}}"
-
-        def wrap_center(text):
-            """Word-wrap text and center each line."""
-            if not text:
-                return []
-            words = text.split()
-            result = []
-            line = ""
-            for word in words:
-                candidate = (line + " " + word).strip() if line else word
-                if len(candidate) <= W:
-                    line = candidate
-                else:
-                    result.append(ctr(line))
-                    line = word
-            if line:
-                result.append(ctr(line))
-            return result
+            val_str = money(value) if isinstance(value, (int, float)) else str(value)
+            lbl_w = W - len(val_str)
+            lbl_w = max(1, lbl_w)
+            return f"{label:<{lbl_w}}{val_str}"
 
         # ── Header ────────────────────────────────────────────────────────────
         lines = [sep]
-        lines.append(ctr(nombre))
-        lines.extend(wrap_center(direccion))
+        for ln in self._word_wrap(nombre, W):
+            lines.append(ln.center(W))
+        for ln in self._word_wrap(direccion, W):
+            lines.append(ln.center(W))
+        if telefono:
+            lines.append(f"TEL: {telefono}".center(W))
+        if rfc:
+            lines.append(f"RFC: {rfc}".center(W))
         lines.append(sep)
 
         # Cajero / cliente
         cajero = _s(venta_data.get("cajero", "N/A")).upper()
-        lines.append(ctr(f"CAJERO: {cajero}"))
+        cajero_line = f"CAJERO: {cajero}"
+        for ln in self._word_wrap(cajero_line, W):
+            lines.append(ln.center(W))
         if venta_data.get("cliente"):
-            lines.append(ctr(f"CLIENTE: {_s(venta_data['cliente']).upper()}"))
+            cli_line = f"CLIENTE: {_s(venta_data['cliente']).upper()}"
+            for ln in self._word_wrap(cli_line, W):
+                lines.append(ln.center(W))
         lines.append(sep)
 
-        # ── Items table ───────────────────────────────────────────────────────
-        NAME_W = W - 6 - PRICE_W
+        # ── Tabla de productos ────────────────────────────────────────────────
         lines.append(f"{'CANT':<6}{'DESCRIPCION':<{NAME_W}}{'PRECIO':>{PRICE_W}}")
         lines.append(sep2)
 
         num_articulos = 0
         for item in venta_data.get("items", []):
-            cant      = item["cantidad"]
-            sub       = item["subtotal"]
+            cant       = int(item.get("cantidad", 1))
+            sub        = float(item.get("subtotal", 0.0))
             num_articulos += cant
-            prod_full = _s(item["nombre"]).upper()
-            qty_prefix = f"{cant:>2} PZ "
+            prod_full  = _s(item.get("nombre", "")).upper()
+            qty_prefix = f"{cant:>2} PZ "  # always 6 chars
             price_str  = money(sub)
 
-            if len(prod_full) <= NAME_W:
-                lines.append(f"{qty_prefix}{prod_full:<{NAME_W}}{price_str:>{PRICE_W}}")
-            else:
-                lines.append(f"{qty_prefix}{prod_full[:NAME_W]:<{NAME_W}}{price_str:>{PRICE_W}}")
-                resto = prod_full[NAME_W:]
-                while resto:
-                    chunk = resto[:NAME_W]
-                    resto = resto[NAME_W:]
-                    lines.append(f"{'':6}{chunk}")
+            # First line: qty + first NAME_W chars of name + price
+            name_first = prod_full[:NAME_W]
+            lines.append(f"{qty_prefix}{name_first:<{NAME_W}}{price_str:>{PRICE_W}}")
+            # Continuation lines if name is longer
+            resto = prod_full[NAME_W:]
+            while resto:
+                chunk, resto = resto[:NAME_W], resto[NAME_W:]
+                lines.append(f"{'':6}{chunk}")
 
-        # ── Totals ────────────────────────────────────────────────────────────
+        # ── Totales ───────────────────────────────────────────────────────────
         lines.append(sep)
-        subtotal  = venta_data.get("subtotal", 0.0)
-        descuento = venta_data.get("descuento", 0.0)
-        iva       = venta_data.get("iva", 0.0)
-        total     = venta_data.get("total", 0.0)
-        pagado    = venta_data.get("monto_pagado", 0.0)
-        cambio    = venta_data.get("cambio", 0.0)
+        subtotal  = float(venta_data.get("subtotal",   0.0))
+        descuento = float(venta_data.get("descuento",  0.0))
+        iva       = float(venta_data.get("iva",         0.0))
+        total     = float(venta_data.get("total",       0.0))
+        pagado    = float(venta_data.get("monto_pagado",0.0))
+        cambio    = float(venta_data.get("cambio",      0.0))
         metodo    = _s(venta_data.get("metodo_pago", "efectivo")).upper()
 
         if descuento > 0:
-            lines.append(tot("SUBTOTAL", subtotal))
-            lines.append(tot("DESCUENTO", descuento))
+            lines.append(tot("SUBTOTAL:", money(subtotal)))
+            lines.append(tot("DESCUENTO:", money(descuento)))
         if iva > 0:
-            lines.append(tot("IVA (16%)", iva))
-
-        lines.append(tot("TOTAL", total))
-        lines.append(tot(metodo, pagado))
+            lines.append(tot("IVA (16%):", money(iva)))
+        lines.append(tot("TOTAL:", money(total)))
         lines.append(sep2)
-        lines.append(tot("CAMBIO", cambio))
+        lines.append(tot(f"{metodo}:", money(pagado)))
+        lines.append(tot("CAMBIO:", money(cambio)))
         lines.append(sep)
 
-        # Bottom info — left-aligned
+        # Info inferior
         lines.append(f"ARTICULOS: {num_articulos}")
         lines.append(f"FOLIO: {venta_data.get('folio', 'N/A')}")
         lines.append(f"FECHA: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-
-        # ── Footer ────────────────────────────────────────────────────────────
-        lines += [
-            sep,
-            ctr("!GRACIAS POR SU COMPRA!"),
-            ctr("CONSERVE SU TICKET"),
-            sep,
-            "", "", "",
-        ]
+        lines += [sep, "GRACIAS POR SU COMPRA".center(W), "CONSERVE SU TICKET".center(W), sep, "", "", ""]
         return "\n".join(lines)
+
+    # ── Ticket de retiro de caja ──────────────────────────────────────────────
+
+    def _build_retiro_ticket(self, retiro_data: dict, farmacia_config: dict) -> str:
+        cfg_d = farmacia_config or {}
+        nombre   = _s(cfg_d.get("farmacia_nombre", cfg.PHARMACY_NAME)).upper()
+        telefono = _s(cfg_d.get("farmacia_telefono", cfg.PHARMACY_PHONE)).upper()
+        W = self.width
+
+        sep  = "=" * W
+        sep2 = "-" * W
+
+        def money(v):
+            return f"${float(v or 0):,.2f}"
+
+        def tot(label, value_str):
+            room = W - len(value_str)
+            room = max(1, room)
+            return f"{label:<{room}}{value_str}"
+
+        lines = [sep]
+        for ln in self._word_wrap(nombre, W):
+            lines.append(ln.center(W))
+        if telefono:
+            lines.append(f"TEL: {telefono}".center(W))
+        lines.append(sep)
+        lines.append("RETIRO DE EFECTIVO DE CAJA".center(W))
+        lines.append(sep)
+
+        fecha   = retiro_data.get("fecha", datetime.now().strftime("%d/%m/%Y %H:%M"))
+        admin   = _s(retiro_data.get("admin", "Administrador")).upper()
+        concepto = _s(retiro_data.get("concepto", "Sin concepto")).upper()
+        monto   = float(retiro_data.get("monto", 0.0))
+
+        lines.append(f"FECHA:   {fecha}")
+        lines.append(f"ADMIN:   {admin}")
+        lines.append(sep2)
+        lines.append("CONCEPTO:")
+        for ln in self._word_wrap(concepto, W - 2):
+            lines.append(f"  {ln}")
+        lines.append(sep2)
+        lines.append(tot("MONTO RETIRADO:", money(monto)))
+        lines.append(sep)
+        lines.append("FIRMA AUTORIZADA:".center(W))
+        lines.append("")
+        lines.append(("_" * min(22, W - 4)).center(W))
+        lines += [sep, "", "", ""]
+        return "\n".join(lines)
+
+    def print_retiro(self, retiro_data: dict, farmacia_config: dict = None) -> bool:
+        """Open cash drawer then print retiro ticket."""
+        if farmacia_config is None:
+            farmacia_config = self._load_farmacia_config()
+
+        w = farmacia_config.get("impresora_ancho", "32")
+        self.width = int(w) if str(w).isdigit() else 32
+        tipo   = farmacia_config.get("impresora_tipo",   "windows")
+        puerto = farmacia_config.get("impresora_nombre") or farmacia_config.get("impresora_puerto", "")
+
+        if not self.connected:
+            _log(f"print_retiro auto-connect: tipo={tipo} puerto={puerto}")
+            self.connect(tipo, puerto or None)
+
+        self.open_cash_drawer()
+
+        if not self.connected:
+            _log("print_retiro: no conectada — solo cajón")
+            return False
+
+        try:
+            ticket = self._build_retiro_ticket(retiro_data, farmacia_config)
+            _log(f"print_retiro via tipo={self.printer_type}")
+            if self.printer_type == "windows":
+                return self._print_raw_text(ticket, "Retiro Caja")
+            if self.printer:
+                self.printer.set(align="left", bold=False, height=1, width=1)
+                self.printer.text(ticket + "\n")
+                self.printer.cut()
+                return True
+        except Exception:
+            _log(f"print_retiro error: {traceback.format_exc()}")
+        return False
+
+    def _print_raw_text(self, text: str, doc_name: str = "Ticket") -> bool:
+        """Send text as RAW ESC/POS to Windows printer."""
+        try:
+            import win32print
+            ESC = b'\x1b'
+            raw = (ESC + b'@' +
+                   text.encode("ascii", errors="replace") +
+                   b'\n\n\n\n' +
+                   ESC + b'm')
+            hP = win32print.OpenPrinter(self.printer_name)
+            try:
+                win32print.StartDocPrinter(hP, 1, (doc_name, None, "RAW"))
+                win32print.StartPagePrinter(hP)
+                win32print.WritePrinter(hP, raw)
+                win32print.EndPagePrinter(hP)
+                win32print.EndDocPrinter(hP)
+            finally:
+                win32print.ClosePrinter(hP)
+            return True
+        except Exception:
+            _log(f"_print_raw_text error: {traceback.format_exc()}")
+            return False
 
     # ── Rutas de impresión ────────────────────────────────────────────────────
 
@@ -425,32 +574,8 @@ class PrinterService:
             return self._print_windows_raw(venta_data, farmacia_config)
 
     def _print_windows_raw(self, venta_data: dict, farmacia_config: dict) -> bool:
-        try:
-            import win32print
-            ticket = self._build_ticket(venta_data, farmacia_config)
-            
-            # Comandos ESC/POS básicos para inicializar y cortar
-            ESC = b'\x1b'
-            raw = (
-                ESC + b'@' + # Initialize
-                ticket.encode("ascii", errors="replace") +
-                b'\n\n\n\n\n' + # Espacio extra al final
-                ESC + b'm' # Corte parcial (algunas máquinas usan 'i' o 'V')
-            )
-
-            hPrinter = win32print.OpenPrinter(self.printer_name)
-            try:
-                win32print.StartDocPrinter(hPrinter, 1, ("Ticket RAW", None, "RAW"))
-                win32print.StartPagePrinter(hPrinter)
-                win32print.WritePrinter(hPrinter, raw)
-                win32print.EndPagePrinter(hPrinter)
-                win32print.EndDocPrinter(hPrinter)
-            finally:
-                win32print.ClosePrinter(hPrinter)
-            return True
-        except Exception:
-            _log(f"FALLO TOTAL RAW: {traceback.format_exc()}")
-            return False
+        ticket = self._build_ticket(venta_data, farmacia_config)
+        return self._print_raw_text(ticket, "Ticket RAW")
 
     def _print_escpos(self, venta_data: dict, farmacia_config: dict) -> bool:
         # Usa el mismo texto que _build_ticket — evita duplicar lógica

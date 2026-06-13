@@ -246,6 +246,19 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
         )
         db.add(r)
         db.commit()
+
+        # Imprimir ticket de retiro y abrir cajón
+        from app.database.models import Usuario as _Usr
+        admin_obj = db.query(_Usr).filter(_Usr.id == usuario_id).first()
+        retiro_ticket_data = {
+            "monto":    r.monto,
+            "concepto": r.concepto or "Sin concepto",
+            "fecha":    r.creado_en.strftime("%d/%m/%Y %H:%M") if r.creado_en else "",
+            "admin":    admin_obj.nombre if admin_obj else "Administrador",
+        }
+        from app.services.printer_service import printer_service as _ps
+        bg.add_task(_ps.print_retiro, retiro_ticket_data)
+
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
