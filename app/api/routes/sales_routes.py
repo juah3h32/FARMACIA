@@ -5,7 +5,7 @@ from app.database.connection import get_db_session
 from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Usuario, Cliente
 from app.api.routes.auth_routes import get_current_api_user
 from sqlalchemy import func
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
@@ -27,9 +27,9 @@ def listar_ventas(
             q = q.filter(Venta.creado_en >= datetime.combine(fecha_inicio, datetime.min.time()))
         if fecha_fin:
             q = q.filter(Venta.creado_en <= datetime.combine(fecha_fin, datetime.max.time()))
-        ventas = (q.options(joinedload(Venta.items).joinedload(ItemVenta.producto),
-                            joinedload(Venta.usuario),
-                            joinedload(Venta.cliente))
+        ventas = (q.options(selectinload(Venta.items).selectinload(ItemVenta.producto),
+                            selectinload(Venta.usuario),
+                            selectinload(Venta.cliente))
                    .order_by(Venta.creado_en.desc()).limit(limite).all())
         return [
             {

@@ -109,6 +109,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         except ValueError:
             metodo = MetodoPago.efectivo
 
+        from datetime import datetime as _dt
         venta = Venta(
             folio=folio,
             usuario_id=int(payload["sub"]),
@@ -122,6 +123,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             cambio=cambio,
             estado=EstadoVenta.completada,
             notas=body.notas,
+            creado_en=_dt.now(),
         )
         db.add(venta)
         db.flush()  # Get venta.id for items

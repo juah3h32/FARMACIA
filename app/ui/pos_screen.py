@@ -691,7 +691,8 @@ class PosScreen(ctk.CTkFrame):
 
         db = get_db_session()
         try:
-            folio = f"V{datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}"
+            now = datetime.now()
+            folio = f"V{now.strftime('%Y%m%d%H%M%S%f')[:-3]}"
             venta = Venta(
                 folio=folio,
                 usuario_id=self.user.id,
@@ -704,6 +705,7 @@ class PosScreen(ctk.CTkFrame):
                 monto_pagado=monto_pagado,
                 cambio=cambio,
                 estado=EstadoVenta.completada,
+                creado_en=now,
             )
             db.add(venta)
             db.flush()

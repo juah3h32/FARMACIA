@@ -504,7 +504,7 @@ class ReportsScreen(ctk.CTkFrame):
         try:
             desde = datetime.strptime(self.entry_desde.get().strip(), "%d/%m/%Y")
             hasta = datetime.strptime(self.entry_hasta.get().strip(), "%d/%m/%Y").replace(
-                hour=23, minute=59, second=59)
+                hour=23, minute=59, second=59, microsecond=999999)
             return desde, hasta
         except ValueError:
             messagebox.showwarning("Fecha inválida", "Formato: DD/MM/YYYY")

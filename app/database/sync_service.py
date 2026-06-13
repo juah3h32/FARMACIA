@@ -30,9 +30,10 @@ _TABLE_ORDER = [
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
 # ventas/compras: estado puede cambiar (completada→cancelada); watermark no capturaría eso
+# items_venta incluido para que sync_from_turso los restaure si el DB local se resetea
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
-    "productos", "lotes", "cortes_caja", "ventas", "compras",
+    "productos", "lotes", "cortes_caja", "ventas", "compras", "items_venta",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
