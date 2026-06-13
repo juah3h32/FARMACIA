@@ -1752,6 +1752,51 @@
           </div>
         </div>
 
+        <!-- Turno Auto-Apertura -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#16A34A,#22C55E,#4ADE80)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#F0FDF4">
+              <i data-lucide="clock" style="width:20px;height:20px;color:#16A34A"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Apertura Automática de Turno</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Si el cajero inicia sesión dentro del horario configurado, el turno se abre solo</p>
+            </div>
+          </div>
+          <div class="p-6 flex flex-col gap-4" style="max-width:480px">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-semibold" style="color:#0F172A">Activar apertura automática</p>
+                <p class="text-xs mt-0.5" style="color:#94A3B8">Solo aplica a cajeros y farmacéuticos</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="cfg-turno-activo" class="sr-only peer" onchange="previewTurnoConfig()">
+                <div class="w-11 h-6 rounded-full peer peer-checked:bg-green-500 peer-focus:ring-2 peer-focus:ring-green-300 transition-all" style="background:#E2E8F0"></div>
+                <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+              </label>
+            </div>
+            <div id="cfg-turno-horario" class="grid grid-cols-2 gap-4 transition-all">
+              <div>
+                <label class="lbl">Hora inicio</label>
+                <input type="time" id="cfg-turno-inicio" class="inp" value="09:00">
+              </div>
+              <div>
+                <label class="lbl">Hora límite</label>
+                <input type="time" id="cfg-turno-fin" class="inp" value="10:00">
+              </div>
+            </div>
+            <p id="cfg-turno-preview" class="text-xs rounded-lg px-3 py-2" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0">
+              El turno se abrirá automáticamente si el cajero inicia sesión entre las 09:00 y las 10:00
+            </p>
+            <button onclick="saveTurnoConfig()"
+                    class="h-10 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
+                    style="background:#16A34A;width:fit-content;padding:0 20px">
+              <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
+            </button>
+          </div>
+        </div>
+
       </div>
 
       <!-- ─── HISTORIAL CLÍNICO ──────────────────── -->
@@ -2973,6 +3018,7 @@ function launchApp() {
   const turnoBtn = document.getElementById('turno-btn');
   if (turnoBtn) turnoBtn.style.display = S.user?.rol === 'admin' ? 'none' : '';
   loadTurnoStatus();
+  autoAbrirTurnoSiCorresponde();
   loadAlertasCaducidad();
   setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
   loadSuppliers();  // populate proveedor selects in product modal
@@ -5170,6 +5216,82 @@ async function exportCSV() {
 }
 
 // ══════════════════════════════════════════════════════════
+// TURNO AUTO-APERTURA
+// ══════════════════════════════════════════════════════════
+async function autoAbrirTurnoSiCorresponde() {
+  if (!S.user || S.user.rol === 'admin') return;
+  try {
+    const cfgRes = await api('/admin/config');
+    if (!cfgRes.ok) return;
+    const cfg = await cfgRes.json();
+    if (cfg.turno_auto_activo !== 'true') return;
+
+    const inicio = cfg.turno_auto_inicio || '09:00';
+    const fin    = cfg.turno_auto_fin    || '10:00';
+    const now    = new Date();
+    const hhmm   = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    if (hhmm < inicio || hhmm > fin) return;
+
+    const turnoRes = await api('/cortes/activo');
+    if (!turnoRes.ok) return;
+    const turno = await turnoRes.json();
+    if (turno.abierto) return;
+
+    const res = await api('/cortes/abrir', {
+      method: 'POST',
+      body: JSON.stringify({ monto_apertura: 0, notas: 'Apertura automática' })
+    });
+    if (res.ok) {
+      toast('Turno abierto automáticamente', 'success');
+      loadTurnoStatus();
+    }
+  } catch(e) { /* silencioso — no interrumpir login */ }
+}
+
+async function initTurnoConfig() {
+  const res = await api('/admin/config');
+  if (!res.ok) return;
+  const cfg = await res.json();
+  const activo = document.getElementById('cfg-turno-activo');
+  const ini    = document.getElementById('cfg-turno-inicio');
+  const fin    = document.getElementById('cfg-turno-fin');
+  if (activo) activo.checked = cfg.turno_auto_activo === 'true';
+  if (ini)    ini.value = cfg.turno_auto_inicio || '09:00';
+  if (fin)    fin.value = cfg.turno_auto_fin    || '10:00';
+  previewTurnoConfig();
+}
+
+function previewTurnoConfig() {
+  const activo  = document.getElementById('cfg-turno-activo')?.checked;
+  const ini     = document.getElementById('cfg-turno-inicio')?.value || '09:00';
+  const fin     = document.getElementById('cfg-turno-fin')?.value    || '10:00';
+  const preview = document.getElementById('cfg-turno-preview');
+  const horario = document.getElementById('cfg-turno-horario');
+  if (horario) horario.style.opacity = activo ? '1' : '0.4';
+  if (!preview) return;
+  if (!activo) {
+    preview.textContent = 'Apertura automática desactivada — el cajero deberá abrir turno manualmente';
+    preview.style.background = '#F8FAFF'; preview.style.color = '#64748B'; preview.style.borderColor = '#E2E8F0';
+  } else {
+    preview.textContent = `El turno se abrirá automáticamente si el cajero inicia sesión entre las ${ini} y las ${fin}`;
+    preview.style.background = '#F0FDF4'; preview.style.color = '#16A34A'; preview.style.borderColor = '#BBF7D0';
+  }
+}
+
+async function saveTurnoConfig() {
+  const activo = document.getElementById('cfg-turno-activo')?.checked;
+  const ini    = document.getElementById('cfg-turno-inicio')?.value || '09:00';
+  const fin    = document.getElementById('cfg-turno-fin')?.value    || '10:00';
+  if (ini >= fin) { toast('La hora inicio debe ser menor que la hora límite','error'); return; }
+  const res = await api('/admin/config', {
+    method: 'POST',
+    body: JSON.stringify({ turno_auto_activo: activo ? 'true' : 'false', turno_auto_inicio: ini, turno_auto_fin: fin })
+  });
+  if (res.ok) toast('Configuración guardada','success');
+  else toast('Error al guardar','error');
+}
+
+// ══════════════════════════════════════════════════════════
 // TURNO (CORTE DE CAJA — CAJERO)
 // ══════════════════════════════════════════════════════════
 async function loadTurnoStatus() {
@@ -6019,6 +6141,7 @@ function initSettings() {
 
   renderTokenHistory();
   loadEndpoints();
+  if (S.user?.rol === 'admin') initTurnoConfig();
   icons();
 }
 

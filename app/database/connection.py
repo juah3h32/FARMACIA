@@ -221,6 +221,9 @@ def _seed_initial_data():
             "impresora_puerto":         "COM1",
             "api_activa":               "true",
             "purge_password_hash":      _hp("171215"),
+            "turno_auto_activo":        "true",
+            "turno_auto_inicio":        "09:00",
+            "turno_auto_fin":           "10:00",
         }
         existing_cfg = {c.clave for c in db.query(Configuracion.clave).all()}
         for clave, valor in configs_default.items():

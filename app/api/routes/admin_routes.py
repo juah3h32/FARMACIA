@@ -234,6 +234,60 @@ def list_endpoints(payload: dict = Depends(get_current_api_user)):
     ]
 
 
+class TurnoConfigIn(BaseModel):
+    turno_auto_activo: str = "true"   # "true" | "false"
+    turno_auto_inicio: str = "09:00"  # "HH:MM"
+    turno_auto_fin:    str = "10:00"  # "HH:MM"
+
+
+_TURNO_CFG_KEYS = {"turno_auto_activo", "turno_auto_inicio", "turno_auto_fin"}
+
+
+@router.get("/config")
+def get_config(payload: dict = Depends(get_current_api_user)):
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        rows = db.query(Configuracion).filter(
+            Configuracion.clave.in_(_TURNO_CFG_KEYS)
+        ).all()
+        return {r.clave: r.valor for r in rows}
+    finally:
+        db.close()
+
+
+@router.post("/config")
+def set_config(body: TurnoConfigIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        updates = {
+            "turno_auto_activo": body.turno_auto_activo,
+            "turno_auto_inicio": body.turno_auto_inicio,
+            "turno_auto_fin":    body.turno_auto_fin,
+        }
+        for clave, valor in updates.items():
+            row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+            if row:
+                row.valor = valor
+            else:
+                db.add(Configuracion(clave=clave, valor=valor))
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            sync_to_turso()
+        return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 class BackupPathIn(BaseModel):
     path: str
 
