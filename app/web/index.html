@@ -23,17 +23,23 @@
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
 <!-- ═══════════ AUDITORÍA STOCK MODAL ═══════════ -->
 <div id="modal-auditoria-stock" class="fixed inset-0 z-50 hidden items-center justify-center">
-  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-auditoria-stock')"></div>
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeAuditoriaModal()"></div>
   <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:720px;max-height:80vh">
     <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
         <i data-lucide="shield-alert" style="width:18px;height:18px;color:#D97706"></i>
         <h2 class="font-bold" style="color:#0F172A">Auditoría de Stock</h2>
         <span id="audit-badge" class="text-xs font-bold px-2 py-0.5 rounded-full ml-1" style="background:#FEF3C7;color:#92400E"></span>
+        <span id="audit-last-update" class="text-xs" style="color:#94A3B8;margin-left:4px"></span>
       </div>
-      <button onclick="closeModal('modal-auditoria-stock')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
-        <i data-lucide="x" style="width:16px;height:16px"></i>
-      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="_refreshAuditoria()" id="audit-refresh-btn" class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1 hover:opacity-80" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A">
+          <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar
+        </button>
+        <button onclick="closeAuditoriaModal()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
     </div>
     <div id="audit-body" class="flex-1 overflow-y-auto p-4">
       <p class="text-center py-8" style="color:#94A3B8">Cargando...</p>
@@ -3077,12 +3083,17 @@ function closeModal(id) {
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA STOCK
 // ══════════════════════════════════════════════════════════
-async function openAuditoriaStock() {
-  openModal('modal-auditoria-stock');
-  document.getElementById('audit-body').innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Analizando...</p>';
+let _auditInterval = null;
+
+async function _refreshAuditoria() {
+  const btn = document.getElementById('audit-refresh-btn');
+  if (btn) btn.disabled = true;
+  const body = document.getElementById('audit-body');
+  if (!body) return;
   const res = await api('/inventario/auditoria-stock');
   if (!res.ok) {
-    document.getElementById('audit-body').innerHTML = '<p class="text-center py-8 text-red-500">Error al cargar auditoría</p>';
+    body.innerHTML = '<p class="text-center py-8 text-red-500">Error al cargar auditoría</p>';
+    if (btn) btn.disabled = false;
     return;
   }
   const data = await res.json();
@@ -3090,10 +3101,13 @@ async function openAuditoriaStock() {
   if (badge) badge.textContent = data.con_discrepancia > 0
     ? `${data.con_discrepancia} discrepancias`
     : '✓ Sin discrepancias';
+  const lastEl = document.getElementById('audit-last-update');
+  if (lastEl) lastEl.textContent = `· ${new Date().toLocaleTimeString('es-MX',{timeStyle:'short'})}`;
 
   const items = data.items || [];
   if (!items.length) {
-    document.getElementById('audit-body').innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Sin datos de ventas</p>';
+    body.innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Sin datos de ventas</p>';
+    if (btn) btn.disabled = false;
     return;
   }
 
@@ -3111,7 +3125,7 @@ async function openAuditoriaStock() {
     </tr>`;
   }).join('');
 
-  document.getElementById('audit-body').innerHTML = `
+  body.innerHTML = `
     <p class="text-xs mb-3" style="color:#64748B">
       Compara unidades en ItemVenta vs registros en MovimientoStock para cada producto.
       Diferencia &gt; 0 = más vendido que registrado en historial de stock.
@@ -3127,6 +3141,20 @@ async function openAuditoriaStock() {
       <tbody>${rows}</tbody>
     </table>`;
   icons();
+  if (btn) btn.disabled = false;
+}
+
+async function openAuditoriaStock() {
+  openModal('modal-auditoria-stock');
+  document.getElementById('audit-body').innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Analizando...</p>';
+  await _refreshAuditoria();
+  if (_auditInterval) clearInterval(_auditInterval);
+  _auditInterval = setInterval(_refreshAuditoria, 15000);
+}
+
+function closeAuditoriaModal() {
+  if (_auditInterval) { clearInterval(_auditInterval); _auditInterval = null; }
+  closeModal('modal-auditoria-stock');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3534,12 +3562,18 @@ function navigate(page) {
 }
 
 let _dashInterval = null;
+let _invInterval  = null;
 
 function loadPage(page) {
   // Stop dashboard auto-refresh when leaving
   if (_dashInterval && page !== 'dashboard') {
     clearInterval(_dashInterval);
     _dashInterval = null;
+  }
+  // Stop inventory auto-refresh when leaving
+  if (_invInterval && page !== 'inventory') {
+    clearInterval(_invInterval);
+    _invInterval = null;
   }
   if (page==='dashboard') {
     loadDashboard();
@@ -3549,7 +3583,18 @@ function loadPage(page) {
     }
   }
   if (page==='pos')        loadPOS();
-  if (page==='inventory')  loadInventory();
+  if (page==='inventory') {
+    // Trigger Turso pull in background so next refresh has fresh data
+    api('/inventario/pull-nube', {method:'POST'}).catch(()=>{});
+    loadInventory();
+    if (!_invInterval) {
+      // Re-pull from Turso + reload products every 30s
+      _invInterval = setInterval(() => {
+        api('/inventario/pull-nube', {method:'POST'}).catch(()=>{});
+        setTimeout(() => _reloadInvProducts(), 2000);
+      }, 30000);
+    }
+  }
   if (page==='customers')  loadCustomers();
   if (page==='employees')  loadEmployees();
   if (page==='suppliers')  loadSuppliers();
@@ -4087,6 +4132,13 @@ async function processSale() {
 // ══════════════════════════════════════════════════════════
 // INVENTORY
 // ══════════════════════════════════════════════════════════
+async function _reloadInvProducts() {
+  const res = await api('/productos/?solo_activos=true');
+  if (!res.ok) return;
+  S.allInv = await res.json();
+  renderInvTable(S.allInv);
+}
+
 async function loadInventory() {
   // Show/hide admin-only buttons
   const addWrap = document.getElementById('inv-add-btn-wrap');

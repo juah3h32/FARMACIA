@@ -522,3 +522,14 @@ def auditoria_stock(payload: dict = Depends(get_current_api_user)):
         }
     finally:
         db.close()
+
+
+@router.post("/pull-nube")
+def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
+    """Trigger a Turso → local sync in background. Returns immediately."""
+    import threading as _t
+    import app.config as _cfg
+    if _cfg.TURSO_SYNC:
+        from app.database.sync_service import sync_from_turso
+        _t.Thread(target=sync_from_turso, daemon=True, name="PullNube").start()
+    return {"ok": True}
