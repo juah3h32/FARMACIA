@@ -533,3 +533,72 @@ def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
         from app.database.sync_service import sync_from_turso
         _t.Thread(target=sync_from_turso, daemon=True, name="PullNube").start()
     return {"ok": True}
+
+
+@router.post("/corregir-audit")
+def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """
+    For each product where (items_venta sold) > (movimientos_stock salidas), create a
+    correction MovimientoStock entry so the audit balances.
+
+    The actual product stock / piezas_sueltas are NOT modified — they were already
+    correctly decremented at sale time. The gap is a logging defect from a past bug
+    where piece-sales of fractioned products recorded stock_delta=0 in the movement log.
+    """
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        # ── Reproduce the audit query ──────────────────────────────────────────
+        ventas_q = (
+            db.query(ItemVenta.producto_id, func.sum(ItemVenta.cantidad).label("tv"))
+            .join(Venta, ItemVenta.venta_id == Venta.id)
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .group_by(ItemVenta.producto_id)
+            .all()
+        )
+        vendido_map = {r.producto_id: r.tv for r in ventas_q}
+
+        mov_q = (
+            db.query(MovimientoStock.producto_id, func.sum(MovimientoStock.cantidad).label("ts"))
+            .filter(MovimientoStock.tipo == TipoMovimiento.salida, MovimientoStock.referencia_tipo == "venta")
+            .group_by(MovimientoStock.producto_id)
+            .all()
+        )
+        salidas_map = {r.producto_id: r.ts for r in mov_q}
+
+        corregidos = 0
+        for pid, vendido in vendido_map.items():
+            diferencia = vendido - salidas_map.get(pid, 0)
+            if diferencia <= 0:
+                continue
+
+            prod = db.query(Producto).filter(Producto.id == pid).first()
+            stock_ref = prod.piezas_sueltas if (prod and prod.venta_fraccionada) else (prod.stock if prod else 0)
+
+            # Create a correction movement — type=salida so the audit totals balance.
+            db.add(MovimientoStock(
+                producto_id=pid,
+                tipo=TipoMovimiento.salida,
+                cantidad=diferencia,
+                stock_anterior=stock_ref,
+                stock_nuevo=stock_ref,
+                referencia_tipo="auditoria_correccion",
+                referencia_id=None,
+                usuario_id=int(payload["sub"]),
+                notas=f"CORRECCIÓN AUDITORÍA — {diferencia} {'pieza(s)' if prod and prod.venta_fraccionada else 'unidad(es)'} sin mov. registrado",
+            ))
+            corregidos += 1
+
+        db.commit()
+
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+
+        return {"ok": True, "corregidos": corregidos}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

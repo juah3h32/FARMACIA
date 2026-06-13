@@ -33,6 +33,9 @@
         <span id="audit-last-update" class="text-xs" style="color:#94A3B8;margin-left:4px"></span>
       </div>
       <div class="flex items-center gap-2">
+        <button onclick="corregirAudit()" id="audit-fix-btn" class="h-7 px-3 rounded-lg text-xs font-semibold items-center gap-1 hover:opacity-80 hidden" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA">
+          <i data-lucide="wrench" style="width:12px;height:12px"></i> Corregir todo
+        </button>
         <button onclick="_refreshAuditoria()" id="audit-refresh-btn" class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1 hover:opacity-80" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A">
           <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar
         </button>
@@ -3103,6 +3106,11 @@ async function _refreshAuditoria() {
     : '✓ Sin discrepancias';
   const lastEl = document.getElementById('audit-last-update');
   if (lastEl) lastEl.textContent = `· ${new Date().toLocaleTimeString('es-MX',{timeStyle:'short'})}`;
+  const fixBtn = document.getElementById('audit-fix-btn');
+  if (fixBtn) {
+    fixBtn.classList.toggle('hidden', data.con_discrepancia === 0);
+    fixBtn.classList.toggle('flex', data.con_discrepancia > 0);
+  }
 
   const items = data.items || [];
   if (!items.length) {
@@ -3155,6 +3163,25 @@ async function openAuditoriaStock() {
 function closeAuditoriaModal() {
   if (_auditInterval) { clearInterval(_auditInterval); _auditInterval = null; }
   closeModal('modal-auditoria-stock');
+}
+
+async function corregirAudit() {
+  const badge = document.getElementById('audit-badge');
+  const n = badge?.textContent?.match(/\d+/)?.[0] || '?';
+  const ok = confirm(`¿Corregir ${n} producto(s) con discrepancia?\n\nSe crearán registros de corrección en el historial de movimientos. El stock físico NO cambia (ya fue descontado correctamente al vender). La auditoría quedará en cero.`);
+  if (!ok) return;
+  const fixBtn = document.getElementById('audit-fix-btn');
+  if (fixBtn) { fixBtn.disabled = true; fixBtn.textContent = 'Corrigiendo...'; }
+  const res = await api('/inventario/corregir-audit', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    showToast(`Corrección aplicada: ${d.corregidos} producto(s) ✓`, 'success');
+    await _refreshAuditoria();
+  } else {
+    const err = await res.json().catch(()=>({}));
+    showToast(err.detail || 'Error al corregir', 'error');
+    if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i data-lucide="wrench" style="width:12px;height:12px"></i> Corregir todo'; lucide.createIcons(); }
+  }
 }
 
 // ══════════════════════════════════════════════════════════
