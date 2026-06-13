@@ -3016,7 +3016,8 @@ async function api(path, opts={}) {
     headers: { 'Content-Type':'application/json', ...(S.token?{Authorization:`Bearer ${S.token}`}:{}) },
     ...opts,
   });
-  if (res.status === 401) { doLogout(); return res; }
+  // Don't force logout during an active update — the API may briefly restart.
+  if (res.status === 401 && !_updPollTimer) { doLogout(); return res; }
   return res;
 }
 

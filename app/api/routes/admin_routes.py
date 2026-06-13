@@ -93,7 +93,10 @@ def install_update(body: InstallUpdateIn | None = None, payload: dict = Depends(
             ok, err = updater_service.download_and_install(on_progress, version_url=vurl, is_installer=isin)
             if ok:
                 _update_state.update({"progress": 1.0, "done": True, "running": False})
-                time.sleep(2.0)
+                # Give the frontend 4 seconds to see "✓ Instalando..." before we exit.
+                # The installer is already launched at this point; os._exit kills Python
+                # cleanly so the installer can overwrite EXE files without conflict.
+                time.sleep(4.0)
                 os._exit(0)
                 return
             else:
@@ -109,7 +112,10 @@ def install_update(body: InstallUpdateIn | None = None, payload: dict = Depends(
 
 
 @router.get("/update/progress")
-def update_progress(payload: dict = Depends(get_current_api_user)):
+def update_progress():
+    # No auth required — only exposes download progress, no sensitive data.
+    # Avoids forced logout when the API restarts mid-update and the old token
+    # would otherwise trigger a 401 → doLogout() in the frontend.
     return dict(_update_state)
 
 

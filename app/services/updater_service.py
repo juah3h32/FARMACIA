@@ -251,6 +251,15 @@ def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool,
     """Download Inno Setup installer and launch it directly (no PowerShell wrapper)."""
     installer_path = tmp / "FarmaciaPOS_update_setup.exe"
 
+    # Delete stale/partial installer from a previous run so we always download fresh.
+    # A leftover file can cause _download_file to skip the download (resume from full
+    # size) and trigger os._exit(0) without the user seeing any progress bar.
+    if installer_path.exists():
+        try:
+            installer_path.unlink()
+        except Exception:
+            pass
+
     ok, err = _download_file(url, installer_path, progress_callback, pct_max=0.95)
     if not ok:
         return False, err
@@ -259,13 +268,11 @@ def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool,
         progress_callback(1.0)
 
     # Launch installer directly — its own manifest requests UAC elevation.
-    # No PowerShell = no black console window. The UAC prompt shows the app name/icon.
-    # /VERYSILENT    : zero UI
-    # /NORESTART     : no Windows reboot
-    # /CLOSEAPPLICATIONS : cierra la app si sigue abierta
-    # /SUPPRESSMSGBOXES  : sin popups de error
-    # The [Run] section in installer.iss (without skipifsilent) relaunches the app.
-    args = '/VERYSILENT /NORESTART /CLOSEAPPLICATIONS /SUPPRESSMSGBOXES'
+    # NO /CLOSEAPPLICATIONS: the Python process calls os._exit(0) itself right after
+    # launching the installer, so the EXE is already gone when the installer runs.
+    # Adding /CLOSEAPPLICATIONS caused the installer to kill the app BEFORE os._exit
+    # ran, resulting in the user losing their session mid-download.
+    args = '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES'
     try:
         import ctypes
         ret = ctypes.windll.shell32.ShellExecuteW(
