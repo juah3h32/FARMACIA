@@ -4,6 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
+from datetime import datetime as _dt
 import enum
 
 Base = declarative_base()
@@ -47,7 +48,7 @@ class Usuario(Base):
     email = Column(String(100))
     activo = Column(Boolean, default=True)
     foto_url = Column(String(500), nullable=True)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     ventas = relationship("Venta", back_populates="usuario")
     movimientos = relationship("MovimientoStock", back_populates="usuario")
@@ -76,7 +77,7 @@ class Proveedor(Base):
     direccion = Column(Text)
     rfc = Column(String(20))
     activo = Column(Boolean, default=True)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     productos = relationship("Producto", back_populates="proveedor")
     compras = relationship("Compra", back_populates="proveedor")
@@ -111,8 +112,8 @@ class Producto(Base):
     unidad_caja = Column(String(30), default="caja")
     piezas_sueltas = Column(Integer, default=0)
     activo = Column(Boolean, default=True)
-    creado_en = Column(DateTime, server_default=func.now())
-    actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
     categoria = relationship("Categoria", back_populates="productos")
     proveedor = relationship("Proveedor", back_populates="productos")
@@ -131,7 +132,7 @@ class Lote(Base):
     fecha_vencimiento = Column(Date)
     cantidad = Column(Integer, default=0)
     precio_compra = Column(Float, default=0.0)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     producto = relationship("Producto", back_populates="lotes")
     items_compra = relationship("ItemCompra", back_populates="lote")
@@ -149,7 +150,7 @@ class Cliente(Base):
     limite_credito = Column(Float, default=0.0)
     saldo_deuda = Column(Float, default=0.0)
     activo = Column(Boolean, default=True)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     ventas = relationship("Venta", back_populates="cliente")
 
@@ -170,7 +171,7 @@ class Venta(Base):
     cambio = Column(Float, default=0.0)
     estado = Column(SAEnum(EstadoVenta), default=EstadoVenta.completada)
     notas = Column(Text)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
     eliminado = Column(Boolean, default=False)
     eliminado_en = Column(DateTime, nullable=True)
 
@@ -204,7 +205,7 @@ class Compra(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     total = Column(Float, default=0.0)
     notas = Column(Text)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     proveedor = relationship("Proveedor", back_populates="compras")
     items = relationship("ItemCompra", back_populates="compra", cascade="all, delete-orphan")
@@ -238,7 +239,7 @@ class CortesCaja(Base):
     total_tarjeta = Column(Float, default=0.0)
     total_transferencia = Column(Float, default=0.0)
     num_ventas = Column(Integer, default=0)
-    abierto_en = Column(DateTime, server_default=func.now())
+    abierto_en = Column(DateTime, default=_dt.now)
     cerrado_en = Column(DateTime, nullable=True)
     notas = Column(Text)
 
@@ -259,7 +260,7 @@ class MovimientoStock(Base):
     referencia_tipo = Column(String(50))
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     notas = Column(Text)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     producto = relationship("Producto", back_populates="movimientos")
     usuario = relationship("Usuario", back_populates="movimientos")
@@ -275,7 +276,7 @@ class AuditoriaLog(Base):
     tabla = Column(String(50))
     registro_id = Column(Integer)
     detalles = Column(Text)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     usuario = relationship("Usuario", back_populates="auditoria")
 
@@ -287,7 +288,7 @@ class Configuracion(Base):
     id = Column(Integer, primary_key=True)
     clave = Column(String(100), unique=True, nullable=False)
     valor = Column(Text)
-    actualizado_en = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
 
 class SexoPaciente(str, enum.Enum):
@@ -310,7 +311,7 @@ class Paciente(Base):
     antecedentes = Column(Text)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
     activo = Column(Boolean, default=True)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     registros = relationship("RegistroClinico", back_populates="paciente", cascade="all, delete-orphan")
     cliente = relationship("Cliente")
@@ -321,7 +322,7 @@ class RegistroClinico(Base):
 
     id = Column(Integer, primary_key=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
-    fecha = Column(DateTime, server_default=func.now())
+    fecha = Column(DateTime, default=_dt.now)
     presion_sistolica = Column(Integer)
     presion_diastolica = Column(Integer)
     pulso = Column(Integer)
@@ -335,7 +336,7 @@ class RegistroClinico(Base):
     tratamiento = Column(Text)
     notas = Column(Text)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    creado_en = Column(DateTime, server_default=func.now())
+    creado_en = Column(DateTime, default=_dt.now)
 
     paciente = relationship("Paciente", back_populates="registros")
     usuario = relationship("Usuario")

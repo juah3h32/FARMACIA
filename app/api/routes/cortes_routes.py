@@ -80,6 +80,7 @@ def abrir_corte(body: AbrirCorteIn, bg: BackgroundTasks, payload: dict = Depends
             usuario_id=usuario_id,
             monto_apertura=body.monto_apertura,
             notas=body.notas,
+            abierto_en=datetime.now(),
         )
         db.add(c)
         db.commit()

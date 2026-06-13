@@ -39,7 +39,7 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
         days=body.dias,
         token_name=body.nombre,
     )
-    expires_at = (datetime.utcnow() + timedelta(days=body.dias)).strftime("%Y-%m-%d")
+    expires_at = (datetime.now() + timedelta(days=body.dias)).strftime("%Y-%m-%d")
     return {
         "token": token,
         "nombre": body.nombre,
