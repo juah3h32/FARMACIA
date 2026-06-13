@@ -146,21 +146,27 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 # ── Pieza suelta ────────────────────────────────────────────
                 # Descuenta de piezas_sueltas primero; si no alcanza, abre cajas.
                 necesarias = item.cantidad
-                if (prod.piezas_sueltas or 0) >= necesarias:
+                piezas_ant = prod.piezas_sueltas or 0
+                if piezas_ant >= necesarias:
                     prod.piezas_sueltas -= necesarias
                     cajas_abiertas = 0
+                    # FIX: track piezas in movement (stock_ant/nuevo = piezas context)
+                    stock_ant = piezas_ant
+                    stock_delta = necesarias
+                    stock_nue_override = prod.piezas_sueltas
                 else:
-                    deficit = necesarias - (prod.piezas_sueltas or 0)
+                    deficit = necesarias - piezas_ant
                     cajas_abiertas = _math.ceil(deficit / (prod.unidades_por_caja or 1))
                     prod.stock = max(0, prod.stock - cajas_abiertas)
                     prod.piezas_sueltas = (
-                        (prod.piezas_sueltas or 0)
+                        piezas_ant
                         + cajas_abiertas * (prod.unidades_por_caja or 1)
                         - necesarias
                     )
                     _fefo_consume(db, item.producto_id, cajas_abiertas)
-                stock_delta = cajas_abiertas  # cajas consumidas para movimiento
-                notas_mov = f"Folio {folio} | {necesarias} {prod.unidad_pieza or 'pieza(s)'} sueltas"
+                    stock_delta = cajas_abiertas
+                    stock_nue_override = prod.stock
+                notas_mov = f"Folio {folio} | {necesarias} {prod.unidad_pieza or 'pieza(s)'}"
                 if cajas_abiertas:
                     notas_mov += f" (abrió {cajas_abiertas} {prod.unidad_caja or 'caja(s)'})"
             elif prod.venta_fraccionada and not item.es_pieza:
@@ -168,12 +174,14 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 prod.stock = max(0, prod.stock - item.cantidad)
                 _fefo_consume(db, item.producto_id, item.cantidad)
                 stock_delta = item.cantidad
+                stock_nue_override = prod.stock
                 notas_mov = f"Folio {folio} | {item.cantidad} {prod.unidad_caja or 'caja(s)'}"
             else:
                 # ── Producto normal ─────────────────────────────────────────
                 prod.stock = max(0, prod.stock - item.cantidad)
                 _fefo_consume(db, item.producto_id, item.cantidad)
                 stock_delta = item.cantidad
+                stock_nue_override = prod.stock
                 notas_mov = f"Folio {folio}"
 
             db.add(MovimientoStock(
@@ -181,7 +189,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 tipo=TipoMovimiento.salida,
                 cantidad=stock_delta,
                 stock_anterior=stock_ant,
-                stock_nuevo=prod.stock,
+                stock_nuevo=stock_nue_override,
                 referencia_id=venta.id,
                 referencia_tipo="venta",
                 usuario_id=usuario_id,

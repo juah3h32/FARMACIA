@@ -10,6 +10,32 @@ from app.api.routes.auth_routes import get_current_api_user
 router = APIRouter()
 
 
+def _calc_disponibles(db):
+    """Returns (ganancia_disponible, capital_inversion) from all-time data."""
+    ventas = (
+        db.query(Venta)
+        .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+        .all()
+    )
+    tv = sum(v.total for v in ventas)
+    venta_ids = [v.id for v in ventas]
+    if venta_ids:
+        cost_rows = (
+            db.query(ItemVenta.cantidad, Producto.precio_compra)
+            .join(Producto, ItemVenta.producto_id == Producto.id)
+            .filter(ItemVenta.venta_id.in_(venta_ids))
+            .all()
+        )
+        total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+    else:
+        total_costo = 0.0
+    ganancia = tv - total_costo
+    all_retiros = db.query(RetiroCaja).all()
+    ret_personal  = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "personal")
+    ret_inversion = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "inversion")
+    return ganancia - ret_personal, max(0.0, total_costo - ret_inversion)
+
+
 class AbrirCorteIn(BaseModel):
     monto_apertura: float = 0.0
     notas: Optional[str] = None
@@ -250,6 +276,21 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
     usuario_id = int(payload["sub"])
     db = get_db_session()
     try:
+        tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
+
+        # Validate against available balance
+        gan_disp, cap_inv = _calc_disponibles(db)
+        if tipo == "personal" and body.monto > gan_disp + 0.005:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Saldo insuficiente. Ganancia disponible: ${gan_disp:.2f}",
+            )
+        if tipo == "inversion" and body.monto > cap_inv + 0.005:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Saldo insuficiente. Capital de inversión disponible: ${cap_inv:.2f}",
+            )
+
         # Intentar asociar al corte activo de cualquier cajero (si admin también tiene uno, o el primer abierto)
         corte = (
             db.query(CortesCaja)
@@ -257,7 +298,6 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
             .order_by(CortesCaja.abierto_en.desc())
             .first()
         )
-        tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
         r = RetiroCaja(
             corte_id=corte.id if corte else None,
             usuario_id=usuario_id,

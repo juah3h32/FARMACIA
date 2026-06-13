@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import date, timedelta, datetime
 from app.database.connection import get_db_session
 from sqlalchemy import func
-from app.database.models import Producto, Lote, MovimientoStock, TipoMovimiento
+from app.database.models import Producto, Lote, MovimientoStock, TipoMovimiento, ItemVenta, Venta, EstadoVenta
 from app.api.routes.auth_routes import get_current_api_user
 import app.config as cfg
 
@@ -460,5 +460,65 @@ def resumen_inventario(payload: dict = Depends(get_current_api_user)):
             result["valor_vencido"] = round(valor_vencido, 2)
             result["valor_critico"] = round(valor_critico, 2)
         return result
+    finally:
+        db.close()
+
+
+@router.get("/auditoria-stock")
+def auditoria_stock(payload: dict = Depends(get_current_api_user)):
+    """
+    Por cada producto: compara unidades vendidas (ItemVenta) vs salidas en MovimientoStock.
+    Devuelve lista de discrepancias donde la diferencia != 0.
+    """
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        # Total vendido por producto (sum of ItemVenta.cantidad en ventas completadas)
+        ventas_q = (
+            db.query(ItemVenta.producto_id, func.sum(ItemVenta.cantidad).label("total_vendido"))
+            .join(Venta, ItemVenta.venta_id == Venta.id)
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .group_by(ItemVenta.producto_id)
+            .all()
+        )
+        vendido_map = {r.producto_id: r.total_vendido for r in ventas_q}
+
+        # Total salidas por producto en MovimientoStock (tipo=salida)
+        mov_q = (
+            db.query(MovimientoStock.producto_id, func.sum(MovimientoStock.cantidad).label("total_salidas"))
+            .filter(MovimientoStock.tipo == TipoMovimiento.salida, MovimientoStock.referencia_tipo == "venta")
+            .group_by(MovimientoStock.producto_id)
+            .all()
+        )
+        salidas_map = {r.producto_id: r.total_salidas for r in mov_q}
+
+        # Todos los productos que aparecen en alguna venta
+        todos_ids = set(vendido_map) | set(salidas_map)
+        productos = {p.id: p for p in db.query(Producto).filter(Producto.id.in_(todos_ids)).all()}
+
+        resultado = []
+        for pid in todos_ids:
+            vendido = vendido_map.get(pid, 0)
+            salidas = salidas_map.get(pid, 0)
+            diferencia = vendido - salidas
+            prod = productos.get(pid)
+            resultado.append({
+                "producto_id":   pid,
+                "nombre":        prod.nombre if prod else f"ID {pid}",
+                "stock_actual":  prod.stock if prod else None,
+                "piezas_sueltas": prod.piezas_sueltas if prod else None,
+                "vendido":       vendido,
+                "mov_salidas":   salidas,
+                "diferencia":    diferencia,
+                "ok":            diferencia == 0,
+            })
+
+        # Sort: discrepancias primero
+        resultado.sort(key=lambda x: (x["ok"], -abs(x["diferencia"])))
+        return {
+            "total": len(resultado),
+            "con_discrepancia": sum(1 for r in resultado if not r["ok"]),
+            "items": resultado,
+        }
     finally:
         db.close()

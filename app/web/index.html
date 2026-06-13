@@ -21,6 +21,26 @@
 <script src="/static/tailwind.js"></script>
 <script src="/static/lucide.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
+<!-- ═══════════ AUDITORÍA STOCK MODAL ═══════════ -->
+<div id="modal-auditoria-stock" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-auditoria-stock')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:720px;max-height:80vh">
+    <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-2">
+        <i data-lucide="shield-alert" style="width:18px;height:18px;color:#D97706"></i>
+        <h2 class="font-bold" style="color:#0F172A">Auditoría de Stock</h2>
+        <span id="audit-badge" class="text-xs font-bold px-2 py-0.5 rounded-full ml-1" style="background:#FEF3C7;color:#92400E"></span>
+      </div>
+      <button onclick="closeModal('modal-auditoria-stock')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="audit-body" class="flex-1 overflow-y-auto p-4">
+      <p class="text-center py-8" style="color:#94A3B8">Cargando...</p>
+    </div>
+  </div>
+</div>
+
 <div id="modal-turno" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-turno')"></div>
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[460px]">
@@ -1139,7 +1159,12 @@
               <option value="ok">Stock OK</option>
             </select>
             <span id="inv-count" class="text-xs" style="color:#64748B"></span>
-            <div class="ml-auto" id="inv-add-btn-wrap">
+            <div class="ml-auto flex items-center gap-2" id="inv-add-btn-wrap">
+              <button onclick="openAuditoriaStock()" id="inv-auditoria-btn"
+                      class="h-9 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 hidden"
+                      style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">
+                <i data-lucide="shield-alert" style="width:13px;height:13px"></i> Auditoría stock
+              </button>
               <button onclick="openProductModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
                       style="background:#243366">
@@ -1971,7 +1996,8 @@
                 </div>
                 <div>
                   <label class="lbl">Monto ($) *</label>
-                  <input id="caja-retiro-monto" type="number" step="0.01" min="0.01" placeholder="0.00" class="inp">
+                  <input id="caja-retiro-monto" type="number" step="0.01" min="0.01" placeholder="0.00" class="inp" oninput="_updateRetiroMontoHint()">
+                  <p id="caja-retiro-limite-hint" class="text-xs mt-1" style="color:#64748B"></p>
                 </div>
                 <div>
                   <label class="lbl">Concepto</label>
@@ -3032,6 +3058,61 @@ function closeModal(id) {
 }
 
 // ══════════════════════════════════════════════════════════
+// AUDITORÍA STOCK
+// ══════════════════════════════════════════════════════════
+async function openAuditoriaStock() {
+  openModal('modal-auditoria-stock');
+  document.getElementById('audit-body').innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Analizando...</p>';
+  const res = await api('/inventario/auditoria-stock');
+  if (!res.ok) {
+    document.getElementById('audit-body').innerHTML = '<p class="text-center py-8 text-red-500">Error al cargar auditoría</p>';
+    return;
+  }
+  const data = await res.json();
+  const badge = document.getElementById('audit-badge');
+  if (badge) badge.textContent = data.con_discrepancia > 0
+    ? `${data.con_discrepancia} discrepancias`
+    : '✓ Sin discrepancias';
+
+  const items = data.items || [];
+  if (!items.length) {
+    document.getElementById('audit-body').innerHTML = '<p class="text-center py-8" style="color:#94A3B8">Sin datos de ventas</p>';
+    return;
+  }
+
+  const rows = items.map(r => {
+    const bg  = r.ok ? '' : 'style="background:#FEF2F2"';
+    const dif = r.diferencia !== 0
+      ? `<span style="color:#DC2626;font-weight:700">+${r.diferencia}</span>`
+      : '<span style="color:#16A34A">✓</span>';
+    return `<tr class="border-b" style="border-color:#F1F5F9" ${bg}>
+      <td class="px-3 py-2 text-xs" style="color:#0F172A">${r.nombre}</td>
+      <td class="px-3 py-2 text-xs text-center" style="color:#374151">${r.vendido}</td>
+      <td class="px-3 py-2 text-xs text-center" style="color:#374151">${r.mov_salidas}</td>
+      <td class="px-3 py-2 text-xs text-center">${dif}</td>
+      <td class="px-3 py-2 text-xs text-center" style="color:#64748B">${r.stock_actual ?? '—'}${r.piezas_sueltas > 0 ? ` <span style="color:#94A3B8">(+${r.piezas_sueltas}p)</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('audit-body').innerHTML = `
+    <p class="text-xs mb-3" style="color:#64748B">
+      Compara unidades en ItemVenta vs registros en MovimientoStock para cada producto.
+      Diferencia &gt; 0 = más vendido que registrado en historial de stock.
+    </p>
+    <table class="w-full text-xs">
+      <thead><tr style="background:#F8FAFF">
+        <th class="px-3 py-2 text-left font-semibold" style="color:#64748B">Producto</th>
+        <th class="px-3 py-2 text-center font-semibold" style="color:#64748B">Vendido</th>
+        <th class="px-3 py-2 text-center font-semibold" style="color:#64748B">Mov. salida</th>
+        <th class="px-3 py-2 text-center font-semibold" style="color:#64748B">Diferencia</th>
+        <th class="px-3 py-2 text-center font-semibold" style="color:#64748B">Stock actual</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  icons();
+}
+
+// ══════════════════════════════════════════════════════════
 // UPDATE
 // ══════════════════════════════════════════════════════════
 let _updPollTimer = null;
@@ -3990,9 +4071,11 @@ async function processSale() {
 // INVENTORY
 // ══════════════════════════════════════════════════════════
 async function loadInventory() {
-  // Show/hide admin-only add button
+  // Show/hide admin-only buttons
   const addWrap = document.getElementById('inv-add-btn-wrap');
   if (addWrap) addWrap.style.display = S.user?.rol === 'admin' ? '' : 'none';
+  const audBtn = document.getElementById('inv-auditoria-btn');
+  if (audBtn) audBtn.classList.toggle('hidden', S.user?.rol !== 'admin');
 
   // Refresh expiry data so the "Próx. vencimiento" column is current
   await loadAlertasCaducidad();
@@ -5515,6 +5598,12 @@ async function loadCajaAdmin() {
     set('caja-stat-inversion',  money(g.capital_inversion ?? 0));
     set('caja-stat-costo-rec',  money(g.total_costo ?? 0));
     set('caja-stat-ret-inv',    money(g.retiros_inversion ?? 0));
+    // Store limits for real-time form validation
+    window._cajaLimites = {
+      personal:  g.ganancia_disponible ?? g.disponible ?? 0,
+      inversion: g.capital_inversion ?? 0,
+    };
+    _updateRetiroMontoHint();
   }
 
   // Process turno FIRST so _cajaTurno is set before _updateCajaStats runs
@@ -5609,6 +5698,21 @@ function renderRetirosCaja() {
   _updateCajaStats();
 }
 
+function _updateRetiroMontoHint() {
+  const tipo   = document.getElementById('caja-retiro-tipo')?.value || 'personal';
+  const monto  = parseFloat(document.getElementById('caja-retiro-monto')?.value) || 0;
+  const limites = window._cajaLimites || { personal: 0, inversion: 0 };
+  const limite  = limites[tipo] ?? 0;
+  const hint    = document.getElementById('caja-retiro-limite-hint');
+  const btn     = document.querySelector('button[onclick="registrarRetiroCaja()"]');
+  if (!hint) return;
+  const ok = monto <= 0 || monto <= limite + 0.005;
+  hint.textContent = `Disponible: $${limite.toFixed(2)}`;
+  hint.style.color = ok ? '#16A34A' : '#DC2626';
+  if (!ok) hint.textContent += ` — excedes por $${(monto - limite).toFixed(2)}`;
+  if (btn) { btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.5'; }
+}
+
 async function cambiarTipoRetiro(id, nuevoTipo) {
   const res = await api(`/cortes/retiro/${id}`, {
     method: 'PATCH',
@@ -5624,6 +5728,7 @@ function updateRetiroTipoUI() {
   const tipo = document.getElementById('caja-retiro-tipo')?.value;
   const hint = document.getElementById('caja-retiro-tipo-hint');
   if (hint) hint.style.display = tipo === 'inversion' ? 'block' : 'none';
+  _updateRetiroMontoHint();
 }
 
 async function registrarRetiroCaja() {
