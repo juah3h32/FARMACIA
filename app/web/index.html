@@ -1554,7 +1554,54 @@
           </div>
           <div>
             <h2 class="text-xl font-black" style="color:#0F172A">Configuración del Sistema</h2>
-            <p class="text-sm" style="color:#64748B">Gestión de acceso API y herramientas de administración</p>
+            <p class="text-sm" style="color:#64748B">Gestión de ventas · respaldo de datos · acceso API · configuración operativa</p>
+          </div>
+        </div>
+
+        <!-- ─── Gestión de ventas (admin) ─────────────────── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626,#B91C1C)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
+              <i data-lucide="receipt" style="width:20px;height:20px;color:#DC2626"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Gestión de Ventas</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Ver todas las ventas · eliminar registros de prueba · restaurar stock</p>
+            </div>
+            <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEF3C7;border:1px solid #FDE68A">
+              <i data-lucide="shield-check" style="width:13px;height:13px;color:#D97706"></i>
+              <span class="text-[10px] font-bold" style="color:#D97706">SOLO ADMIN</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="flex gap-3 mb-4 flex-wrap">
+              <input id="av-desde" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
+              <input id="av-hasta" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
+              <input id="av-buscar" type="text" class="inp flex-1" placeholder="Buscar folio, cajero o producto..." style="min-width:160px" oninput="renderAdminVentas()">
+              <button onclick="loadAdminVentas()" class="h-10 px-4 rounded-xl font-semibold text-sm transition-all hover:opacity-80 flex items-center gap-1.5" style="background:#EEF1F9;color:#243366">
+                <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
+              </button>
+            </div>
+            <div class="rounded-xl border overflow-hidden" style="border-color:#E2E8F0">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr style="background:#F8FAFF">
+                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Folio</th>
+                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Fecha</th>
+                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Cajero</th>
+                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Productos</th>
+                    <th class="px-3 py-2.5 text-right font-semibold" style="color:#64748B">Total</th>
+                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Método</th>
+                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="av-tbody">
+                  <tr><td colspan="7" class="text-center py-8" style="color:#94A3B8">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p id="av-count" class="text-xs mt-2" style="color:#94A3B8"></p>
           </div>
         </div>
 
@@ -1816,52 +1863,140 @@
           </div>
         </div>
 
-        <!-- ─── Gestión de ventas (admin) ─────────────────── -->
-        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626,#B91C1C)"></div>
-          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
-              <i data-lucide="receipt" style="width:20px;height:20px;color:#DC2626"></i>
+
+      </div>
+
+      <!-- ─── CONTROL DE CAJA (ADMIN) ──────────────── -->
+      <div data-page="caja" class="page" style="overflow-y:auto;padding:1.25rem;gap:1.25rem;display:none;flex-direction:column">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#243366,#1e3a8a)">
+              <i data-lucide="landmark" style="width:22px;height:22px;color:#fff"></i>
             </div>
             <div>
-              <h2 class="font-bold" style="color:#0F172A">Gestión de Ventas</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">Eliminar ventas de prueba y liberar stock</p>
-            </div>
-            <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEF3C7;border:1px solid #FDE68A">
-              <i data-lucide="shield-check" style="width:13px;height:13px;color:#D97706"></i>
-              <span class="text-[10px] font-bold" style="color:#D97706">SOLO ADMIN</span>
+              <h2 class="text-xl font-black" style="color:#0F172A">Control de Caja</h2>
+              <p class="text-sm" style="color:#64748B">Retiros de efectivo · Historial de turnos · Cuadre de caja</p>
             </div>
           </div>
-          <div class="p-6">
-            <!-- Filtros -->
-            <div class="flex gap-3 mb-4 flex-wrap">
-              <input id="av-desde" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
-              <input id="av-hasta" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
-              <input id="av-buscar" type="text" class="inp flex-1" placeholder="Buscar folio, cajero o producto..." style="min-width:160px" oninput="renderAdminVentas()">
-              <button onclick="loadAdminVentas()" class="h-10 px-4 rounded-xl font-semibold text-sm transition-all hover:opacity-80 flex items-center gap-1.5" style="background:#EEF1F9;color:#243366">
-                <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
-              </button>
+          <button onclick="loadCajaAdmin()" class="h-9 px-4 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
+          </button>
+        </div>
+
+        <!-- Stats row -->
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
+            <p class="text-xs font-semibold mb-1" style="color:#64748B">Retiros hoy</p>
+            <p id="caja-stat-retiros-hoy" class="text-2xl font-black" style="color:#DC2626">—</p>
+            <p id="caja-stat-retiros-n" class="text-xs mt-1" style="color:#94A3B8">— movimientos</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
+            <p class="text-xs font-semibold mb-1" style="color:#64748B">Total retiros (período)</p>
+            <p id="caja-stat-retiros-periodo" class="text-2xl font-black" style="color:#EF4444">—</p>
+            <p class="text-xs mt-1" style="color:#94A3B8">Según filtro de fecha</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
+            <p class="text-xs font-semibold mb-1" style="color:#64748B">Turnos abiertos</p>
+            <p id="caja-stat-turnos" class="text-2xl font-black" style="color:#D97706">—</p>
+            <p class="text-xs mt-1" style="color:#94A3B8">En este momento</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
+            <p class="text-xs font-semibold mb-1" style="color:#64748B">Ventas (período)</p>
+            <p id="caja-stat-ventas" class="text-2xl font-black" style="color:#16A34A">—</p>
+            <p class="text-xs mt-1" style="color:#94A3B8">Solo completadas</p>
+          </div>
+        </div>
+
+        <!-- Main 2-col layout -->
+        <div class="grid gap-5" style="grid-template-columns:320px 1fr">
+
+          <!-- LEFT: nuevo retiro + filtros de fecha -->
+          <div class="flex flex-col gap-4">
+
+            <!-- Nuevo retiro form -->
+            <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0">
+              <div class="h-1 w-full" style="background:linear-gradient(90deg,#DC2626,#EF4444)"></div>
+              <div class="flex items-center gap-3 px-5 py-3.5 border-b" style="border-color:#F1F5F9">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
+                  <i data-lucide="arrow-down-from-line" style="width:16px;height:16px;color:#DC2626"></i>
+                </div>
+                <div>
+                  <p class="font-bold text-sm" style="color:#0F172A">Registrar retiro</p>
+                  <p class="text-xs" style="color:#94A3B8">Saca efectivo de la caja</p>
+                </div>
+              </div>
+              <div class="p-5 flex flex-col gap-3">
+                <div>
+                  <label class="lbl">Monto ($) *</label>
+                  <input id="caja-retiro-monto" type="number" step="0.01" min="0.01" placeholder="0.00" class="inp">
+                </div>
+                <div>
+                  <label class="lbl">Concepto</label>
+                  <input id="caja-retiro-concepto" class="inp" placeholder="Pago proveedor, gastos, etc.">
+                </div>
+                <button onclick="registrarRetiroCaja()"
+                  class="h-11 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
+                  style="background:#DC2626">
+                  <i data-lucide="minus-circle" style="width:16px;height:16px"></i> Registrar retiro
+                </button>
+              </div>
             </div>
-            <!-- Tabla -->
-            <div class="rounded-xl border overflow-hidden" style="border-color:#E2E8F0">
+
+            <!-- Filtro de fecha para historial -->
+            <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0">
+              <p class="text-xs font-bold uppercase tracking-wider mb-3" style="color:#64748B">Filtrar historial</p>
+              <div class="flex flex-col gap-2">
+                <div>
+                  <label class="lbl">Desde</label>
+                  <input id="caja-desde" type="date" class="inp" oninput="loadCajaAdmin()">
+                </div>
+                <div>
+                  <label class="lbl">Hasta</label>
+                  <input id="caja-hasta" type="date" class="inp" oninput="loadCajaAdmin()">
+                </div>
+              </div>
+            </div>
+
+            <!-- Turno activo del admin (si existe) -->
+            <div id="caja-turno-card" class="bg-white rounded-2xl border overflow-hidden hidden" style="border-color:#E2E8F0">
+              <div class="h-1 w-full" style="background:#16A34A"></div>
+              <div class="p-5">
+                <p class="text-xs font-bold uppercase tracking-wider mb-3" style="color:#64748B">Mi turno activo</p>
+                <div id="caja-turno-info" class="space-y-1.5 text-xs"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: historial de retiros -->
+          <div class="bg-white rounded-2xl border overflow-hidden flex flex-col" style="border-color:#E2E8F0">
+            <div class="h-1 w-full" style="background:linear-gradient(90deg,#DC2626,#F97316,#EAB308)"></div>
+            <div class="flex items-center gap-3 px-5 py-4 border-b" style="border-color:#F1F5F9">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
+                <i data-lucide="clock-arrow-down" style="width:16px;height:16px;color:#DC2626"></i>
+              </div>
+              <div>
+                <p class="font-bold" style="color:#0F172A">Historial de Retiros</p>
+                <p id="caja-retiros-count" class="text-xs" style="color:#94A3B8">—</p>
+              </div>
+              <input id="caja-retiros-buscar" type="text" placeholder="Buscar concepto..." class="inp ml-auto" style="width:180px" oninput="renderRetirosCaja()">
+            </div>
+            <div class="overflow-auto flex-1">
               <table class="w-full text-xs">
-                <thead>
+                <thead style="position:sticky;top:0;z-index:1">
                   <tr style="background:#F8FAFF">
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Folio</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Fecha</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Cajero</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Productos</th>
-                    <th class="px-3 py-2.5 text-right font-semibold" style="color:#64748B">Total</th>
-                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Método</th>
-                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Acción</th>
+                    <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Fecha y hora</th>
+                    <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Concepto</th>
+                    <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Registrado por</th>
+                    <th class="px-4 py-3 text-right font-semibold" style="color:#64748B">Monto</th>
                   </tr>
                 </thead>
-                <tbody id="av-tbody">
-                  <tr><td colspan="7" class="text-center py-8" style="color:#94A3B8">Cargando...</td></tr>
+                <tbody id="caja-retiros-tbody">
+                  <tr><td colspan="4" class="text-center py-10" style="color:#94A3B8">Sin retiros registrados</td></tr>
                 </tbody>
               </table>
             </div>
-            <p id="av-count" class="text-xs mt-2" style="color:#94A3B8"></p>
           </div>
         </div>
 
@@ -2786,15 +2921,16 @@ const S = {
 };
 
 const NAV = [
-  { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',     admin:false },
-  { key:'pos',       icon:'shopping-cart',    label:'Nueva Venta',   admin:false },
-  { key:'inventory', icon:'package',          label:'Inventario',    admin:false },
-  { key:'customers', icon:'users',            label:'Clientes',      admin:false },
-  { key:'reports',   icon:'bar-chart-3',      label:'Reportes',      admin:true  },
-  { key:'suppliers', icon:'truck',            label:'Proveedores',   admin:true  },
-  { key:'employees', icon:'user-cog',         label:'Empleados',     admin:true  },
-  { key:'settings',  icon:'settings',         label:'Configuración', admin:true  },
-  { key:'historial', icon:'heart-pulse',      label:'Historial Clínico', admin:false },
+  { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',        admin:false },
+  { key:'pos',       icon:'shopping-cart',    label:'Nueva Venta',      admin:false },
+  { key:'inventory', icon:'package',          label:'Inventario',       admin:false },
+  { key:'customers', icon:'users',            label:'Clientes',         admin:false },
+  { key:'reports',   icon:'bar-chart-3',      label:'Reportes',         admin:true  },
+  { key:'caja',      icon:'landmark',         label:'Control de Caja',  admin:true  },
+  { key:'suppliers', icon:'truck',            label:'Proveedores',      admin:true  },
+  { key:'employees', icon:'user-cog',         label:'Empleados',        admin:true  },
+  { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
+  { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -3282,6 +3418,7 @@ function loadPage(page) {
   if (page==='employees')  loadEmployees();
   if (page==='suppliers')  loadSuppliers();
   if (page==='reports')    initReports();
+  if (page==='caja')       loadCajaAdmin();
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
   icons();
@@ -5304,6 +5441,137 @@ async function exportCSV() {
 }
 
 // ══════════════════════════════════════════════════════════
+// CONTROL DE CAJA (ADMIN PAGE)
+// ══════════════════════════════════════════════════════════
+let _cajaRetiros = [];
+
+async function loadCajaAdmin() {
+  // Default date range: last 30 days
+  const desdeEl = document.getElementById('caja-desde');
+  const hastaEl = document.getElementById('caja-hasta');
+  if (desdeEl && !desdeEl.value) {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    desdeEl.value = d.toISOString().slice(0, 10);
+  }
+  if (hastaEl && !hastaEl.value) {
+    hastaEl.value = new Date().toISOString().slice(0, 10);
+  }
+
+  const [retRes, turnoRes] = await Promise.all([
+    api('/cortes/retiros?limite=500'),
+    api('/cortes/activo'),
+  ]);
+
+  // Retiros
+  if (retRes.ok) {
+    _cajaRetiros = await retRes.json();
+    renderRetirosCaja();
+    _updateCajaStats();
+  }
+
+  // Turno activo del admin
+  if (turnoRes.ok) {
+    const t = await turnoRes.json();
+    const card = document.getElementById('caja-turno-card');
+    const info = document.getElementById('caja-turno-info');
+    if (t.abierto && card && info) {
+      card.classList.remove('hidden');
+      const money = v => '$' + (v||0).toFixed(2);
+      const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
+      info.innerHTML = `
+        <div class="flex justify-between"><span style="color:#94A3B8">Apertura</span><span class="font-semibold">${fmtDT(t.abierto_en)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Fondo</span><span class="font-semibold">${money(t.monto_apertura)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Ventas efectivo</span><span class="font-semibold" style="color:#16A34A">${money(t.total_efectivo)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Retiros</span><span class="font-semibold" style="color:#DC2626">${money(t.total_retiros||0)}</span></div>
+        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Esperado en caja</span><span class="font-bold" style="color:#243366">${money(t.esperado_caja)}</span></div>`;
+    } else if (card) {
+      card.classList.add('hidden');
+    }
+  }
+}
+
+function _updateCajaStats() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const desde = document.getElementById('caja-desde')?.value || '';
+  const hasta  = document.getElementById('caja-hasta')?.value  || '';
+
+  // Retiros hoy
+  const retHoy = _cajaRetiros.filter(r => (r.creado_en||'').slice(0,10) === hoy);
+  const totalHoy = retHoy.reduce((a,r)=>a+r.monto,0);
+  document.getElementById('caja-stat-retiros-hoy').textContent = '$' + totalHoy.toFixed(2);
+  document.getElementById('caja-stat-retiros-n').textContent   = retHoy.length + ' movimiento' + (retHoy.length!==1?'s':'');
+
+  // Retiros en período
+  const retPer = _cajaRetiros.filter(r => {
+    const d = (r.creado_en||'').slice(0,10);
+    return (!desde || d >= desde) && (!hasta || d <= hasta);
+  });
+  const totalPer = retPer.reduce((a,r)=>a+r.monto,0);
+  document.getElementById('caja-stat-retiros-periodo').textContent = '$' + totalPer.toFixed(2);
+
+  // Turnos abiertos (no tenemos un endpoint global; mostrar si admin tiene uno)
+  document.getElementById('caja-stat-turnos').textContent = '—';
+  // Ventas del período (rough estimate from retiros metadata — N/A here, placeholder)
+  document.getElementById('caja-stat-ventas').textContent = '—';
+}
+
+function renderRetirosCaja() {
+  const q     = (document.getElementById('caja-retiros-buscar')?.value||'').toLowerCase();
+  const desde = document.getElementById('caja-desde')?.value  || '';
+  const hasta = document.getElementById('caja-hasta')?.value  || '';
+
+  let lista = _cajaRetiros.filter(r => {
+    const d = (r.creado_en||'').slice(0,10);
+    if (desde && d < desde) return false;
+    if (hasta && d > hasta) return false;
+    if (q && !(r.concepto||'').toLowerCase().includes(q) && !(r.usuario||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const countEl = document.getElementById('caja-retiros-count');
+  if (countEl) {
+    const total = lista.reduce((a,r)=>a+r.monto,0);
+    countEl.textContent = `${lista.length} retiro${lista.length!==1?'s':''} · Total: $${total.toFixed(2)}`;
+  }
+
+  const tbody = document.getElementById('caja-retiros-tbody');
+  if (!tbody) return;
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-10" style="color:#94A3B8">Sin retiros en el período</td></tr>';
+    return;
+  }
+
+  const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
+  tbody.innerHTML = lista.map(r => `
+    <tr class="border-b hovrow" style="border-color:#F8FAFF">
+      <td class="px-4 py-2.5" style="color:#374151;white-space:nowrap">${fmtDT(r.creado_en)}</td>
+      <td class="px-4 py-2.5" style="color:#0F172A">${r.concepto || '<span style="color:#94A3B8">Sin concepto</span>'}</td>
+      <td class="px-4 py-2.5" style="color:#64748B">${r.usuario || '—'}</td>
+      <td class="px-4 py-2.5 text-right font-bold" style="color:#DC2626">$${(r.monto||0).toFixed(2)}</td>
+    </tr>`).join('');
+  _updateCajaStats();
+}
+
+async function registrarRetiroCaja() {
+  const monto   = parseFloat(document.getElementById('caja-retiro-monto')?.value);
+  const concepto= document.getElementById('caja-retiro-concepto')?.value.trim() || null;
+  if (!monto || monto <= 0) { toast('Ingresa un monto válido','error'); return; }
+  const res = await api('/cortes/retiro', {
+    method: 'POST',
+    body: JSON.stringify({ monto, concepto }),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    toast(e.detail || 'Error al registrar retiro','error');
+    return;
+  }
+  toast(`Retiro de $${monto.toFixed(2)} registrado`,'success');
+  document.getElementById('caja-retiro-monto').value = '';
+  document.getElementById('caja-retiro-concepto').value = '';
+  loadCajaAdmin();
+}
+
+// ══════════════════════════════════════════════════════════
 // TURNO AUTO-APERTURA
 // ══════════════════════════════════════════════════════════
 async function autoAbrirTurnoSiCorresponde() {
@@ -6272,7 +6540,10 @@ function initSettings() {
 
   renderTokenHistory();
   loadEndpoints();
-  if (S.user?.rol === 'admin') { initTurnoConfig(); loadAdminVentas(); }
+  if (S.user?.rol === 'admin') {
+    initTurnoConfig();
+    loadAdminVentas();
+  }
   icons();
 }
 
@@ -6282,8 +6553,19 @@ function initSettings() {
 let _avCache = [];
 
 async function loadAdminVentas() {
-  const desde  = document.getElementById('av-desde')?.value;
-  const hasta  = document.getElementById('av-hasta')?.value;
+  if (S.user?.rol !== 'admin') return;
+  // Default: last 30 days if no filter set
+  const desdeEl = document.getElementById('av-desde');
+  const hastaEl = document.getElementById('av-hasta');
+  if (desdeEl && !desdeEl.value) {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    desdeEl.value = d.toISOString().slice(0, 10);
+  }
+  if (hastaEl && !hastaEl.value) {
+    hastaEl.value = new Date().toISOString().slice(0, 10);
+  }
+  const desde = desdeEl?.value;
+  const hasta  = hastaEl?.value;
   let url = '/ventas/?limite=500';
   if (desde) url += `&fecha_inicio=${desde}`;
   if (hasta) url += `&fecha_fin=${hasta}`;
@@ -6294,6 +6576,7 @@ async function loadAdminVentas() {
 }
 
 function renderAdminVentas() {
+  if (S.user?.rol !== 'admin') return;
   const q = (document.getElementById('av-buscar')?.value || '').toLowerCase().trim();
   const tbody = document.getElementById('av-tbody');
   if (!tbody) return;

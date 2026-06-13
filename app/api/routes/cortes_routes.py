@@ -269,18 +269,24 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
 
 @router.get("/retiros")
 def listar_retiros(
-    limite: int = 50,
+    limite: int = 200,
     corte_id: Optional[int] = None,
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
     payload: dict = Depends(get_current_api_user),
 ):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    limite = min(max(1, limite), 200)
+    limite = min(max(1, limite), 500)
     db = get_db_session()
     try:
         q = db.query(RetiroCaja)
         if corte_id is not None:
             q = q.filter(RetiroCaja.corte_id == corte_id)
+        if fecha_inicio:
+            q = q.filter(RetiroCaja.creado_en >= datetime.fromisoformat(fecha_inicio))
+        if fecha_fin:
+            q = q.filter(RetiroCaja.creado_en <= datetime.fromisoformat(fecha_fin + "T23:59:59"))
         retiros = q.order_by(RetiroCaja.creado_en.desc()).limit(limite).all()
         return [
             {
