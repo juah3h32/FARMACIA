@@ -3665,11 +3665,11 @@ function loadPage(page) {
     api('/inventario/pull-nube', {method:'POST'}).catch(()=>{});
     loadInventory();
     if (!_invInterval) {
-      // Re-pull from Turso + reload products every 30s
+      // Re-pull from Turso + reload products every 60s
       _invInterval = setInterval(() => {
         api('/inventario/pull-nube', {method:'POST'}).catch(()=>{});
-        setTimeout(() => _reloadInvProducts(), 2000);
-      }, 30000);
+        setTimeout(() => _reloadInvProducts(), 3000);
+      }, 60000);
     }
   }
   if (page==='customers')  loadCustomers();

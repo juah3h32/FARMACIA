@@ -33,19 +33,21 @@ def _build_engine():
         except Exception as e:
             print(f"[FarmaciaPOS] Error conectando a Turso: {e} — usando SQLite local")
 
-    # Local SQLite with WAL mode for crash safety
+    # Local SQLite with WAL mode + 30s busy-timeout so concurrent sync threads
+    # don't cause "database is locked" when the user writes at the same time.
     eng = create_engine(
         cfg.DATABASE_URL,
-        connect_args={"check_same_thread": False},
+        connect_args={"check_same_thread": False, "timeout": 30},
         echo=False,
     )
 
     @event.listens_for(eng, "connect")
     def _set_pragmas(dbapi_conn, _rec):
         cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL")   # survives crashes without corruption
+        cur.execute("PRAGMA journal_mode=WAL")    # concurrent reads + single writer
         cur.execute("PRAGMA synchronous=NORMAL")  # safe + fast with WAL
         cur.execute("PRAGMA foreign_keys=ON")
+        cur.execute("PRAGMA busy_timeout=30000")  # 30s wait before "database is locked"
         cur.close()
 
     return eng
