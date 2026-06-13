@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime
 from sqlalchemy import func
 from app.database.connection import get_db_session
-from app.database.models import CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago
+from app.database.models import CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -53,6 +53,22 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
         tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
         tv = sum(v.total for v in ventas)
         total_retiros = sum(r.monto for r in retiros)
+
+        # Cost of goods sold — join ItemVenta → Producto.precio_compra
+        venta_ids = [v.id for v in ventas]
+        if venta_ids:
+            cost_rows = (
+                db.query(ItemVenta.cantidad, Producto.precio_compra)
+                .join(Producto, ItemVenta.producto_id == Producto.id)
+                .filter(ItemVenta.venta_id.in_(venta_ids))
+                .all()
+            )
+            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+        else:
+            total_costo = 0.0
+        ganancia   = tv - total_costo
+        disponible = ganancia - total_retiros
+
         return {
             "abierto":          True,
             "id":               c.id,
@@ -63,7 +79,10 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             "total_efectivo":   ef,
             "total_tarjeta":    tj,
             "total_transferencia": tr,
+            "total_costo":      total_costo,
+            "ganancia":         ganancia,
             "total_retiros":    total_retiros,
+            "disponible":       disponible,
             "esperado_caja":    c.monto_apertura + ef - total_retiros,
             "notas":            c.notas or "",
             "retiros": [

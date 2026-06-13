@@ -1896,8 +1896,8 @@
             <div class="min-w-0">
               <p class="text-xs font-bold" style="color:#166534">Puedo retirar ahora</p>
               <p id="caja-stat-disponible" class="font-black" style="color:#15803D;font-size:1.65rem;line-height:1.15">—</p>
-              <p class="text-xs truncate" style="color:#4ADE80">
-                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> efectivo&nbsp;·&nbsp;<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado
+              <p class="text-xs truncate" style="color:#86EFAC">
+                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> ganancia&nbsp;·&nbsp;<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado
               </p>
             </div>
           </div>
@@ -5475,14 +5475,14 @@ async function loadCajaAdmin() {
       card.classList.remove('hidden');
       const money = v => '$' + (v||0).toFixed(2);
       const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
-      const disponible = (t.total_efectivo||0) - (t.total_retiros||0);
       info.innerHTML = `
         <div class="flex justify-between"><span style="color:#94A3B8">Apertura</span><span class="font-semibold">${fmtDT(t.abierto_en)}</span></div>
-        <div class="flex justify-between"><span style="color:#94A3B8">Fondo inicial</span><span class="font-semibold">${money(t.monto_apertura)}</span></div>
-        <div class="flex justify-between"><span style="color:#94A3B8">Ventas efectivo</span><span class="font-semibold" style="color:#16A34A">${money(t.total_efectivo)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Total ventas</span><span class="font-semibold" style="color:#0F172A">${money(t.total_ventas)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Costo productos</span><span class="font-semibold" style="color:#64748B">−${money(t.total_costo||0)}</span></div>
+        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Ganancia bruta</span><span class="font-bold" style="color:#16A34A">${money(t.ganancia||0)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Ya retirado</span><span class="font-semibold" style="color:#DC2626">−${money(t.total_retiros||0)}</span></div>
-        <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">💰 Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(disponible)}</span></div>
-        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Esperado en caja</span><span class="font-bold" style="color:#243366">${money(t.esperado_caja)}</span></div>`;
+        <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">💰 Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(t.disponible||0)}</span></div>
+        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Efectivo en caja</span><span class="font-bold" style="color:#243366">${money(t.esperado_caja)}</span></div>`;
     } else if (card) {
       card.classList.add('hidden');
     }
@@ -5501,14 +5501,15 @@ function _updateCajaStats() {
   const hasta  = document.getElementById('caja-hasta')?.value  || '';
   const money  = v => '$' + (v||0).toFixed(2);
 
-  // ── Disponible (desde turno activo) ───────────────────────────────────────
-  const ef  = _cajaTurno ? (_cajaTurno.total_efectivo || 0) : null;
-  const ret = _cajaTurno ? (_cajaTurno.total_retiros  || 0) : null;
+  // ── Disponible (ganancia turno − retiros) ────────────────────────────────
+  const gan = _cajaTurno ? (_cajaTurno.ganancia    ?? null) : null;
+  const ret = _cajaTurno ? (_cajaTurno.total_retiros || 0) : null;
+  const dis = _cajaTurno ? (_cajaTurno.disponible   ?? null) : null;
   const dispEl = document.getElementById('caja-stat-disponible');
   const efEl   = document.getElementById('caja-stat-ef');
   const retTEl = document.getElementById('caja-stat-ret-turno');
-  if (dispEl) dispEl.textContent = ef !== null ? money(ef - ret) : '—';
-  if (efEl)   efEl.textContent   = ef !== null ? money(ef) : '—';
+  if (dispEl) dispEl.textContent = dis !== null ? money(dis) : '—';
+  if (efEl)   efEl.textContent   = gan !== null ? money(gan) : '—';
   if (retTEl) retTEl.textContent = ret !== null ? money(ret) : '—';
 
   // ── Retiros hoy ───────────────────────────────────────────────────────────
