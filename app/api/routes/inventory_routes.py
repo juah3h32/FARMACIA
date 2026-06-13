@@ -483,10 +483,10 @@ def auditoria_stock(payload: dict = Depends(get_current_api_user)):
         )
         vendido_map = {r.producto_id: r.total_vendido for r in ventas_q}
 
-        # Total salidas por producto en MovimientoStock (tipo=salida)
+        # Total salidas por producto (tipo=salida: includes venta + auditoria_correccion)
         mov_q = (
             db.query(MovimientoStock.producto_id, func.sum(MovimientoStock.cantidad).label("total_salidas"))
-            .filter(MovimientoStock.tipo == TipoMovimiento.salida, MovimientoStock.referencia_tipo == "venta")
+            .filter(MovimientoStock.tipo == TipoMovimiento.salida)
             .group_by(MovimientoStock.producto_id)
             .all()
         )
@@ -535,20 +535,19 @@ def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
     return {"ok": True}
 
 
+import math as _math
+
 @router.post("/corregir-audit")
 def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     """
-    For each product where (items_venta sold) > (movimientos_stock salidas), create a
-    correction MovimientoStock entry so the audit balances.
-
-    The actual product stock / piezas_sueltas are NOT modified — they were already
-    correctly decremented at sale time. The gap is a logging defect from a past bug
-    where piece-sales of fractioned products recorded stock_delta=0 in the movement log.
+    Reconcile actual stock against sales history.
+    For each product where (items_venta sold) > (all tipo=salida movements):
+      - Deducts the difference from prod.stock / piezas_sueltas
+      - Creates a correction MovimientoStock entry for audit trail + Turso sync
     """
     _require_admin(payload)
     db = get_db_session()
     try:
-        # ── Reproduce the audit query ──────────────────────────────────────────
         ventas_q = (
             db.query(ItemVenta.producto_id, func.sum(ItemVenta.cantidad).label("tv"))
             .join(Venta, ItemVenta.venta_id == Venta.id)
@@ -558,9 +557,10 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
         )
         vendido_map = {r.producto_id: r.tv for r in ventas_q}
 
+        # Count ALL tipo=salida (includes venta + auditoria_correccion)
         mov_q = (
             db.query(MovimientoStock.producto_id, func.sum(MovimientoStock.cantidad).label("ts"))
-            .filter(MovimientoStock.tipo == TipoMovimiento.salida, MovimientoStock.referencia_tipo == "venta")
+            .filter(MovimientoStock.tipo == TipoMovimiento.salida)
             .group_by(MovimientoStock.producto_id)
             .all()
         )
@@ -568,24 +568,46 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
 
         corregidos = 0
         for pid, vendido in vendido_map.items():
-            diferencia = vendido - salidas_map.get(pid, 0)
+            diferencia = float(vendido) - float(salidas_map.get(pid, 0) or 0)
             if diferencia <= 0:
                 continue
 
             prod = db.query(Producto).filter(Producto.id == pid).first()
-            stock_ref = prod.piezas_sueltas if (prod and prod.venta_fraccionada) else (prod.stock if prod else 0)
+            if not prod:
+                continue
 
-            # Create a correction movement — type=salida so the audit totals balance.
+            if prod.venta_fraccionada:
+                # diferencia is in piezas — deduct from piezas_sueltas first, then boxes
+                piezas_ant = prod.piezas_sueltas or 0
+                upc = prod.unidades_por_caja or 1
+                if piezas_ant >= diferencia:
+                    stock_ant = piezas_ant
+                    prod.piezas_sueltas = max(0, piezas_ant - diferencia)
+                    stock_nuevo = prod.piezas_sueltas
+                else:
+                    deficit = diferencia - piezas_ant
+                    cajas = _math.ceil(deficit / upc)
+                    prod.stock = max(0, prod.stock - cajas)
+                    prod.piezas_sueltas = max(0, piezas_ant + cajas * upc - diferencia)
+                    stock_ant = piezas_ant
+                    stock_nuevo = prod.piezas_sueltas
+                notas = f"CORRECCIÓN STOCK — {int(diferencia)} {prod.unidad_pieza or 'pieza(s)'} vendidas sin descuento registrado"
+            else:
+                stock_ant = prod.stock or 0
+                prod.stock = max(0, stock_ant - diferencia)
+                stock_nuevo = prod.stock
+                notas = f"CORRECCIÓN STOCK — {int(diferencia)} unidad(es) vendidas sin descuento registrado"
+
             db.add(MovimientoStock(
                 producto_id=pid,
                 tipo=TipoMovimiento.salida,
                 cantidad=diferencia,
-                stock_anterior=stock_ref,
-                stock_nuevo=stock_ref,
+                stock_anterior=stock_ant,
+                stock_nuevo=stock_nuevo,
                 referencia_tipo="auditoria_correccion",
                 referencia_id=None,
                 usuario_id=int(payload["sub"]),
-                notas=f"CORRECCIÓN AUDITORÍA — {diferencia} {'pieza(s)' if prod and prod.venta_fraccionada else 'unidad(es)'} sin mov. registrado",
+                notas=notas,
             ))
             corregidos += 1
 

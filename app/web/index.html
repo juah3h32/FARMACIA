@@ -3168,7 +3168,7 @@ function closeAuditoriaModal() {
 async function corregirAudit() {
   const badge = document.getElementById('audit-badge');
   const n = badge?.textContent?.match(/\d+/)?.[0] || '?';
-  const ok = confirm(`¿Corregir ${n} producto(s) con discrepancia?\n\nSe crearán registros de corrección en el historial de movimientos. El stock físico NO cambia (ya fue descontado correctamente al vender). La auditoría quedará en cero.`);
+  const ok = confirm(`¿Corregir stock de ${n} producto(s)?\n\nSe descontará del inventario la cantidad vendida que no fue registrada.\nProductos agotados quedarán en 0.\nEsta acción se sincroniza a Turso y todas las PCs.`);
   if (!ok) return;
   const fixBtn = document.getElementById('audit-fix-btn');
   if (fixBtn) { fixBtn.disabled = true; fixBtn.textContent = 'Corrigiendo...'; }
