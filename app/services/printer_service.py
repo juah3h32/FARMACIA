@@ -332,8 +332,6 @@ class PrinterService:
         cfg_d = farmacia_config or {}
         nombre    = _s(cfg_d.get("farmacia_nombre",    cfg.PHARMACY_NAME)).upper()
         direccion = _s(cfg_d.get("farmacia_direccion", cfg.PHARMACY_ADDRESS)).upper()
-        telefono  = _s(cfg_d.get("farmacia_telefono",  cfg.PHARMACY_PHONE)).upper()
-        rfc       = _s(cfg_d.get("farmacia_rfc",       cfg.PHARMACY_RFC)).upper()
         W = self.width
 
         sep  = "=" * W
@@ -356,10 +354,6 @@ class PrinterService:
             lines.append(ln.center(W))
         for ln in self._word_wrap(direccion, W):
             lines.append(ln.center(W))
-        if telefono:
-            lines.append(f"TEL: {telefono}".center(W))
-        if rfc:
-            lines.append(f"RFC: {rfc}".center(W))
         lines.append(sep)
 
         # Cajero / cliente

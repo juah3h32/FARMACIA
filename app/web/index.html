@@ -1886,27 +1886,44 @@
         </div>
 
         <!-- Stats row -->
-        <div class="grid grid-cols-4 gap-4">
+        <div class="grid gap-4" style="grid-template-columns:1fr 1fr 1fr 1fr">
+
+          <!-- DISPONIBLE — protagonista -->
+          <div class="rounded-2xl p-5 border-2 col-span-2" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-color:#86EFAC">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background:#16A34A">
+                <i data-lucide="banknote" style="width:16px;height:16px;color:#fff"></i>
+              </div>
+              <p class="text-sm font-bold" style="color:#166534">Puedo retirar ahora</p>
+            </div>
+            <p id="caja-stat-disponible" class="font-black mb-1" style="color:#15803D;font-size:2.2rem;line-height:1">—</p>
+            <p class="text-xs" style="color:#4ADE80">Ventas efectivo − retiros ya hechos este turno</p>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div class="rounded-lg p-2" style="background:rgba(255,255,255,.6)">
+                <p style="color:#64748B">Ventas en efectivo</p>
+                <p id="caja-stat-ef" class="font-bold" style="color:#16A34A">—</p>
+              </div>
+              <div class="rounded-lg p-2" style="background:rgba(255,255,255,.6)">
+                <p style="color:#64748B">Ya retirado este turno</p>
+                <p id="caja-stat-ret-turno" class="font-bold" style="color:#DC2626">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Retiros hoy -->
           <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
             <p class="text-xs font-semibold mb-1" style="color:#64748B">Retiros hoy</p>
             <p id="caja-stat-retiros-hoy" class="text-2xl font-black" style="color:#DC2626">—</p>
             <p id="caja-stat-retiros-n" class="text-xs mt-1" style="color:#94A3B8">— movimientos</p>
           </div>
+
+          <!-- Retiros período -->
           <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
-            <p class="text-xs font-semibold mb-1" style="color:#64748B">Total retiros (período)</p>
+            <p class="text-xs font-semibold mb-1" style="color:#64748B">Retiros período</p>
             <p id="caja-stat-retiros-periodo" class="text-2xl font-black" style="color:#EF4444">—</p>
             <p class="text-xs mt-1" style="color:#94A3B8">Según filtro de fecha</p>
           </div>
-          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
-            <p class="text-xs font-semibold mb-1" style="color:#64748B">Turnos abiertos</p>
-            <p id="caja-stat-turnos" class="text-2xl font-black" style="color:#D97706">—</p>
-            <p class="text-xs mt-1" style="color:#94A3B8">En este momento</p>
-          </div>
-          <div class="bg-white rounded-2xl p-4 border" style="border-color:#E2E8F0">
-            <p class="text-xs font-semibold mb-1" style="color:#64748B">Ventas (período)</p>
-            <p id="caja-stat-ventas" class="text-2xl font-black" style="color:#16A34A">—</p>
-            <p class="text-xs mt-1" style="color:#94A3B8">Solo completadas</p>
-          </div>
+
         </div>
 
         <!-- Main 2-col layout -->
@@ -5444,6 +5461,7 @@ async function exportCSV() {
 // CONTROL DE CAJA (ADMIN PAGE)
 // ══════════════════════════════════════════════════════════
 let _cajaRetiros = [];
+let _cajaTurno   = null;
 
 async function loadCajaAdmin() {
   // Default date range: last 30 days
@@ -5472,17 +5490,21 @@ async function loadCajaAdmin() {
   // Turno activo del admin
   if (turnoRes.ok) {
     const t = await turnoRes.json();
+    _cajaTurno = t.abierto ? t : null;
+    _updateCajaStats();   // refresh disponible with turno data
     const card = document.getElementById('caja-turno-card');
     const info = document.getElementById('caja-turno-info');
     if (t.abierto && card && info) {
       card.classList.remove('hidden');
       const money = v => '$' + (v||0).toFixed(2);
       const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
+      const disponible = (t.total_efectivo||0) - (t.total_retiros||0);
       info.innerHTML = `
         <div class="flex justify-between"><span style="color:#94A3B8">Apertura</span><span class="font-semibold">${fmtDT(t.abierto_en)}</span></div>
-        <div class="flex justify-between"><span style="color:#94A3B8">Fondo</span><span class="font-semibold">${money(t.monto_apertura)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Fondo inicial</span><span class="font-semibold">${money(t.monto_apertura)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Ventas efectivo</span><span class="font-semibold" style="color:#16A34A">${money(t.total_efectivo)}</span></div>
-        <div class="flex justify-between"><span style="color:#94A3B8">Retiros</span><span class="font-semibold" style="color:#DC2626">${money(t.total_retiros||0)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Ya retirado</span><span class="font-semibold" style="color:#DC2626">−${money(t.total_retiros||0)}</span></div>
+        <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">💰 Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(disponible)}</span></div>
         <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Esperado en caja</span><span class="font-bold" style="color:#243366">${money(t.esperado_caja)}</span></div>`;
     } else if (card) {
       card.classList.add('hidden');
@@ -5491,28 +5513,34 @@ async function loadCajaAdmin() {
 }
 
 function _updateCajaStats() {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy  = new Date().toISOString().slice(0, 10);
   const desde = document.getElementById('caja-desde')?.value || '';
   const hasta  = document.getElementById('caja-hasta')?.value  || '';
+  const money  = v => '$' + (v||0).toFixed(2);
 
-  // Retiros hoy
+  // ── Disponible (desde turno activo) ───────────────────────────────────────
+  const ef  = _cajaTurno ? (_cajaTurno.total_efectivo || 0) : null;
+  const ret = _cajaTurno ? (_cajaTurno.total_retiros  || 0) : null;
+  const dispEl = document.getElementById('caja-stat-disponible');
+  const efEl   = document.getElementById('caja-stat-ef');
+  const retTEl = document.getElementById('caja-stat-ret-turno');
+  if (dispEl) dispEl.textContent = ef !== null ? money(ef - ret) : '—';
+  if (efEl)   efEl.textContent   = ef !== null ? money(ef) : '— (sin turno activo)';
+  if (retTEl) retTEl.textContent = ret !== null ? money(ret) : '—';
+
+  // ── Retiros hoy ───────────────────────────────────────────────────────────
   const retHoy = _cajaRetiros.filter(r => (r.creado_en||'').slice(0,10) === hoy);
   const totalHoy = retHoy.reduce((a,r)=>a+r.monto,0);
-  document.getElementById('caja-stat-retiros-hoy').textContent = '$' + totalHoy.toFixed(2);
+  document.getElementById('caja-stat-retiros-hoy').textContent = money(totalHoy);
   document.getElementById('caja-stat-retiros-n').textContent   = retHoy.length + ' movimiento' + (retHoy.length!==1?'s':'');
 
-  // Retiros en período
+  // ── Retiros en período ────────────────────────────────────────────────────
   const retPer = _cajaRetiros.filter(r => {
     const d = (r.creado_en||'').slice(0,10);
     return (!desde || d >= desde) && (!hasta || d <= hasta);
   });
   const totalPer = retPer.reduce((a,r)=>a+r.monto,0);
-  document.getElementById('caja-stat-retiros-periodo').textContent = '$' + totalPer.toFixed(2);
-
-  // Turnos abiertos (no tenemos un endpoint global; mostrar si admin tiene uno)
-  document.getElementById('caja-stat-turnos').textContent = '—';
-  // Ventas del período (rough estimate from retiros metadata — N/A here, placeholder)
-  document.getElementById('caja-stat-ventas').textContent = '—';
+  document.getElementById('caja-stat-retiros-periodo').textContent = money(totalPer);
 }
 
 function renderRetirosCaja() {
