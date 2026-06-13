@@ -396,8 +396,33 @@ class EditarRetiroIn(BaseModel):
     tipo: str   # 'personal' | 'inversion'
 
 
+@router.delete("/retiro/{retiro_id}")
+def eliminar_retiro(retiro_id: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    db = get_db_session()
+    try:
+        r = db.query(RetiroCaja).filter(RetiroCaja.id == retiro_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="Retiro no encontrado")
+        db.delete(r)
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, "id": retiro_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 @router.patch("/retiro/{retiro_id}")
-def editar_retiro(retiro_id: int, body: EditarRetiroIn, payload: dict = Depends(get_current_api_user)):
+def editar_retiro(retiro_id: int, body: EditarRetiroIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     if body.tipo not in ("personal", "inversion"):
@@ -409,6 +434,10 @@ def editar_retiro(retiro_id: int, body: EditarRetiroIn, payload: dict = Depends(
             raise HTTPException(status_code=404, detail="Retiro no encontrado")
         r.tipo = body.tipo
         db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
         return {"ok": True, "id": r.id, "tipo": r.tipo}
     except HTTPException:
         raise

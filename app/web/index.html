@@ -1916,9 +1916,14 @@
               <p class="text-xs" style="color:#64748B">Retiros · Historial · Cuadre</p>
             </div>
           </div>
-          <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
-            <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
-          </button>
+          <div class="flex gap-2">
+            <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
+              <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
+            </button>
+            <button id="caja-sync-btn" onclick="forzarSyncCaja()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE" title="Sincronizar con la nube">
+              <i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync
+            </button>
+          </div>
         </div>
 
         <!-- Stats row (compact, single height) -->
@@ -2063,10 +2068,11 @@
                     <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Registrado por</th>
                     <th class="px-4 py-3 text-right font-semibold" style="color:#64748B">Monto</th>
                     <th class="px-4 py-3 text-center font-semibold" style="color:#64748B">Tipo</th>
+                    <th class="px-4 py-3 text-center font-semibold" style="color:#64748B">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="caja-retiros-tbody">
-                  <tr><td colspan="4" class="text-center py-10" style="color:#94A3B8">Sin retiros registrados</td></tr>
+                  <tr><td colspan="6" class="text-center py-10" style="color:#94A3B8">Sin retiros registrados</td></tr>
                 </tbody>
               </table>
             </div>
@@ -5580,6 +5586,24 @@ async function exportCSV() {
 let _cajaRetiros = [];
 let _cajaTurno   = null;
 
+async function forzarSyncCaja() {
+  const btn = document.getElementById('caja-sync-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; }
+  try {
+    const r = await api('/api/admin/db-sync', { method: 'POST' });
+    if (r.ok) {
+      showToast('Sincronización completada ✓', 'success');
+      await loadCajaAdmin();
+    } else {
+      showToast('Error al sincronizar', 'error');
+    }
+  } catch(e) {
+    showToast('Error al sincronizar', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync'; lucide.createIcons(); }
+  }
+}
+
 async function loadCajaAdmin() {
   // Default date range: last 30 days
   const desdeEl = document.getElementById('caja-desde');
@@ -5690,7 +5714,7 @@ function renderRetirosCaja() {
   const tbody = document.getElementById('caja-retiros-tbody');
   if (!tbody) return;
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-10" style="color:#94A3B8">Sin retiros en el período</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10" style="color:#94A3B8">Sin retiros en el período</td></tr>';
     return;
   }
 
@@ -5705,6 +5729,13 @@ function renderRetirosCaja() {
       <td class="px-4 py-2.5" style="color:#64748B">${r.usuario || '—'}</td>
       <td class="px-4 py-2.5 text-right font-bold" style="color:#DC2626">$${(r.monto||0).toFixed(2)}</td>
       <td class="px-4 py-2.5 text-center">${tipoBtn(r)}</td>
+      <td class="px-4 py-2.5 text-center">
+        <button onclick="borrarRetiro(${r.id},'${(r.concepto||'Sin concepto').replace(/'/g,'\\\'')}',$${(r.monto||0).toFixed(2)})"
+          title="Eliminar retiro"
+          style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">
+          🗑 Borrar
+        </button>
+      </td>
     </tr>`).join('');
   _updateCajaStats();
 }
@@ -5733,6 +5764,19 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
   const label = nuevoTipo === 'inversion' ? '🏪 Inversión' : '💰 Personal';
   toast(`Retiro cambiado a ${label}`,'success');
   loadCajaAdmin();
+}
+
+async function borrarRetiro(id, concepto, montoStr) {
+  const confirmado = confirm(`¿Borrar este retiro?\n\n${concepto} — ${montoStr}\n\nEsta acción restaurará el saldo disponible.`);
+  if (!confirmado) return;
+  const res = await api(`/cortes/retiro/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    showToast('Retiro eliminado. Saldo restaurado ✓', 'success');
+    loadCajaAdmin();
+  } else {
+    const err = await res.json().catch(()=>({}));
+    showToast(err.detail || 'Error al eliminar retiro', 'error');
+  }
 }
 
 function toggleRetiroFecha() {

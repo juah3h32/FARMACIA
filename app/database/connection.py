@@ -122,8 +122,10 @@ def _migrate():
             except Exception:
                 pass  # column already exists — skip
 
-    # Turso cloud — only sync columns that were actually new (avoids HTTP call on normal starts)
-    if cfg.TURSO_SYNC and added:
+    # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).
+    # We cannot rely on `added` here because columns added manually to local DB won't be
+    # in `added`, yet Turso may still be missing them.
+    if cfg.TURSO_SYNC:
         from app.database.sync_service import _turso_pipeline_url, _turso_headers
         import requests as _req
         url, hdrs = _turso_pipeline_url(), _turso_headers()
@@ -131,7 +133,7 @@ def _migrate():
             payload = {
                 "requests": [
                     {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
-                    for t, c, ct in added
+                    for t, c, ct in new_cols
                 ] + [{"type": "close"}]
             }
             _req.post(url, headers=hdrs, json=payload, timeout=15)

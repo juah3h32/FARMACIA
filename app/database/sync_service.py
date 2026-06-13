@@ -39,7 +39,7 @@ _FULL_SYNC = frozenset({
 # Tables that are shared across PCs — never delete rows from Turso by absence
 # (each PC may have a subset; deletions happen via soft-delete / purge only)
 _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
-                               "compras", "items_compra", "cortes_caja"})
+                               "compras", "items_compra", "cortes_caja", "retiros_caja"})
 
 # Watermark per table: last id synced to Turso (append-only tables only)
 # Persisted to disk so restarts don't re-send the entire history.
