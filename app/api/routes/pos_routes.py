@@ -87,6 +87,31 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                         detail=f"'{prod.nombre}' tiene todos los lotes vencidos — no se puede vender",
                     )
 
+        # Guard: reject if insufficient stock before any decrement
+        for item in body.items:
+            prod = products.get(item.producto_id)
+            if not prod:
+                continue
+            if prod.venta_fraccionada and item.es_pieza:
+                total_piezas = (prod.piezas_sueltas or 0) + (prod.stock or 0) * (prod.unidades_por_caja or 1)
+                if total_piezas < item.cantidad:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Stock insuficiente: '{prod.nombre}' — disponible {total_piezas} {prod.unidad_pieza or 'pieza(s)'}, solicitado {item.cantidad}",
+                    )
+            elif prod.venta_fraccionada and not item.es_pieza:
+                if (prod.stock or 0) < item.cantidad:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Stock insuficiente: '{prod.nombre}' — disponible {prod.stock or 0} {prod.unidad_caja or 'caja(s)'}, solicitado {item.cantidad}",
+                    )
+            else:
+                if (prod.stock or 0) < item.cantidad:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Stock insuficiente: '{prod.nombre}' — disponible {prod.stock or 0}, solicitado {item.cantidad}",
+                    )
+
         # Calculate totals in one pass
         subtotal  = 0.0
         iva_total = 0.0
