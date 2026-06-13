@@ -256,6 +256,7 @@ class RetiroCaja(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     monto = Column(Float, nullable=False)
     concepto = Column(Text)
+    tipo = Column(String(20), default="personal")   # 'personal' | 'inversion'
     creado_en = Column(DateTime, default=_dt.now)
 
     corte = relationship("CortesCaja", back_populates="retiros")

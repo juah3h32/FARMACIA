@@ -1899,7 +1899,7 @@
         <!-- Stats row (compact, single height) -->
         <div class="flex gap-3 flex-shrink-0">
 
-          <!-- DISPONIBLE — protagonista -->
+          <!-- DISPONIBLE — ganancia personal -->
           <div class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-color:#86EFAC;min-width:0">
             <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#16A34A">
               <i data-lucide="banknote" style="width:17px;height:17px;color:#fff"></i>
@@ -1908,7 +1908,21 @@
               <p class="text-xs font-bold" style="color:#166534">Puedo retirar ahora</p>
               <p id="caja-stat-disponible" class="font-black" style="color:#15803D;font-size:1.65rem;line-height:1.15">—</p>
               <p class="text-xs truncate" style="color:#86EFAC">
-                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> ganancia&nbsp;·&nbsp;<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado
+                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> ganancia&nbsp;·&nbsp;<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado personal
+              </p>
+            </div>
+          </div>
+
+          <!-- INVERSIÓN — capital para proveedores -->
+          <div class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#93C5FD;min-width:0">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#2563EB">
+              <i data-lucide="landmark" style="width:17px;height:17px;color:#fff"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold" style="color:#1E40AF">Para inversión / proveedores</p>
+              <p id="caja-stat-inversion" class="font-black" style="color:#1D4ED8;font-size:1.65rem;line-height:1.15">—</p>
+              <p class="text-xs truncate" style="color:#93C5FD">
+                <span id="caja-stat-costo-rec" style="color:#2563EB;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
               </p>
             </div>
           </div>
@@ -1949,12 +1963,22 @@
               </div>
               <div class="p-4 flex flex-col gap-3">
                 <div>
+                  <label class="lbl">Tipo de retiro *</label>
+                  <select id="caja-retiro-tipo" class="inp" onchange="updateRetiroTipoUI()">
+                    <option value="personal">💰 Ganancia personal</option>
+                    <option value="inversion">🏪 Inversión / Pago proveedor</option>
+                  </select>
+                </div>
+                <div>
                   <label class="lbl">Monto ($) *</label>
                   <input id="caja-retiro-monto" type="number" step="0.01" min="0.01" placeholder="0.00" class="inp">
                 </div>
                 <div>
                   <label class="lbl">Concepto</label>
                   <input id="caja-retiro-concepto" class="inp" placeholder="Pago proveedor, gastos, etc.">
+                </div>
+                <div id="caja-retiro-tipo-hint" class="rounded-xl px-3 py-2 text-xs" style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;display:none">
+                  <strong>Inversión:</strong> descuenta del capital recuperado de inventario, no de tu ganancia personal.
                 </div>
                 <button onclick="registrarRetiroCaja()"
                   class="h-10 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
@@ -2002,6 +2026,7 @@
                     <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Concepto</th>
                     <th class="px-4 py-3 text-left font-semibold" style="color:#64748B">Registrado por</th>
                     <th class="px-4 py-3 text-right font-semibold" style="color:#64748B">Monto</th>
+                    <th class="px-4 py-3 text-center font-semibold" style="color:#64748B">Tipo</th>
                   </tr>
                 </thead>
                 <tbody id="caja-retiros-tbody">
@@ -5479,16 +5504,17 @@ async function loadCajaAdmin() {
     api('/cortes/ganancia'),
   ]);
 
-  // Ganancia global (turno-independent) — populate stat card first
+  // Ganancia global (turno-independent) — populate stat cards first
   if (ganRes.ok) {
     const g = await ganRes.json();
     const money = v => '$' + (v||0).toFixed(2);
-    const dEl = document.getElementById('caja-stat-disponible');
-    const gEl = document.getElementById('caja-stat-ef');
-    const rEl = document.getElementById('caja-stat-ret-turno');
-    if (dEl) dEl.textContent = money(g.disponible);
-    if (gEl) gEl.textContent = money(g.ganancia);
-    if (rEl) rEl.textContent = money(g.total_retiros);
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('caja-stat-disponible', money(g.ganancia_disponible ?? g.disponible));
+    set('caja-stat-ef',         money(g.ganancia));
+    set('caja-stat-ret-turno',  money(g.retiros_personales ?? g.total_retiros));
+    set('caja-stat-inversion',  money(g.capital_inversion ?? 0));
+    set('caja-stat-costo-rec',  money(g.total_costo ?? 0));
+    set('caja-stat-ret-inv',    money(g.retiros_inversion ?? 0));
   }
 
   // Process turno FIRST so _cajaTurno is set before _updateCajaStats runs
@@ -5569,30 +5595,53 @@ function renderRetirosCaja() {
   }
 
   const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
+  const tipoBtn = r => r.tipo === 'inversion'
+    ? `<button onclick="cambiarTipoRetiro(${r.id},'personal')" title="Cambiar a Personal" style="background:#DBEAFE;color:#1E40AF;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">🏪 Inversión ⇄</button>`
+    : `<button onclick="cambiarTipoRetiro(${r.id},'inversion')" title="Cambiar a Inversión" style="background:#DCFCE7;color:#166534;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">💰 Personal ⇄</button>`;
   tbody.innerHTML = lista.map(r => `
     <tr class="border-b hovrow" style="border-color:#F8FAFF">
       <td class="px-4 py-2.5" style="color:#374151;white-space:nowrap">${fmtDT(r.creado_en)}</td>
       <td class="px-4 py-2.5" style="color:#0F172A">${r.concepto || '<span style="color:#94A3B8">Sin concepto</span>'}</td>
       <td class="px-4 py-2.5" style="color:#64748B">${r.usuario || '—'}</td>
       <td class="px-4 py-2.5 text-right font-bold" style="color:#DC2626">$${(r.monto||0).toFixed(2)}</td>
+      <td class="px-4 py-2.5 text-center">${tipoBtn(r)}</td>
     </tr>`).join('');
   _updateCajaStats();
+}
+
+async function cambiarTipoRetiro(id, nuevoTipo) {
+  const res = await api(`/cortes/retiro/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ tipo: nuevoTipo }),
+  });
+  if (!res.ok) { toast('Error al cambiar tipo','error'); return; }
+  const label = nuevoTipo === 'inversion' ? '🏪 Inversión' : '💰 Personal';
+  toast(`Retiro cambiado a ${label}`,'success');
+  loadCajaAdmin();
+}
+
+function updateRetiroTipoUI() {
+  const tipo = document.getElementById('caja-retiro-tipo')?.value;
+  const hint = document.getElementById('caja-retiro-tipo-hint');
+  if (hint) hint.style.display = tipo === 'inversion' ? 'block' : 'none';
 }
 
 async function registrarRetiroCaja() {
   const monto   = parseFloat(document.getElementById('caja-retiro-monto')?.value);
   const concepto= document.getElementById('caja-retiro-concepto')?.value.trim() || null;
+  const tipo    = document.getElementById('caja-retiro-tipo')?.value || 'personal';
   if (!monto || monto <= 0) { toast('Ingresa un monto válido','error'); return; }
   const res = await api('/cortes/retiro', {
     method: 'POST',
-    body: JSON.stringify({ monto, concepto }),
+    body: JSON.stringify({ monto, concepto, tipo }),
   });
   if (!res.ok) {
     const e = await res.json().catch(()=>({}));
     toast(e.detail || 'Error al registrar retiro','error');
     return;
   }
-  toast(`Retiro de $${monto.toFixed(2)} registrado`,'success');
+  const label = tipo === 'inversion' ? 'inversión' : 'personal';
+  toast(`Retiro ${label} de $${monto.toFixed(2)} registrado`,'success');
   document.getElementById('caja-retiro-monto').value = '';
   document.getElementById('caja-retiro-concepto').value = '';
   loadCajaAdmin();

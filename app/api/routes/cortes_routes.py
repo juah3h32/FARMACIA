@@ -237,6 +237,7 @@ def historial_cajero(
 class RetiroIn(BaseModel):
     monto: float
     concepto: Optional[str] = None
+    tipo: str = "personal"   # 'personal' | 'inversion'
 
 
 @router.post("/retiro")
@@ -256,11 +257,13 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
             .order_by(CortesCaja.abierto_en.desc())
             .first()
         )
+        tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
         r = RetiroCaja(
             corte_id=corte.id if corte else None,
             usuario_id=usuario_id,
             monto=body.monto,
             concepto=body.concepto,
+            tipo=tipo,
             creado_en=datetime.now(),
         )
         db.add(r)
@@ -326,11 +329,39 @@ def listar_retiros(
                 "corte_id":  r.corte_id,
                 "monto":     r.monto,
                 "concepto":  r.concepto or "",
+                "tipo":      r.tipo or "personal",
                 "creado_en": r.creado_en.isoformat() if r.creado_en else None,
                 "usuario":   r.usuario.nombre if r.usuario else "",
             }
             for r in retiros
         ]
+    finally:
+        db.close()
+
+
+class EditarRetiroIn(BaseModel):
+    tipo: str   # 'personal' | 'inversion'
+
+
+@router.patch("/retiro/{retiro_id}")
+def editar_retiro(retiro_id: int, body: EditarRetiroIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if body.tipo not in ("personal", "inversion"):
+        raise HTTPException(status_code=400, detail="tipo debe ser 'personal' o 'inversion'")
+    db = get_db_session()
+    try:
+        r = db.query(RetiroCaja).filter(RetiroCaja.id == retiro_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="Retiro no encontrado")
+        r.tipo = body.tipo
+        db.commit()
+        return {"ok": True, "id": r.id, "tipo": r.tipo}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
@@ -361,17 +392,25 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
         else:
             total_costo = 0.0
 
-        total_retiros = db.query(func.sum(RetiroCaja.monto)).scalar() or 0.0
-        ganancia      = tv - total_costo
-        disponible    = ganancia - total_retiros
+        all_retiros = db.query(RetiroCaja).all()
+        retiros_personales = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "personal")
+        retiros_inversion  = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "inversion")
+        total_retiros      = retiros_personales + retiros_inversion
+        ganancia           = tv - total_costo
+        ganancia_disponible = ganancia - retiros_personales
+        capital_inversion   = max(0.0, total_costo - retiros_inversion)
 
         return {
-            "num_ventas":    len(ventas),
-            "total_ventas":  tv,
-            "total_costo":   total_costo,
-            "ganancia":      ganancia,
-            "total_retiros": total_retiros,
-            "disponible":    disponible,
+            "num_ventas":          len(ventas),
+            "total_ventas":        tv,
+            "total_costo":         total_costo,
+            "ganancia":            ganancia,
+            "total_retiros":       total_retiros,
+            "retiros_personales":  retiros_personales,
+            "retiros_inversion":   retiros_inversion,
+            "disponible":          ganancia_disponible,
+            "ganancia_disponible": ganancia_disponible,
+            "capital_inversion":   capital_inversion,
         }
     finally:
         db.close()
