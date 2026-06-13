@@ -25,7 +25,7 @@ _WATERMARK_FILE = cfg.DATA_DIR / "watermarks.json"
 _TABLE_ORDER = [
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "ventas", "items_venta",
-    "compras", "items_compra", "cortes_caja", "movimientos_stock", "auditoria_log",
+    "compras", "items_compra", "cortes_caja", "retiros_caja", "movimientos_stock", "auditoria_log",
 ]
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
@@ -33,7 +33,7 @@ _TABLE_ORDER = [
 # items_venta incluido para que sync_from_turso los restaure si el DB local se resetea
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
-    "productos", "lotes", "cortes_caja", "ventas", "compras", "items_venta",
+    "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence

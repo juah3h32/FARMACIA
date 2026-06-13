@@ -77,6 +77,22 @@ def get_db_session() -> Session:
 
 def _migrate():
     """Add new columns to existing tables without dropping data."""
+    # Create retiros_caja table if it doesn't exist yet
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS retiros_caja ("
+                "id INTEGER PRIMARY KEY, "
+                "corte_id INTEGER REFERENCES cortes_caja(id), "
+                "usuario_id INTEGER NOT NULL REFERENCES usuarios(id), "
+                "monto REAL NOT NULL, "
+                "concepto TEXT, "
+                "creado_en DATETIME)"
+            ))
+            conn.commit()
+        except Exception:
+            pass
+
     new_cols = [
         ("productos", "presentacion",       "VARCHAR(50)"),
         ("productos", "concentracion",      "VARCHAR(50)"),

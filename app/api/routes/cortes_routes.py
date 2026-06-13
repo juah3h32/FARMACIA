@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime
 from sqlalchemy import func
 from app.database.connection import get_db_session
-from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago
+from app.database.models import CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -47,10 +47,12 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             )
             .all()
         )
+        retiros = db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
         ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
         tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
         tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
         tv = sum(v.total for v in ventas)
+        total_retiros = sum(r.monto for r in retiros)
         return {
             "abierto":          True,
             "id":               c.id,
@@ -61,8 +63,14 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             "total_efectivo":   ef,
             "total_tarjeta":    tj,
             "total_transferencia": tr,
-            "esperado_caja":    c.monto_apertura + ef,
+            "total_retiros":    total_retiros,
+            "esperado_caja":    c.monto_apertura + ef - total_retiros,
             "notas":            c.notas or "",
+            "retiros": [
+                {"id": r.id, "monto": r.monto, "concepto": r.concepto or "",
+                 "creado_en": r.creado_en.isoformat() if r.creado_en else None}
+                for r in retiros
+            ],
         }
     finally:
         db.close()
@@ -203,5 +211,87 @@ def historial_cajero(
                 "abierto":          c.cerrado_en is None,
             })
         return result
+    finally:
+        db.close()
+
+
+class RetiroIn(BaseModel):
+    monto: float
+    concepto: Optional[str] = None
+
+
+@router.post("/retiro")
+def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden retirar efectivo")
+    if body.monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
+
+    usuario_id = int(payload["sub"])
+    db = get_db_session()
+    try:
+        # Intentar asociar al corte activo de cualquier cajero (si admin también tiene uno, o el primer abierto)
+        corte = (
+            db.query(CortesCaja)
+            .filter(CortesCaja.cerrado_en == None)
+            .order_by(CortesCaja.abierto_en.desc())
+            .first()
+        )
+        r = RetiroCaja(
+            corte_id=corte.id if corte else None,
+            usuario_id=usuario_id,
+            monto=body.monto,
+            concepto=body.concepto,
+            creado_en=datetime.now(),
+        )
+        db.add(r)
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {
+            "ok": True,
+            "id": r.id,
+            "monto": r.monto,
+            "concepto": r.concepto,
+            "creado_en": r.creado_en.isoformat(),
+            "corte_id": r.corte_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/retiros")
+def listar_retiros(
+    limite: int = 50,
+    corte_id: Optional[int] = None,
+    payload: dict = Depends(get_current_api_user),
+):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    limite = min(max(1, limite), 200)
+    db = get_db_session()
+    try:
+        q = db.query(RetiroCaja)
+        if corte_id is not None:
+            q = q.filter(RetiroCaja.corte_id == corte_id)
+        retiros = q.order_by(RetiroCaja.creado_en.desc()).limit(limite).all()
+        return [
+            {
+                "id":        r.id,
+                "corte_id":  r.corte_id,
+                "monto":     r.monto,
+                "concepto":  r.concepto or "",
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+                "usuario":   r.usuario.nombre if r.usuario else "",
+            }
+            for r in retiros
+        ]
     finally:
         db.close()

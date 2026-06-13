@@ -244,6 +244,22 @@ class CortesCaja(Base):
     notas = Column(Text)
 
     usuario = relationship("Usuario", back_populates="cortes")
+    retiros = relationship("RetiroCaja", back_populates="corte", cascade="all, delete-orphan")
+
+
+class RetiroCaja(Base):
+    """Retiro de efectivo de caja durante un turno (solo admin)"""
+    __tablename__ = "retiros_caja"
+
+    id = Column(Integer, primary_key=True)
+    corte_id = Column(Integer, ForeignKey("cortes_caja.id"), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    monto = Column(Float, nullable=False)
+    concepto = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+
+    corte = relationship("CortesCaja", back_populates="retiros")
+    usuario = relationship("Usuario")
 
 
 class MovimientoStock(Base):

@@ -86,9 +86,25 @@
           <p id="tp-tj" class="font-bold text-base mt-1" style="color:#D97706">$0.00</p>
         </div>
       </div>
-      <div class="rounded-xl p-3 mb-4 text-xs flex justify-between" style="background:#F8FAFF;border:1px solid #E2E8F0">
+      <!-- Retiros (solo admin, se muestra si hay retiros o el usuario es admin) -->
+      <div id="tp-retiros-row" class="rounded-xl p-3 mb-2 text-xs hidden" style="background:#FEF2F2;border:1px solid #FECACA">
+        <div class="flex justify-between mb-1">
+          <span style="color:#DC2626;font-weight:600">— Retiros de caja</span>
+          <span id="tp-retiros-total" class="font-bold" style="color:#DC2626">$0.00</span>
+        </div>
+        <div id="tp-retiros-lista" class="space-y-0.5"></div>
+      </div>
+      <div class="rounded-xl p-3 mb-2 text-xs flex justify-between" style="background:#F8FAFF;border:1px solid #E2E8F0">
         <span style="color:#64748B">Efectivo esperado en caja</span>
         <span id="tp-esperado" class="font-bold" style="color:#0F172A">—</span>
+      </div>
+      <!-- Botón retirar efectivo (admin only) -->
+      <div id="tp-btn-retiro-wrap" class="mb-4 hidden">
+        <button onclick="openModal('modal-retiro-caja')"
+          class="w-full h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all hover:opacity-80"
+          style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
+          <i data-lucide="arrow-down-from-line" style="width:13px;height:13px"></i> Retirar efectivo de caja
+        </button>
       </div>
       <div class="border-t pt-4" style="border-color:#E2E8F0">
         <p class="text-xs font-semibold mb-3" style="color:#374151">Cerrar turno</p>
@@ -152,6 +168,43 @@
     <div id="turno-footer-cerrado" class="px-6 pb-5 hidden">
       <button onclick="loadHistorialTurno();openModal('modal-historial-turno');closeModal('modal-turno')" class="w-full h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all hover:opacity-80" style="background:#F1F5F9;color:#64748B">
         <i data-lucide="history" style="width:13px;height:13px"></i> Ver mi historial
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ RETIRO CAJA MODAL ═══════════ -->
+<div id="modal-retiro-caja" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-retiro-caja')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[400px]">
+    <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b" style="border-color:#F1F5F9">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
+          <i data-lucide="arrow-down-from-line" style="width:16px;height:16px;color:#DC2626"></i>
+        </div>
+        <span class="font-bold text-sm" style="color:#0F172A">Retirar efectivo de caja</span>
+      </div>
+      <button onclick="closeModal('modal-retiro-caja')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="rounded-xl p-3 text-xs" style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B">
+        <i data-lucide="alert-triangle" style="width:12px;height:12px;display:inline;margin-right:4px"></i>
+        Solo el administrador puede registrar retiros. Queda registro permanente.
+      </div>
+      <div>
+        <label class="lbl">Monto a retirar ($) *</label>
+        <input id="retiro-monto" type="number" step="0.01" min="0.01" placeholder="0.00" class="inp">
+      </div>
+      <div>
+        <label class="lbl">Concepto / motivo</label>
+        <input id="retiro-concepto" class="inp" placeholder="Ej: Pago a proveedor, gastos operativos...">
+      </div>
+      <button onclick="confirmarRetiro()"
+        class="w-full h-11 rounded-xl font-bold text-white text-sm transition-all hover:opacity-90 flex items-center justify-center gap-2"
+        style="background:#DC2626">
+        <i data-lucide="arrow-down-from-line" style="width:16px;height:16px"></i> Registrar retiro
       </button>
     </div>
   </div>
@@ -4793,6 +4846,7 @@ function showCorteDetalle(c) {
       <div class="space-y-1.5 text-xs">
         <div class="flex justify-between"><span style="color:#94A3B8">Fondo apertura</span><span class="font-semibold">${fmt(c.monto_apertura)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">+ Efectivo vendido</span><span class="font-semibold" style="color:#22C55E">${fmt(c.total_efectivo)}</span></div>
+        <div id="detalle-retiros-seccion"></div>
         <div class="flex justify-between border-t pt-1.5" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">= Esperado en caja</span><span class="font-bold">${fmt(c.esperado_caja)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Contado al cierre</span><span class="font-semibold">${c.monto_cierre!=null?fmt(c.monto_cierre):'—'}</span></div>
         <div class="flex justify-between border-t pt-1.5" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Diferencia</span><span class="font-bold" style="color:${difColor}">${dif!=null?((dif>=0?'+':'')+fmt(dif)):'—'}</span></div>
@@ -4802,6 +4856,25 @@ function showCorteDetalle(c) {
       <span class="text-sm font-bold" style="color:${estadoColor}">${estado}</span>
     </div>`;
   openModal('modal-corte-detalle');
+  // Cargar retiros de este corte
+  if (S.user?.rol === 'admin') {
+    api(`/cortes/retiros?corte_id=${c.id}&limite=50`).then(async r => {
+      if (!r.ok) return;
+      const retiros = await r.json();
+      const sec = document.getElementById('detalle-retiros-seccion');
+      if (!sec) return;
+      if (retiros.length === 0) { sec.innerHTML = ''; return; }
+      const total = retiros.reduce((a,r)=>a+r.monto, 0);
+      const money = v => '$'+(v||0).toFixed(2);
+      sec.innerHTML = `<div class="flex justify-between mt-1" style="color:#DC2626">
+        <span>— Retiros de caja</span><span class="font-semibold">${money(total)}</span>
+      </div>` + retiros.map(r =>
+        `<div class="flex justify-between pl-3 text-xs" style="color:#DC2626;opacity:.8">
+          <span>${r.concepto||'Sin concepto'}</span><span>${money(r.monto)}</span>
+        </div>`
+      ).join('');
+    });
+  }
 }
 
 // ── Vencimientos ──────────────────────────────────────────────────────────
@@ -5336,6 +5409,29 @@ async function openTurnoPanel() {
     document.getElementById('tp-ef').textContent           = money(d.total_efectivo);
     document.getElementById('tp-tj').textContent           = money((d.total_tarjeta||0) + (d.total_transferencia||0));
     document.getElementById('tp-esperado').textContent     = money(d.esperado_caja);
+
+    // Retiros de caja
+    const retiros     = d.retiros || [];
+    const totalRetiro = d.total_retiros || 0;
+    const retiroRow   = document.getElementById('tp-retiros-row');
+    const retiroTotal = document.getElementById('tp-retiros-total');
+    const retiroLista = document.getElementById('tp-retiros-lista');
+    const btnRetiro   = document.getElementById('tp-btn-retiro-wrap');
+    if (retiros.length > 0) {
+      retiroRow.classList.remove('hidden');
+      retiroTotal.textContent = money(totalRetiro);
+      retiroLista.innerHTML = retiros.map(r =>
+        `<div class="flex justify-between py-0.5" style="color:#DC2626">
+          <span class="truncate max-w-[180px]">${r.concepto || 'Sin concepto'}</span>
+          <span class="font-semibold">${money(r.monto)}</span>
+        </div>`
+      ).join('');
+    } else {
+      retiroRow.classList.add('hidden');
+    }
+    if (S.user?.rol === 'admin') btnRetiro?.classList.remove('hidden');
+    else btnRetiro?.classList.add('hidden');
+
     document.getElementById('turno-monto-cierre').value = '';
     const difEl = document.getElementById('turno-dif-val');
     if (difEl) { difEl.textContent = '—'; difEl.style.color = '#64748B'; }
@@ -5367,6 +5463,26 @@ function calcDiferencia() {
   el.textContent = (dif >= 0 ? '+' : '') + '$' + dif.toFixed(2);
   el.style.color = dif > 0.005 ? '#16A34A' : dif < -0.005 ? '#DC2626' : '#64748B';
   if (row) row.style.background = dif > 0.005 ? '#F0FDF4' : dif < -0.005 ? '#FEF2F2' : '#F8FAFF';
+}
+
+async function confirmarRetiro() {
+  const monto = parseFloat(document.getElementById('retiro-monto')?.value);
+  if (!monto || monto <= 0) { toast('Ingresa un monto válido','error'); return; }
+  const concepto = document.getElementById('retiro-concepto')?.value.trim() || null;
+  const res = await api('/cortes/retiro', {
+    method: 'POST',
+    body: JSON.stringify({ monto, concepto }),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    toast(e.detail || 'Error al registrar retiro', 'error');
+    return;
+  }
+  toast(`Retiro de $${monto.toFixed(2)} registrado`, 'success');
+  document.getElementById('retiro-monto').value = '';
+  document.getElementById('retiro-concepto').value = '';
+  closeModal('modal-retiro-caja');
+  openTurnoPanel();
 }
 
 async function abrirTurno() {
