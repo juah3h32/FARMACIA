@@ -264,6 +264,7 @@ class RetiroIn(BaseModel):
     monto: float
     concepto: Optional[str] = None
     tipo: str = "personal"   # 'personal' | 'inversion'
+    fecha: Optional[str] = None  # ISO date "YYYY-MM-DD", None = hoy
 
 
 @router.post("/retiro")
@@ -277,6 +278,18 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
     db = get_db_session()
     try:
         tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
+
+        # Parse optional backdated date
+        if body.fecha:
+            try:
+                from datetime import date as _date
+                parsed = datetime.strptime(body.fecha, "%Y-%m-%d")
+                # Keep time as 23:59 so it sorts after regular events of that day
+                creado_en = parsed.replace(hour=23, minute=59, second=0)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Fecha inválida, usa YYYY-MM-DD")
+        else:
+            creado_en = datetime.now()
 
         # Validate against available balance
         gan_disp, cap_inv = _calc_disponibles(db)
@@ -304,7 +317,7 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
             monto=body.monto,
             concepto=body.concepto,
             tipo=tipo,
-            creado_en=datetime.now(),
+            creado_en=creado_en,
         )
         db.add(r)
         db.commit()

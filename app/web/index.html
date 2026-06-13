@@ -2003,6 +2003,16 @@
                   <label class="lbl">Concepto</label>
                   <input id="caja-retiro-concepto" class="inp" placeholder="Pago proveedor, gastos, etc.">
                 </div>
+                <div>
+                  <label class="flex items-center gap-2 cursor-pointer text-xs" style="color:#64748B">
+                    <input type="checkbox" id="caja-retiro-fecha-toggle" onchange="toggleRetiroFecha()" style="accent-color:#243366">
+                    Registrar en otra fecha (olvidé registrarlo)
+                  </label>
+                  <div id="caja-retiro-fecha-wrap" class="hidden mt-1.5">
+                    <input id="caja-retiro-fecha" type="date" class="inp text-xs">
+                    <p class="text-xs mt-1" style="color:#F59E0B">⚠ Solo para retiros ya realizados que no se registraron ese día.</p>
+                  </div>
+                </div>
                 <div id="caja-retiro-tipo-hint" class="rounded-xl px-3 py-2 text-xs" style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;display:none">
                   <strong>Inversión:</strong> descuenta del capital recuperado de inventario, no de tu ganancia personal.
                 </div>
@@ -5725,6 +5735,18 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
   loadCajaAdmin();
 }
 
+function toggleRetiroFecha() {
+  const checked = document.getElementById('caja-retiro-fecha-toggle')?.checked;
+  const wrap = document.getElementById('caja-retiro-fecha-wrap');
+  if (!wrap) return;
+  wrap.classList.toggle('hidden', !checked);
+  if (checked && !document.getElementById('caja-retiro-fecha').value) {
+    // Default to yesterday so user has to consciously pick the date
+    const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+    document.getElementById('caja-retiro-fecha').value = ayer.toISOString().slice(0, 10);
+  }
+}
+
 function updateRetiroTipoUI() {
   const tipo = document.getElementById('caja-retiro-tipo')?.value;
   const hint = document.getElementById('caja-retiro-tipo-hint');
@@ -5736,10 +5758,13 @@ async function registrarRetiroCaja() {
   const monto   = parseFloat(document.getElementById('caja-retiro-monto')?.value);
   const concepto= document.getElementById('caja-retiro-concepto')?.value.trim() || null;
   const tipo    = document.getElementById('caja-retiro-tipo')?.value || 'personal';
+  const usarFecha = document.getElementById('caja-retiro-fecha-toggle')?.checked;
+  const fecha   = usarFecha ? (document.getElementById('caja-retiro-fecha')?.value || null) : null;
   if (!monto || monto <= 0) { toast('Ingresa un monto válido','error'); return; }
+  if (usarFecha && !fecha) { toast('Selecciona la fecha del retiro','error'); return; }
   const res = await api('/cortes/retiro', {
     method: 'POST',
-    body: JSON.stringify({ monto, concepto, tipo }),
+    body: JSON.stringify({ monto, concepto, tipo, fecha }),
   });
   if (!res.ok) {
     const e = await res.json().catch(()=>({}));
@@ -5747,9 +5772,12 @@ async function registrarRetiroCaja() {
     return;
   }
   const label = tipo === 'inversion' ? 'inversión' : 'personal';
-  toast(`Retiro ${label} de $${monto.toFixed(2)} registrado`,'success');
+  const fechaLabel = fecha ? ` (${fecha})` : '';
+  toast(`Retiro ${label} de $${monto.toFixed(2)} registrado${fechaLabel}`,'success');
   document.getElementById('caja-retiro-monto').value = '';
   document.getElementById('caja-retiro-concepto').value = '';
+  const tog = document.getElementById('caja-retiro-fecha-toggle');
+  if (tog) { tog.checked = false; toggleRetiroFecha(); }
   loadCajaAdmin();
 }
 
