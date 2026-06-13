@@ -333,3 +333,45 @@ def listar_retiros(
         ]
     finally:
         db.close()
+
+
+@router.get("/ganancia")
+def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
+    """All-time profit snapshot — turno-independent. Admin only."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    db = get_db_session()
+    try:
+        ventas = (
+            db.query(Venta)
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .all()
+        )
+        tv = sum(v.total for v in ventas)
+
+        venta_ids = [v.id for v in ventas]
+        if venta_ids:
+            cost_rows = (
+                db.query(ItemVenta.cantidad, Producto.precio_compra)
+                .join(Producto, ItemVenta.producto_id == Producto.id)
+                .filter(ItemVenta.venta_id.in_(venta_ids))
+                .all()
+            )
+            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+        else:
+            total_costo = 0.0
+
+        total_retiros = db.query(func.sum(RetiroCaja.monto)).scalar() or 0.0
+        ganancia      = tv - total_costo
+        disponible    = ganancia - total_retiros
+
+        return {
+            "num_ventas":    len(ventas),
+            "total_ventas":  tv,
+            "total_costo":   total_costo,
+            "ganancia":      ganancia,
+            "total_retiros": total_retiros,
+            "disponible":    disponible,
+        }
+    finally:
+        db.close()

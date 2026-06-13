@@ -1252,7 +1252,18 @@
         <!-- ── TAB: VENTAS ──────────────────────────────────────── -->
         <div id="rep-tab-content-ventas" class="space-y-3">
           <!-- KPI row -->
-          <div class="grid grid-cols-4 gap-4">
+          <div class="grid grid-cols-5 gap-4">
+            <!-- Ganancia card — protagonist -->
+            <div class="rounded-2xl border-2 p-5" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);box-shadow:0 1px 4px rgba(0,0,0,.03)">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#16A34A">
+                  <i data-lucide="banknote" style="width:15px;height:15px;color:#fff"></i>
+                </div>
+                <p class="text-xs font-bold" style="color:#166534">Mi Ganancia</p>
+              </div>
+              <p id="rep-ganancia" class="text-2xl font-black" style="color:#15803D">$0.00</p>
+              <p id="rep-costo-label" class="text-xs mt-1" style="color:#4ADE80">Costo: <span id="rep-costo">$0.00</span></p>
+            </div>
             <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="flex items-center gap-2 mb-3">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#EEF1F9">
@@ -4726,13 +4737,15 @@ async function loadReports() {
 
   if (rRes.ok) {
     const r = await rRes.json();
-    document.getElementById('rep-total').textContent = fmt(r.total);
-    document.getElementById('rep-num').textContent   = fmtN(r.num_ventas);
-    document.getElementById('rep-prom').textContent  = fmt(r.ticket_promedio);
-    document.getElementById('rep-best').textContent  = fmt(r.mejor_dia_monto);
-    document.getElementById('rep-ef').textContent    = fmt(r.efectivo);
-    document.getElementById('rep-ta').textContent    = fmt(r.tarjeta);
-    document.getElementById('rep-tr').textContent    = fmt(r.transferencia||0);
+    document.getElementById('rep-total').textContent   = fmt(r.total);
+    document.getElementById('rep-num').textContent     = fmtN(r.num_ventas);
+    document.getElementById('rep-prom').textContent    = fmt(r.ticket_promedio);
+    document.getElementById('rep-best').textContent    = fmt(r.mejor_dia_monto);
+    document.getElementById('rep-ef').textContent      = fmt(r.efectivo);
+    document.getElementById('rep-ta').textContent      = fmt(r.tarjeta);
+    document.getElementById('rep-tr').textContent      = fmt(r.transferencia||0);
+    document.getElementById('rep-ganancia').textContent = fmt(r.ganancia ?? 0);
+    document.getElementById('rep-costo').textContent    = fmt(r.total_costo ?? 0);
   }
 
   if (topRes.ok) {
@@ -5460,10 +5473,23 @@ async function loadCajaAdmin() {
     hastaEl.value = new Date().toISOString().slice(0, 10);
   }
 
-  const [retRes, turnoRes] = await Promise.all([
+  const [retRes, turnoRes, ganRes] = await Promise.all([
     api('/cortes/retiros?limite=500'),
     api('/cortes/activo'),
+    api('/cortes/ganancia'),
   ]);
+
+  // Ganancia global (turno-independent) — populate stat card first
+  if (ganRes.ok) {
+    const g = await ganRes.json();
+    const money = v => '$' + (v||0).toFixed(2);
+    const dEl = document.getElementById('caja-stat-disponible');
+    const gEl = document.getElementById('caja-stat-ef');
+    const rEl = document.getElementById('caja-stat-ret-turno');
+    if (dEl) dEl.textContent = money(g.disponible);
+    if (gEl) gEl.textContent = money(g.ganancia);
+    if (rEl) rEl.textContent = money(g.total_retiros);
+  }
 
   // Process turno FIRST so _cajaTurno is set before _updateCajaStats runs
   if (turnoRes.ok) {
@@ -5500,17 +5526,6 @@ function _updateCajaStats() {
   const desde = document.getElementById('caja-desde')?.value || '';
   const hasta  = document.getElementById('caja-hasta')?.value  || '';
   const money  = v => '$' + (v||0).toFixed(2);
-
-  // ── Disponible (ganancia turno − retiros) ────────────────────────────────
-  const gan = _cajaTurno ? (_cajaTurno.ganancia    ?? null) : null;
-  const ret = _cajaTurno ? (_cajaTurno.total_retiros || 0) : null;
-  const dis = _cajaTurno ? (_cajaTurno.disponible   ?? null) : null;
-  const dispEl = document.getElementById('caja-stat-disponible');
-  const efEl   = document.getElementById('caja-stat-ef');
-  const retTEl = document.getElementById('caja-stat-ret-turno');
-  if (dispEl) dispEl.textContent = dis !== null ? money(dis) : '—';
-  if (efEl)   efEl.textContent   = gan !== null ? money(gan) : '—';
-  if (retTEl) retTEl.textContent = ret !== null ? money(ret) : '—';
 
   // ── Retiros hoy ───────────────────────────────────────────────────────────
   const retHoy = _cajaRetiros.filter(r => (r.creado_en||'').slice(0,10) === hoy);

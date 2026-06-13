@@ -50,8 +50,22 @@ def resumen(
             d = v.creado_en.date().isoformat() if v.creado_en else "?"
             por_dia[d] = por_dia.get(d, 0.0) + v.total
 
-        mejor_dia  = max(por_dia, key=por_dia.get) if por_dia else None
+        mejor_dia   = max(por_dia, key=por_dia.get) if por_dia else None
         mejor_monto = por_dia[mejor_dia] if mejor_dia else 0.0
+
+        # Cost of goods sold for period
+        venta_ids = [v.id for v in ventas]
+        if venta_ids:
+            cost_rows = (
+                db.query(ItemVenta.cantidad, Producto.precio_compra)
+                .join(Producto, ItemVenta.producto_id == Producto.id)
+                .filter(ItemVenta.venta_id.in_(venta_ids))
+                .all()
+            )
+            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+        else:
+            total_costo = 0.0
+        ganancia = total - total_costo
 
         return {
             "total":            total,
@@ -62,6 +76,8 @@ def resumen(
             "efectivo":         sum(v.total for v in ventas if v.metodo_pago.value == "efectivo"),
             "tarjeta":          sum(v.total for v in ventas if v.metodo_pago.value == "tarjeta"),
             "transferencia":    sum(v.total for v in ventas if v.metodo_pago.value == "transferencia"),
+            "total_costo":      total_costo,
+            "ganancia":         ganancia,
             "por_dia": [{"fecha": k, "total": v} for k, v in sorted(por_dia.items())],
         }
     finally:
