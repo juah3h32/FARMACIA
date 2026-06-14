@@ -684,6 +684,7 @@
   .page.active { display:flex !important; flex-direction:column; height:calc(100vh - 88px); overflow:hidden; animation:pageIn .22s ease both; }
   .page[data-page="dashboard"].active { gap:0.75rem; overflow-y:auto; }
   .page[data-page="settings"].active { display:block !important; overflow-y:auto; overflow-x:hidden; }
+  .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
   .nav-item { transition:background .15s,color .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
   .nav-item.active { background:#243366 !important; color:#fff !important; }
@@ -2182,6 +2183,146 @@
         </div>
       </div>
 
+      <!-- ─── MARKETING ─────────────────────────────── -->
+      <div data-page="marketing" class="page flex flex-col gap-3" style="height:100%;overflow:hidden">
+
+        <!-- Tab bar -->
+        <div class="bg-white rounded-2xl border flex overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">
+          <button id="mkt-tab-pdf" onclick="mktSwitchTab('pdf')"
+            class="flex-1 h-11 text-sm font-semibold transition-all"
+            style="background:#2563EB;color:#fff">📄 Catálogo PDF</button>
+          <button id="mkt-tab-promo" onclick="mktSwitchTab('promo')"
+            class="flex-1 h-11 text-sm font-semibold transition-all"
+            style="background:transparent;color:#64748B">🎨 Imagen Promo</button>
+        </div>
+
+        <!-- ── PDF Panel ── -->
+        <div id="mkt-panel-pdf" class="flex flex-col gap-3 flex-1 overflow-hidden">
+          <div class="bg-white rounded-2xl border p-3 flex items-center gap-3 flex-shrink-0 flex-wrap" style="border-color:#E2E8F0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold" style="color:#64748B">Filtro:</span>
+              <select id="mkt-filtro" class="h-9 px-3 rounded-xl border text-xs" style="border-color:#E2E8F0">
+                <option value="todos">Todos los productos</option>
+                <option value="activos">Solo activos</option>
+                <option value="stock">Con stock</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold" style="color:#64748B">Orden:</span>
+              <select id="mkt-orden" class="h-9 px-3 rounded-xl border text-xs" style="border-color:#E2E8F0">
+                <option value="nombre">Nombre A-Z</option>
+                <option value="precio_asc">Precio ↑</option>
+                <option value="precio_desc">Precio ↓</option>
+                <option value="stock">Stock</option>
+                <option value="categoria">Categoría</option>
+              </select>
+            </div>
+            <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+              <input type="checkbox" id="mkt-inc-stock" checked class="rounded"> Stock
+            </label>
+            <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+              <input type="checkbox" id="mkt-inc-barcode" checked class="rounded"> Código
+            </label>
+            <button onclick="mktGenerarPDF()"
+              class="ml-auto h-10 px-5 rounded-xl text-sm font-bold text-white flex items-center gap-2 transition-all hover:opacity-90"
+              style="background:#2563EB">
+              <i data-lucide="file-down" style="width:15px;height:15px"></i> Generar PDF
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl border flex flex-col overflow-hidden flex-1" style="border-color:#E2E8F0">
+            <div class="grid text-xs font-bold px-4 py-3 flex-shrink-0"
+                 style="grid-template-columns:1fr 140px 90px 70px 110px;background:#2563EB;color:#fff;border-radius:16px 16px 0 0">
+              <span>Nombre</span><span>Categoría</span>
+              <span class="text-right">Precio</span><span class="text-center">Stock</span><span>Código</span>
+            </div>
+            <div id="mkt-prod-list" class="overflow-y-auto flex-1">
+              <p class="text-center py-10 text-xs" style="color:#94A3B8">Cargando...</p>
+            </div>
+            <div class="px-4 py-2 border-t text-xs text-right flex-shrink-0" style="border-color:#F1F5F9;color:#94A3B8">
+              <span id="mkt-prod-count">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Promo Panel ── -->
+        <div id="mkt-panel-promo" class="hidden gap-4 flex-1 overflow-hidden" style="display:none">
+          <!-- Controls -->
+          <div class="bg-white rounded-2xl border overflow-y-auto flex-shrink-0 scroll-light" style="width:310px;border-color:#E2E8F0">
+            <div class="p-4 space-y-3">
+              <h3 class="font-bold text-sm" style="color:#0F172A">🎨 Configurar Promoción</h3>
+
+              <div>
+                <label class="lbl">Buscar producto</label>
+                <input id="mkt-promo-search" type="text" placeholder="Nombre o código..." class="inp"
+                  oninput="mktFiltrarPromo(this.value)">
+                <div id="mkt-promo-results" class="mt-1 rounded-xl border overflow-hidden"
+                     style="border-color:#E2E8F0;max-height:150px;overflow-y:auto;display:none"></div>
+                <p id="mkt-promo-selected" class="text-xs mt-1 font-semibold" style="color:#16A34A;display:none"></p>
+              </div>
+
+              <div id="mkt-img-row" style="display:none">
+                <label class="flex items-center gap-2 cursor-pointer p-3 rounded-xl select-none"
+                       style="background:#F0FDF4;border:1px solid #BBF7D0">
+                  <input type="checkbox" id="mkt-usar-imagen" class="rounded">
+                  <span class="text-xs font-semibold" style="color:#15803D">🖼 Usar imagen Cloudinary (fondo blanco)</span>
+                </label>
+              </div>
+              <div id="mkt-no-img-row" style="display:none">
+                <p class="text-xs px-3 py-2 rounded-xl" style="background:#F8FAFF;color:#94A3B8">Sin imagen — solo diseño azul disponible</p>
+              </div>
+
+              <div class="h-px" style="background:#E2E8F0"></div>
+
+              <div>
+                <p class="text-xs font-semibold" style="color:#64748B">Precio actual</p>
+                <p id="mkt-precio-actual" class="text-xl font-black mt-0.5" style="color:#2563EB">$0.00</p>
+              </div>
+
+              <div>
+                <label class="lbl">Precio PROMO (el que vendes) *</label>
+                <input id="mkt-precio-promo" type="number" step="0.01" min="0"
+                  placeholder="Ej: 18.00" class="inp" oninput="mktAutoTachado()">
+              </div>
+
+              <div>
+                <label class="lbl">Precio tachado (precio "antes")</label>
+                <input id="mkt-precio-tachado" type="number" step="0.01" min="0"
+                  placeholder="Auto: precio promo + $5" class="inp">
+                <p class="text-xs mt-0.5" style="color:#94A3B8">Se calcula automáticamente sumando $5</p>
+              </div>
+
+              <div>
+                <label class="lbl">Texto adicional (opcional)</label>
+                <input id="mkt-texto-extra" class="inp" placeholder="Ej: Por tiempo limitado">
+              </div>
+
+              <button onclick="mktPreviewPromo()"
+                class="w-full h-10 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                style="background:#16A34A">
+                <i data-lucide="eye" style="width:15px;height:15px"></i> Vista previa
+              </button>
+              <button onclick="mktDescargarPromo()"
+                class="w-full h-10 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                style="background:#2563EB">
+                <i data-lucide="download" style="width:15px;height:15px"></i> Descargar PNG
+              </button>
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div class="bg-white rounded-2xl border flex-1 flex flex-col items-center justify-center overflow-auto scroll-light"
+               style="border-color:#E2E8F0">
+            <div id="mkt-preview-empty" class="text-center" style="color:#94A3B8">
+              <i data-lucide="image" style="width:52px;height:52px;margin:0 auto 12px"></i>
+              <p class="text-sm">Selecciona un producto<br>y pulsa Vista previa</p>
+            </div>
+            <img id="mkt-preview-img" style="display:none;max-height:calc(100vh - 200px);max-width:100%;object-fit:contain;border-radius:12px;padding:12px">
+          </div>
+        </div>
+
+      </div><!-- /marketing -->
+
     </main>
   </div><!-- /right panel -->
 </div><!-- /app -->
@@ -3055,6 +3196,7 @@ const NAV = [
   { key:'caja',      icon:'landmark',         label:'Control de Caja',  admin:true  },
   { key:'suppliers', icon:'truck',            label:'Proveedores',      admin:true  },
   { key:'employees', icon:'user-cog',         label:'Empleados',        admin:true  },
+  { key:'marketing', icon:'image',            label:'Marketing',        admin:true  },
   { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
   { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
 ];
@@ -3622,7 +3764,8 @@ function tickClock() {
 const TITLES={
   dashboard:'Dashboard', pos:'Punto de Venta', inventory:'Inventario',
   customers:'Clientes', reports:'Reportes', suppliers:'Proveedores',
-  employees:'Empleados', settings:'Configuración', historial:'Historial Clínico'
+  employees:'Empleados', settings:'Configuración', historial:'Historial Clínico',
+  marketing:'Marketing — PDF y Promos'
 };
 
 function navigate(page) {
@@ -3679,6 +3822,7 @@ function loadPage(page) {
   if (page==='caja')       loadCajaAdmin();
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
+  if (page==='marketing')  loadMarketing();
   icons();
 }
 
@@ -7924,6 +8068,213 @@ window.addEventListener('load', () => {
   }
   document.getElementById('l-user').focus();
 });
+
+// ══════════════════════════════════════════════════════════
+// MARKETING
+// ══════════════════════════════════════════════════════════
+let _mktProds = [];
+let _mktSelectedProd = null;
+
+function mktSwitchTab(tab) {
+  const isPdf = tab === 'pdf';
+  const panPdf   = document.getElementById('mkt-panel-pdf');
+  const panPromo = document.getElementById('mkt-panel-promo');
+  const btnPdf   = document.getElementById('mkt-tab-pdf');
+  const btnPromo = document.getElementById('mkt-tab-promo');
+
+  panPdf.style.display   = isPdf ? 'flex' : 'none';
+  panPromo.style.display = isPdf ? 'none' : 'flex';
+  panPdf.classList.toggle('hidden', !isPdf);
+  panPromo.classList.toggle('hidden', isPdf);
+
+  btnPdf.style.background   = isPdf   ? '#2563EB' : 'transparent';
+  btnPdf.style.color         = isPdf   ? '#fff'    : '#64748B';
+  btnPromo.style.background  = !isPdf  ? '#2563EB' : 'transparent';
+  btnPromo.style.color       = !isPdf  ? '#fff'    : '#64748B';
+}
+
+async function loadMarketing() {
+  const res = await api('/productos/?solo_activos=false');
+  if (!res.ok) return;
+  _mktProds = await res.json();
+  _mktRenderProdList();
+}
+
+function _mktGetFilteredProds() {
+  const filtro = document.getElementById('mkt-filtro')?.value || 'todos';
+  const orden  = document.getElementById('mkt-orden')?.value  || 'nombre';
+  let prods = [..._mktProds];
+  if (filtro === 'activos') prods = prods.filter(p => p.activo);
+  if (filtro === 'stock')   prods = prods.filter(p => p.activo && p.stock > 0);
+  if (orden === 'nombre')       prods.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  else if (orden==='precio_asc')  prods.sort((a,b)=>a.precio_venta-b.precio_venta);
+  else if (orden==='precio_desc') prods.sort((a,b)=>b.precio_venta-a.precio_venta);
+  else if (orden==='stock')       prods.sort((a,b)=>a.stock-b.stock);
+  else if (orden==='categoria')   prods.sort((a,b)=>(a.categoria_nombre||'').localeCompare(b.categoria_nombre||''));
+  return prods;
+}
+
+function _mktRenderProdList() {
+  const el = document.getElementById('mkt-prod-list');
+  const ct = document.getElementById('mkt-prod-count');
+  if (!el) return;
+  const prods = _mktGetFilteredProds();
+  ct.textContent = `${prods.length} productos`;
+  if (!prods.length) {
+    el.innerHTML = '<p class="text-center py-10 text-xs" style="color:#94A3B8">Sin productos</p>';
+    return;
+  }
+  el.innerHTML = prods.map((p, i) => `
+    <div class="grid items-center px-4 py-2.5 text-xs"
+         style="grid-template-columns:1fr 140px 90px 70px 110px;border-bottom:1px solid #F1F5F9;background:${i%2===0?'#fff':'#F8FAFF'}">
+      <span class="font-medium truncate pr-2" style="color:#0F172A" title="${p.nombre}">${p.nombre}</span>
+      <span class="truncate" style="color:#64748B">${p.categoria_nombre||'—'}</span>
+      <span class="text-right font-semibold" style="color:#16A34A">${fmt(p.precio_venta)}</span>
+      <span class="text-center font-${p.stock<=p.stock_minimo?'bold':'normal'}" style="color:${p.stock<=p.stock_minimo?'#EF4444':'#0F172A'}">${p.stock}</span>
+      <span class="truncate" style="color:#94A3B8">${p.codigo_barras||'—'}</span>
+    </div>`).join('');
+}
+
+async function _saveFile(blob, suggestedName, mimeTypes) {
+  if (window.showSaveFilePicker) {
+    try {
+      const fh = await window.showSaveFilePicker({ suggestedName, types: mimeTypes });
+      const ws = await fh.createWritable();
+      await ws.write(blob);
+      await ws.close();
+      return true;
+    } catch(e) {
+      if (e.name === 'AbortError') return false;   // usuario canceló
+      // showSaveFilePicker no disponible/bloqueado → fallback
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href    = url;
+  a.download = suggestedName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+async function mktGenerarPDF() {
+  const filtro   = document.getElementById('mkt-filtro').value;
+  const orden    = document.getElementById('mkt-orden').value;
+  const incStock = document.getElementById('mkt-inc-stock').checked;
+  const incCode  = document.getElementById('mkt-inc-barcode').checked;
+  toast('Generando PDF...', 'info');
+  try {
+    const res = await fetch(
+      `/api/marketing/pdf?filtro=${filtro}&orden=${orden}&inc_stock=${incStock}&inc_barcode=${incCode}`,
+      { headers: { Authorization: `Bearer ${S.token}` } }
+    );
+    if (!res.ok) { toast('Error generando PDF', 'error'); return; }
+    const blob  = await res.blob();
+    const fname = `Catalogo_Farmacia_${new Date().toISOString().slice(0,10)}.pdf`;
+    const saved = await _saveFile(blob, fname, [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]);
+    if (saved) toast('PDF guardado ✓', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function mktFiltrarPromo(term) {
+  const res = document.getElementById('mkt-promo-results');
+  if (!term.trim()) { res.style.display = 'none'; return; }
+  const matches = _mktProds.filter(p =>
+    p.nombre.toLowerCase().includes(term.toLowerCase()) ||
+    (p.codigo_barras||'').includes(term)
+  ).slice(0, 14);
+  if (!matches.length) { res.style.display = 'none'; return; }
+  res.innerHTML = matches.map(p => `
+    <div onclick="mktSeleccionarProd(${p.id})"
+         class="px-3 py-2 text-xs cursor-pointer hover:bg-blue-50 flex justify-between items-center"
+         style="border-bottom:1px solid #F1F5F9">
+      <span class="font-medium">${p.nombre}${p.imagen_url?' 🖼':''}</span>
+      <span class="font-semibold" style="color:#16A34A">${fmt(p.precio_venta)}</span>
+    </div>`).join('');
+  res.style.display = 'block';
+}
+
+function mktSeleccionarProd(id) {
+  const prod = _mktProds.find(p => p.id === id);
+  if (!prod) return;
+  _mktSelectedProd = prod;
+
+  document.getElementById('mkt-promo-search').value = '';
+  document.getElementById('mkt-promo-results').style.display = 'none';
+  const sel = document.getElementById('mkt-promo-selected');
+  sel.textContent = `✓ ${prod.nombre}`;
+  sel.style.display = 'block';
+
+  document.getElementById('mkt-precio-actual').textContent = fmt(prod.precio_venta);
+  document.getElementById('mkt-precio-promo').value   = prod.precio_venta.toFixed(2);
+  document.getElementById('mkt-precio-tachado').value = (prod.precio_venta + 5).toFixed(2);
+  document.getElementById('mkt-texto-extra').value    = '';
+
+  const imgRow   = document.getElementById('mkt-img-row');
+  const noImgRow = document.getElementById('mkt-no-img-row');
+  if (prod.imagen_url) {
+    imgRow.style.display   = 'block';
+    noImgRow.style.display = 'none';
+    document.getElementById('mkt-usar-imagen').checked = true;
+  } else {
+    imgRow.style.display   = 'none';
+    noImgRow.style.display = 'block';
+  }
+}
+
+function mktAutoTachado() {
+  const promo = parseFloat(document.getElementById('mkt-precio-promo').value) || 0;
+  const tacEl = document.getElementById('mkt-precio-tachado');
+  if (!tacEl.value) tacEl.value = (promo + 5).toFixed(2);
+}
+
+async function _mktGetPromoBlob() {
+  if (!_mktSelectedProd) { toast('Selecciona un producto primero', 'warning'); return null; }
+  const precioPromo   = parseFloat(document.getElementById('mkt-precio-promo').value)   || 0;
+  const precioTachado = parseFloat(document.getElementById('mkt-precio-tachado').value) || (precioPromo + 5);
+  const textoExtra    = document.getElementById('mkt-texto-extra').value.trim();
+  const usarImagenEl  = document.getElementById('mkt-usar-imagen');
+  const usarImagen    = usarImagenEl?.checked && !!_mktSelectedProd.imagen_url;
+
+  const res = await fetch('/api/marketing/promo-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${S.token}` },
+    body: JSON.stringify({
+      producto_id:    _mktSelectedProd.id,
+      precio_promo:   precioPromo,
+      precio_tachado: precioTachado,
+      texto_extra:    textoExtra,
+      usar_imagen:    usarImagen,
+    }),
+  });
+  if (!res.ok) { toast('Error generando imagen', 'error'); return null; }
+  return await res.blob();
+}
+
+async function mktPreviewPromo() {
+  toast('Generando vista previa...', 'info');
+  const blob = await _mktGetPromoBlob();
+  if (!blob) return;
+  const url   = URL.createObjectURL(blob);
+  const img   = document.getElementById('mkt-preview-img');
+  const empty = document.getElementById('mkt-preview-empty');
+  img.src          = url;
+  img.style.display = 'block';
+  empty.style.display = 'none';
+  toast('Vista previa lista ✓', 'success');
+}
+
+async function mktDescargarPromo() {
+  toast('Generando imagen...', 'info');
+  const blob = await _mktGetPromoBlob();
+  if (!blob) return;
+  const name  = (_mktSelectedProd?.nombre||'promo').slice(0,20).replace(/\s+/g,'_');
+  const fname = `Promo_${name}_${new Date().toISOString().slice(0,10)}.png`;
+  const saved = await _saveFile(blob, fname, [{ description: 'Imagen PNG', accept: { 'image/png': ['.png'] } }]);
+  if (saved) toast('Imagen guardada ✓', 'success');
+}
 </script>
 </body>
 </html>

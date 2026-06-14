@@ -37,6 +37,7 @@ NAV_ITEMS = [
     ("🚚",  "Proveedores",   "suppliers", None),
     ("👤",  "Empleados",     "employees", [RolUsuario.admin]),
     ("📊",  "Reportes",      "reports",   None),
+    ("🎨",  "Marketing",     "marketing", [RolUsuario.admin]),
     ("⚙️",  "Configuración", "settings",  [RolUsuario.admin]),
 ]
 
@@ -48,6 +49,7 @@ SCREEN_TITLES = {
     "suppliers": "Proveedores",
     "employees": "Empleados",
     "reports":   "Reportes",
+    "marketing": "Marketing — PDF y Promos",
     "settings":  "Configuración",
 }
 
@@ -458,6 +460,9 @@ class MainWindow(ctk.CTkToplevel):
         elif key == "reports":
             from app.ui.reports_screen import ReportsScreen
             return ReportsScreen(p, self.user)
+        elif key == "marketing":
+            from app.ui.marketing_screen import MarketingScreen
+            return MarketingScreen(p, self.user)
         elif key == "settings":
             from app.ui.settings_screen import SettingsScreen
             return SettingsScreen(p, self.user)

@@ -59,6 +59,7 @@ class ProductoResponse(BaseModel):
     marca: Optional[str]
     categoria_id: Optional[int] = None
     proveedor_id: Optional[int] = None
+    categoria_nombre: Optional[str] = None
     proveedor_nombre: Optional[str] = None
     precio_compra: float = 0.0
     precio_venta: float
@@ -86,6 +87,7 @@ class ProductoResponse(BaseModel):
 
 def _prod_dict(p: Producto) -> dict:
     d = ProductoResponse.model_validate(p).model_dump()
+    d["categoria_nombre"] = p.categoria.nombre if p.categoria else None
     d["proveedor_nombre"] = p.proveedor.nombre if p.proveedor else None
     return d
 
