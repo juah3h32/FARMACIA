@@ -860,26 +860,22 @@ def _layout_blanco(producto, precio_promo: float,
     img  = Image.new("RGB", (W, H), WHITE)
     draw = ImageDraw.Draw(img)
 
-    # ── Header NAVY → #3c73b9 ─────────────────────────────────────────────────
-    for y in range(HEADER):
-        t = y / HEADER
-        r = int(NAVY[0] + (BRAND[0] - NAVY[0]) * t)
-        g = int(NAVY[1] + (BRAND[1] - NAVY[1]) * t)
-        b = int(NAVY[2] + (BRAND[2] - NAVY[2]) * t)
-        draw.line([(0, y), (W, y)], fill=(r, g, b))
-    draw.ellipse([-65, -65, 165, 165], outline=(255, 255, 255), width=1)
-    draw.ellipse([W - 165, -65, W + 65, 165], outline=(255, 255, 255), width=1)
+    # ── Header sólido #3c73b9 (sin gradiente, sin arcos) ─────────────────────
+    draw.rectangle([(0, 0), (W, HEADER)], fill=BRAND)
     _paste_logo(img, draw, 0, 0, W, HEADER, white=True)
 
-    # Barra #3c73b9 bajo el header
-    draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=BRAND)
+    # Barra NAVY bajo el header
+    draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=NAVY)
 
     cy = HEADER + 5 + 28   # top del primer elemento
 
-    # ── Badge OFERTA ──────────────────────────────────────────────────────────
-    bw, bh = 212, 34
+    # ── Badge OFERTA (pill manual — sin artefactos de esquinas) ─────────────
+    bw, bh = 230, 36
     bx = (W - bw) // 2
-    draw.rounded_rectangle([bx, cy, bx + bw, cy + bh], radius=17, fill=RED)
+    r = bh // 2
+    draw.ellipse([bx, cy, bx + bh, cy + bh], fill=RED)
+    draw.ellipse([bx + bw - bh, cy, bx + bw, cy + bh], fill=RED)
+    draw.rectangle([bx + r, cy, bx + bw - r, cy + bh], fill=RED)
     draw.text((W // 2, cy + bh // 2), "★  OFERTA ESPECIAL  ★",
               font=_pil_font(FONT_BOLD, 17), fill=WHITE, anchor="mm")
     cy += bh + 30   # gap explícito badge → nombre
