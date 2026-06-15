@@ -614,18 +614,21 @@ def start_background_sync(interval: int = 60) -> threading.Thread:
             print(f"[Sync] Initial pull error: {e}")
 
         while True:
-            # Wake up when dirty (local write happened) or after `interval` seconds
-            _dirty.wait(timeout=interval)
+            # Returns True if event fired (dirty write), False if timed out (heartbeat)
+            woke_by_write = _dirty.wait(timeout=interval)
             _dirty.clear()
             try:
                 sync_to_turso()
             except Exception as e:
                 print(f"[Sync] Push error: {e}")
-            # Always pull after push (or on heartbeat) — catches remote changes
-            try:
-                sync_from_turso()
-            except Exception as e:
-                print(f"[Sync] Pull error: {e}")
+            # Pull ONLY on heartbeat (timeout), NOT on every write.
+            # Pulling after a sale risks fetching Turso's pre-sale value (HTTP race)
+            # before our push is visible in Turso. Local stock is authoritative.
+            if not woke_by_write:
+                try:
+                    sync_from_turso()
+                except Exception as e:
+                    print(f"[Sync] Pull error: {e}")
 
     t = threading.Thread(target=_loop, daemon=True, name="TursoSync")
     t.start()

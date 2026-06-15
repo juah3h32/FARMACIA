@@ -2324,18 +2324,14 @@
                 <p class="text-xs mt-0.5" style="color:#94A3B8">Aparece en el badge rojo de la imagen</p>
               </div>
 
-              <div>
-                <label class="lbl flex items-center justify-between">
-                  <span>Descripción <span style="color:#94A3B8;font-weight:400">(bajo el nombre)</span></span>
-                  <button type="button" id="mkt-btn-ia-desc" onclick="mktGenerarDescPromo()"
-                          class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
-                          style="background:#6366F1;color:#fff;border:none;cursor:pointer" title="Generar con IA">
-                    <i id="mkt-desc-icon" data-lucide="wand-2" style="width:10px;height:10px"></i>
-                    <span id="mkt-desc-txt">IA</span>
-                  </button>
-                </label>
-                <textarea id="mkt-descripcion-promo" class="inp resize-none" rows="3"
-                          placeholder="Descripción breve del producto (se auto-rellena desde el producto)…"></textarea>
+              <div class="flex items-center gap-2">
+                <button type="button" id="mkt-btn-ia-desc" onclick="mktGenerarDescPromo()"
+                        class="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold flex-shrink-0"
+                        style="background:#6366F1;color:#fff;border:none;cursor:pointer" title="Generar descripción con IA para la imagen">
+                  <i id="mkt-desc-icon" data-lucide="wand-2" style="width:11px;height:11px"></i>
+                  <span id="mkt-desc-txt">Descripción IA</span>
+                </button>
+                <span id="mkt-desc-status" class="text-xs truncate" style="color:#94A3B8">— sin descripción</span>
               </div>
 
               <div>
@@ -8154,7 +8150,20 @@ window.addEventListener('load', () => {
 // MARKETING
 // ══════════════════════════════════════════════════════════
 let _mktProds = [];
-let _mktSelectedProd = null;
+let _mktSelectedProd     = null;
+let _mktDescripcionPromo = '';
+
+function _mktUpdateDescStatus() {
+  const el = document.getElementById('mkt-desc-status');
+  if (!el) return;
+  if (_mktDescripcionPromo) {
+    el.textContent = `✓ ${_mktDescripcionPromo.length} caracteres`;
+    el.style.color = '#16A34A';
+  } else {
+    el.textContent = '— sin descripción';
+    el.style.color = '#94A3B8';
+  }
+}
 
 function mktSwitchTab(tab) {
   const isPdf = tab === 'pdf';
@@ -8293,7 +8302,8 @@ function mktSeleccionarProd(id) {
   document.getElementById('mkt-precio-promo').value        = prod.precio_venta.toFixed(2);
   document.getElementById('mkt-precio-tachado').value      = (prod.precio_venta + 5).toFixed(2);
   document.getElementById('mkt-texto-extra').value         = '';
-  document.getElementById('mkt-descripcion-promo').value   = prod.descripcion || '';
+  _mktDescripcionPromo = prod.descripcion || '';
+  _mktUpdateDescStatus();
 
   const imgRow   = document.getElementById('mkt-img-row');
   const noImgRow = document.getElementById('mkt-no-img-row');
@@ -8319,7 +8329,7 @@ async function _mktGetPromoBlob() {
   const precioTachado    = parseFloat(document.getElementById('mkt-precio-tachado').value) || (precioPromo + 5);
   const textoExtra       = document.getElementById('mkt-texto-extra').value.trim();
   const diaOferta        = document.getElementById('mkt-dia-oferta')?.value || '';
-  const descripcionPromo = document.getElementById('mkt-descripcion-promo')?.value.trim() || '';
+  const descripcionPromo = _mktDescripcionPromo || '';
   const usarImagenEl     = document.getElementById('mkt-usar-imagen');
   const usarImagen       = usarImagenEl?.checked && !!_mktSelectedProd.imagen_url;
 
@@ -8364,7 +8374,8 @@ async function mktGenerarDescPromo() {
     let data = {};
     try { data = await res.json(); } catch (_) {}
     if (res.ok && data?.descripcion) {
-      document.getElementById('mkt-descripcion-promo').value = data.descripcion;
+      _mktDescripcionPromo = data.descripcion;
+      _mktUpdateDescStatus();
     } else {
       toast(data?.detail || 'No se pudo generar', 'error');
     }

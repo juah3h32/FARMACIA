@@ -988,8 +988,8 @@ def _layout_blanco(producto, precio_promo: float,
     ext_h   = (_text_h(texto_extra, f_extra) + 16) if texto_extra else 0
     price_block_h = tach_h + 10 + price_h + 16 + sav_h + ext_h
 
-    # Anclar bloque de precios 50px arriba del footer
-    price_start = H - FOOTER - 50 - price_block_h
+    # Anclar bloque de precios 120px arriba del footer (reduce el hueco central)
+    price_start = H - FOOTER - 120 - price_block_h
 
     # ── Separador centrado en el hueco entre info y precios ───────────────────
     sep_y = (info_bottom + price_start) // 2

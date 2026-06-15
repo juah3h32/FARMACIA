@@ -477,7 +477,7 @@ def auditoria_stock(payload: dict = Depends(get_current_api_user)):
         ventas_q = (
             db.query(ItemVenta.producto_id, func.sum(ItemVenta.cantidad).label("total_vendido"))
             .join(Venta, ItemVenta.venta_id == Venta.id)
-            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado == False)
             .group_by(ItemVenta.producto_id)
             .all()
         )
@@ -551,7 +551,7 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
         ventas_q = (
             db.query(ItemVenta.producto_id, func.sum(ItemVenta.cantidad).label("tv"))
             .join(Venta, ItemVenta.venta_id == Venta.id)
-            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado == False)
             .group_by(ItemVenta.producto_id)
             .all()
         )
@@ -663,7 +663,7 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
             .join(Venta, ItemVenta.venta_id == Venta.id)
             .filter(
                 Venta.estado == EstadoVenta.completada,
-                Venta.eliminado.is_not(True),
+                Venta.eliminado == False,
             )
             .group_by(ItemVenta.producto_id)
             .all()
