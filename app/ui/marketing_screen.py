@@ -930,40 +930,59 @@ def _layout_blanco(producto, precio_promo: float,
         sub_txt = "  ·  ".join(sub)
         draw.text((LX, cy), sub_txt, font=f_sub, fill=GRAY, anchor="lt")
         bb = draw.textbbox((LX, cy), sub_txt, font=f_sub, anchor="lt")
-        cy = bb[3] + 28
+        cy = bb[3]
 
-    # ── LEFT: separador ──────────────────────────────────────────────────────
-    draw.line([(LX, cy), (LXR - 10, cy)], fill=(200, 215, 245), width=1)
-    cy += 22
+    info_bottom = cy + 28  # breathing room below info section
+
+    # ── LEFT BOTTOM: medir bloque de precios ─────────────────────────────────
+    f_tach   = _pil_font(FONT_SEMI, 36)
+    f_price  = _pil_font(FONT_BLACK, 98)
+    f_bold20 = _pil_font(FONT_BOLD, 20)
+    f_extra  = _pil_font(FONT_ITALIC, 19)
+    txt_t = f"${precio_tachado:,.2f}"
+    txt_p = f"${precio_promo:,.2f}"
+    ahorro = precio_tachado - precio_promo
+
+    def _text_h(txt, font):
+        bb = draw.textbbox((0, 0), txt, font=font, anchor="lt")
+        return bb[3] - bb[1]
+
+    tach_h  = _text_h(txt_t, f_tach)
+    price_h = _text_h(txt_p, f_price)
+    sav_h   = (36 + 10) if ahorro > 0.01 else 0
+    ext_h   = (_text_h(texto_extra, f_extra) + 16) if texto_extra else 0
+    price_block_h = tach_h + 10 + price_h + 16 + sav_h + ext_h
+
+    # Anclar bloque de precios 50px arriba del footer
+    price_start = H - FOOTER - 50 - price_block_h
+
+    # ── Separador centrado en el hueco entre info y precios ───────────────────
+    sep_y = (info_bottom + price_start) // 2
+    draw.line([(LX, sep_y), (LXR - 10, sep_y)], fill=(200, 215, 245), width=1)
 
     # ── LEFT: precio tachado ─────────────────────────────────────────────────
-    f_tach = _pil_font(FONT_SEMI, 36)
-    txt_t  = f"${precio_tachado:,.2f}"
-    bb = draw.textbbox((LX, cy), txt_t, font=f_tach, anchor="lt")
-    draw.text((LX, cy), txt_t, font=f_tach, fill=SILV, anchor="lt")
+    py = price_start
+    bb = draw.textbbox((LX, py), txt_t, font=f_tach, anchor="lt")
+    draw.text((LX, py), txt_t, font=f_tach, fill=SILV, anchor="lt")
     mid_y = (bb[1] + bb[3]) // 2
     draw.line([(bb[0] - 2, mid_y), (bb[2] + 2, mid_y)], fill=RED, width=3)
-    cy = bb[3] + 10
+    py = bb[3] + 10
 
     # ── LEFT: precio promo GRANDE ────────────────────────────────────────────
-    f_price = _pil_font(FONT_BLACK, 98)
-    txt_p   = f"${precio_promo:,.2f}"
-    bb = draw.textbbox((LX, cy), txt_p, font=f_price, anchor="lt")
-    draw.text((LX, cy), txt_p, font=f_price, fill=DARK, anchor="lt")
-    cy = bb[3] + 16
+    bb = draw.textbbox((LX, py), txt_p, font=f_price, anchor="lt")
+    draw.text((LX, py), txt_p, font=f_price, fill=DARK, anchor="lt")
+    py = bb[3] + 16
 
     # ── LEFT: badge ahorras ───────────────────────────────────────────────────
-    ahorro = precio_tachado - precio_promo
     if ahorro > 0.01:
-        sw, sh = int(draw.textlength(f"¡AHORRAS ${ahorro:,.2f}!", font=_pil_font(FONT_BOLD, 20))) + 32, 36
-        draw.rounded_rectangle([LX, cy, LX + sw, cy + sh], radius=18, fill=GREEN)
-        draw.text((LX + sw // 2, cy + sh // 2), f"¡AHORRAS ${ahorro:,.2f}!",
-                  font=_pil_font(FONT_BOLD, 20), fill=WHITE, anchor="mm")
-        cy += sh + 10
+        sw = int(draw.textlength(f"¡AHORRAS ${ahorro:,.2f}!", font=f_bold20)) + 32
+        draw.rounded_rectangle([LX, py, LX + sw, py + 36], radius=18, fill=GREEN)
+        draw.text((LX + sw // 2, py + 18), f"¡AHORRAS ${ahorro:,.2f}!",
+                  font=f_bold20, fill=WHITE, anchor="mm")
+        py += 46
 
     if texto_extra:
-        draw.text((LX, cy + 8), texto_extra,
-                  font=_pil_font(FONT_ITALIC, 19), fill=GRAY, anchor="lt")
+        draw.text((LX, py + 8), texto_extra, font=f_extra, fill=GRAY, anchor="lt")
 
     # ── RIGHT: foto grande centrada ───────────────────────────────────────────
     RW = RXR - RX      # 500

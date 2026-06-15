@@ -624,3 +624,58 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+@router.post("/recalcular-stock")
+def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """
+    Fija el stock de cada producto al stock_nuevo del último MovimientoStock registrado.
+    Corrige corrupciones históricas causadas por sincronizaciones fuera de orden.
+    """
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        from sqlalchemy import text as _sql_text
+
+        productos = db.query(Producto).filter(Producto.activo.is_(True)).all()
+        corregidos = []
+
+        for prod in productos:
+            ultimo_mov = (
+                db.query(MovimientoStock)
+                .filter(MovimientoStock.producto_id == prod.id)
+                .order_by(MovimientoStock.id.desc())
+                .first()
+            )
+            if not ultimo_mov:
+                continue
+            if prod.stock == ultimo_mov.stock_nuevo:
+                continue
+
+            old_stock = prod.stock
+            prod.stock = ultimo_mov.stock_nuevo
+            db.execute(
+                _sql_text("UPDATE productos SET stock=:s WHERE id=:id"),
+                {"s": ultimo_mov.stock_nuevo, "id": prod.id},
+            )
+            corregidos.append({
+                "id": prod.id,
+                "nombre": prod.nombre,
+                "stock_anterior": old_stock,
+                "stock_nuevo": ultimo_mov.stock_nuevo,
+            })
+            print(f"[RecalcStock] {prod.nombre}: {old_stock} → {ultimo_mov.stock_nuevo}")
+
+        db.commit()
+
+        import app.config as _cfg
+        if corregidos and _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+
+        return {"ok": True, "corregidos": len(corregidos), "detalle": corregidos}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
