@@ -231,13 +231,13 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 ),
                 {"s": prod.stock or 0, "ps": prod.piezas_sueltas or 0, "id": pid},
             )
-            print(f"[POS] stock update: producto {pid} ({prod.nombre}) → stock={prod.stock or 0}, piezas_sueltas={prod.piezas_sueltas or 0}")
+            print(f"[POS] stock update: producto {pid} ({prod.nombre}) -> stock={prod.stock or 0}, piezas_sueltas={prod.piezas_sueltas or 0}")
 
         db.commit()
         # Verify committed stock via fresh query
         for pid in products:
             row = db.execute(_sql_text("SELECT stock FROM productos WHERE id=:id"), {"id": pid}).fetchone()
-            print(f"[POS] ✓ committed: producto {pid} stock={row[0] if row else '?'}")
+            print(f"[POS] OK committed: producto {pid} stock={row[0] if row else '?'}")
 
         # Imprimir ticket
         from app.services.printer_service import printer_service

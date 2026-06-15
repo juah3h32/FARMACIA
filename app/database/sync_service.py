@@ -504,7 +504,7 @@ def sync_from_turso() -> int:
                                 ).fetchone()
                                 local_stock = local_now[0] if local_now else "?"
                                 if str(turso_stock) != str(local_stock):
-                                    print(f"[Sync] productos id={row[id_idx]}: Turso={turso_stock} → kept local={local_stock}")
+                                    print(f"[Sync] productos id={row[id_idx]}: Turso={turso_stock} -> kept local={local_stock}")
                     elif table == "ventas" and "eliminado" in cols:
                         # Monotonic: eliminado=1 can never go back to 0
                         set_clause = ", ".join(

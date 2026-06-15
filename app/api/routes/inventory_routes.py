@@ -735,7 +735,7 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
                 "stock_anterior": old_stock,
                 "stock_nuevo": stock_calculado,
             })
-            print(f"[RecalcStock] {prod.nombre}: {old_stock}→{stock_calculado} | {razon}")
+            print(f"[RecalcStock] {prod.nombre}: {old_stock}->{stock_calculado} | {razon}")
 
         db.commit()
 
