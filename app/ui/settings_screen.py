@@ -70,7 +70,7 @@ class SettingsScreen(ctk.CTkFrame):
         # Ancho de papel
         ctk.CTkLabel(print_frame, text="Papel:", anchor="e",
                      font=ctk.CTkFont(size=12)).grid(row=1, column=0, padx=(16, 8), pady=8, sticky="e")
-        self.opt_ancho = ctk.CTkOptionMenu(print_frame, values=["58mm  (32 col)", "80mm  (48 col)"])
+        self.opt_ancho = ctk.CTkOptionMenu(print_frame, values=["50mm  (26 col)", "58mm  (32 col)", "80mm  (48 col)"])
         self.opt_ancho.grid(row=1, column=1, padx=(0, 16), pady=8, sticky="ew")
 
         # Fila Windows: lista de impresoras
@@ -478,7 +478,12 @@ class SettingsScreen(ctk.CTkFrame):
 
         # Ancho de papel
         ancho = configs.get("impresora_ancho", "32")
-        self.opt_ancho.set("80mm  (48 col)" if ancho == "48" else "58mm  (32 col)")
+        if ancho == "48":
+            self.opt_ancho.set("80mm  (48 col)")
+        elif ancho == "26":
+            self.opt_ancho.set("50mm  (26 col)")
+        else:
+            self.opt_ancho.set("58mm  (32 col)")
 
         # Windows printer list
         self._refresh_win_printers()
@@ -559,7 +564,8 @@ class SettingsScreen(ctk.CTkFrame):
 
     def _guardar_impresora(self):
         tipo = self.opt_impresora.get()
-        ancho = "48" if "80mm" in self.opt_ancho.get() else "32"
+        _ancho_sel = self.opt_ancho.get()
+        ancho = "48" if "80mm" in _ancho_sel else "26" if "50mm" in _ancho_sel else "32"
         if tipo == "windows":
             sel = self.opt_win_printer.get()
             if sel == "Escribir nombre manualmente...":

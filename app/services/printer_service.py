@@ -336,16 +336,30 @@ class PrinterService:
 
         sep  = "=" * W
         sep2 = "-" * W
-        PRICE_W = 9
-        NAME_W  = max(10, W - 6 - PRICE_W)
+
+        # Column widths adapt to paper size
+        # 50mm (W<=28): qty "2x " = 4 chars, price = 7 chars
+        # 58mm (W<=36): qty "2 PZ " = 6 chars, price = 9 chars
+        # 80mm (W>36) : qty "2 PZ " = 6 chars, price = 10 chars
+        if W <= 28:
+            QTY_W   = 4
+            PRICE_W = 7
+        elif W <= 36:
+            QTY_W   = 6
+            PRICE_W = 9
+        else:
+            QTY_W   = 6
+            PRICE_W = 10
+        NAME_W = max(8, W - QTY_W - PRICE_W)
 
         def money(v):
-            return f"${float(v or 0):,.2f}"
+            n = float(v or 0)
+            # omit thousands separator on narrow paper to save chars
+            return f"${n:,.2f}" if W > 28 else f"${n:.2f}"
 
         def tot(label, value):
             val_str = money(value) if isinstance(value, (int, float)) else str(value)
-            lbl_w = W - len(val_str)
-            lbl_w = max(1, lbl_w)
+            lbl_w = max(1, W - len(val_str))
             return f"{label:<{lbl_w}}{val_str}"
 
         # ── Header ────────────────────────────────────────────────────────────
@@ -358,17 +372,19 @@ class PrinterService:
 
         # Cajero / cliente
         cajero = _s(venta_data.get("cajero", "N/A")).upper()
-        cajero_line = f"CAJERO: {cajero}"
-        for ln in self._word_wrap(cajero_line, W):
+        for ln in self._word_wrap(f"CAJ: {cajero}" if W <= 28 else f"CAJERO: {cajero}", W):
             lines.append(ln.center(W))
         if venta_data.get("cliente"):
-            cli_line = f"CLIENTE: {_s(venta_data['cliente']).upper()}"
+            cli_line = f"CLI: {_s(venta_data['cliente']).upper()}" if W <= 28 else f"CLIENTE: {_s(venta_data['cliente']).upper()}"
             for ln in self._word_wrap(cli_line, W):
                 lines.append(ln.center(W))
         lines.append(sep)
 
         # ── Tabla de productos ────────────────────────────────────────────────
-        lines.append(f"{'CANT':<6}{'DESCRIPCION':<{NAME_W}}{'PRECIO':>{PRICE_W}}")
+        hdr_qty  = "QTY" if W <= 28 else "CANT"
+        hdr_name = "DESCRIPCION"
+        hdr_prc  = "PRECIO"
+        lines.append(f"{hdr_qty:<{QTY_W}}{hdr_name:<{NAME_W}}{hdr_prc:>{PRICE_W}}")
         lines.append(sep2)
 
         num_articulos = 0
@@ -377,17 +393,23 @@ class PrinterService:
             sub        = float(item.get("subtotal", 0.0))
             num_articulos += cant
             prod_full  = _s(item.get("nombre", "")).upper()
-            qty_prefix = f"{cant:>2} PZ "  # always 6 chars
             price_str  = money(sub)
 
-            # First line: qty + first NAME_W chars of name + price
+            # qty prefix: compact on 50mm
+            if W <= 28:
+                qty_prefix = f"{cant}x".ljust(QTY_W)
+            else:
+                qty_prefix = f"{cant:>2} PZ "  # always 6 chars
+
+            # First line: qty + first NAME_W chars + price
             name_first = prod_full[:NAME_W]
             lines.append(f"{qty_prefix}{name_first:<{NAME_W}}{price_str:>{PRICE_W}}")
-            # Continuation lines if name is longer
+            # Continuation lines if name longer than NAME_W
             resto = prod_full[NAME_W:]
+            indent = " " * QTY_W
             while resto:
                 chunk, resto = resto[:NAME_W], resto[NAME_W:]
-                lines.append(f"{'':6}{chunk}")
+                lines.append(f"{indent}{chunk}")
 
         # ── Totales ───────────────────────────────────────────────────────────
         lines.append(sep)
@@ -535,8 +557,14 @@ class PrinterService:
             hDC = win32ui.CreateDC()
             hDC.CreatePrinterDC(self.printer_name)
             
-            # Tamaño de fuente más grande para asegurar visibilidad en térmicas
-            font_size = 12 if self.width > 40 else 10
+            # Font size scales with paper width so text fits the printable area
+            # 80mm: font_size=11 | 58mm: font_size=9 | 50mm: font_size=7
+            if self.width > 40:
+                font_size = 11
+            elif self.width > 28:
+                font_size = 9
+            else:
+                font_size = 7
 
             hDC.StartDoc("Ticket Farmacia")
             hDC.StartPage()
