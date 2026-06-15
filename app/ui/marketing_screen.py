@@ -16,8 +16,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import app.config as cfg
 
 # ── Paleta ────────────────────────────────────────────────────────────────────
-BLUE       = "#2563EB"
-BLUE_D     = "#1D4ED8"
+BLUE       = "#1d2140"
+BLUE_D     = "#1d2140"
 BLUE_L     = "#EFF6FF"
 GREEN      = "#16A34A"
 GREEN_L    = "#DCFCE7"
@@ -32,8 +32,11 @@ RED        = "#EF4444"
 
 # Rutas assets
 _BASE            = Path(__file__).parent.parent.parent
-LOGO_PATH        = _BASE / "LOGO.png"
-LOGO_BLANCO_PATH = _BASE / "BLANCO_LOGO.png"
+_LOGOS           = _BASE / "assets" / "logos"
+_PROMO           = _BASE / "assets" / "promo"
+LOGO_PATH        = _LOGOS / "LOGO.png"
+LOGO_BLANCO_PATH = _LOGOS / "BLANCO_LOGO.png"
+LOGO_PROMO_PATH  = _PROMO / "espromo.webp"
 
 # Fuentes — Montserrat (busca sistema y carpeta usuario, fallback Arial)
 _SYS_FONTS  = Path("C:/Windows/Fonts")
@@ -675,29 +678,39 @@ def _wrap_name(text: str, max_chars: int) -> list:
     return lines or [text[:max_chars]]
 
 
+def _load_logo_pil() -> Image.Image | None:
+    """Carga LOGO_PROMO.svg (via svglib) o fallback a PNGs."""
+    for p in (LOGO_PROMO_PATH, LOGO_BLANCO_PATH, LOGO_PATH):
+        if p.exists():
+            try:
+                return Image.open(p).convert("RGBA")
+            except Exception:
+                pass
+    return None
+
+
 def _paste_logo(img: Image.Image, draw: ImageDraw.ImageDraw,
                 x1: int, y1: int, x2: int, y2: int,
                 white: bool = True) -> int:
     """Paste logo centered inside (x1,y1)-(x2,y2). Returns bottom y of logo."""
-    src = LOGO_BLANCO_PATH if white else LOGO_PATH
-    if not src.exists():
-        src = LOGO_PATH if white else LOGO_BLANCO_PATH
     W_box, H_box = x2 - x1, y2 - y1
-    try:
-        logo = Image.open(src).convert("RGBA")
-        rw = (W_box * 0.82) / logo.width
-        rh = (H_box * 0.82) / logo.height
-        r  = min(rw, rh)
-        logo = logo.resize((int(logo.width * r), int(logo.height * r)), Image.LANCZOS)
-        lx = x1 + (W_box - logo.width) // 2
-        ly = y1 + (H_box - logo.height) // 2
-        img.paste(logo, (lx, ly), logo)
-        return ly + logo.height
-    except Exception:
-        fill = (255, 255, 255) if white else (37, 99, 235)
-        draw.text(((x1 + x2) // 2, (y1 + y2) // 2), cfg.PHARMACY_NAME,
-                  font=_pil_font(FONT_BOLD, 28), fill=fill, anchor="mm")
-        return y2
+    logo_src = _load_logo_pil()
+    if logo_src is not None:
+        try:
+            rw = (W_box * 0.82) / logo_src.width
+            rh = (H_box * 0.82) / logo_src.height
+            r  = min(rw, rh)
+            logo = logo_src.resize((int(logo_src.width * r), int(logo_src.height * r)), Image.LANCZOS)
+            lx = x1 + (W_box - logo.width) // 2
+            ly = y1 + (H_box - logo.height) // 2
+            img.paste(logo, (lx, ly), logo.split()[3])
+            return ly + logo.height
+        except Exception:
+            pass
+    fill = (255, 255, 255) if white else (37, 99, 235)
+    draw.text(((x1 + x2) // 2, (y1 + y2) // 2), cfg.PHARMACY_NAME,
+              font=_pil_font(FONT_BOLD, 28), fill=fill, anchor="mm")
+    return y2
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -781,7 +794,7 @@ def _layout_azul(producto, precio_promo: float,
     bw, bh, badge_y = 238, 48, 190
     bx = (CONTENT_W - bw) // 2
     draw.rounded_rectangle([bx, badge_y, bx + bw, badge_y + bh], radius=24, fill=GOLD)
-    draw.text((CONTENT_W // 2, badge_y + bh // 2), "★  OFERTA ESPECIAL  ★",
+    draw.text((CONTENT_W // 2, badge_y + bh // 2), "OFERTA ESPECIAL",
               font=_pil_font(FONT_BOLD, 21), fill=NAVY, anchor="mm")
 
     # ── Product name (up to 2 wrapped lines) ──────────────────────────────────
@@ -848,7 +861,7 @@ def _layout_blanco(producto, precio_promo: float,
     HEADER = 138
     FOOTER = 72
 
-    NAVY  = (8,   22,  68)
+    NAVY  = (29,  33,  64)    # #1d2140
     BRAND = (60,  115, 185)   # #3c73b9
     DARK  = (5,   15,  48)
     WHITE = (255, 255, 255)
@@ -860,12 +873,12 @@ def _layout_blanco(producto, precio_promo: float,
     img  = Image.new("RGB", (W, H), WHITE)
     draw = ImageDraw.Draw(img)
 
-    # ── Header sólido #3c73b9 (sin gradiente, sin arcos) ─────────────────────
-    draw.rectangle([(0, 0), (W, HEADER)], fill=BRAND)
+    # ── Header #1d2140 ───────────────────────────────────────────────────────
+    draw.rectangle([(0, 0), (W, HEADER)], fill=NAVY)
     _paste_logo(img, draw, 0, 0, W, HEADER, white=True)
 
-    # Barra NAVY bajo el header
-    draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=NAVY)
+    # Barra #3c73b9 bajo el header
+    draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=BRAND)
 
     cy = HEADER + 5 + 28   # top del primer elemento
 
@@ -876,7 +889,7 @@ def _layout_blanco(producto, precio_promo: float,
     draw.ellipse([bx, cy, bx + bh, cy + bh], fill=RED)
     draw.ellipse([bx + bw - bh, cy, bx + bw, cy + bh], fill=RED)
     draw.rectangle([bx + r, cy, bx + bw - r, cy + bh], fill=RED)
-    draw.text((W // 2, cy + bh // 2), "★  OFERTA ESPECIAL  ★",
+    draw.text((W // 2, cy + bh // 2), "OFERTA ESPECIAL",
               font=_pil_font(FONT_BOLD, 17), fill=WHITE, anchor="mm")
     cy += bh + 30   # gap explícito badge → nombre
 
@@ -968,7 +981,7 @@ def _generar_pdf_reportlab(productos, path: str,
                             inc_stock: bool = True,
                             inc_barcode: bool = True):
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
@@ -976,7 +989,7 @@ def _generar_pdf_reportlab(productos, path: str,
                                      Image as RLImage)
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
-    BLUE_RL   = colors.HexColor("#2563EB")
+    BLUE_RL   = colors.HexColor("#1d2140")
     BLUE_L_RL = colors.HexColor("#EFF6FF")
     DARK_RL   = colors.HexColor("#0F172A")
     MUTED_RL  = colors.HexColor("#64748B")
@@ -986,7 +999,7 @@ def _generar_pdf_reportlab(productos, path: str,
 
     doc = SimpleDocTemplate(
         path,
-        pagesize=landscape(letter),
+        pagesize=letter,
         rightMargin=1.5 * cm, leftMargin=1.5 * cm,
         topMargin=2 * cm, bottomMargin=2 * cm,
     )
@@ -1001,12 +1014,20 @@ def _generar_pdf_reportlab(productos, path: str,
     story = []
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    # Header
+    # Header: solo logo + título (sin texto duplicado del nombre)
+    logo_cell = ""
+    for logo_src in (LOGO_PATH, LOGO_BLANCO_PATH):
+        if logo_src.exists():
+            try:
+                logo_rl = RLImage(str(logo_src))
+                logo_rl._restrictSize(7 * cm, 2.2 * cm)
+                logo_cell = logo_rl
+                break
+            except Exception:
+                pass
+
     hdr_data = [[
-        "",
-        Paragraph(f"<b>{cfg.PHARMACY_NAME}</b>",
-                  ParagraphStyle("t", parent=styles["Title"],
-                                 fontSize=20, textColor=BLUE_RL, fontName="Helvetica-Bold")),
+        logo_cell,
         Paragraph(
             f"<b>Catálogo de Productos</b><br/>"
             f"<font color='#64748B' size='9'>Generado: {now_str}</font>",
@@ -1015,15 +1036,8 @@ def _generar_pdf_reportlab(productos, path: str,
                            alignment=TA_RIGHT, fontName="Helvetica-Bold", leading=18)
         ),
     ]]
-    if LOGO_PATH.exists():
-        try:
-            logo_rl = RLImage(str(LOGO_PATH))
-            logo_rl._restrictSize(6 * cm, 2 * cm)
-            hdr_data[0][0] = logo_rl
-        except Exception:
-            pass
 
-    hdr_t = Table(hdr_data, colWidths=[3 * cm, None, 8 * cm])
+    hdr_t = Table(hdr_data, colWidths=[8 * cm, None])
     hdr_t.setStyle(TableStyle([
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
@@ -1040,7 +1054,7 @@ def _generar_pdf_reportlab(productos, path: str,
 
     # Columnas
     headers  = ["#", "Nombre del Producto", "Categoría", "Precio Venta"]
-    col_w    = [0.8 * cm, None, 4.5 * cm, 3 * cm]
+    col_w    = [1.2 * cm, None, 4.5 * cm, 3 * cm]
     if inc_barcode:
         headers.append("Código de Barras")
         col_w.append(4 * cm)

@@ -92,6 +92,14 @@ async def serve_logo_svg():
     from fastapi import HTTPException
     raise HTTPException(status_code=404)
 
+@app.get("/logo_sistema.webp")
+async def serve_logo_sistema():
+    logo = _WEB_DIR / "logo_sistema.webp"
+    if logo.exists():
+        return FileResponse(str(logo), media_type="image/webp")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404)
+
 
 @app.get("/")
 @app.get("/{path:path}")

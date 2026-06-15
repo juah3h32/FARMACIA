@@ -47,6 +47,8 @@ def generar_catalogo_pdf(
             q = q.filter(Producto.activo.is_(True))
         elif filtro == "stock":
             q = q.filter(Producto.activo.is_(True), Producto.stock > 0)
+        elif filtro == "sin_stock":
+            q = q.filter(Producto.activo.is_(True), Producto.stock <= 0)
         prods = q.order_by(Producto.nombre).all()
 
         if orden == "precio_asc":

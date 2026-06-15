@@ -55,7 +55,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[460px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="timer" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="timer" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 class="font-bold" style="color:#0F172A">Control de Turno</h2>
       </div>
       <button onclick="closeModal('modal-turno')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -100,7 +100,7 @@
       <div class="grid grid-cols-2 gap-3 mb-4 text-xs">
         <div class="rounded-xl p-3 text-center" style="background:#EEF1F9">
           <p style="color:#64748B">Ventas del turno</p>
-          <p id="tp-num-ventas" class="font-bold text-lg mt-1" style="color:#243366">0</p>
+          <p id="tp-num-ventas" class="font-bold text-lg mt-1" style="color:#1d2140">0</p>
         </div>
         <div class="rounded-xl p-3 text-center" style="background:#F0FDF4">
           <p style="color:#64748B">Total ingresado</p>
@@ -165,7 +165,7 @@
                 class="inp flex-1" oninput="calcDiferencia()">
               <button onclick="usarEsperado()"
                 class="px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition-all hover:opacity-80"
-                style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
+                style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
                 Usar esperado
               </button>
             </div>
@@ -248,7 +248,7 @@
       <h2 class="font-bold text-lg mb-1" style="color:#0F172A">Turno Cerrado</h2>
       <p id="cierre-estado" class="text-sm font-semibold mb-4">—</p>
       <div id="cierre-body" class="text-left space-y-2 text-xs border rounded-xl p-4 mb-5" style="border-color:#E2E8F0"></div>
-      <button onclick="closeModal('modal-cierre-resumen')" class="w-full h-10 rounded-xl font-semibold text-white text-sm" style="background:#243366">Aceptar</button>
+      <button onclick="closeModal('modal-cierre-resumen')" class="w-full h-10 rounded-xl font-semibold text-white text-sm" style="background:#1d2140">Aceptar</button>
     </div>
   </div>
 </div>
@@ -259,7 +259,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[700px] max-h-[80vh] flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="history" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="history" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 class="font-bold" style="color:#0F172A">Mis Turnos</h2>
       </div>
       <button onclick="closeModal('modal-historial-turno')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -284,7 +284,7 @@
       </table>
     </div>
     <div class="px-6 py-3 border-t flex-shrink-0" style="border-color:#E2E8F0">
-      <button onclick="openModal('modal-turno');closeModal('modal-historial-turno')" class="h-8 px-4 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">← Volver al turno</button>
+      <button onclick="openModal('modal-turno');closeModal('modal-historial-turno')" class="h-8 px-4 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#1d2140">← Volver al turno</button>
     </div>
   </div>
 </div>
@@ -408,7 +408,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[480px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="clock" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="clock" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 class="font-bold" style="color:#0F172A">Detalle de Corte</h2>
       </div>
       <button onclick="closeModal('modal-corte-detalle')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -441,7 +441,7 @@
     <div id="cad-chips" class="flex gap-3 px-6 py-3 border-b flex-shrink-0" style="border-color:#F1F5F9"></div>
     <!-- Filtro -->
     <div class="px-6 py-2 flex gap-2 flex-shrink-0">
-      <button onclick="filterCad('todos')"   id="fcad-todos"   class="fcad-btn active px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#EEF1F9;color:#243366">Todos</button>
+      <button onclick="filterCad('todos')"   id="fcad-todos"   class="fcad-btn active px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#EEF1F9;color:#1d2140">Todos</button>
       <button onclick="filterCad('vencido')" id="fcad-vencido" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Vencidos</button>
       <button onclick="filterCad('critico')" id="fcad-critico" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Críticos ≤30d</button>
       <button onclick="filterCad('proximo')" id="fcad-proximo" class="fcad-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all" style="background:#F1F5F9;color:#64748B">Próximos ≤90d</button>
@@ -492,7 +492,7 @@
 </div>
 <!-- ═══════════ UPDATE DOWNLOAD PROGRESS (background) ═══════════ -->
 <div id="update-dl-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
-     background:#1a2a57;padding:10px 20px;box-shadow:0 -2px 16px rgba(0,0,0,.2)">
+     background:#1d2140;padding:10px 20px;box-shadow:0 -2px 16px rgba(0,0,0,.2)">
   <div style="max-width:800px;margin:0 auto;display:flex;align-items:center;gap:14px">
     <i data-lucide="download-cloud" style="width:18px;height:18px;color:#93C5FD;flex-shrink:0"></i>
     <div style="flex:1">
@@ -527,7 +527,7 @@
     </button>
     <div id="upd-checking" class="text-center py-4">
       <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:#EEF1F9">
-        <i data-lucide="loader" style="width:24px;height:24px;color:#243366" class="animate-spin"></i>
+        <i data-lucide="loader" style="width:24px;height:24px;color:#1d2140" class="animate-spin"></i>
       </div>
       <p class="font-semibold" style="color:#0F172A">Buscando actualizaciones...</p>
     </div>
@@ -537,7 +537,7 @@
       </div>
       <p class="font-bold text-lg mb-1" style="color:#0F172A">Tienes la versión más reciente</p>
       <p id="upd-current-v" class="text-sm" style="color:#64748B"></p>
-      <button onclick="closeUpdateModal()" class="mt-6 h-9 px-6 rounded-xl text-sm font-semibold text-white" style="background:#243366">Cerrar</button>
+      <button onclick="closeUpdateModal()" class="mt-6 h-9 px-6 rounded-xl text-sm font-semibold text-white" style="background:#1d2140">Cerrar</button>
     </div>
     <div id="upd-available" class="hidden">
       <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:#FFFBEB">
@@ -560,13 +560,13 @@
           <span id="upd-progress-pct">0%</span>
         </div>
         <div class="w-full rounded-full h-2" style="background:#E2E8F0">
-          <div id="upd-progress-bar" class="h-2 rounded-full transition-all" style="background:#243366;width:0%"></div>
+          <div id="upd-progress-bar" class="h-2 rounded-full transition-all" style="background:#1d2140;width:0%"></div>
         </div>
       </div>
       <p id="upd-error" class="text-xs text-center mb-3 hidden" style="color:#EF4444"></p>
       <div class="flex gap-3">
         <button id="upd-btn-cancel" onclick="closeUpdateModal()" class="flex-1 h-10 rounded-xl text-sm font-semibold border" style="color:#64748B;border-color:#E2E8F0">Cancelar</button>
-        <button id="upd-btn-install" onclick="startUpdate()" class="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style="background:#243366">Instalar seleccionada</button>
+        <button id="upd-btn-install" onclick="startUpdate()" class="flex-1 h-10 rounded-xl text-sm font-semibold text-white" style="background:#1d2140">Instalar seleccionada</button>
       </div>
     </div>
   </div>
@@ -592,7 +592,7 @@
         <p id="entrada-prod-sub" class="text-xs mt-1 hidden" style="color:#64748B"></p>
         <p id="entrada-prod-pres" class="text-xs mt-0.5 hidden" style="color:#94A3B8"></p>
         <div id="entrada-prod-meta" class="flex flex-wrap items-center gap-2 mt-2">
-          <span id="entrada-prod-precio" class="text-xs font-bold hidden" style="color:#2563EB"></span>
+          <span id="entrada-prod-precio" class="text-xs font-bold hidden" style="color:#1d2140"></span>
           <span id="entrada-stock-actual" class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:#DCFCE7;color:#16A34A"></span>
           <span id="entrada-badge-receta" class="text-xs font-semibold px-2 py-0.5 rounded-full hidden" style="background:#FEF3C7;color:#B45309">Receta</span>
           <span id="entrada-badge-ctrl"   class="text-xs font-semibold px-2 py-0.5 rounded-full hidden" style="background:#FEE2E2;color:#DC2626">Controlada</span>
@@ -687,7 +687,7 @@
   .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
   .nav-item { transition:background .15s,color .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
-  .nav-item.active { background:#243366 !important; color:#fff !important; }
+  .nav-item.active { background:#1d2140 !important; color:#fff !important; }
 
   /* ── KPI cards ───────────────────────────────────────── */
   .kpi-card { transition:box-shadow .2s,transform .2s; }
@@ -708,7 +708,7 @@
   .logo-ring    { animation:pulseRing 2.2s ease infinite; }
 
   /* ── Inputs ──────────────────────────────────────────── */
-  input:focus,select:focus,textarea:focus { outline:2px solid #243366; outline-offset:0; }
+  input:focus,select:focus,textarea:focus { outline:2px solid #1d2140; outline-offset:0; }
 
   /* ── Toast ───────────────────────────────────────────── */
   .t-in  { animation:tin  .28s ease forwards; }
@@ -733,7 +733,7 @@
   .lbl { display:block; font-size:11px; font-weight:600; color:#374151; margin-bottom:4px; }
   .inp { display:block; width:100%; height:38px; padding:0 11px; border-radius:9px;
          border:1px solid #E2E8F0; background:#F8FAFF; font-size:13px; transition:border-color .15s; }
-  .inp:focus { border-color:#243366; }
+  .inp:focus { border-color:#1d2140; }
   select.inp { appearance:auto; }
   textarea.inp { height:auto; padding:8px 11px; resize:vertical; }
   #pm-img-wrap:hover .pm-img-hover { opacity:1 !important; }
@@ -746,7 +746,7 @@
 
   <!-- LEFT — branding panel -->
   <div class="flex-1 relative flex flex-col items-center justify-center overflow-hidden"
-       style="background:#243366">
+       style="background:#1d2140">
     <!-- decorative glow circles -->
     <div class="absolute -top-24 -left-24 w-72 h-72 rounded-full pointer-events-none"
          style="background:radial-gradient(circle,rgba(255,255,255,.07) 0%,transparent 70%)"></div>
@@ -757,7 +757,7 @@
     <div id="login-card" class="flex flex-col items-center relative z-10 px-12 text-center">
       <!-- logo directo, sin caja -->
       <div class="mb-6 flex justify-center">
-        <img src="/logo.svg" style="width:200px;height:120px;object-fit:contain;display:block">
+        <img src="/logo_sistema.webp" style="width:200px;height:120px;object-fit:contain;display:block">
       </div>
       <span class="text-sm font-medium" style="color:rgba(255,255,255,.7)">Sistema de Punto de Venta</span>
 
@@ -809,7 +809,7 @@
 
       <button id="l-btn" onclick="doLogin()"
               class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 mt-1"
-              style="background:linear-gradient(135deg,#243366,#1a2a57)">
+              style="background:linear-gradient(135deg,#1d2140,#1d2140)">
         Iniciar Sesión
       </button>
 
@@ -822,10 +822,10 @@
 <div id="app" class="hidden flex h-screen">
 
   <!-- ── Sidebar ───────────────────────────────────── -->
-  <aside class="w-52 flex flex-col flex-shrink-0" style="background:#243366">
+  <aside class="w-52 flex flex-col flex-shrink-0" style="background:#1d2140">
     <!-- Brand -->
     <div class="px-4 py-5 flex items-center justify-center" style="border-bottom:1px solid rgba(255,255,255,.08)">
-      <img src="/logo.svg" style="max-width:100%; height:auto; max-height:60px; object-fit:contain; display:block">
+      <img src="/logo_sistema.webp" style="max-width:100%; height:auto; max-height:60px; object-fit:contain; display:block">
     </div>
 
     <!-- Nav -->
@@ -844,7 +844,7 @@
              style="background:linear-gradient(135deg,#60A5FA,#A78BFA)">
           <div id="user-avatar"
                class="w-full h-full rounded-full overflow-hidden flex items-center justify-center font-bold text-sm"
-               style="background:#1E3A8A;color:#fff">?</div>
+               style="background:#1d2140;color:#fff">?</div>
         </div>
         <div class="flex-1 min-w-0">
           <p id="user-name" class="text-[12px] font-semibold truncate" style="color:#E2E8F0">—</p>
@@ -909,7 +909,7 @@
           </div>
           <button onclick="loadDashboard()"
                   class="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all hover:opacity-80"
-                  style="background:#EEF1F9;color:#243366">
+                  style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
           </button>
         </div>
@@ -917,7 +917,7 @@
         <!-- KPI cards (fila 1 siempre + fila 2 admin) -->
         <div class="grid grid-cols-4 gap-4" style="flex-shrink:0">
           <!-- Fila 1: operacional -->
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#243366)">
+          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#1d2140)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="shopping-cart" style="width:20px;height:20px;color:#fff"></i>
@@ -951,7 +951,7 @@
           </div>
 
           <!-- Fila 2: financiero — admin only, hidden por defecto -->
-          <div id="kpi-card-costo" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#1e3a8a,#1e40af)">
+          <div id="kpi-card-costo" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#1d2140,#1e40af)">
             <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
               <i data-lucide="package" style="width:20px;height:20px;color:#fff"></i>
@@ -1003,7 +1003,7 @@
               </div>
               <button onclick="navigate('pos')"
                       class="h-8 px-4 rounded-xl text-xs font-bold text-white flex items-center gap-1.5"
-                      style="background:linear-gradient(135deg,#243366,#1a2a57)">
+                      style="background:linear-gradient(135deg,#1d2140,#1d2140)">
                 <i data-lucide="plus" style="width:13px;height:13px"></i> Nueva venta
               </button>
             </div>
@@ -1071,7 +1071,7 @@
             <div class="bg-white rounded-2xl border flex flex-col flex-1 overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="px-4 py-3 border-b flex items-center justify-between flex-shrink-0" style="border-color:#E2E8F0">
                 <div class="flex items-center gap-2">
-                  <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#243366"></i>
+                  <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#1d2140"></i>
                   <h2 class="font-semibold text-sm" style="color:#0F172A">Carrito</h2>
                 </div>
                 <button onclick="clearCart()" class="text-xs flex items-center gap-1" style="color:#EF4444">
@@ -1101,7 +1101,7 @@
                     <option value="tarjeta">💳 Tarjeta</option>
                   </select>
                   <button onclick="setExactAmount()" class="h-10 rounded-xl text-[10px] font-bold border transition-all hover:bg-blue-50"
-                          style="color:#243366;border-color:#CBD5E1;background:#fff">
+                          style="color:#1d2140;border-color:#CBD5E1;background:#fff">
                     EXACTO
                   </button>
                 </div>
@@ -1109,11 +1109,11 @@
                 <div id="cambio-row" class="space-y-2">
                   <!-- Botones rápidos -->
                   <div class="grid grid-cols-5 gap-1.5">
-                    <button onclick="addCash(20)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$20</button>
-                    <button onclick="addCash(50)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$50</button>
-                    <button onclick="addCash(100)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$100</button>
-                    <button onclick="addCash(200)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$200</button>
-                    <button onclick="addCash(500)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1E3A8A;border-color:#E2E8F0">$500</button>
+                    <button onclick="addCash(20)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1d2140;border-color:#E2E8F0">$20</button>
+                    <button onclick="addCash(50)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1d2140;border-color:#E2E8F0">$50</button>
+                    <button onclick="addCash(100)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1d2140;border-color:#E2E8F0">$100</button>
+                    <button onclick="addCash(200)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1d2140;border-color:#E2E8F0">$200</button>
+                    <button onclick="addCash(500)" class="h-9 rounded-lg text-xs font-black border bg-white transition-all hover:bg-blue-50 hover:border-blue-200 active:scale-95" style="color:#1d2140;border-color:#E2E8F0">$500</button>
                   </div>
                   
                   <div class="relative">
@@ -1130,7 +1130,7 @@
                 </div>
 
                 <button id="btn-cobrar" onclick="processSale()" class="w-full h-12 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg shadow-blue-900/10"
-                        style="background:linear-gradient(135deg,#243366,#1a2a57)">
+                        style="background:linear-gradient(135deg,#1d2140,#1d2140)">
                   <i data-lucide="shopping-bag" style="width:18px;height:18px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
                 </button>
               </div>
@@ -1177,7 +1177,7 @@
               </button>
               <button onclick="openProductModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#243366">
+                      style="background:#1d2140">
                 <i data-lucide="plus" style="width:15px;height:15px"></i> Agregar producto
               </button>
             </div>
@@ -1216,7 +1216,7 @@
             <div class="ml-auto">
               <button onclick="openCustModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#243366">
+                      style="background:#1d2140">
                 <i data-lucide="user-plus" style="width:15px;height:15px"></i> Agregar cliente
               </button>
             </div>
@@ -1253,15 +1253,15 @@
             <input id="rep-hasta" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0">
           </div>
           <div class="flex gap-1">
-            <button onclick="repPeriodo(0)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Hoy</button>
-            <button onclick="repPeriodo(7)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">7 días</button>
-            <button onclick="repPeriodo(-1)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Este mes</button>
-            <button onclick="repPeriodo(-2)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#243366">Mes ant.</button>
+            <button onclick="repPeriodo(0)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Hoy</button>
+            <button onclick="repPeriodo(7)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">7 días</button>
+            <button onclick="repPeriodo(-1)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Este mes</button>
+            <button onclick="repPeriodo(-2)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Mes ant.</button>
             <button onclick="repPeriodo(-99)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#F5F3FF;color:#7C3AED">Todas</button>
           </div>
           <button onclick="loadReports()"
                   class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                  style="background:#243366">
+                  style="background:#1d2140">
             <i data-lucide="bar-chart-2" style="width:14px;height:14px"></i> Generar
           </button>
           <button onclick="exportCSV()"
@@ -1275,7 +1275,7 @@
         <div class="flex gap-1 p-1 rounded-xl" style="background:#F1F5F9">
           <button id="rep-tab-ventas" onclick="repTab('ventas')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
-                  style="background:#243366;color:#fff">📊 Ventas</button>
+                  style="background:#1d2140;color:#fff">📊 Ventas</button>
           <button id="rep-tab-cortes" onclick="repTab('cortes')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
                   style="background:transparent;color:#64748B">🧾 Cortes de Caja</button>
@@ -1302,11 +1302,11 @@
             <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="flex items-center gap-2 mb-3">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#EEF1F9">
-                  <i data-lucide="trending-up" style="width:15px;height:15px;color:#243366"></i>
+                  <i data-lucide="trending-up" style="width:15px;height:15px;color:#1d2140"></i>
                 </div>
                 <p class="text-xs font-medium" style="color:#64748B">Total Ventas</p>
               </div>
-              <p id="rep-total" class="text-2xl font-bold" style="color:#243366">$0.00</p>
+              <p id="rep-total" class="text-2xl font-bold" style="color:#1d2140">$0.00</p>
             </div>
             <div class="bg-white rounded-2xl border p-5" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="flex items-center gap-2 mb-3">
@@ -1346,9 +1346,9 @@
             </div>
             <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
-                <i data-lucide="credit-card" style="width:20px;height:20px;color:#243366"></i>
+                <i data-lucide="credit-card" style="width:20px;height:20px;color:#1d2140"></i>
               </div>
-              <div><p class="text-xs" style="color:#64748B">Tarjeta</p><p id="rep-ta" class="font-bold text-lg" style="color:#243366">$0.00</p></div>
+              <div><p class="text-xs" style="color:#64748B">Tarjeta</p><p id="rep-ta" class="font-bold text-lg" style="color:#1d2140">$0.00</p></div>
             </div>
             <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:#F5F3FF">
@@ -1400,7 +1400,7 @@
                   <tr>
                     <th class="px-3 py-2 w-8 rep-admin-col hidden">
                       <input type="checkbox" id="rep-chk-all" onchange="repToggleAll(this.checked)"
-                             class="w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#243366">
+                             class="w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#1d2140">
                     </th>
                     <th class="text-left px-3 py-2 font-semibold w-6" style="color:#64748B"></th>
                     <th class="text-left px-3 py-2 font-semibold" style="color:#64748B">Folio</th>
@@ -1429,7 +1429,7 @@
             </div>
             <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <p class="text-xs font-medium mb-1" style="color:#64748B">Total Ventas</p>
-              <p id="cc-total" class="text-2xl font-bold" style="color:#243366">—</p>
+              <p id="cc-total" class="text-2xl font-bold" style="color:#1d2140">—</p>
             </div>
             <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <p class="text-xs font-medium mb-1" style="color:#64748B">Efectivo</p>
@@ -1484,7 +1484,7 @@
           <div class="bg-white rounded-2xl border p-4 flex items-center gap-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
             <span class="text-xs font-semibold" style="color:#374151">Filtrar:</span>
             <div class="flex gap-1">
-              <button onclick="vencFilter('todos')"      id="vf-todos"      class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#243366;color:#fff">Todos</button>
+              <button onclick="vencFilter('todos')"      id="vf-todos"      class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#1d2140;color:#fff">Todos</button>
               <button onclick="vencFilter('vencidos')"   id="vf-vencidos"   class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#FEF2F2;color:#EF4444">Vencidos</button>
               <button onclick="vencFilter('por_vencer')" id="vf-por_vencer" class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#FFFBEB;color:#D97706">Por vencer</button>
               <button onclick="vencFilter('vigentes')"   id="vf-vigentes"   class="vf-btn h-8 px-3 rounded-lg text-xs font-medium" style="background:#F0FDF4;color:#16A34A">Vigentes</button>
@@ -1524,14 +1524,14 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
-              <i data-lucide="truck" style="width:20px;height:20px;color:#243366"></i>
+              <i data-lucide="truck" style="width:20px;height:20px;color:#1d2140"></i>
             </div>
             <div>
               <h2 class="font-bold text-base" style="color:#0F172A">Proveedores</h2>
               <p class="text-xs" style="color:#64748B">Gestión de proveedores y asignación a productos</p>
             </div>
           </div>
-          <button onclick="openSupModal()" class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2" style="background:#243366">
+          <button onclick="openSupModal()" class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2" style="background:#1d2140">
             <i data-lucide="plus" style="width:15px;height:15px"></i> Nuevo proveedor
           </button>
         </div>
@@ -1567,7 +1567,7 @@
             <div class="ml-auto">
               <button onclick="openEmpModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                      style="background:#243366">
+                      style="background:#1d2140">
                 <i data-lucide="user-plus" style="width:15px;height:15px"></i> Agregar empleado
               </button>
             </div>
@@ -1625,7 +1625,7 @@
               <input id="av-desde" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
               <input id="av-hasta" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
               <input id="av-buscar" type="text" class="inp flex-1" placeholder="Buscar folio, cajero o producto..." style="min-width:160px" oninput="renderAdminVentas()">
-              <button onclick="loadAdminVentas()" class="h-10 px-4 rounded-xl font-semibold text-sm transition-all hover:opacity-80 flex items-center gap-1.5" style="background:#EEF1F9;color:#243366">
+              <button onclick="loadAdminVentas()" class="h-10 px-4 rounded-xl font-semibold text-sm transition-all hover:opacity-80 flex items-center gap-1.5" style="background:#EEF1F9;color:#1d2140">
                 <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
               </button>
             </div>
@@ -1778,10 +1778,10 @@
 
         <!-- API Endpoints Reference -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#243366,#0EA5E9,#22C55E)"></div>
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#1d2140,#0EA5E9,#22C55E)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
-              <i data-lucide="book-open" style="width:20px;height:20px;color:#243366"></i>
+              <i data-lucide="book-open" style="width:20px;height:20px;color:#1d2140"></i>
             </div>
             <div>
               <h2 class="font-bold" style="color:#0F172A">Referencia de Endpoints</h2>
@@ -1789,7 +1789,7 @@
             </div>
             <button onclick="loadEndpoints()"
                     class="ml-auto h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-80"
-                    style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
+                    style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar
             </button>
           </div>
@@ -1918,7 +1918,7 @@
         <!-- Header -->
         <div class="flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#243366,#1e3a8a)">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#1d2140,#1d2140)">
               <i data-lucide="landmark" style="width:18px;height:18px;color:#fff"></i>
             </div>
             <div>
@@ -1927,10 +1927,10 @@
             </div>
           </div>
           <div class="flex gap-2">
-            <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#243366;border:1px solid #C5CEDE">
+            <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
             </button>
-            <button id="caja-sync-btn" onclick="forzarSyncCaja()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE" title="Sincronizar con la nube">
+            <button id="caja-sync-btn" onclick="forzarSyncCaja()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EFF6FF;color:#1d2140;border:1px solid #BFDBFE" title="Sincronizar con la nube">
               <i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync
             </button>
           </div>
@@ -1955,14 +1955,14 @@
 
           <!-- INVERSIÓN — capital para proveedores -->
           <div class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#93C5FD;min-width:0">
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#2563EB">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#1d2140">
               <i data-lucide="landmark" style="width:17px;height:17px;color:#fff"></i>
             </div>
             <div class="min-w-0">
               <p class="text-xs font-bold" style="color:#1E40AF">Para inversión / proveedores</p>
-              <p id="caja-stat-inversion" class="font-black" style="color:#1D4ED8;font-size:1.65rem;line-height:1.15">—</p>
+              <p id="caja-stat-inversion" class="font-black" style="color:#1d2140;font-size:1.65rem;line-height:1.15">—</p>
               <p class="text-xs truncate" style="color:#93C5FD">
-                <span id="caja-stat-costo-rec" style="color:#2563EB;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
+                <span id="caja-stat-costo-rec" style="color:#1d2140;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
               </p>
             </div>
           </div>
@@ -2020,7 +2020,7 @@
                 </div>
                 <div>
                   <label class="flex items-center gap-2 cursor-pointer text-xs" style="color:#64748B">
-                    <input type="checkbox" id="caja-retiro-fecha-toggle" onchange="toggleRetiroFecha()" style="accent-color:#243366">
+                    <input type="checkbox" id="caja-retiro-fecha-toggle" onchange="toggleRetiroFecha()" style="accent-color:#1d2140">
                     Registrar en otra fecha (olvidé registrarlo)
                   </label>
                   <div id="caja-retiro-fecha-wrap" class="hidden mt-1.5">
@@ -2106,7 +2106,7 @@
             </div>
             <button onclick="openHistPacienteModal(null)" title="Nuevo paciente"
                     class="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style="background:#243366;color:#fff">
+                    style="background:#1d2140;color:#fff">
               <i data-lucide="user-plus" style="width:14px;height:14px"></i>
             </button>
           </div>
@@ -2146,7 +2146,7 @@
                     </button>
                     <button onclick="openHistRegistroModal()"
                             class="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white"
-                            style="background:#243366">
+                            style="background:#1d2140">
                       <i data-lucide="plus" style="width:13px;height:13px"></i> Nuevo registro
                     </button>
                   </div>
@@ -2190,7 +2190,7 @@
         <div class="bg-white rounded-2xl border flex overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">
           <button id="mkt-tab-pdf" onclick="mktSwitchTab('pdf')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
-            style="background:#2563EB;color:#fff">📄 Catálogo PDF</button>
+            style="background:#1d2140;color:#fff">📄 Catálogo PDF</button>
           <button id="mkt-tab-promo" onclick="mktSwitchTab('promo')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
             style="background:transparent;color:#64748B">🎨 Imagen Promo</button>
@@ -2223,16 +2223,28 @@
             <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
               <input type="checkbox" id="mkt-inc-barcode" checked class="rounded"> Código
             </label>
-            <button onclick="mktGenerarPDF()"
-              class="ml-auto h-10 px-5 rounded-xl text-sm font-bold text-white flex items-center gap-2 transition-all hover:opacity-90"
-              style="background:#2563EB">
-              <i data-lucide="file-down" style="width:15px;height:15px"></i> Generar PDF
-            </button>
+            <div class="ml-auto flex items-center gap-2">
+              <button onclick="mktGenerarPDF('todos')"
+                class="h-10 px-4 rounded-xl text-sm font-bold text-white flex items-center gap-1.5 transition-all hover:opacity-90"
+                style="background:#1d2140" title="Todos los productos activos">
+                <i data-lucide="file-down" style="width:14px;height:14px"></i> General
+              </button>
+              <button onclick="mktGenerarPDF('stock')"
+                class="h-10 px-4 rounded-xl text-sm font-bold text-white flex items-center gap-1.5 transition-all hover:opacity-90"
+                style="background:#16A34A" title="Solo productos con stock > 0">
+                <i data-lucide="package-check" style="width:14px;height:14px"></i> Con Stock
+              </button>
+              <button onclick="mktGenerarPDF('sin_stock')"
+                class="h-10 px-4 rounded-xl text-sm font-bold text-white flex items-center gap-1.5 transition-all hover:opacity-90"
+                style="background:#DC2626" title="Solo productos sin stock">
+                <i data-lucide="package-x" style="width:14px;height:14px"></i> Sin Stock
+              </button>
+            </div>
           </div>
 
           <div class="bg-white rounded-2xl border flex flex-col overflow-hidden flex-1" style="border-color:#E2E8F0">
             <div class="grid text-xs font-bold px-4 py-3 flex-shrink-0"
-                 style="grid-template-columns:1fr 140px 90px 70px 110px;background:#2563EB;color:#fff;border-radius:16px 16px 0 0">
+                 style="grid-template-columns:1fr 140px 90px 70px 110px;background:#1d2140;color:#fff;border-radius:16px 16px 0 0">
               <span>Nombre</span><span>Categoría</span>
               <span class="text-right">Precio</span><span class="text-center">Stock</span><span>Código</span>
             </div>
@@ -2276,7 +2288,7 @@
 
               <div>
                 <p class="text-xs font-semibold" style="color:#64748B">Precio actual</p>
-                <p id="mkt-precio-actual" class="text-xl font-black mt-0.5" style="color:#2563EB">$0.00</p>
+                <p id="mkt-precio-actual" class="text-xl font-black mt-0.5" style="color:#1d2140">$0.00</p>
               </div>
 
               <div>
@@ -2304,7 +2316,7 @@
               </button>
               <button onclick="mktDescargarPromo()"
                 class="w-full h-10 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90"
-                style="background:#2563EB">
+                style="background:#1d2140">
                 <i data-lucide="download" style="width:15px;height:15px"></i> Descargar PNG
               </button>
             </div>
@@ -2481,7 +2493,7 @@
     </div>
     <div class="px-6 py-3 flex gap-2 border-t justify-end" style="border-color:#E2E8F0">
       <button onclick="closeModal('modal-hist-paciente')" class="h-9 px-4 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cancelar</button>
-      <button onclick="saveHistPaciente()" class="h-9 px-5 rounded-xl text-sm font-semibold text-white" style="background:#243366">Guardar</button>
+      <button onclick="saveHistPaciente()" class="h-9 px-5 rounded-xl text-sm font-semibold text-white" style="background:#1d2140">Guardar</button>
     </div>
   </div>
 </div>
@@ -2594,7 +2606,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="package" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="package" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 id="prod-modal-title" class="font-bold" style="color:#0F172A">Agregar Producto</h2>
       </div>
       <button onclick="closeModal('modal-product')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -2827,7 +2839,7 @@
           <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-bold" style="color:#374151">Lotes / Fechas de vencimiento</p>
-              <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#243366">
+              <button onclick="openEntradaModalFromEdit()" class="h-7 px-3 rounded-lg text-xs font-semibold" style="background:#EEF1F9;color:#1d2140">
                 + Agregar entrada
               </button>
             </div>
@@ -2842,7 +2854,7 @@
     <!-- Footer -->
     <div class="flex gap-3 px-5 py-4 border-t flex-shrink-0" style="border-color:#E2E8F0">
       <button onclick="closeModal('modal-product')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveProduct()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#243366,#1a2a57)">Guardar producto</button>
+      <button onclick="saveProduct()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#1d2140,#1d2140)">Guardar producto</button>
     </div>
   </div>
 </div>
@@ -2853,7 +2865,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[420px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="user-round" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="user-round" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 id="cust-modal-title" class="font-bold" style="color:#0F172A">Agregar Cliente</h2>
       </div>
       <button onclick="closeModal('modal-customer')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -2868,7 +2880,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-customer')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveCustomer()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Guardar</button>
+      <button onclick="saveCustomer()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#1d2140">Guardar</button>
     </div>
   </div>
 </div>
@@ -2879,7 +2891,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[440px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="user-cog" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="user-cog" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 id="em-modal-title" class="font-bold" style="color:#0F172A">Nuevo Empleado</h2>
       </div>
       <button onclick="closeModal('modal-employee')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8">
@@ -2910,7 +2922,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-employee')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button id="em-save-btn" onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#243366">Crear empleado</button>
+      <button id="em-save-btn" onclick="saveEmployee()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#1d2140">Crear empleado</button>
     </div>
   </div>
 </div>
@@ -2921,7 +2933,7 @@
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[480px]">
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
       <div class="flex items-center gap-2">
-        <i data-lucide="truck" style="width:18px;height:18px;color:#243366"></i>
+        <i data-lucide="truck" style="width:18px;height:18px;color:#1d2140"></i>
         <h2 id="sup-modal-title" class="font-bold" style="color:#0F172A">Nuevo Proveedor</h2>
       </div>
       <button onclick="closeModal('modal-supplier')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
@@ -2938,7 +2950,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-supplier')" class="flex-1 h-10 rounded-xl border text-sm font-medium hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button id="sup-save-btn" onclick="saveSupplier()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm hover:opacity-90" style="background:#243366">Crear proveedor</button>
+      <button id="sup-save-btn" onclick="saveSupplier()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm hover:opacity-90" style="background:#1d2140">Crear proveedor</button>
     </div>
   </div>
 </div>
@@ -2954,9 +2966,9 @@
     <p id="pay-folio" class="text-sm mb-2" style="color:#64748B"></p>
     <p class="text-xs font-semibold uppercase tracking-widest mb-0" style="color:#64748B">Total cobrado</p>
     <p id="pay-total" class="text-3xl font-extrabold mb-3" style="color:#16A34A"></p>
-    <div class="rounded-2xl py-4 px-5 mb-4" style="background:#EEF1F9;border:2px solid #243366">
-      <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#243366">CAMBIO A ENTREGAR</p>
-      <p id="pay-cambio" class="text-5xl font-black" style="color:#1a2a57"></p>
+    <div class="rounded-2xl py-4 px-5 mb-4" style="background:#EEF1F9;border:2px solid #1d2140">
+      <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#1d2140">CAMBIO A ENTREGAR</p>
+      <p id="pay-cambio" class="text-5xl font-black" style="color:#1d2140"></p>
     </div>
     <!-- Ticket preview (solo modo prueba) -->
     <div id="pay-ticket-preview-wrap" class="hidden mb-4">
@@ -2964,7 +2976,7 @@
         <p class="text-xs font-bold" style="color:#374151">Vista previa del ticket</p>
         <button onclick="pmImprimirTicketPrueba()" id="btn-imprimir-prueba"
                 class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1"
-                style="background:#243366;color:#fff">
+                style="background:#1d2140;color:#fff">
           <i data-lucide="printer" style="width:11px;height:11px"></i> Imprimir
         </button>
       </div>
@@ -2973,7 +2985,7 @@
     </div>
     <button onclick="closeModal('modal-payment')"
             class="w-full h-11 rounded-xl text-white font-semibold flex items-center justify-center gap-2"
-            style="background:linear-gradient(135deg,#243366,#1a2a57)">
+            style="background:linear-gradient(135deg,#1d2140,#1d2140)">
       <i data-lucide="plus" style="width:15px;height:15px"></i> Nueva venta
     </button>
   </div>
@@ -2987,7 +2999,7 @@
 
     <!-- Gradient header with avatar -->
     <div class="relative flex flex-col items-center pt-8 pb-6 px-6"
-         style="background:linear-gradient(145deg,#0F172A 0%,#1E3A8A 60%,#312E81 100%)">
+         style="background:linear-gradient(145deg,#0F172A 0%,#1d2140 60%,#312E81 100%)">
       <!-- Close X -->
       <button onclick="closeProfileModal()"
           class="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/20"
@@ -3001,7 +3013,7 @@
              style="background:linear-gradient(135deg,#60A5FA,#A78BFA,#F472B6)">
           <div id="profile-photo-preview"
                class="w-full h-full rounded-full overflow-hidden flex items-center justify-center font-black text-2xl"
-               style="background:#1E3A8A;color:#fff">?</div>
+               style="background:#1d2140;color:#fff">?</div>
         </div>
         <!-- Camera overlay -->
         <div class="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -3010,7 +3022,7 @@
         </div>
         <!-- Camera badge -->
         <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-             style="background:#243366;border:2px solid #0F172A">
+             style="background:#1d2140;border:2px solid #0F172A">
           <i data-lucide="camera" style="width:10px;height:10px;color:#fff"></i>
         </div>
       </div>
@@ -3027,7 +3039,7 @@
       <!-- Change photo -->
       <button onclick="document.getElementById('photo-input').click()"
           class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80"
-          style="background:#EEF1F9;color:#243366">
+          style="background:#EEF1F9;color:#1d2140">
         <i data-lucide="image" style="width:16px;height:16px"></i>
         Cambiar foto de perfil
       </button>
@@ -3641,7 +3653,7 @@ function updateUserCard() {
 
   // Apply photo or initials to sidebar avatar
   const photo = u.foto_url || localStorage.getItem('profile_photo_' + u.id) || null;
-  _applyAvatarPhoto('user-avatar', photo, initials, '#1E3A8A');
+  _applyAvatarPhoto('user-avatar', photo, initials, '#1d2140');
 }
 
 function _applyAvatarPhoto(elemId, photo, initials, bg) {
@@ -3677,7 +3689,7 @@ function openProfileModal() {
     document.getElementById('remove-photo-btn').classList.remove('hidden');
   } else {
     prev.innerHTML        = initials;
-    prev.style.background = '#1E3A8A';
+    prev.style.background = '#1d2140';
     document.getElementById('remove-photo-btn').classList.add('hidden');
   }
 
@@ -3740,7 +3752,7 @@ async function removeProfilePhoto() {
   const initials    = displayName[0].toUpperCase();
   const prev = document.getElementById('profile-photo-preview');
   prev.innerHTML = initials;
-  prev.style.background = '#243366';
+  prev.style.background = '#1d2140';
   document.getElementById('remove-photo-btn').classList.add('hidden');
   updateUserCard();
   toast('Foto eliminada', 'info');
@@ -3862,7 +3874,7 @@ async function loadDashboard() {
   const qa = document.getElementById('dash-quick-actions');
   if (qa) {
     const btnPri = (icon, label, action) =>
-      `<button onclick="${action}" class="w-full h-9 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 px-3 transition-all hover:opacity-90 col-span-2" style="background:linear-gradient(135deg,#243366,#1a2a57)"><i data-lucide="${icon}" style="width:13px;height:13px"></i> ${label}</button>`;
+      `<button onclick="${action}" class="w-full h-9 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 px-3 transition-all hover:opacity-90 col-span-2" style="background:linear-gradient(135deg,#1d2140,#1d2140)"><i data-lucide="${icon}" style="width:13px;height:13px"></i> ${label}</button>`;
     const btn2 = (icon, label, action, color='#64748B') =>
       `<button onclick="${action}" class="h-9 rounded-xl text-xs font-medium flex items-center gap-1.5 px-3 border transition-all hover:bg-slate-50" style="border-color:#E2E8F0;color:#374151"><i data-lucide="${icon}" style="width:12px;height:12px;color:${color}"></i> ${label}</button>`;
     qa.style.display = 'grid';
@@ -3936,10 +3948,10 @@ async function loadDashboard() {
   // Recent sales
   const tbody=document.getElementById('dash-recent');
   const methBg={efectivo:'#F0FDF4',tarjeta:'#EEF1F9',transferencia:'#F5F3FF'};
-  const methCl={efectivo:'#16A34A',tarjeta:'#243366',transferencia:'#8B5CF6'};
+  const methCl={efectivo:'#16A34A',tarjeta:'#1d2140',transferencia:'#8B5CF6'};
   tbody.innerHTML=d.recent_sales.length ? d.recent_sales.map(v=>`
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
-      <td class="px-6 py-3 font-mono text-xs font-bold" style="color:#243366">${v.folio}</td>
+      <td class="px-6 py-3 font-mono text-xs font-bold" style="color:#1d2140">${v.folio}</td>
       <td class="px-6 py-3 text-xs" style="color:#374151">${v.cajero||'—'}</td>
       <td class="px-6 py-3">
         <span class="px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -3965,7 +3977,7 @@ async function loadDashboard() {
     const grand=Math.max(rs.total||1, 0.01);
     const bars=[
       {label:'Efectivo', val:rs.efectivo||0, color:'#22C55E', bg:'#F0FDF4', icon:'banknote'},
-      {label:'Tarjeta',  val:rs.tarjeta||0,  color:'#243366', bg:'#EEF1F9', icon:'credit-card'},
+      {label:'Tarjeta',  val:rs.tarjeta||0,  color:'#1d2140', bg:'#EEF1F9', icon:'credit-card'},
     ];
     const pbEl=document.getElementById('dash-pay-bars');
     if (pbEl) pbEl.innerHTML=bars.map(b=>{
@@ -4000,7 +4012,7 @@ async function loadPOS() {
   const cobrarBtn = document.getElementById('btn-cobrar');
   if (cobrarBtn) {
     const isAdmin = S.user?.rol === 'admin';
-    cobrarBtn.style.background = isAdmin ? '#94A3B8' : 'linear-gradient(135deg,#243366,#1a2a57)';
+    cobrarBtn.style.background = isAdmin ? '#94A3B8' : 'linear-gradient(135deg,#1d2140,#1d2140)';
     cobrarBtn.style.cursor = isAdmin ? 'not-allowed' : 'pointer';
     cobrarBtn.title = isAdmin ? 'Solo cajeros pueden cobrar' : '';
   }
@@ -4202,7 +4214,7 @@ function renderCart() {
               <span class="w-7 text-center text-xs font-semibold">${i.cantidad}</span>
               <button onclick="changeQty('${cartKey}',+1)" class="w-6 h-6 rounded-lg text-xs font-bold border hover:bg-slate-50 transition-colors" style="border-color:#E2E8F0">+</button>
             </div>
-            <span class="text-xs font-bold" style="color:#243366">${fmt(i.precio_venta*i.cantidad)}</span>
+            <span class="text-xs font-bold" style="color:#1d2140">${fmt(i.precio_venta*i.cantidad)}</span>
           </div>
         </div>
       </div>`;
@@ -4251,7 +4263,9 @@ function updateCambio() {
   document.getElementById('cart-cambio').textContent=fmt(Math.max(0,pag-total));
 }
 
+let _saleInProgress = false;
 async function processSale() {
+  if (_saleInProgress) return;
   if (S.user?.rol === 'admin') { toast('El administrador no puede realizar ventas. Inicia sesión como cajero.','error'); return; }
   if (!S.cart.length) { toast('El carrito está vacío','warning'); return; }
   const metodo=document.getElementById('cart-metodo').value;
@@ -4312,7 +4326,16 @@ async function processSale() {
     metodo_pago: metodo,
     monto_pagado:pag,
   };
-  const res=await api('/pos/',{method:'POST',body:JSON.stringify(body)});
+  _saleInProgress = true;
+  const btn = document.getElementById('btn-cobrar');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  let res;
+  try {
+    res = await api('/pos/', { method: 'POST', body: JSON.stringify(body) });
+  } finally {
+    _saleInProgress = false;
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
   if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al procesar venta','error'); return; }
   const data=await res.json();
   document.getElementById('pay-folio').textContent=`Folio: ${data.folio}`;
@@ -4449,7 +4472,7 @@ function renderInvTable(prods) {
     if (!info) return '<span style="color:#CBD5E1;font-size:11px">Sin fecha</span>';
     const diasLabel = info.dias < 0 ? `Hace ${-info.dias}d` : `${info.dias}d`;
     const lotesBadge = info.count > 1
-      ? `<span style="font-size:10px;background:#EEF1F9;color:#243366;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
+      ? `<span style="font-size:10px;background:#EEF1F9;color:#1d2140;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
       : '';
     const fechaFmt = fmtDate(info.fecha);
     if (info.estado==='vencido')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEF2F2;color:#EF4444;padding:2px 5px;border-radius:10px;font-weight:700">⛔ Vencido ${diasLabel}</span>${lotesBadge}</div>`;
@@ -4474,10 +4497,10 @@ function renderInvTable(prods) {
       <td class="px-3 py-2.5 text-xs" style="color:#64748B">${p.stock_minimo}</td>
       <td class="px-3 py-2.5">
         ${p.proveedor_nombre
-          ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium whitespace-nowrap" style="background:#EEF1F9;color:#243366">${p.proveedor_nombre}</span>`
+          ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium whitespace-nowrap" style="background:#EEF1F9;color:#1d2140">${p.proveedor_nombre}</span>`
           : '<span style="color:#CBD5E1">—</span>'}
       </td>
-      <td class="px-3 py-2.5 font-semibold text-sm whitespace-nowrap" style="color:#243366">${fmt(p.precio_venta)}</td>
+      <td class="px-3 py-2.5 font-semibold text-sm whitespace-nowrap" style="color:#1d2140">${fmt(p.precio_venta)}</td>
       <td class="px-3 py-2.5">${expBadge(expInfo)}</td>
       <td class="px-3 py-2.5">
         <span class="px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
@@ -4497,7 +4520,7 @@ function renderInvTable(prods) {
           <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico de inventario" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F5F3FF;color:#7C3AED">
             <i data-lucide="clipboard-check" style="width:13px;height:13px"></i>
           </button>
-          <button onclick="openProductModal(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#EEF1F9;color:#243366">
+          <button onclick="openProductModal(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="pencil" style="width:13px;height:13px"></i>
           </button>
           <button onclick="deleteProduct(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#FEF2F2;color:#EF4444">
@@ -5017,7 +5040,7 @@ function renderCustTable(cs) {
       <td class="px-5 py-3">
         ${S.user?.rol==='admin' ? `
         <div class="flex gap-1.5">
-          <button onclick="openCustModal(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#243366">
+          <button onclick="openCustModal(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
           </button>
           <button onclick="deleteCust(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#FEF2F2;color:#EF4444">
@@ -5113,7 +5136,7 @@ function repTab(tab) {
     const btn = document.getElementById(`rep-tab-${t}`);
     const con = document.getElementById(`rep-tab-content-${t}`);
     const active = t === tab;
-    btn.style.background = active ? '#243366' : 'transparent';
+    btn.style.background = active ? '#1d2140' : 'transparent';
     btn.style.color      = active ? '#fff'    : '#64748B';
     con.classList.toggle('hidden', !active);
   });
@@ -5157,7 +5180,7 @@ async function loadReports() {
         <tr class="hovrow border-b" style="border-color:#F1F5F9">
           <td class="px-4 py-2 font-bold text-sm" style="color:${medals[i]||'#64748B'}">${i+1}</td>
           <td class="px-4 py-2 font-medium" style="color:#0F172A">${p.nombre}</td>
-          <td class="px-4 py-2 text-right font-semibold" style="color:#243366">${fmtN(p.cantidad)}</td>
+          <td class="px-4 py-2 text-right font-semibold" style="color:#1d2140">${fmtN(p.cantidad)}</td>
           <td class="px-4 py-2 text-right font-semibold" style="color:#22C55E">${fmt(p.ingreso)}</td>
         </tr>`).join('')
       : '<tr><td colspan="4" class="text-center py-6" style="color:#94A3B8">Sin ventas en el periodo</td></tr>';
@@ -5200,12 +5223,12 @@ async function loadReports() {
             style="border-color:#F1F5F9;background:${bg}">
           ${isAdmin ? `<td class="px-3 py-2 text-center rep-admin-col" onclick="event.stopPropagation()">
             <input type="checkbox" class="rep-chk w-3.5 h-3.5 cursor-pointer rounded" data-id="${v.id}"
-                   style="accent-color:#243366" onchange="repUpdateBulk()">
+                   style="accent-color:#1d2140" onchange="repUpdateBulk()">
           </td>` : ''}
           <td class="px-3 py-2 text-center cursor-pointer" onclick="repToggleDetail(${v.id})">
             <i data-lucide="chevron-right" id="rep-chevron-${v.id}" style="width:12px;height:12px;color:#94A3B8;transition:transform .15s"></i>
           </td>
-          <td class="px-3 py-2 font-mono font-bold cursor-pointer" style="color:#243366" onclick="repToggleDetail(${v.id})">${v.folio||'#'+v.id}</td>
+          <td class="px-3 py-2 font-mono font-bold cursor-pointer" style="color:#1d2140" onclick="repToggleDetail(${v.id})">${v.folio||'#'+v.id}</td>
           <td class="px-3 py-2 cursor-pointer" style="color:#374151" onclick="repToggleDetail(${v.id})">${(v.creado_en||'').replace('T',' ').slice(0,16)}</td>
           <td class="px-3 py-2 font-semibold cursor-pointer" style="color:#7C3AED" onclick="repToggleDetail(${v.id})">${v.cajero||'—'}</td>
           <td class="px-3 py-2 cursor-pointer" style="color:#64748B" onclick="repToggleDetail(${v.id})">${v.cliente_nombre||'Público general'}</td>
@@ -5237,7 +5260,7 @@ function repItemsTable(items, descGlobal, iva) {
         <p class="text-xs font-semibold" style="color:#0F172A">${i.nombre}</p>
         ${sub ? `<p class="text-[10px] mt-0.5" style="color:#94A3B8">${sub}</p>` : ''}
       </td>
-      <td class="py-2 px-3 text-xs text-center font-semibold" style="color:#243366">${i.cantidad}</td>
+      <td class="py-2 px-3 text-xs text-center font-semibold" style="color:#1d2140">${i.cantidad}</td>
       <td class="py-2 px-3 text-xs text-right" style="color:#64748B">${fmt(i.precio_unitario)}</td>
       <td class="py-2 px-3 text-xs text-right" style="color:${i.descuento>0?'#F59E0B':'#64748B'}">${i.descuento>0?'−'+fmt(i.descuento):'—'}</td>
       <td class="py-2 pl-3 text-xs text-right font-bold" style="color:#0F172A">${fmt(i.subtotal)}</td>
@@ -5370,7 +5393,7 @@ async function loadCortes() {
           <td class="px-4 py-2" style="color:#374151">${fmtDT(c.cerrado_en)}</td>
           <td class="px-4 py-2 text-center" style="color:#64748B">${fmtDur(c.duracion_min)}</td>
           <td class="px-4 py-2 text-right" style="color:#64748B">${c.num_ventas}</td>
-          <td class="px-4 py-2 text-right font-semibold" style="color:#243366">${fmt(c.total_ventas)}</td>
+          <td class="px-4 py-2 text-right font-semibold" style="color:#1d2140">${fmt(c.total_ventas)}</td>
           <td class="px-4 py-2 text-right" style="color:#22C55E">${fmt(c.total_efectivo)}</td>
           <td class="px-4 py-2 text-right" style="color:#F59E0B">${fmt(c.total_tarjeta)}</td>
           <td class="px-4 py-2 text-right" style="color:#8B5CF6">${fmt(c.total_transferencia)}</td>
@@ -5403,7 +5426,7 @@ function showCorteDetalle(c) {
     <div class="border-t pt-3" style="border-color:#E2E8F0">
       <p class="text-xs font-semibold mb-2" style="color:#64748B">Ventas del turno</p>
       <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-        <div class="flex justify-between"><span style="color:#94A3B8">Total ventas</span><span class="font-bold" style="color:#243366">${fmt(c.total_ventas)}</span></div>
+        <div class="flex justify-between"><span style="color:#94A3B8">Total ventas</span><span class="font-bold" style="color:#1d2140">${fmt(c.total_ventas)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Efectivo</span><span class="font-bold" style="color:#22C55E">${fmt(c.total_efectivo)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Tarjeta</span><span class="font-bold" style="color:#F59E0B">${fmt(c.total_tarjeta)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Transferencia</span><span class="font-bold" style="color:#8B5CF6">${fmt(c.total_transferencia)}</span></div>
@@ -5455,7 +5478,7 @@ async function loadVencimientos(filtro) {
     if (!btn) return;
     const active = f === _vencFiltro;
     if (active) {
-      btn.style.boxShadow = '0 0 0 2px #243366';
+      btn.style.boxShadow = '0 0 0 2px #1d2140';
       btn.style.fontWeight = '700';
     } else {
       btn.style.boxShadow = 'none';
@@ -5657,7 +5680,7 @@ function filterCad(f) {
     b.style.background = '#F1F5F9'; b.style.color = '#64748B';
   });
   const active = document.getElementById('fcad-' + f);
-  if (active) { active.style.background = '#EEF1F9'; active.style.color = '#243366'; }
+  if (active) { active.style.background = '#EEF1F9'; active.style.color = '#1d2140'; }
   renderCadModal();
 }
 
@@ -5934,7 +5957,7 @@ async function loadCajaAdmin() {
         <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Ganancia bruta</span><span class="font-bold" style="color:#16A34A">${money(t.ganancia||0)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Ya retirado</span><span class="font-semibold" style="color:#DC2626">−${money(t.total_retiros||0)}</span></div>
         <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">💰 Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(t.disponible||0)}</span></div>
-        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Efectivo en caja</span><span class="font-bold" style="color:#243366">${money(t.esperado_caja)}</span></div>`;
+        <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Efectivo en caja</span><span class="font-bold" style="color:#1d2140">${money(t.esperado_caja)}</span></div>`;
     } else if (card) {
       card.classList.add('hidden');
     }
@@ -6419,13 +6442,13 @@ async function loadEmployees() {
   if (!res.ok) return;
   const emps=await res.json();
   const tbody=document.getElementById('emp-tbody');
-  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EEF1F9;color:#243366',farmaceutico:'background:#F0FDF4;color:#16A34A'};
+  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EEF1F9;color:#1d2140',farmaceutico:'background:#F0FDF4;color:#16A34A'};
   tbody.innerHTML=emps.length?emps.map(e=>`
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
       <td class="px-5 py-3">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
-               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':'#243366'}">
+               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':'#1d2140'}">
             ${(e.nombre||'?')[0].toUpperCase()}
           </div>
           <span class="font-medium text-sm" style="color:#0F172A">${e.nombre}</span>
@@ -6442,7 +6465,7 @@ async function loadEmployees() {
         <div class="flex gap-1">
           <button onclick="openEditEmpModal(${e.id},'${e.nombre.replace(/'/g,"\\'")}','${e.username}','${e.rol}','${(e.telefono||'').replace(/'/g,"\\'")}','${(e.email||'').replace(/'/g,"\\'")}' )"
                   class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors hover:opacity-80"
-                  style="background:#EEF1F9;color:#243366">
+                  style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
           </button>
           ${e.id!==S.user.id?`
@@ -6572,7 +6595,7 @@ function _renderSupTable(sups) {
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
       <td class="px-5 py-3">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style="background:#243366">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style="background:#1d2140">
             ${(s.nombre||'?')[0]}
           </div>
           <span class="font-semibold text-sm" style="color:#0F172A">${s.nombre}</span>
@@ -6593,7 +6616,7 @@ function _renderSupTable(sups) {
         <div class="flex gap-1">
           <button onclick="openEditSupModal(${s.id},'${s.nombre.replace(/'/g,"\\'")}','${(s.contacto||'').replace(/'/g,"\\'")}','${(s.telefono||'').replace(/'/g,"\\'")}','${(s.email||'').replace(/'/g,"\\'")}','${(s.rfc||'').replace(/'/g,"\\'")}','${(s.direccion||'').replace(/'/g,"\\'")}' )"
                   class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1 hover:opacity-80"
-                  style="background:#EEF1F9;color:#243366">
+                  style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
           </button>
           <button onclick="confirmDeleteSup(${s.id},'${s.nombre.replace(/'/g,"\\'")}')"
@@ -6949,7 +6972,7 @@ async function loadEndpoints() {
   const res = await api('/admin/endpoints');
   if (!res.ok) { toast('Error cargando endpoints','error'); return; }
   const endpoints = await res.json();
-  const mc = {GET:'#22C55E', POST:'#243366', PUT:'#F59E0B', DELETE:'#EF4444'};
+  const mc = {GET:'#22C55E', POST:'#1d2140', PUT:'#F59E0B', DELETE:'#EF4444'};
   const el = document.getElementById('endpoints-list');
   el.innerHTML = `
     <div class="overflow-x-auto rounded-xl" style="border:1px solid #F1F5F9">
@@ -6967,7 +6990,7 @@ async function loadEndpoints() {
               <td class="px-4 py-2.5">
                 <span class="px-2 py-1 rounded-lg font-bold text-white text-[10px]" style="background:${mc[e.method]||'#64748B'}">${e.method}</span>
               </td>
-              <td class="px-4 py-2.5 font-mono" style="color:#243366">${e.path}</td>
+              <td class="px-4 py-2.5 font-mono" style="color:#1d2140">${e.path}</td>
               <td class="px-4 py-2.5" style="color:#64748B">${e.desc}</td>
             </tr>`).join('')}
         </tbody>
@@ -7145,11 +7168,11 @@ function renderAdminVentas() {
     }).join('');
 
     return `<tr class="border-b hovrow" style="border-color:#F1F5F9">
-      <td class="px-3 py-2 font-mono font-bold" style="color:#243366">${v.folio||v.id}</td>
+      <td class="px-3 py-2 font-mono font-bold" style="color:#1d2140">${v.folio||v.id}</td>
       <td class="px-3 py-2" style="color:#374151;white-space:nowrap">${fmtDT(v.creado_en)}</td>
       <td class="px-3 py-2" style="color:#64748B">${v.cajero}</td>
       <td class="px-3 py-2">
-        <button onclick="toggleAvItems('av-items-${v.id}')" class="text-xs underline" style="color:#243366">
+        <button onclick="toggleAvItems('av-items-${v.id}')" class="text-xs underline" style="color:#1d2140">
           ${v.num_items} producto${v.num_items!==1?'s':''}
         </button>
         <div id="av-items-${v.id}" class="hidden mt-1 rounded-lg p-2" style="background:#F8FAFF;border:1px solid #E2E8F0">
@@ -7789,7 +7812,7 @@ function histRecordCard(r) {
     r.peso          ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#F5F3FF;color:#7C3AED">${r.peso} kg</span>` : '',
     r.talla         ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#F0F9FF;color:#0284C7">${r.talla} cm</span>` : '',
     r.glucosa       ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#FFF7ED;color:#D97706">${r.glucosa} mg/dL gluc.</span>` : '',
-    r.saturacion_o2 ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#EFF6FF;color:#2563EB">${r.saturacion_o2}% O₂</span>` : '',
+    r.saturacion_o2 ? `<span class="text-xs px-2 py-0.5 rounded-lg" style="background:#EFF6FF;color:#1d2140">${r.saturacion_o2}% O₂</span>` : '',
   ].filter(Boolean).join('');
 
   const notes = [
@@ -7857,7 +7880,7 @@ function histVentaCard(v) {
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <p class="text-xs font-bold font-mono" style="color:#243366">${v.folio||'#'+v.id}</p>
+            <p class="text-xs font-bold font-mono" style="color:#1d2140">${v.folio||'#'+v.id}</p>
             <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style="background:${estadoBg};color:${estadoColor}">${v.estado}</span>
           </div>
           <p class="text-xs" style="color:#94A3B8">${fecha}</p>
@@ -8087,9 +8110,9 @@ function mktSwitchTab(tab) {
   panPdf.classList.toggle('hidden', !isPdf);
   panPromo.classList.toggle('hidden', isPdf);
 
-  btnPdf.style.background   = isPdf   ? '#2563EB' : 'transparent';
+  btnPdf.style.background   = isPdf   ? '#1d2140' : 'transparent';
   btnPdf.style.color         = isPdf   ? '#fff'    : '#64748B';
-  btnPromo.style.background  = !isPdf  ? '#2563EB' : 'transparent';
+  btnPromo.style.background  = !isPdf  ? '#1d2140' : 'transparent';
   btnPromo.style.color       = !isPdf  ? '#fff'    : '#64748B';
 }
 
@@ -8159,20 +8182,21 @@ async function _saveFile(blob, suggestedName, mimeTypes) {
   return true;
 }
 
-async function mktGenerarPDF() {
-  const filtro   = document.getElementById('mkt-filtro').value;
+async function mktGenerarPDF(tipo = 'todos') {
   const orden    = document.getElementById('mkt-orden').value;
   const incStock = document.getElementById('mkt-inc-stock').checked;
   const incCode  = document.getElementById('mkt-inc-barcode').checked;
+  const labels   = { todos: 'General', stock: 'ConStock', sin_stock: 'SinStock' };
   toast('Generando PDF...', 'info');
   try {
     const res = await fetch(
-      `/api/marketing/pdf?filtro=${filtro}&orden=${orden}&inc_stock=${incStock}&inc_barcode=${incCode}`,
+      `/api/marketing/pdf?filtro=${tipo}&orden=${orden}&inc_stock=${incStock}&inc_barcode=${incCode}`,
       { headers: { Authorization: `Bearer ${S.token}` } }
     );
     if (!res.ok) { toast('Error generando PDF', 'error'); return; }
     const blob  = await res.blob();
-    const fname = `Catalogo_Farmacia_${new Date().toISOString().slice(0,10)}.pdf`;
+    const date  = new Date().toISOString().slice(0,10);
+    const fname = `Catalogo_${labels[tipo]}_${date}.pdf`;
     const saved = await _saveFile(blob, fname, [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]);
     if (saved) toast('PDF guardado ✓', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
