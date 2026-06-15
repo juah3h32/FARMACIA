@@ -629,32 +629,39 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
 @router.post("/recalcular-stock")
 def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     """
-    Recalculates stock from authoritative sources:
-      stock_correcto = total_entradas - total_vendido_real - total_bajas_manuales
-    ItemVenta is ground truth for sales (never corrupted by sync bugs).
-    MovimientoStock tipo=entrada is ground truth for purchases.
-    Only touches products that have at least one entrada movement.
-    Also creates an audit MovimientoStock record for each correction.
+    Two-track reconciliation:
+    Track A — Sync corruption: last MovimientoStock.stock_nuevo < prod.stock means
+              a cloud pull reset the column after the sale was recorded. Trust the movement.
+    Track B — Unrecorded decrements: ItemVenta vendidas > movimientos tipo=salida/venta
+              means sales happened without a matching movement. Apply the delta.
+    Works even when products have no entrada records.
     """
     _require_admin(payload)
     db = get_db_session()
     try:
         from sqlalchemy import text as _sql_text
 
-        # Ground truth 1: total purchased per product (entrada = compras/lotes registrados)
-        entradas_map = {
-            r.producto_id: int(r.total or 0)
+        # Last movement per product — stock_nuevo is what prod.stock SHOULD be after that op
+        last_mov_sub = (
+            db.query(
+                MovimientoStock.producto_id,
+                func.max(MovimientoStock.id).label("last_id"),
+            )
+            .group_by(MovimientoStock.producto_id)
+            .subquery()
+        )
+        last_stock_map: dict[int, int] = {
+            r.producto_id: int(r.stock_nuevo if r.stock_nuevo is not None else -1)
             for r in db.query(
                 MovimientoStock.producto_id,
-                func.sum(MovimientoStock.cantidad).label("total"),
+                MovimientoStock.stock_nuevo,
             )
-            .filter(MovimientoStock.tipo == TipoMovimiento.entrada)
-            .group_by(MovimientoStock.producto_id)
+            .join(last_mov_sub, MovimientoStock.id == last_mov_sub.c.last_id)
             .all()
         }
 
-        # Ground truth 2: total sold per product (ItemVenta of completed non-deleted ventas)
-        vendidas_map = {
+        # Total actually sold (ItemVenta ground truth)
+        vendidas_map: dict[int, int] = {
             r.producto_id: int(r.total or 0)
             for r in db.query(
                 ItemVenta.producto_id,
@@ -669,8 +676,8 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
             .all()
         }
 
-        # Bajas manuales: baja_lote únicamente (ajuste-fisico ya establece stock directamente)
-        bajas_map = {
+        # Total decremented via movement records for ventas
+        decrementado_map: dict[int, int] = {
             r.producto_id: int(r.total or 0)
             for r in db.query(
                 MovimientoStock.producto_id,
@@ -678,7 +685,7 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
             )
             .filter(
                 MovimientoStock.tipo == TipoMovimiento.salida,
-                MovimientoStock.referencia_tipo == "baja_lote",
+                MovimientoStock.referencia_tipo == "venta",
             )
             .group_by(MovimientoStock.producto_id)
             .all()
@@ -689,16 +696,22 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
         usuario_id = int(payload["sub"])
 
         for prod in productos:
-            total_entradas = entradas_map.get(prod.id, 0)
-            if total_entradas == 0:
-                continue  # sin historial de compras — no se puede reconstruir
+            old_stock   = prod.stock or 0
+            last_stock  = last_stock_map.get(prod.id)
+            vendidas    = vendidas_map.get(prod.id, 0)
+            decrementado = decrementado_map.get(prod.id, 0)
+            faltante    = max(0, vendidas - decrementado)
 
-            total_vendidas  = vendidas_map.get(prod.id, 0)
-            total_bajas     = bajas_map.get(prod.id, 0)
-            stock_calculado = max(0, total_entradas - total_vendidas - total_bajas)
-            old_stock       = prod.stock or 0
-
-            if stock_calculado == old_stock:
+            if last_stock is not None and last_stock >= 0 and last_stock < old_stock:
+                # Track A: sync pulled cloud value after a sale, raising prod.stock
+                # above what the movement log recorded. Trust the movement.
+                stock_calculado = last_stock
+                razon = f"movimiento={last_stock} < stock={old_stock} (sync corruption)"
+            elif faltante > 0:
+                # Track B: sales in ItemVenta have no matching salida movement
+                stock_calculado = max(0, old_stock - faltante)
+                razon = f"vendidas={vendidas}, decrementado={decrementado}, faltante={faltante}"
+            else:
                 continue
 
             prod.stock = stock_calculado
@@ -714,10 +727,7 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
                 stock_nuevo=stock_calculado,
                 referencia_tipo="recalculo_historico",
                 usuario_id=usuario_id,
-                notas=(
-                    f"RECÁLCULO AUTOMÁTICO · entradas={total_entradas} "
-                    f"ventas={total_vendidas} bajas={total_bajas} → stock={stock_calculado}"
-                ),
+                notas=f"RECÁLCULO · {razon}",
             ))
             corregidos.append({
                 "id": prod.id,
@@ -725,10 +735,7 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
                 "stock_anterior": old_stock,
                 "stock_nuevo": stock_calculado,
             })
-            print(
-                f"[RecalcStock] {prod.nombre}: {old_stock} → {stock_calculado} "
-                f"(entradas={total_entradas}, vendidas={total_vendidas}, bajas={total_bajas})"
-            )
+            print(f"[RecalcStock] {prod.nombre}: {old_stock}→{stock_calculado} | {razon}")
 
         db.commit()
 
