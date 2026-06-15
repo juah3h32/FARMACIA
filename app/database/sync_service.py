@@ -464,17 +464,23 @@ def sync_from_turso() -> int:
                         # Pass 1: insert rows that don't exist yet (new products from other PCs)
                         sql_insert = f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql_insert, rows)
-                        # Pass 2: update existing rows.
-                        # imagen_url/descripcion: never overwrite with null.
-                        # stock/piezas_sueltas: KEEP LOCAL — the local POS is authoritative
-                        #   for stock. Pull would race with a just-completed sale and restore
-                        #   the pre-sale Turso value. Stock is only pushed TO Turso, never
-                        #   pulled FROM Turso (push already runs right after each sale).
+                        # Pass 2: update existing rows — last-writer-wins by actualizado_en.
+                        # stock/piezas_sueltas: ALWAYS keep local (never overwritten by pull).
+                        # imagen_url/descripcion: keep local if Turso sends null.
+                        # All other fields: take Turso value ONLY IF Turso's actualizado_en
+                        #   is strictly newer than local — prevents pull from reverting a local
+                        #   edit that was pushed to Turso but hasn't propagated yet in the
+                        #   Turso read path (HTTP round-trip race).
+                        _has_ts = "actualizado_en" in cols
                         set_clause = ", ".join(
                             f"{c}=COALESCE(excluded.{c}, {table}.{c})"
                             if c in ("imagen_url", "descripcion") else
                             f"{c}={table}.{c}"
                             if c in ("stock", "piezas_sueltas") else
+                            (
+                                f"{c}=CASE WHEN excluded.actualizado_en > {table}.actualizado_en"
+                                f" THEN excluded.{c} ELSE {table}.{c} END"
+                            ) if _has_ts else
                             f"{c}=excluded.{c}"
                             for c in cols if c != "id"
                         )

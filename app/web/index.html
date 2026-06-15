@@ -4881,30 +4881,40 @@ async function saveProduct() {
 
   const method = isEdit ? 'PUT' : 'POST';
   const path   = isEdit ? `/productos/${S.prodEditId}` : '/productos/';
-  const res = await api(path, {method, body:JSON.stringify(body)});
+
+  let res;
+  try {
+    res = await api(path, {method, body:JSON.stringify(body)});
+  } catch(e) {
+    toast('Error de conexión al guardar producto','error'); return;
+  }
 
   if (!res.ok) {
-    const e=await res.json(); toast(e.detail||'Error','error'); return;
+    const e = await res.json().catch(()=>({}));
+    toast(e.detail||'Error al guardar producto','error'); return;
   }
 
   if (!isEdit) {
     // Create lote with the initial stock
-    const prodData = await res.json();
+    const prodData = await res.json().catch(()=>({}));
     const cantidad  = parseInt(document.getElementById('pm-cantidad').value)||0;
     const fechaVenc = document.getElementById('pm-fechavenc').value;
     const nroLote   = document.getElementById('pm-lote').value.trim()||null;
 
-    const entRes = await api('/inventario/entrada', {
-      method: 'POST',
-      body: JSON.stringify({
-        producto_id:       prodData.id,
-        cantidad,
-        numero_lote:       nroLote,
-        fecha_vencimiento: fechaVenc,
-        precio_compra:     parseFloat(document.getElementById('pm-pcompra').value)||0,
-      }),
-    });
-    if (!entRes.ok) {
+    let entRes;
+    try {
+      entRes = await api('/inventario/entrada', {
+        method: 'POST',
+        body: JSON.stringify({
+          producto_id:       prodData.id,
+          cantidad,
+          numero_lote:       nroLote,
+          fecha_vencimiento: fechaVenc,
+          precio_compra:     parseFloat(document.getElementById('pm-pcompra').value)||0,
+        }),
+      });
+    } catch(e) { entRes = null; }
+    if (!entRes || !entRes.ok) {
       toast('Producto creado pero error al registrar lote — ve a Inventario y agrega la entrada','warning');
     } else {
       toast('Producto creado con lote de vencimiento','success');
