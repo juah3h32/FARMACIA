@@ -629,42 +629,106 @@ def corregir_audit(bg: BackgroundTasks, payload: dict = Depends(get_current_api_
 @router.post("/recalcular-stock")
 def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     """
-    Fija el stock de cada producto al stock_nuevo del último MovimientoStock registrado.
-    Corrige corrupciones históricas causadas por sincronizaciones fuera de orden.
+    Recalculates stock from authoritative sources:
+      stock_correcto = total_entradas - total_vendido_real - total_bajas_manuales
+    ItemVenta is ground truth for sales (never corrupted by sync bugs).
+    MovimientoStock tipo=entrada is ground truth for purchases.
+    Only touches products that have at least one entrada movement.
+    Also creates an audit MovimientoStock record for each correction.
     """
     _require_admin(payload)
     db = get_db_session()
     try:
         from sqlalchemy import text as _sql_text
 
+        # Ground truth 1: total purchased per product (entrada = compras/lotes registrados)
+        entradas_map = {
+            r.producto_id: int(r.total or 0)
+            for r in db.query(
+                MovimientoStock.producto_id,
+                func.sum(MovimientoStock.cantidad).label("total"),
+            )
+            .filter(MovimientoStock.tipo == TipoMovimiento.entrada)
+            .group_by(MovimientoStock.producto_id)
+            .all()
+        }
+
+        # Ground truth 2: total sold per product (ItemVenta of completed non-deleted ventas)
+        vendidas_map = {
+            r.producto_id: int(r.total or 0)
+            for r in db.query(
+                ItemVenta.producto_id,
+                func.sum(ItemVenta.cantidad).label("total"),
+            )
+            .join(Venta, ItemVenta.venta_id == Venta.id)
+            .filter(
+                Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
+            )
+            .group_by(ItemVenta.producto_id)
+            .all()
+        }
+
+        # Bajas manuales: baja_lote únicamente (ajuste-fisico ya establece stock directamente)
+        bajas_map = {
+            r.producto_id: int(r.total or 0)
+            for r in db.query(
+                MovimientoStock.producto_id,
+                func.sum(MovimientoStock.cantidad).label("total"),
+            )
+            .filter(
+                MovimientoStock.tipo == TipoMovimiento.salida,
+                MovimientoStock.referencia_tipo == "baja_lote",
+            )
+            .group_by(MovimientoStock.producto_id)
+            .all()
+        }
+
         productos = db.query(Producto).filter(Producto.activo.is_(True)).all()
         corregidos = []
+        usuario_id = int(payload["sub"])
 
         for prod in productos:
-            ultimo_mov = (
-                db.query(MovimientoStock)
-                .filter(MovimientoStock.producto_id == prod.id)
-                .order_by(MovimientoStock.id.desc())
-                .first()
-            )
-            if not ultimo_mov:
-                continue
-            if prod.stock == ultimo_mov.stock_nuevo:
+            total_entradas = entradas_map.get(prod.id, 0)
+            if total_entradas == 0:
+                continue  # sin historial de compras — no se puede reconstruir
+
+            total_vendidas  = vendidas_map.get(prod.id, 0)
+            total_bajas     = bajas_map.get(prod.id, 0)
+            stock_calculado = max(0, total_entradas - total_vendidas - total_bajas)
+            old_stock       = prod.stock or 0
+
+            if stock_calculado == old_stock:
                 continue
 
-            old_stock = prod.stock
-            prod.stock = ultimo_mov.stock_nuevo
+            prod.stock = stock_calculado
             db.execute(
                 _sql_text("UPDATE productos SET stock=:s WHERE id=:id"),
-                {"s": ultimo_mov.stock_nuevo, "id": prod.id},
+                {"s": stock_calculado, "id": prod.id},
             )
+            db.add(MovimientoStock(
+                producto_id=prod.id,
+                tipo=TipoMovimiento.ajuste,
+                cantidad=abs(stock_calculado - old_stock),
+                stock_anterior=old_stock,
+                stock_nuevo=stock_calculado,
+                referencia_tipo="recalculo_historico",
+                usuario_id=usuario_id,
+                notas=(
+                    f"RECÁLCULO AUTOMÁTICO · entradas={total_entradas} "
+                    f"ventas={total_vendidas} bajas={total_bajas} → stock={stock_calculado}"
+                ),
+            ))
             corregidos.append({
                 "id": prod.id,
                 "nombre": prod.nombre,
                 "stock_anterior": old_stock,
-                "stock_nuevo": ultimo_mov.stock_nuevo,
+                "stock_nuevo": stock_calculado,
             })
-            print(f"[RecalcStock] {prod.nombre}: {old_stock} → {ultimo_mov.stock_nuevo}")
+            print(
+                f"[RecalcStock] {prod.nombre}: {old_stock} → {stock_calculado} "
+                f"(entradas={total_entradas}, vendidas={total_vendidas}, bajas={total_bajas})"
+            )
 
         db.commit()
 

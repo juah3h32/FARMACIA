@@ -3394,20 +3394,25 @@ function closeAuditConfirm() {
 async function recalcularStock() {
   const btn = document.getElementById('inv-recalc-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" style="width:12px;height:12px"></i> Recalculando...'; icons(); }
-  const res = await api('/inventario/recalcular-stock', { method: 'POST' });
-  if (res.ok) {
-    const d = await res.json();
-    if (d.corregidos > 0) {
-      showToast(`Stock corregido: ${d.corregidos} producto(s) actualizado(s) ✓`, 'success');
-      _reloadInvProducts();
+  try {
+    const res = await api('/inventario/recalcular-stock', { method: 'POST' });
+    if (res.ok) {
+      const d = await res.json();
+      if (d.corregidos > 0) {
+        showToast(`Stock corregido en ${d.corregidos} producto(s) ✓`, 'success');
+        await _reloadInvProducts();
+      } else {
+        showToast('Stock ya está correcto según historial ✓', 'success');
+      }
     } else {
-      showToast('Stock ya está en sync con los movimientos ✓', 'success');
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || 'Error al recalcular stock', 'error');
     }
-  } else {
-    const err = await res.json().catch(()=>({}));
-    showToast(err.detail || 'Error al recalcular', 'error');
+  } catch (e) {
+    showToast('Error de conexión al recalcular', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="refresh-ccw" style="width:12px;height:12px"></i> Recalcular stock'; icons(); }
   }
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="refresh-ccw" style="width:12px;height:12px"></i> Recalcular stock'; icons(); }
 }
 
 async function _ejecutarCorreccionAudit() {
