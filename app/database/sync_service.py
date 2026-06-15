@@ -308,47 +308,48 @@ def import_from_turso() -> bool:
     Skips if local already has data (usuarios table is non-empty).
     Returns True if import ran.
     """
-    lconn = _local_conn()
-    try:
-        # Check both usuarios AND productos: a seeded-but-empty-inventory DB should still import
-        n_users = lconn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
-        n_prod  = lconn.execute("SELECT COUNT(*) FROM productos").fetchone()[0]
-    except Exception:
-        n_users = n_prod = 0
+    with _lock:  # prevent race with background sync thread that starts concurrently
+        lconn = _local_conn()
+        try:
+            # Check both usuarios AND productos
+            n_users = lconn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+            n_prod  = lconn.execute("SELECT COUNT(*) FROM productos").fetchone()[0]
+        except Exception:
+            n_users = n_prod = 0
 
-    if n_users > 0 and n_prod > 0:
-        lconn.close()
-        print("[Sync] Local DB has data — skipping Turso import")
-        return False
+        if n_users > 0 and n_prod > 0:
+            lconn.close()
+            print("[Sync] Local DB has data — skipping Turso import")
+            return False
 
-    print("[Sync] Local DB empty — importing from Turso...")
-    try:
-        lconn.execute("PRAGMA foreign_keys = OFF")
-        total = 0
-        for table in _TABLE_ORDER:
-            try:
-                cols, rows = _turso_read_table(table)
-                if not cols or not rows:
-                    continue
-                col_str = ", ".join(cols)
-                ph_str  = ", ".join(["?" for _ in cols])
-                sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
-                lconn.executemany(sql, rows)
-                total += len(rows)
-                print(f"[Sync]   {table}: {len(rows)} rows")
-            except Exception as e:
-                print(f"[Sync]   Warning — {table}: {e}")
-        lconn.execute("PRAGMA foreign_keys = ON")
-        lconn.commit()
-        print(f"[Sync] Import complete — {total} rows total")
-        return True
-    except Exception as e:
-        lconn.rollback()
-        print(f"[Sync] Import failed: {e}")
-        traceback.print_exc()
-        return False
-    finally:
-        lconn.close()
+        print("[Sync] Local DB empty — importing from Turso...")
+        try:
+            lconn.execute("PRAGMA foreign_keys = OFF")
+            total = 0
+            for table in _TABLE_ORDER:
+                try:
+                    cols, rows = _turso_read_table(table)
+                    if not cols or not rows:
+                        continue
+                    col_str = ", ".join(cols)
+                    ph_str  = ", ".join(["?" for _ in cols])
+                    sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+                    lconn.executemany(sql, rows)
+                    total += len(rows)
+                    print(f"[Sync]   {table}: {len(rows)} rows")
+                except Exception as e:
+                    print(f"[Sync]   Warning — {table}: {e}")
+            lconn.execute("PRAGMA foreign_keys = ON")
+            lconn.commit()
+            print(f"[Sync] Import complete — {total} rows total")
+            return True
+        except Exception as e:
+            lconn.rollback()
+            print(f"[Sync] Import failed: {e}")
+            traceback.print_exc()
+            return False
+        finally:
+            lconn.close()
 
 
 def sync_to_turso() -> None:
@@ -471,16 +472,19 @@ def sync_from_turso() -> int:
                         #   is strictly newer than local — prevents pull from reverting a local
                         #   edit that was pushed to Turso but hasn't propagated yet in the
                         #   Turso read path (HTTP round-trip race).
+                        # All non-stock fields use actualizado_en as conflict resolver:
+                        # take Turso value only if Turso's timestamp is strictly newer.
+                        # stock/piezas_sueltas always keep local (never pulled from Turso).
                         _has_ts = "actualizado_en" in cols
                         set_clause = ", ".join(
-                            f"{c}=COALESCE(excluded.{c}, {table}.{c})"
-                            if c in ("imagen_url", "descripcion") else
                             f"{c}={table}.{c}"
                             if c in ("stock", "piezas_sueltas") else
                             (
                                 f"{c}=CASE WHEN excluded.actualizado_en > {table}.actualizado_en"
                                 f" THEN excluded.{c} ELSE {table}.{c} END"
                             ) if _has_ts else
+                            f"{c}=COALESCE(excluded.{c}, {table}.{c})"
+                            if c in ("imagen_url", "descripcion") else
                             f"{c}=excluded.{c}"
                             for c in cols if c != "id"
                         )

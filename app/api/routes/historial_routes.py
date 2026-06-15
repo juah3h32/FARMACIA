@@ -173,7 +173,7 @@ def agregar_registro(pid: int, body: RegistroIn, payload: dict = Depends(get_cur
             raise HTTPException(status_code=404, detail="Paciente no encontrado")
         data = body.model_dump()
         data["paciente_id"] = pid
-        data["usuario_id"] = payload.get("id")
+        data["usuario_id"] = int(payload["sub"])
         r = RegistroClinico(**data)
         db.add(r)
         db.commit()

@@ -191,7 +191,14 @@ def normalizar_nombres(payload: dict = Depends(get_current_api_user)):
             if changed:
                 updated += 1
         db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC and updated > 0:
+            from app.database.sync_service import sync_to_turso
+            sync_to_turso()
         return {"ok": True, "actualizados": updated, "total": len(prods)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

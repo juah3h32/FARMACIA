@@ -3409,17 +3409,17 @@ async function recalcularStock() {
     if (res.ok) {
       const d = await res.json();
       if (d.corregidos > 0) {
-        showToast(`Stock corregido en ${d.corregidos} producto(s) ✓`, 'success');
+        toast(`Stock corregido en ${d.corregidos} producto(s) ✓`, 'success');
         await _reloadInvProducts();
       } else {
-        showToast('Stock ya está correcto según historial ✓', 'success');
+        toast('Stock ya está correcto según historial ✓', 'success');
       }
     } else {
       const err = await res.json().catch(() => ({}));
-      showToast(err.detail || 'Error al recalcular stock', 'error');
+      toast(err.detail || 'Error al recalcular stock', 'error');
     }
   } catch (e) {
-    showToast('Error de conexión al recalcular', 'error');
+    toast('Error de conexión al recalcular', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="refresh-ccw" style="width:12px;height:12px"></i> Recalcular stock'; icons(); }
   }
@@ -3432,12 +3432,12 @@ async function _ejecutarCorreccionAudit() {
   const res = await api('/inventario/corregir-audit', { method: 'POST' });
   if (res.ok) {
     const d = await res.json();
-    showToast(`Stock corregido: ${d.corregidos} producto(s) ✓`, 'success');
+    toast(`Stock corregido: ${d.corregidos} producto(s) ✓`, 'success');
     await _refreshAuditoria();
     _reloadInvProducts();
   } else {
     const err = await res.json().catch(()=>({}));
-    showToast(err.detail || 'Error al corregir', 'error');
+    toast(err.detail || 'Error al corregir', 'error');
     if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i data-lucide="wrench" style="width:12px;height:12px"></i> Corregir todo'; lucide.createIcons(); }
   }
 }
@@ -5955,13 +5955,13 @@ async function forzarSyncCaja() {
   try {
     const r = await api('/api/admin/db-sync', { method: 'POST' });
     if (r.ok) {
-      showToast('Sincronización completada ✓', 'success');
+      toast('Sincronización completada ✓', 'success');
       await loadCajaAdmin();
     } else {
-      showToast('Error al sincronizar', 'error');
+      toast('Error al sincronizar', 'error');
     }
   } catch(e) {
-    showToast('Error al sincronizar', 'error');
+    toast('Error al sincronizar', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync'; lucide.createIcons(); }
   }
@@ -6134,11 +6134,11 @@ async function borrarRetiro(id, concepto, montoStr) {
   if (!confirmado) return;
   const res = await api(`/cortes/retiro/${id}`, { method: 'DELETE' });
   if (res.ok) {
-    showToast('Retiro eliminado. Saldo restaurado ✓', 'success');
+    toast('Retiro eliminado. Saldo restaurado ✓', 'success');
     loadCajaAdmin();
   } else {
     const err = await res.json().catch(()=>({}));
-    showToast(err.detail || 'Error al eliminar retiro', 'error');
+    toast(err.detail || 'Error al eliminar retiro', 'error');
   }
 }
 

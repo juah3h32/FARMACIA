@@ -204,9 +204,11 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
                 Producto.codigo_barras == body.codigo_barras,
                 Producto.activo == False,
             ).update({"codigo_barras": None})
+        from datetime import datetime as _dt_now
         was_fraccionada = p.venta_fraccionada
         for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
             setattr(p, k, v)
+        p.actualizado_en = _dt_now.now()  # guarantee bump so sync CASE WHEN keeps local
         if p.venta_fraccionada and not was_fraccionada and (p.stock or 0) > 0 and (p.piezas_sueltas or 0) == 0:
             p.piezas_sueltas = p.unidades_por_caja or 1
             p.stock = max(0, p.stock - 1)
