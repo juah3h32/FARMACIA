@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy import text as _sql_text
 from app.database.connection import get_db_session
 from app.database.models import Venta, ItemVenta, Producto, Lote, MovimientoStock, TipoMovimiento, EstadoVenta, MetodoPago
 from app.api.routes.auth_routes import get_current_api_user
@@ -221,7 +222,22 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 notas=notas_mov,
             ))
 
+        # Belt-and-suspenders: raw SQL stock update guarantees the decrement
+        # reaches SQLite even if ORM tracking misses it for any reason.
+        for pid, prod in products.items():
+            db.execute(
+                _sql_text(
+                    "UPDATE productos SET stock=:s, piezas_sueltas=:ps WHERE id=:id"
+                ),
+                {"s": prod.stock or 0, "ps": prod.piezas_sueltas or 0, "id": pid},
+            )
+            print(f"[POS] stock update: producto {pid} ({prod.nombre}) → stock={prod.stock or 0}, piezas_sueltas={prod.piezas_sueltas or 0}")
+
         db.commit()
+        # Verify committed stock via fresh query
+        for pid in products:
+            row = db.execute(_sql_text("SELECT stock FROM productos WHERE id=:id"), {"id": pid}).fetchone()
+            print(f"[POS] ✓ committed: producto {pid} stock={row[0] if row else '?'}")
 
         # Imprimir ticket
         from app.services.printer_service import printer_service

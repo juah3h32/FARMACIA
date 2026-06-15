@@ -464,10 +464,17 @@ def sync_from_turso() -> int:
                         # Pass 1: insert rows that don't exist yet (new products from other PCs)
                         sql_insert = f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql_insert, rows)
-                        # Pass 2: update existing rows but protect local imagen_url/descripcion
+                        # Pass 2: update existing rows.
+                        # imagen_url/descripcion: never overwrite with null.
+                        # stock/piezas_sueltas: KEEP LOCAL — the local POS is authoritative
+                        #   for stock. Pull would race with a just-completed sale and restore
+                        #   the pre-sale Turso value. Stock is only pushed TO Turso, never
+                        #   pulled FROM Turso (push already runs right after each sale).
                         set_clause = ", ".join(
                             f"{c}=COALESCE(excluded.{c}, {table}.{c})"
                             if c in ("imagen_url", "descripcion") else
+                            f"{c}={table}.{c}"
+                            if c in ("stock", "piezas_sueltas") else
                             f"{c}=excluded.{c}"
                             for c in cols if c != "id"
                         )
@@ -476,6 +483,18 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql_update, rows)
+                        # Diagnostic: show Turso stock vs local after UPSERT
+                        if "stock" in cols:
+                            id_idx  = cols.index("id")
+                            stk_idx = cols.index("stock")
+                            for row in rows:
+                                turso_stock = row[stk_idx]
+                                local_now = lconn.execute(
+                                    f"SELECT stock FROM productos WHERE id=?", (row[id_idx],)
+                                ).fetchone()
+                                local_stock = local_now[0] if local_now else "?"
+                                if str(turso_stock) != str(local_stock):
+                                    print(f"[Sync] productos id={row[id_idx]}: Turso={turso_stock} → kept local={local_stock}")
                     elif table == "ventas" and "eliminado" in cols:
                         # Monotonic: eliminado=1 can never go back to 0
                         set_clause = ", ".join(
