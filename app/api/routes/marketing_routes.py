@@ -93,6 +93,7 @@ class PromoImageIn(BaseModel):
     precio_promo:   float
     precio_tachado: Optional[float] = None
     texto_extra:    str = ""
+    dia_oferta:     str = ""
     usar_imagen:    bool = False
 
 
@@ -123,6 +124,7 @@ def generar_promo_image(
             precio_promo=body.precio_promo,
             precio_tachado=precio_tachado,
             texto_extra=body.texto_extra,
+            dia_oferta=body.dia_oferta,
             usar_imagen=usar_imagen,
         )
 

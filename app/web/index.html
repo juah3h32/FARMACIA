@@ -244,7 +244,7 @@
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)"></div>
   <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[420px]">
     <div class="px-6 py-5 text-center">
-      <div id="cierre-icon" class="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center text-3xl">✓</div>
+      <div id="cierre-icon" class="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center" style="background:#F0FDF4"><i data-lucide="check-circle-2" style="width:36px;height:36px;color:#16A34A"></i></div>
       <h2 class="font-bold text-lg mb-1" style="color:#0F172A">Turno Cerrado</h2>
       <p id="cierre-estado" class="text-sm font-semibold mb-4">—</p>
       <div id="cierre-body" class="text-left space-y-2 text-xs border rounded-xl p-4 mb-5" style="border-color:#E2E8F0"></div>
@@ -1097,8 +1097,8 @@
                 <div class="grid grid-cols-2 gap-2">
                   <select id="cart-metodo" class="w-full h-10 px-3 rounded-xl text-xs border font-semibold" style="border-color:#E2E8F0;background:#F8FAFF"
                           onchange="toggleCambioRow()">
-                    <option value="efectivo">💵 Efectivo</option>
-                    <option value="tarjeta">💳 Tarjeta</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
                   </select>
                   <button onclick="setExactAmount()" class="h-10 rounded-xl text-[10px] font-bold border transition-all hover:bg-blue-50"
                           style="color:#1d2140;border-color:#CBD5E1;background:#fff">
@@ -1275,13 +1275,13 @@
         <div class="flex gap-1 p-1 rounded-xl" style="background:#F1F5F9">
           <button id="rep-tab-ventas" onclick="repTab('ventas')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
-                  style="background:#1d2140;color:#fff">📊 Ventas</button>
+                  style="background:#1d2140;color:#fff"><i data-lucide="bar-chart-3" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px"></i>Ventas</button>
           <button id="rep-tab-cortes" onclick="repTab('cortes')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
-                  style="background:transparent;color:#64748B">🧾 Cortes de Caja</button>
+                  style="background:transparent;color:#64748B"><i data-lucide="receipt" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px"></i>Cortes de Caja</button>
           <button id="rep-tab-vencimientos" onclick="repTab('vencimientos')"
                   class="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
-                  style="background:transparent;color:#64748B">📅 Vencimientos</button>
+                  style="background:transparent;color:#64748B"><i data-lucide="calendar-clock" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px"></i>Vencimientos</button>
         </div>
 
         <!-- ── TAB: VENTAS ──────────────────────────────────────── -->
@@ -2005,8 +2005,8 @@
                 <div>
                   <label class="lbl">Tipo de retiro *</label>
                   <select id="caja-retiro-tipo" class="inp" onchange="updateRetiroTipoUI()">
-                    <option value="personal">💰 Ganancia personal</option>
-                    <option value="inversion">🏪 Inversión / Pago proveedor</option>
+                    <option value="personal">Ganancia personal</option>
+                    <option value="inversion">Inversión / Pago proveedor</option>
                   </select>
                 </div>
                 <div>
@@ -2190,10 +2190,10 @@
         <div class="bg-white rounded-2xl border flex overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">
           <button id="mkt-tab-pdf" onclick="mktSwitchTab('pdf')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
-            style="background:#1d2140;color:#fff">📄 Catálogo PDF</button>
+            style="background:#1d2140;color:#fff"><i data-lucide="file-down" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Catálogo PDF</button>
           <button id="mkt-tab-promo" onclick="mktSwitchTab('promo')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
-            style="background:transparent;color:#64748B">🎨 Imagen Promo</button>
+            style="background:transparent;color:#64748B"><i data-lucide="megaphone" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Imagen Promo</button>
         </div>
 
         <!-- ── PDF Panel ── -->
@@ -2262,7 +2262,7 @@
           <!-- Controls -->
           <div class="bg-white rounded-2xl border overflow-y-auto flex-shrink-0 scroll-light" style="width:310px;border-color:#E2E8F0">
             <div class="p-4 space-y-3">
-              <h3 class="font-bold text-sm" style="color:#0F172A">🎨 Configurar Promoción</h3>
+              <h3 class="font-bold text-sm flex items-center gap-2" style="color:#0F172A"><i data-lucide="sliders-horizontal" style="width:14px;height:14px;color:#1d2140"></i> Configurar Promoción</h3>
 
               <div>
                 <label class="lbl">Buscar producto</label>
@@ -2277,7 +2277,7 @@
                 <label class="flex items-center gap-2 cursor-pointer p-3 rounded-xl select-none"
                        style="background:#F0FDF4;border:1px solid #BBF7D0">
                   <input type="checkbox" id="mkt-usar-imagen" class="rounded">
-                  <span class="text-xs font-semibold" style="color:#15803D">🖼 Usar imagen Cloudinary (fondo blanco)</span>
+                  <span class="text-xs font-semibold flex items-center gap-1" style="color:#15803D"><i data-lucide="image" style="width:12px;height:12px"></i> Usar imagen Cloudinary (fondo blanco)</span>
                 </label>
               </div>
               <div id="mkt-no-img-row" style="display:none">
@@ -2302,6 +2302,21 @@
                 <input id="mkt-precio-tachado" type="number" step="0.01" min="0"
                   placeholder="Auto: precio promo + $5" class="inp">
                 <p class="text-xs mt-0.5" style="color:#94A3B8">Se calcula automáticamente sumando $5</p>
+              </div>
+
+              <div>
+                <label class="lbl">Día del badge (opcional)</label>
+                <select id="mkt-dia-oferta" class="inp">
+                  <option value="">— OFERTA ESPECIAL (genérico) —</option>
+                  <option value="LUNES">Lunes</option>
+                  <option value="MARTES">Martes</option>
+                  <option value="MIÉRCOLES" selected>Miércoles</option>
+                  <option value="JUEVES">Jueves</option>
+                  <option value="VIERNES">Viernes</option>
+                  <option value="SÁBADO">Sábado</option>
+                  <option value="TODOS LOS DÍAS">Todos los días</option>
+                </select>
+                <p class="text-xs mt-0.5" style="color:#94A3B8">Aparece en el badge rojo de la imagen</p>
               </div>
 
               <div>
@@ -2414,7 +2429,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-purge-historial')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="executePurgeHistorial()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:linear-gradient(135deg,#EF4444,#DC2626)">🗑 Eliminar historial</button>
+      <button onclick="executePurgeHistorial()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90 flex items-center justify-center gap-1.5" style="background:linear-gradient(135deg,#EF4444,#DC2626)"><i data-lucide="trash-2" style="width:14px;height:14px"></i> Eliminar historial</button>
     </div>
   </div>
 </div>
@@ -2773,8 +2788,8 @@
             <div class="flex items-center justify-between mb-0.5">
               <label class="lbl" style="margin-bottom:0">Descripción</label>
               <button type="button" id="pm-btn-generar" onclick="pmGenerarDescripcion()" class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded" style="background:#6366F1;color:#fff;border:none;cursor:pointer" title="Generar descripción automática con IA">
-                <span id="pm-generar-icon">✨</span>
-                <span id="pm-generar-txt">Generar</span>
+                <i id="pm-generar-icon" data-lucide="wand-2" style="width:11px;height:11px"></i>
+                <span id="pm-generar-txt">IA</span>
               </button>
             </div>
             <textarea id="pm-descripcion" class="inp resize-none flex-1" style="min-height:110px" placeholder="Indicaciones, usos, contraindicaciones..."></textarea>
@@ -3208,7 +3223,7 @@ const NAV = [
   { key:'caja',      icon:'landmark',         label:'Control de Caja',  admin:true  },
   { key:'suppliers', icon:'truck',            label:'Proveedores',      admin:true  },
   { key:'employees', icon:'user-cog',         label:'Empleados',        admin:true  },
-  { key:'marketing', icon:'image',            label:'Marketing',        admin:true  },
+  { key:'marketing', icon:'megaphone',         label:'Marketing',        admin:true  },
   { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
   { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
 ];
@@ -4943,7 +4958,7 @@ async function pmGenerarDescripcion() {
   const icon = document.getElementById('pm-generar-icon');
   const txt  = document.getElementById('pm-generar-txt');
   btn.disabled = true;
-  icon.textContent = '⏳';
+  icon.setAttribute('data-lucide','loader-2'); lucide.createIcons();
   txt.textContent  = 'Generando...';
   try {
     const body = {
@@ -4966,8 +4981,8 @@ async function pmGenerarDescripcion() {
     toast(e?.message||'Error al generar descripción','error');
   } finally {
     btn.disabled     = false;
-    icon.textContent = '✨';
-    txt.textContent  = 'Generar';
+    icon.setAttribute('data-lucide','wand-2'); lucide.createIcons();
+    txt.textContent  = 'IA';
   }
 }
 
@@ -8259,6 +8274,7 @@ async function _mktGetPromoBlob() {
   const precioPromo   = parseFloat(document.getElementById('mkt-precio-promo').value)   || 0;
   const precioTachado = parseFloat(document.getElementById('mkt-precio-tachado').value) || (precioPromo + 5);
   const textoExtra    = document.getElementById('mkt-texto-extra').value.trim();
+  const diaOferta     = document.getElementById('mkt-dia-oferta')?.value || '';
   const usarImagenEl  = document.getElementById('mkt-usar-imagen');
   const usarImagen    = usarImagenEl?.checked && !!_mktSelectedProd.imagen_url;
 
@@ -8270,6 +8286,7 @@ async function _mktGetPromoBlob() {
       precio_promo:   precioPromo,
       precio_tachado: precioTachado,
       texto_extra:    textoExtra,
+      dia_oferta:     diaOferta,
       usar_imagen:    usarImagen,
     }),
   });

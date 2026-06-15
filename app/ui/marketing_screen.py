@@ -719,13 +719,14 @@ def _paste_logo(img: Image.Image, draw: ImageDraw.ImageDraw,
 
 def _generar_imagen_promo(producto, precio_promo: float,
                            precio_tachado: float, texto_extra: str = "",
-                           usar_imagen: bool = False) -> Image.Image:
+                           usar_imagen: bool = False,
+                           dia_oferta: str = "") -> Image.Image:
     prod_img = None
     if usar_imagen and producto.imagen_url:
         prod_img = _fetch_cloudinary_image(producto.imagen_url)
 
     if prod_img is not None:
-        return _layout_blanco(producto, precio_promo, precio_tachado, texto_extra, prod_img)
+        return _layout_blanco(producto, precio_promo, precio_tachado, texto_extra, prod_img, dia_oferta)
     else:
         return _layout_azul(producto, precio_promo, precio_tachado, texto_extra)
 
@@ -856,7 +857,7 @@ def _layout_azul(producto, precio_promo: float,
 
 def _layout_blanco(producto, precio_promo: float,
                     precio_tachado: float, texto_extra: str,
-                    prod_img: Image.Image) -> Image.Image:
+                    prod_img: Image.Image, dia_oferta: str = "") -> Image.Image:
     W, H   = 1080, 1080
     HEADER = 138
     FOOTER = 72
@@ -883,14 +884,19 @@ def _layout_blanco(producto, precio_promo: float,
     cy = HEADER + 5 + 28   # top del primer elemento
 
     # ── Badge OFERTA (pill manual — sin artefactos de esquinas) ─────────────
-    bw, bh = 230, 36
+    f_badge    = _pil_font(FONT_BOLD, 17)
+    badge_text = (f"{dia_oferta.strip().upper()} DE OFERTAS"
+                  if dia_oferta.strip() else "OFERTA ESPECIAL")
+    text_w = int(draw.textlength(badge_text, font=f_badge))
+    bh = 36
+    bw = text_w + 52   # 26px padding each side
     bx = (W - bw) // 2
-    r = bh // 2
+    r  = bh // 2
     draw.ellipse([bx, cy, bx + bh, cy + bh], fill=RED)
     draw.ellipse([bx + bw - bh, cy, bx + bw, cy + bh], fill=RED)
     draw.rectangle([bx + r, cy, bx + bw - r, cy + bh], fill=RED)
-    draw.text((W // 2, cy + bh // 2), "OFERTA ESPECIAL",
-              font=_pil_font(FONT_BOLD, 17), fill=WHITE, anchor="mm")
+    draw.text((W // 2, cy + bh // 2), badge_text,
+              font=f_badge, fill=WHITE, anchor="mm")
     cy += bh + 30   # gap explícito badge → nombre
 
     # ── Nombre (anchor="mt": y = TOP del texto, sin overlap garantizado) ──────
