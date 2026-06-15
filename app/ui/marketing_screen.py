@@ -858,12 +858,13 @@ def _layout_azul(producto, precio_promo: float,
 def _layout_blanco(producto, precio_promo: float,
                     precio_tachado: float, texto_extra: str,
                     prod_img: Image.Image, dia_oferta: str = "") -> Image.Image:
+    """Layout horizontal: info a la izquierda, foto grande a la derecha."""
     W, H   = 1080, 1080
-    HEADER = 138
+    HEADER = 130
     FOOTER = 72
 
-    NAVY  = (29,  33,  64)    # #1d2140
-    BRAND = (60,  115, 185)   # #3c73b9
+    NAVY  = (29,  33,  64)
+    BRAND = (60,  115, 185)
     DARK  = (5,   15,  48)
     WHITE = (255, 255, 255)
     GRAY  = (80,  100, 140)
@@ -874,102 +875,112 @@ def _layout_blanco(producto, precio_promo: float,
     img  = Image.new("RGB", (W, H), WHITE)
     draw = ImageDraw.Draw(img)
 
-    # ── Header #1d2140 ───────────────────────────────────────────────────────
+    # ── Header ───────────────────────────────────────────────────────────────
     draw.rectangle([(0, 0), (W, HEADER)], fill=NAVY)
     _paste_logo(img, draw, 0, 0, W, HEADER, white=True)
-
-    # Barra #3c73b9 bajo el header
     draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=BRAND)
 
-    cy = HEADER + 5 + 28   # top del primer elemento
+    # ── Column geometry ───────────────────────────────────────────────────────
+    # Left info column: x ∈ [48, 530]  → 482px wide
+    # Divider at x = 545
+    # Right image column: x ∈ [555, 1055] → 500px wide
+    CONTENT_Y = HEADER + 5
+    LX  = 48    # left margin of info column
+    LXR = 530   # right edge of info column
+    DIV = 545   # vertical divider x
+    RX  = 555   # left edge of image column
+    RXR = 1055  # right edge of image column
 
-    # ── Badge OFERTA (pill manual — sin artefactos de esquinas) ─────────────
-    f_badge    = _pil_font(FONT_BOLD, 17)
+    # Thin vertical divider
+    draw.line([(DIV, CONTENT_Y + 40), (DIV, H - FOOTER - 40)],
+              fill=(210, 220, 245), width=1)
+
+    # ── LEFT: badge ──────────────────────────────────────────────────────────
+    cy = CONTENT_Y + 50
+
+    f_badge    = _pil_font(FONT_BOLD, 16)
     badge_text = (f"{dia_oferta.strip().upper()} DE OFERTAS"
                   if dia_oferta.strip() else "OFERTA ESPECIAL")
     text_w = int(draw.textlength(badge_text, font=f_badge))
-    bh = 36
-    bw = text_w + 52   # 26px padding each side
-    bx = (W - bw) // 2
+    bh = 34
+    bw = text_w + 44
+    bx = LX
     r  = bh // 2
     draw.ellipse([bx, cy, bx + bh, cy + bh], fill=RED)
     draw.ellipse([bx + bw - bh, cy, bx + bw, cy + bh], fill=RED)
     draw.rectangle([bx + r, cy, bx + bw - r, cy + bh], fill=RED)
-    draw.text((W // 2, cy + bh // 2), badge_text,
+    draw.text((bx + bw // 2, cy + bh // 2), badge_text,
               font=f_badge, fill=WHITE, anchor="mm")
-    cy += bh + 30   # gap explícito badge → nombre
+    cy += bh + 26
 
-    # ── Nombre (anchor="mt": y = TOP del texto, sin overlap garantizado) ──────
-    f_name = _pil_font(FONT_BLACK, 62)
-    lines  = _wrap_name(producto.nombre.upper(), 20)
-    for i, line in enumerate(lines[:2]):
-        bb = draw.textbbox((W // 2, cy), line, font=f_name, anchor="mt")
-        draw.text((W // 2, cy), line, font=f_name, fill=DARK, anchor="mt")
-        cy = bb[3] + (8 if i < len(lines[:2]) - 1 else 0)
-    cy += 18   # gap nombre → presentación
+    # ── LEFT: nombre ─────────────────────────────────────────────────────────
+    f_name = _pil_font(FONT_BLACK, 58)
+    lines  = _wrap_name(producto.nombre.upper(), 13)
+    for i, line in enumerate(lines[:3]):
+        bb = draw.textbbox((LX, cy), line, font=f_name, anchor="lt")
+        draw.text((LX, cy), line, font=f_name, fill=DARK, anchor="lt")
+        cy = bb[3] + (6 if i < len(lines[:3]) - 1 else 0)
+    cy += 16
 
-    # ── Presentación deduplicada ──────────────────────────────────────────────
+    # ── LEFT: presentación ───────────────────────────────────────────────────
     raw_sub = [producto.presentacion, producto.concentracion, producto.contenido]
     sub = list(dict.fromkeys(x for x in raw_sub if x))
     if sub:
-        f_sub = _pil_font(FONT_SEMI, 21)
-        bb = draw.textbbox((W // 2, cy), "  ·  ".join(sub), font=f_sub, anchor="mt")
-        draw.text((W // 2, cy), "  ·  ".join(sub), font=f_sub, fill=GRAY, anchor="mt")
-        cy = bb[3] + 20
-    else:
-        cy += 6
+        f_sub = _pil_font(FONT_SEMI, 19)
+        sub_txt = "  ·  ".join(sub)
+        draw.text((LX, cy), sub_txt, font=f_sub, fill=GRAY, anchor="lt")
+        bb = draw.textbbox((LX, cy), sub_txt, font=f_sub, anchor="lt")
+        cy = bb[3] + 28
 
-    # ── Imagen — fondo blanco, sin caja, sin oval, tamaño máximo ─────────────
-    IMG_H  = 290
-    MAX_IW = 960
-    try:
-        pimg  = prod_img.convert("RGBA")
-        iw, ih = pimg.size
-        scale  = min(MAX_IW / iw, IMG_H / ih)
-        nw, nh = int(iw * scale), int(ih * scale)
-        pfit   = pimg.resize((nw, nh), Image.LANCZOS)
-        px = (W - nw) // 2
-        py = cy + (IMG_H - nh) // 2
-        img.paste(pfit.convert("RGB"), (px, py), pfit.split()[3])
-    except Exception:
-        pass
-    cy += IMG_H + 24
-
-    # ── Separador fino ────────────────────────────────────────────────────────
-    draw.line([(W // 4, cy), (3 * W // 4, cy)], fill=(200, 215, 245), width=1)
+    # ── LEFT: separador ──────────────────────────────────────────────────────
+    draw.line([(LX, cy), (LXR - 10, cy)], fill=(200, 215, 245), width=1)
     cy += 22
 
-    # ── Precio tachado (anchor="mt", medido con textbbox) ────────────────────
-    f_tach = _pil_font(FONT_SEMI, 38)
+    # ── LEFT: precio tachado ─────────────────────────────────────────────────
+    f_tach = _pil_font(FONT_SEMI, 36)
     txt_t  = f"${precio_tachado:,.2f}"
-    bb = draw.textbbox((W // 2, cy), txt_t, font=f_tach, anchor="mt")
-    draw.text((W // 2, cy), txt_t, font=f_tach, fill=SILV, anchor="mt")
+    bb = draw.textbbox((LX, cy), txt_t, font=f_tach, anchor="lt")
+    draw.text((LX, cy), txt_t, font=f_tach, fill=SILV, anchor="lt")
     mid_y = (bb[1] + bb[3]) // 2
-    draw.line([(bb[0] - 4, mid_y), (bb[2] + 4, mid_y)], fill=RED, width=4)
-    cy = bb[3] + 26   # gap medido tachado → precio (sin overlap)
+    draw.line([(bb[0] - 2, mid_y), (bb[2] + 2, mid_y)], fill=RED, width=3)
+    cy = bb[3] + 10
 
-    # ── Precio PROMO — Montserrat Black 88px ──────────────────────────────────
-    f_price = _pil_font(FONT_BLACK, 88)
+    # ── LEFT: precio promo GRANDE ────────────────────────────────────────────
+    f_price = _pil_font(FONT_BLACK, 98)
     txt_p   = f"${precio_promo:,.2f}"
-    bb = draw.textbbox((W // 2, cy), txt_p, font=f_price, anchor="mt")
-    draw.text((W // 2, cy), txt_p, font=f_price, fill=DARK, anchor="mt")
-    cy = bb[3] + 14
+    bb = draw.textbbox((LX, cy), txt_p, font=f_price, anchor="lt")
+    draw.text((LX, cy), txt_p, font=f_price, fill=DARK, anchor="lt")
+    cy = bb[3] + 16
 
-    # ── Badge ahorro ──────────────────────────────────────────────────────────
+    # ── LEFT: badge ahorras ───────────────────────────────────────────────────
     ahorro = precio_tachado - precio_promo
     if ahorro > 0.01:
-        sw, sh = 254, 36
-        sx = (W - sw) // 2
-        draw.rounded_rectangle([sx, cy, sx + sw, cy + sh], radius=18, fill=GREEN)
-        draw.text((W // 2, cy + sh // 2), f"¡AHORRAS ${ahorro:,.2f}!",
-                  font=_pil_font(FONT_BOLD, 21), fill=WHITE, anchor="mm")
+        sw, sh = int(draw.textlength(f"¡AHORRAS ${ahorro:,.2f}!", font=_pil_font(FONT_BOLD, 20))) + 32, 36
+        draw.rounded_rectangle([LX, cy, LX + sw, cy + sh], radius=18, fill=GREEN)
+        draw.text((LX + sw // 2, cy + sh // 2), f"¡AHORRAS ${ahorro:,.2f}!",
+                  font=_pil_font(FONT_BOLD, 20), fill=WHITE, anchor="mm")
         cy += sh + 10
 
     if texto_extra:
-        draw.text((W // 2, cy + 8), texto_extra,
-                  font=_pil_font(FONT_ITALIC, 20), fill=GRAY, anchor="mt")
+        draw.text((LX, cy + 8), texto_extra,
+                  font=_pil_font(FONT_ITALIC, 19), fill=GRAY, anchor="lt")
 
-    # ── Footer NAVY + barra #3c73b9 ───────────────────────────────────────────
+    # ── RIGHT: foto grande centrada ───────────────────────────────────────────
+    RW = RXR - RX      # 500
+    RH = H - FOOTER - CONTENT_Y - 20
+    try:
+        pimg   = prod_img.convert("RGBA")
+        iw, ih = pimg.size
+        scale  = min(RW / iw, RH / ih) * 0.90
+        nw, nh = int(iw * scale), int(ih * scale)
+        pfit   = pimg.resize((nw, nh), Image.LANCZOS)
+        px = RX + (RW - nw) // 2
+        py = CONTENT_Y + 20 + (RH - nh) // 2
+        img.paste(pfit.convert("RGB"), (px, py), pfit.split()[3])
+    except Exception:
+        pass
+
+    # ── Footer ────────────────────────────────────────────────────────────────
     draw.rectangle([(0, H - FOOTER), (W, H)], fill=NAVY)
     draw.rectangle([(0, H - FOOTER), (W, H - FOOTER + 5)], fill=BRAND)
     draw.text((W // 2, H - FOOTER // 2 + 2),
