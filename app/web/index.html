@@ -2325,6 +2325,20 @@
               </div>
 
               <div>
+                <label class="lbl flex items-center justify-between">
+                  <span>Descripción <span style="color:#94A3B8;font-weight:400">(bajo el nombre)</span></span>
+                  <button type="button" id="mkt-btn-ia-desc" onclick="mktGenerarDescPromo()"
+                          class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded"
+                          style="background:#6366F1;color:#fff;border:none;cursor:pointer" title="Generar con IA">
+                    <i id="mkt-desc-icon" data-lucide="wand-2" style="width:10px;height:10px"></i>
+                    <span id="mkt-desc-txt">IA</span>
+                  </button>
+                </label>
+                <textarea id="mkt-descripcion-promo" class="inp resize-none" rows="3"
+                          placeholder="Descripción breve del producto (se auto-rellena desde el producto)…"></textarea>
+              </div>
+
+              <div>
                 <label class="lbl">Texto adicional (opcional)</label>
                 <input id="mkt-texto-extra" class="inp" placeholder="Ej: Por tiempo limitado">
               </div>
@@ -8276,9 +8290,10 @@ function mktSeleccionarProd(id) {
   sel.style.display = 'block';
 
   document.getElementById('mkt-precio-actual').textContent = fmt(prod.precio_venta);
-  document.getElementById('mkt-precio-promo').value   = prod.precio_venta.toFixed(2);
-  document.getElementById('mkt-precio-tachado').value = (prod.precio_venta + 5).toFixed(2);
-  document.getElementById('mkt-texto-extra').value    = '';
+  document.getElementById('mkt-precio-promo').value        = prod.precio_venta.toFixed(2);
+  document.getElementById('mkt-precio-tachado').value      = (prod.precio_venta + 5).toFixed(2);
+  document.getElementById('mkt-texto-extra').value         = '';
+  document.getElementById('mkt-descripcion-promo').value   = prod.descripcion || '';
 
   const imgRow   = document.getElementById('mkt-img-row');
   const noImgRow = document.getElementById('mkt-no-img-row');
@@ -8300,27 +8315,66 @@ function mktAutoTachado() {
 
 async function _mktGetPromoBlob() {
   if (!_mktSelectedProd) { toast('Selecciona un producto primero', 'warning'); return null; }
-  const precioPromo   = parseFloat(document.getElementById('mkt-precio-promo').value)   || 0;
-  const precioTachado = parseFloat(document.getElementById('mkt-precio-tachado').value) || (precioPromo + 5);
-  const textoExtra    = document.getElementById('mkt-texto-extra').value.trim();
-  const diaOferta     = document.getElementById('mkt-dia-oferta')?.value || '';
-  const usarImagenEl  = document.getElementById('mkt-usar-imagen');
-  const usarImagen    = usarImagenEl?.checked && !!_mktSelectedProd.imagen_url;
+  const precioPromo      = parseFloat(document.getElementById('mkt-precio-promo').value)   || 0;
+  const precioTachado    = parseFloat(document.getElementById('mkt-precio-tachado').value) || (precioPromo + 5);
+  const textoExtra       = document.getElementById('mkt-texto-extra').value.trim();
+  const diaOferta        = document.getElementById('mkt-dia-oferta')?.value || '';
+  const descripcionPromo = document.getElementById('mkt-descripcion-promo')?.value.trim() || '';
+  const usarImagenEl     = document.getElementById('mkt-usar-imagen');
+  const usarImagen       = usarImagenEl?.checked && !!_mktSelectedProd.imagen_url;
 
   const res = await fetch('/api/marketing/promo-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${S.token}` },
     body: JSON.stringify({
-      producto_id:    _mktSelectedProd.id,
-      precio_promo:   precioPromo,
-      precio_tachado: precioTachado,
-      texto_extra:    textoExtra,
-      dia_oferta:     diaOferta,
-      usar_imagen:    usarImagen,
+      producto_id:       _mktSelectedProd.id,
+      precio_promo:      precioPromo,
+      precio_tachado:    precioTachado,
+      texto_extra:       textoExtra,
+      dia_oferta:        diaOferta,
+      usar_imagen:       usarImagen,
+      descripcion_promo: descripcionPromo,
     }),
   });
   if (!res.ok) { toast('Error generando imagen', 'error'); return null; }
   return await res.blob();
+}
+
+async function mktGenerarDescPromo() {
+  if (!_mktSelectedProd) { toast('Selecciona un producto primero', 'warning'); return; }
+  const btn  = document.getElementById('mkt-btn-ia-desc');
+  const icon = document.getElementById('mkt-desc-icon');
+  const txt  = document.getElementById('mkt-desc-txt');
+  btn.disabled = true;
+  icon.setAttribute('data-lucide', 'loader-2'); icons();
+  txt.textContent = 'Generando...';
+  try {
+    const p = _mktSelectedProd;
+    const res = await api('/ai/descripcion', {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre:          p.nombre          || '',
+        nombre_generico: p.nombre_generico || '',
+        marca:           p.marca           || '',
+        presentacion:    p.presentacion    || '',
+        concentracion:   p.concentracion   || '',
+        contenido:       p.contenido       || '',
+      }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (res.ok && data?.descripcion) {
+      document.getElementById('mkt-descripcion-promo').value = data.descripcion;
+    } else {
+      toast(data?.detail || 'No se pudo generar', 'error');
+    }
+  } catch (e) {
+    toast('Error al generar descripción', 'error');
+  } finally {
+    btn.disabled = false;
+    icon.setAttribute('data-lucide', 'wand-2'); icons();
+    txt.textContent = 'IA';
+  }
 }
 
 async function mktPreviewPromo() {

@@ -89,12 +89,13 @@ def generar_catalogo_pdf(
 # ── Imagen promo ──────────────────────────────────────────────────────────────
 
 class PromoImageIn(BaseModel):
-    producto_id:    int
-    precio_promo:   float
-    precio_tachado: Optional[float] = None
-    texto_extra:    str = ""
-    dia_oferta:     str = ""
-    usar_imagen:    bool = False
+    producto_id:       int
+    precio_promo:      float
+    precio_tachado:    Optional[float] = None
+    texto_extra:       str = ""
+    dia_oferta:        str = ""
+    usar_imagen:       bool = False
+    descripcion_promo: str = ""
 
 
 @router.post("/promo-image")
@@ -126,6 +127,7 @@ def generar_promo_image(
             texto_extra=body.texto_extra,
             dia_oferta=body.dia_oferta,
             usar_imagen=usar_imagen,
+            descripcion_promo=body.descripcion_promo,
         )
 
         buf = io.BytesIO()

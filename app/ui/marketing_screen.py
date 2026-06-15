@@ -720,13 +720,17 @@ def _paste_logo(img: Image.Image, draw: ImageDraw.ImageDraw,
 def _generar_imagen_promo(producto, precio_promo: float,
                            precio_tachado: float, texto_extra: str = "",
                            usar_imagen: bool = False,
-                           dia_oferta: str = "") -> Image.Image:
+                           dia_oferta: str = "",
+                           descripcion_promo: str = "") -> Image.Image:
     prod_img = None
     if usar_imagen and producto.imagen_url:
         prod_img = _fetch_cloudinary_image(producto.imagen_url)
 
     if prod_img is not None:
-        return _layout_blanco(producto, precio_promo, precio_tachado, texto_extra, prod_img, dia_oferta)
+        return _layout_blanco(
+            producto, precio_promo, precio_tachado, texto_extra,
+            prod_img, dia_oferta, descripcion_promo,
+        )
     else:
         return _layout_azul(producto, precio_promo, precio_tachado, texto_extra)
 
@@ -857,7 +861,8 @@ def _layout_azul(producto, precio_promo: float,
 
 def _layout_blanco(producto, precio_promo: float,
                     precio_tachado: float, texto_extra: str,
-                    prod_img: Image.Image, dia_oferta: str = "") -> Image.Image:
+                    prod_img: Image.Image, dia_oferta: str = "",
+                    descripcion_promo: str = "") -> Image.Image:
     """Layout horizontal: info a la izquierda, foto grande a la derecha."""
     W, H   = 1080, 1080
     HEADER = 130
@@ -921,6 +926,36 @@ def _layout_blanco(producto, precio_promo: float,
         draw.text((LX, cy), line, font=f_name, fill=DARK, anchor="lt")
         cy = bb[3] + (6 if i < len(lines[:3]) - 1 else 0)
     cy += 16
+
+    # ── LEFT: descripción IA ─────────────────────────────────────────────────
+    if descripcion_promo:
+        f_desc = _pil_font(FONT_REG, 17)
+        max_w  = LXR - LX   # 482 px
+        words  = descripcion_promo.split()
+        desc_lines: list[str] = []
+        cur = ""
+        for w in words:
+            test = (cur + " " + w).strip() if cur else w
+            if draw.textlength(test, font=f_desc) <= max_w:
+                cur = test
+            else:
+                if cur:
+                    desc_lines.append(cur)
+                cur = w
+        if cur:
+            desc_lines.append(cur)
+        if len(desc_lines) > 3:
+            desc_lines = desc_lines[:3]
+            last = desc_lines[2]
+            while last and draw.textlength(last + "…", font=f_desc) > max_w:
+                last = last.rsplit(" ", 1)[0]
+            desc_lines[2] = (last + "…") if last else "…"
+        cy += 10
+        for i, dl in enumerate(desc_lines):
+            draw.text((LX, cy), dl, font=f_desc, fill=GRAY, anchor="lt")
+            bb = draw.textbbox((LX, cy), dl, font=f_desc, anchor="lt")
+            cy = bb[3] + (4 if i < len(desc_lines) - 1 else 0)
+        cy += 14
 
     # ── LEFT: presentación ───────────────────────────────────────────────────
     raw_sub = [producto.presentacion, producto.concentracion, producto.contenido]
