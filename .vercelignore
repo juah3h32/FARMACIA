@@ -2,8 +2,6 @@ dist/
 build/
 data/
 instalador/
-assets/
-farmacia-app/
 *.spec
 version_info.txt
 scripts/
