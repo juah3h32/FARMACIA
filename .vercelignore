@@ -4,9 +4,7 @@ data/
 instalador/
 *.spec
 version_info.txt
-scripts/
 FarmaciaPOS_debug2.spec
-LOGO.png
 __pycache__/
 *.pyc
 *.pyo
