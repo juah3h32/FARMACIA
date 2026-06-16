@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
 from app.database.connection import get_db_session
-from app.database.models import ProductoWeb, CategoriaWeb
+from app.database.models import ProductoWeb, CategoriaWeb, Producto, Categoria
 from app.api.routes.app_auth_routes import get_current_cliente_app
 
 router = APIRouter()
@@ -295,6 +295,90 @@ def listar_pedidos_admin(payload: dict = Depends(get_current_cliente_app)):
                 ],
             })
         return {"success": True, "data": result}
+    finally:
+        db.close()
+
+
+@router.post("/sync-pos")
+def sync_desde_pos(payload: dict = Depends(get_current_cliente_app)):
+    """Copia categorías y productos activos del POS → catálogo web (upsert por nombre)."""
+    _require_admin_web(payload)
+    db = get_db_session()
+    try:
+        # ── Categorías ────────────────────────────────────────────────────────
+        cats_pos = db.query(Categoria).all()
+        cat_map = {}  # nombre_lower → CategoriaWeb.id
+        cats_creadas = 0
+        for c in cats_pos:
+            nombre_l = c.nombre.strip().lower()
+            existe = db.query(CategoriaWeb).filter(
+                CategoriaWeb.nombre.ilike(c.nombre.strip())
+            ).first()
+            if not existe:
+                nueva = CategoriaWeb(
+                    nombre=c.nombre.strip(),
+                    descripcion=c.descripcion,
+                    activo=True,
+                )
+                db.add(nueva)
+                db.flush()
+                cat_map[nombre_l] = nueva.id
+                cats_creadas += 1
+            else:
+                cat_map[nombre_l] = existe.id
+
+        # ── Productos ─────────────────────────────────────────────────────────
+        prods_pos = db.query(Producto).filter(Producto.activo == True).all()
+        prods_creados = 0
+        prods_actualizados = 0
+        for p in prods_pos:
+            cat_web_id = None
+            if p.categoria_id:
+                cat_pos = db.query(Categoria).filter(Categoria.id == p.categoria_id).first()
+                if cat_pos:
+                    cat_web_id = cat_map.get(cat_pos.nombre.strip().lower())
+
+            existe = db.query(ProductoWeb).filter(
+                ProductoWeb.nombre.ilike(p.nombre.strip())
+            ).first()
+            if existe:
+                existe.precio        = p.precio_venta
+                existe.imagen_url    = p.imagen_url or existe.imagen_url
+                existe.presentacion  = p.presentacion
+                existe.concentracion = p.concentracion
+                existe.contenido     = p.contenido
+                existe.marca         = p.marca
+                existe.categoria_id  = cat_web_id or existe.categoria_id
+                existe.disponible    = True
+                prods_actualizados  += 1
+            else:
+                nuevo = ProductoWeb(
+                    nombre=p.nombre.strip(),
+                    nombre_generico=p.nombre_generico,
+                    marca=p.marca,
+                    descripcion=p.descripcion,
+                    categoria_id=cat_web_id,
+                    precio=p.precio_venta,
+                    imagen_url=p.imagen_url,
+                    presentacion=p.presentacion,
+                    concentracion=p.concentracion,
+                    contenido=p.contenido,
+                    requiere_receta=p.requiere_receta,
+                    disponible=True,
+                )
+                db.add(nuevo)
+                prods_creados += 1
+
+        db.commit()
+        return {
+            "success": True,
+            "categorias_creadas": cats_creadas,
+            "productos_creados": prods_creados,
+            "productos_actualizados": prods_actualizados,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
