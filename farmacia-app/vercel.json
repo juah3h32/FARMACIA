@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install --ignore-scripts",
-  "buildCommand": "./node_modules/.bin/expo export --platform web",
+  "buildCommand": "node node_modules/expo/bin/cli.js export --platform web",
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
