@@ -1,7 +1,7 @@
 {
-  "installCommand": "cd farmacia-app && npm install --ignore-scripts",
-  "buildCommand": "cd farmacia-app && node node_modules/expo/bin/cli export --platform web",
-  "outputDirectory": "farmacia-app/dist",
+  "installCommand": "npm ci --ignore-scripts",
+  "buildCommand": "node node_modules/expo/bin/cli export --platform web",
+  "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
