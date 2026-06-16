@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 // expo-haptics requiere build nativo; guard igual que expo-speech
 let Haptics = null;
 try { Haptics = require("expo-haptics"); } catch (_) {}
@@ -7,7 +6,8 @@ import * as Location from "expo-location";
 let TaskManager = null;
 try { TaskManager = require("expo-task-manager"); } catch (_) {}
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
+let Notifications = null;
+try { Notifications = require("expo-notifications"); } catch (_) {}
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +24,17 @@ import {
   Vibration,
   View,
 } from "react-native";
+
+let createAudioPlayer = null;
+let setAudioModeAsync = null;
+if (Platform.OS !== "web") {
+  try {
+    const _audio = require("expo-audio");
+    createAudioPlayer = _audio.createAudioPlayer;
+    setAudioModeAsync = _audio.setAudioModeAsync;
+  } catch (_) {}
+}
+
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationsContext";
 import { useTheme } from "../context/ThemeContext";
