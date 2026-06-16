@@ -11,7 +11,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.farmaciaebenezer.app",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -48,7 +47,6 @@
       "bundler": "metro"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin",
       [
         "expo-splash-screen",
         {
@@ -79,16 +77,10 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ],
-      "expo-audio"
+      ]
     ],
     "experiments": {
       "reactCompiler": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "2ef78f19-b53d-484e-8987-2015d7324bed"
-      }
     }
   }
 }
