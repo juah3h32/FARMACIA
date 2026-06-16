@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install",
+  "installCommand": "npm install --ignore-scripts",
   "buildCommand": "./node_modules/.bin/expo export --platform web",
   "outputDirectory": "dist",
   "framework": null,
