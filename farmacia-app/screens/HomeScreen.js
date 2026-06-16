@@ -34,40 +34,15 @@ const YELLOW = "#3c73b9";
 // ─── DATA ────────────────────────────────────────────────────────────────────
 // Las categorías se cargan desde la API (ver useHomeData)
 
-// Marcas: reemplaza estas URLs con tus links reales de Cloudinary
 const BRANDS = [
-  {
-    name: "Marca 1",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496685/QyW4qf4bS-uuEyqMcrlOS_xxupzg.webp",
-  },
-  {
-    name: "Marca 2",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496686/8raVd8Ge171ERwyz9Nekf_i6qeim.webp",
-  },
-  {
-    name: "Marca 3",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496686/aarfs_ilybpd.png",
-  },
-  {
-    name: "Marca 4",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496685/vYWD8lIqjt3GIeKFTZaav_iuipju.webp",
-  },
-  {
-    name: "Marca 5",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496685/coAP5yJmDus_5jMyJftPO_v1wlfj.webp",
-  },
-  {
-    name: "Marca 6",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496685/EtMNQTFHzDJ_hvyuV7zkb_ndvqj4.webp",
-  },
-  {
-    name: "Marca 7",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496684/ReymaLogoOficial_glqfgk.png",
-  },
-  {
-    name: "Marca 8",
-    img: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775496684/images_lxabhm.png",
-  },
+  { name: "Bayer" },
+  { name: "Genomma" },
+  { name: "Pfizer" },
+  { name: "Sanofi" },
+  { name: "MK" },
+  { name: "Liomont" },
+  { name: "Novartis" },
+  { name: "Abbott" },
 ];
 
 // ─── HOOK DATOS INICIO DESDE API ─────────────────────────────────────────────
@@ -830,9 +805,9 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
             ]}
           >
             <View style={styles.bannerTextWrap}>
-              <Text style={styles.bannerLine1}>TODO LO QUE TU</Text>
-              <Text style={styles.bannerLine2}>NEGOCIO</Text>
-              <Text style={styles.bannerLine3}>NECESITA</Text>
+              <Text style={styles.bannerLine1}>TU FARMACIA DE</Text>
+              <Text style={styles.bannerLine2}>CONFIANZA</Text>
+              <Text style={styles.bannerLine3}>A DOMICILIO</Text>
 
               {isDesktop ? (
                 <View style={{ position: "relative", zIndex: 999 }}>
@@ -890,9 +865,7 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
             </View>
 
             <Image
-              source={{
-                uri: "https://res.cloudinary.com/dfuzfdrat/image/upload/q_auto/f_auto/v1775497342/Sin_t_%CC%B8tulo-2_Recuperado_fpjpzz.png",
-              }}
+              source={require("../assets/images/logo.png")}
               style={[styles.bannerImg, isDesktop && styles.bannerImgDesktop]}
               resizeMode="contain"
             />
@@ -1146,12 +1119,7 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
               >
                 {BRANDS.map((brand, index) => (
                   <View key={index} style={[styles.brandLogoWrap, { backgroundColor: t.card, borderColor: t.border }]}>
-                    <Image
-                      source={{ uri: brand.img }}
-                      style={styles.brandLogo}
-                      resizeMode="contain"
-                      // Cloudinary entrega imágenes optimizadas automáticamente
-                    />
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: t.text, textAlign: "center" }}>{brand.name}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -1164,23 +1132,17 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
           </View>
         )}
 
-        {/* ── SOLO PC: BANNERS APP + DOMICILIO ── */}
+        {/* ── SOLO PC: INFO BLOQUES ── */}
         {isDesktop && (
           <View style={[styles.appPromoSection, styles.centeredContainer]}>
-            <Image
-              source={{
-                uri: "https://res.cloudinary.com/TU_CLOUD/image/upload/banner-app.jpg",
-              }}
-              style={styles.appPromoBannerImg}
-              resizeMode="cover"
-            />
-            <Image
-              source={{
-                uri: "https://res.cloudinary.com/TU_CLOUD/image/upload/banner-domicilio.jpg",
-              }}
-              style={styles.appPromoBannerImg}
-              resizeMode="cover"
-            />
+            <View style={[styles.appPromoBannerImg, { backgroundColor: RED, borderRadius: 16, justifyContent: "center", alignItems: "center", padding: 20 }]}>
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "900", textAlign: "center" }}>📱 DESCARGA NUESTRA APP</Text>
+              <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 14, textAlign: "center", marginTop: 8 }}>Pide tus medicamentos desde tu celular</Text>
+            </View>
+            <View style={[styles.appPromoBannerImg, { backgroundColor: YELLOW, borderRadius: 16, justifyContent: "center", alignItems: "center", padding: 20 }]}>
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "900", textAlign: "center" }}>🚚 ENTREGA A DOMICILIO</Text>
+              <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 14, textAlign: "center", marginTop: 8 }}>Recibe tus pedidos en la comodidad de tu hogar</Text>
+            </View>
           </View>
         )}
 
@@ -1194,9 +1156,9 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
                   <Image source={require("../assets/images/logo.png")} style={styles.footerLogoImg} resizeMode="contain" />
                 </View>
                 <Text style={styles.footerDesc}>
-                  Somos una distribuidora líder de productos esenciales,
-                  destinada a satisfacer las necesidades de todo tipo de
-                  negocios.
+                  Farmacia Eben-Ezer — tu farmacia de confianza con servicio
+                  a domicilio. Medicamentos, salud y bienestar para toda
+                  tu familia.
                 </Text>
                 <Text style={styles.footerSubtitle}>MÉTODOS DE PAGO</Text>
                 <View style={styles.paymentMethodsRow}>
@@ -1237,7 +1199,7 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
 
               {/* Columna 3: Links */}
               <View style={styles.footerCol}>
-                <Text style={styles.footerTitle}>TODO PAL NEGOCIO</Text>
+                <Text style={styles.footerTitle}>FARMACIA EBEN-EZER</Text>
                 {[
                   "Inicio",
                   "Productos",
@@ -1260,7 +1222,7 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
                 <Text style={styles.footerTitle}>CONTÁCTANOS</Text>
                 <Text style={styles.footerLink}>Sucursales</Text>
                 <Text style={[styles.footerLink, { fontWeight: "700" }]}>
-                  atencionaclientes@todopalnegocio.com.mx
+                  pablocorona111@gmail.com
                 </Text>
                 <Text style={[styles.footerTitle, { marginTop: 20 }]}>
                   SÍGUENOS EN NUESTRAS REDES
@@ -1276,7 +1238,7 @@ export default function RappiStore({ onCartPress, onStorePress, onOrdersPress, o
 
             <View style={styles.footerBottomBar}>
               <Text style={styles.footerCopyright}>
-                Copyright © TODO PAL NEGOCIO. Todos los derechos reservados.
+                Copyright © Farmacia Eben-Ezer. Todos los derechos reservados.
               </Text>
             </View>
           </View>
