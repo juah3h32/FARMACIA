@@ -308,6 +308,107 @@ class Configuracion(Base):
     actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
 
+class CategoriaWeb(Base):
+    """Categorías del catálogo web/app — independientes del POS."""
+    __tablename__ = "categorias_web"
+
+    id        = Column(Integer, primary_key=True)
+    nombre    = Column(String(100), nullable=False, unique=True)
+    descripcion = Column(Text, nullable=True)
+    imagen_url  = Column(String(500), nullable=True)
+    orden       = Column(Integer, default=0)
+    activo      = Column(Boolean, default=True)
+
+    productos = relationship("ProductoWeb", back_populates="categoria")
+
+
+class ProductoWeb(Base):
+    """Catálogo web/app — independiente del inventario POS."""
+    __tablename__ = "productos_web"
+
+    id               = Column(Integer, primary_key=True)
+    nombre           = Column(String(200), nullable=False)
+    nombre_generico  = Column(String(200), nullable=True)
+    marca            = Column(String(100), nullable=True)
+    descripcion      = Column(Text, nullable=True)
+    categoria_id     = Column(Integer, ForeignKey("categorias_web.id"), nullable=True)
+    precio           = Column(Float, nullable=False)
+    precio_tachado   = Column(Float, nullable=True)
+    imagen_url       = Column(String(500), nullable=True)
+    presentacion     = Column(String(100), nullable=True)
+    concentracion    = Column(String(100), nullable=True)
+    contenido        = Column(String(100), nullable=True)
+    requiere_receta  = Column(Boolean, default=False)
+    disponible       = Column(Boolean, default=True)
+    destacado        = Column(Boolean, default=False)
+    orden            = Column(Integer, default=0)
+    creado_en        = Column(DateTime, default=_dt.now)
+    actualizado_en   = Column(DateTime, default=_dt.now, onupdate=_dt.now)
+
+    categoria = relationship("CategoriaWeb", back_populates="productos")
+
+
+class EstadoPedidoWeb(str, enum.Enum):
+    pendiente   = "pendiente"
+    confirmado  = "confirmado"
+    preparando  = "preparando"
+    listo       = "listo"
+    en_camino   = "en_camino"
+    entregado   = "entregado"
+    cancelado   = "cancelado"
+
+
+class ClienteApp(Base):
+    """Usuarios de la app móvil/web — distintos de los clientes del POS."""
+    __tablename__ = "clientes_app"
+
+    id            = Column(Integer, primary_key=True)
+    nombre        = Column(String(150), nullable=False)
+    email         = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=True)
+    google_id     = Column(String(100), unique=True, nullable=True, index=True)
+    telefono      = Column(String(20), nullable=True)
+    foto_url      = Column(String(500), nullable=True)
+    # "cliente_app" (default) | "admin_web" (gestiona catálogo web)
+    rol           = Column(String(20), default="cliente_app", nullable=False)
+    activo        = Column(Boolean, default=True)
+    creado_en     = Column(DateTime, default=_dt.now)
+
+    pedidos = relationship("PedidoWeb", back_populates="cliente_app")
+
+
+class PedidoWeb(Base):
+    """Orden creada desde la app móvil/web."""
+    __tablename__ = "pedidos_web"
+
+    id                 = Column(Integer, primary_key=True)
+    cliente_app_id     = Column(Integer, ForeignKey("clientes_app.id"), nullable=False)
+    estado             = Column(SAEnum(EstadoPedidoWeb), default=EstadoPedidoWeb.pendiente)
+    total              = Column(Float, nullable=False)
+    direccion_entrega  = Column(Text, nullable=True)
+    notas              = Column(Text, nullable=True)
+    referencia_venta_id = Column(Integer, ForeignKey("ventas.id"), nullable=True)
+    creado_en          = Column(DateTime, default=_dt.now)
+    actualizado_en     = Column(DateTime, default=_dt.now, onupdate=_dt.now)
+
+    cliente_app = relationship("ClienteApp", back_populates="pedidos")
+    items       = relationship("PedidoWebItem", back_populates="pedido", cascade="all, delete-orphan")
+
+
+class PedidoWebItem(Base):
+    __tablename__ = "pedidos_web_items"
+
+    id              = Column(Integer, primary_key=True)
+    pedido_id       = Column(Integer, ForeignKey("pedidos_web.id"), nullable=False)
+    producto_id     = Column(Integer, ForeignKey("productos_web.id"), nullable=False)
+    cantidad        = Column(Integer, nullable=False)
+    precio_unitario = Column(Float, nullable=False)
+    subtotal        = Column(Float, nullable=False)
+
+    pedido   = relationship("PedidoWeb", back_populates="items")
+    producto = relationship("ProductoWeb")
+
+
 class SexoPaciente(str, enum.Enum):
     masculino = "masculino"
     femenino = "femenino"

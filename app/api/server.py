@@ -5,8 +5,8 @@ from pathlib import Path
 from app.api.routes import auth_routes, products_routes, sales_routes, inventory_routes
 from app.api.routes import dashboard_routes, pos_routes, customers_routes, employees_routes
 from app.api.routes import admin_routes, reports_routes, cortes_routes, ai_routes, suppliers_routes
-from app.api.routes import historial_routes
-from app.api.routes import marketing_routes
+from app.api.routes import historial_routes, marketing_routes
+from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, catalogo_web_routes
 import uvicorn
 import app.config as cfg
 
@@ -25,8 +25,7 @@ app = FastAPI(
 )
 
 _cors_origins = ["http://127.0.0.1", "http://localhost"]
-# En Vercel el frontend es same-origin, pero permitir *.vercel.app para previews
-_cors_regex = r"https://.*\.vercel\.app" if cfg._ON_VERCEL else None
+_cors_regex = r"https://(.*\.vercel\.app|farmacia-ebenezer\.com|.*\.farmacia-ebenezer\.com)"
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,8 +49,14 @@ app.include_router(reports_routes.router,   prefix="/api/reportes",   tags=["Rep
 app.include_router(cortes_routes.router,    prefix="/api/cortes",     tags=["Cortes"])
 app.include_router(ai_routes.router,        prefix="/api/ai",         tags=["AI"])
 app.include_router(suppliers_routes.router, prefix="/api/proveedores", tags=["Proveedores"])
-app.include_router(historial_routes.router,  prefix="/api/historial",  tags=["Historial"])
-app.include_router(marketing_routes.router,  prefix="/api/marketing",  tags=["Marketing"])
+app.include_router(historial_routes.router,    prefix="/api/historial",   tags=["Historial"])
+app.include_router(marketing_routes.router,    prefix="/api/marketing",   tags=["Marketing"])
+# App móvil/web — público (sin auth)
+app.include_router(public_routes.router,       prefix="/api/public",      tags=["Público"])
+# App móvil/web — clientes autenticados
+app.include_router(app_auth_routes.router,     prefix="/api/app/auth",    tags=["App Auth"])
+app.include_router(pedidos_web_routes.router,   prefix="/api/app/pedidos",  tags=["App Pedidos"])
+app.include_router(catalogo_web_routes.router,  prefix="/api/app/catalogo", tags=["App Catálogo Admin"])
 
 
 @app.get("/api/health")

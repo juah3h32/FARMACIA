@@ -1,0 +1,8 @@
+# Proteger la carpeta admin de listado
+Options -Indexes
+
+# Bloquear acceso directo a la carpeta uploads si no es una imagen
+<FilesMatch "\.php$">
+  Order Allow,Deny
+  Allow from all
+</FilesMatch>

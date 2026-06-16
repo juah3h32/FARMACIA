@@ -1,0 +1,16 @@
+Options -Indexes
+RewriteEngine On
+
+# Permitir acceso directo a archivos existentes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Todo lo demás va a index.php
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# CORS para preflight
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS, DELETE, PUT"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>

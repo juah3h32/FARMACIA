@@ -1,0 +1,35 @@
+{
+  "_comment": "PENDIENTE: Reemplazar este archivo con el google-services.json del nuevo proyecto Firebase de Farmacia Eben-Ezer. Descárgalo desde: Firebase Console → Tu Proyecto → Configuración → Android",
+  "project_info": {
+    "project_number": "PENDIENTE",
+    "project_id": "farmacia-eben-ezer",
+    "storage_bucket": "farmacia-eben-ezer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "PENDIENTE",
+        "android_client_info": {
+          "package_name": "com.farmaciaebenezer.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "PENDIENTE.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "PENDIENTE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
