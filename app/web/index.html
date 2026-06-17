@@ -737,6 +737,7 @@
   select.inp { appearance:auto; }
   textarea.inp { height:auto; padding:8px 11px; resize:vertical; }
   #pm-img-wrap:hover .pm-img-hover { opacity:1 !important; }
+  @keyframes chatDot { 0%,80%,100%{transform:scale(.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-900 antialiased overflow-hidden h-screen">
@@ -8420,6 +8421,177 @@ async function mktDescargarPromo() {
   const saved = await _saveFile(blob, fname, [{ description: 'Imagen PNG', accept: { 'image/png': ['.png'] } }]);
   if (saved) toast('Imagen guardada ✓', 'success');
 }
+
+// ── Asistente Farmacéutico ─────────────────────────────────────────────────
+let _chatHistory = [];
+let _chatOpen = false;
+
+function toggleChat() {
+  _chatOpen = !_chatOpen;
+  const panel = document.getElementById('chat-panel');
+  panel.style.display = _chatOpen ? 'flex' : 'none';
+  if (_chatOpen) {
+    panel.style.flexDirection = 'column';
+    lucide.createIcons();
+    document.getElementById('chat-input').focus();
+  }
+}
+
+function _chatAppendBot(text, sugeridos) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'flex gap-2 items-start';
+  let sugsHtml = '';
+  if (sugeridos && sugeridos.length) {
+    sugsHtml = '<div class="mt-2 flex flex-col gap-1.5">' +
+      sugeridos.map(p => {
+        const noStock = (p.stock||0) <= 0;
+        const bg     = noStock ? '#FEF2F2' : '#F0FDF4';
+        const bd     = noStock ? '#FECACA' : '#BBF7D0';
+        const clr    = noStock ? '#DC2626' : '#15803D';
+        const sub    = [p.concentracion, p.presentacion].filter(Boolean).join(' ');
+        return `<div class="rounded-xl px-3 py-2 flex items-center justify-between gap-2" style="background:${bg};border:1px solid ${bd}">
+          <div style="min-width:0;flex:1">
+            <p class="font-semibold truncate" style="font-size:11px;color:#0F172A">${p.nombre}</p>
+            ${sub ? `<p style="font-size:10px;color:#64748B">${sub}</p>` : ''}
+            <p style="font-size:11px;font-weight:700;color:${clr}">$${Number(p.precio_venta).toFixed(2)} · ${noStock?'Sin stock':p.stock+' en stock'}</p>
+          </div>
+          ${!noStock ? `<button onclick="chatAddToCart(${p.id})" class="flex-shrink-0 h-7 px-2 rounded-lg text-white font-semibold" style="font-size:11px;background:#1d2140;white-space:nowrap">+ Agregar</button>` : ''}
+        </div>`;
+      }).join('') + '</div>';
+  }
+  div.innerHTML = `
+    <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center" style="background:#1d2140">
+      <i data-lucide="bot" style="width:13px;height:13px;color:#fff"></i>
+    </div>
+    <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background:#fff;border:1px solid #E2E8F0;color:#374151;max-width:268px">
+      ${text.replace(/\n/g,'<br>')}${sugsHtml}
+    </div>`;
+  msgs.appendChild(div);
+  lucide.createIcons();
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function _chatAppendUser(text) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'flex justify-end';
+  div.innerHTML = `<div class="rounded-2xl rounded-tr-sm px-3 py-2 text-xs text-white" style="background:#1d2140;max-width:250px">${text}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function _chatShowTyping() {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.id = 'chat-typing';
+  div.className = 'flex gap-2 items-start';
+  div.innerHTML = `
+    <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center" style="background:#1d2140">
+      <i data-lucide="bot" style="width:13px;height:13px;color:#fff"></i>
+    </div>
+    <div class="rounded-2xl rounded-tl-sm px-3 py-2.5" style="background:#fff;border:1px solid #E2E8F0">
+      <div class="flex gap-1 items-center">
+        <span style="width:6px;height:6px;border-radius:50%;background:#94A3B8;display:inline-block;animation:chatDot 1.2s infinite 0s"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:#94A3B8;display:inline-block;animation:chatDot 1.2s infinite .4s"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:#94A3B8;display:inline-block;animation:chatDot 1.2s infinite .8s"></span>
+      </div>
+    </div>`;
+  msgs.appendChild(div);
+  lucide.createIcons();
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const text = (inp.value||'').trim();
+  if (!text) return;
+  inp.value = '';
+  inp.disabled = true;
+  document.getElementById('chat-send-btn').disabled = true;
+  _chatAppendUser(text);
+  _chatShowTyping();
+  try {
+    const res = await api('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ mensaje: text, historial: _chatHistory.slice(-8) }),
+    });
+    document.getElementById('chat-typing')?.remove();
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      _chatAppendBot(e.detail || 'Error al consultar el asistente.', []);
+    } else {
+      const d = await res.json();
+      _chatHistory.push({ rol:'user', contenido:text });
+      _chatHistory.push({ rol:'assistant', contenido:d.respuesta });
+      if (_chatHistory.length > 16) _chatHistory = _chatHistory.slice(-16);
+      _chatAppendBot(d.respuesta, d.sugeridos||[]);
+    }
+  } catch(err) {
+    document.getElementById('chat-typing')?.remove();
+    _chatAppendBot('Error de conexión. Intenta de nuevo.', []);
+  } finally {
+    inp.disabled = false;
+    document.getElementById('chat-send-btn').disabled = false;
+    inp.focus();
+  }
+}
+
+function chatAddToCart(pid) {
+  if (S.currentPage !== 'pos') navigate('pos');
+  addToCart(pid);
+  toast('Producto agregado al carrito ✓', 'success');
+}
 </script>
+
+<!-- ── Asistente Farmacéutico (FAB + panel) ─────────────────────────────── -->
+<button id="chat-fab" onclick="toggleChat()"
+  class="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 h-12 rounded-2xl font-semibold text-white text-sm shadow-lg transition-all hover:scale-105 active:scale-95"
+  style="background:#1d2140;box-shadow:0 4px 20px rgba(29,33,64,.40)">
+  <i data-lucide="bot" style="width:18px;height:18px"></i>
+  <span>Asistente</span>
+</button>
+
+<div id="chat-panel" class="fixed z-50 flex-col rounded-2xl overflow-hidden shadow-2xl"
+     style="display:none;bottom:80px;right:20px;width:360px;height:530px;background:#fff;border:1px solid #E2E8F0">
+  <!-- Header -->
+  <div class="flex items-center justify-between px-4 py-3 flex-shrink-0" style="background:#1d2140">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(255,255,255,.15)">
+        <i data-lucide="bot" style="width:16px;height:16px;color:#fff"></i>
+      </div>
+      <div>
+        <p class="font-bold text-white text-sm">Farmacito</p>
+        <p class="text-xs" style="color:rgba(255,255,255,.6)">Asistente farmacéutico IA</p>
+      </div>
+    </div>
+    <button onclick="toggleChat()" class="w-7 h-7 rounded-lg flex items-center justify-center" style="color:rgba(255,255,255,.7)">
+      <i data-lucide="x" style="width:15px;height:15px"></i>
+    </button>
+  </div>
+  <!-- Messages -->
+  <div id="chat-messages" class="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3 custom-scrollbar" style="background:#F8FAFF">
+    <div class="flex gap-2 items-start">
+      <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center" style="background:#1d2140">
+        <i data-lucide="bot" style="width:13px;height:13px;color:#fff"></i>
+      </div>
+      <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background:#fff;border:1px solid #E2E8F0;color:#374151;max-width:268px">
+        ¡Hola! Soy Farmacito 💊 Consúltame sobre medicamentos o dime síntomas y te digo qué tienes disponible.
+        <br><span style="color:#94A3B8;font-size:10px">Ej: "¿Tienes naproxeno?" · "Qué dar para dolor de cabeza"</span>
+      </div>
+    </div>
+  </div>
+  <!-- Input -->
+  <div class="flex items-center gap-2 px-3 py-3 flex-shrink-0" style="border-top:1px solid #E2E8F0;background:#fff">
+    <input id="chat-input" type="text" placeholder="Escribe tu consulta..."
+      class="flex-1 h-9 px-3 rounded-xl text-xs border" style="border-color:#E2E8F0;outline:none;color:#0F172A"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendChat()"/>
+    <button onclick="sendChat()" id="chat-send-btn"
+      class="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+      style="background:#1d2140">
+      <i data-lucide="send" style="width:14px;height:14px"></i>
+    </button>
+  </div>
+</div>
 </body>
 </html>
