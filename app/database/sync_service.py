@@ -64,6 +64,22 @@ _watermarks: dict[str, int] = _load_watermarks()
 _lock  = threading.RLock()
 _dirty = threading.Event()   # set after any local write → immediate sync
 
+# Callbacks fired (in sync thread) after every successful sync_from_turso pull.
+_post_sync_hooks: list = []
+
+
+def register_post_sync(callback) -> None:
+    """Register a callable invoked after each Turso pull completes."""
+    _post_sync_hooks.append(callback)
+
+
+def _fire_post_sync() -> None:
+    for cb in _post_sync_hooks:
+        try:
+            cb()
+        except Exception as e:
+            print(f"[Sync] post-sync hook error: {e}")
+
 
 def mark_dirty() -> None:
     """Call after any local SQLite write to trigger immediate Turso sync."""
@@ -466,19 +482,14 @@ def sync_from_turso() -> int:
                         sql_insert = f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql_insert, rows)
                         # Pass 2: update existing rows — last-writer-wins by actualizado_en.
-                        # stock/piezas_sueltas: ALWAYS keep local (never overwritten by pull).
+                        # All fields (including stock/piezas_sueltas) use actualizado_en:
+                        # take Turso value only if Turso's timestamp is strictly newer than
+                        # local — so a sale on THIS PC (which updates actualizado_en) always
+                        # wins over an older Turso snapshot, while a newer sale on ANOTHER PC
+                        # correctly overwrites the stale local stock.
                         # imagen_url/descripcion: keep local if Turso sends null.
-                        # All other fields: take Turso value ONLY IF Turso's actualizado_en
-                        #   is strictly newer than local — prevents pull from reverting a local
-                        #   edit that was pushed to Turso but hasn't propagated yet in the
-                        #   Turso read path (HTTP round-trip race).
-                        # All non-stock fields use actualizado_en as conflict resolver:
-                        # take Turso value only if Turso's timestamp is strictly newer.
-                        # stock/piezas_sueltas always keep local (never pulled from Turso).
                         _has_ts = "actualizado_en" in cols
                         set_clause = ", ".join(
-                            f"{c}={table}.{c}"
-                            if c in ("stock", "piezas_sueltas") else
                             (
                                 f"{c}=CASE WHEN excluded.actualizado_en > {table}.actualizado_en"
                                 f" THEN excluded.{c} ELSE {table}.{c} END"
@@ -528,6 +539,7 @@ def sync_from_turso() -> int:
             lconn.execute("PRAGMA foreign_keys = ON")
             lconn.commit()
             print(f"[Sync] Pull complete — {total} rows merged from Turso")
+            _fire_post_sync()
             return total
         except Exception as e:
             lconn.rollback()
@@ -601,7 +613,7 @@ def make_daily_backup() -> bool:
     return True
 
 
-def start_background_sync(interval: int = 60) -> threading.Thread:
+def start_background_sync(interval: int = 30) -> threading.Thread:
     """Daemon thread: daily backup + bidirectional sync every cycle.
 
     On write (mark_dirty): push local → Turso immediately, then pull Turso → local.

@@ -108,6 +108,10 @@ class MainWindow(ctk.CTkToplevel):
         self._init_scanner_service()
         updater_service.check_for_update_async(self._on_update_check)
 
+        if cfg.TURSO_SYNC:
+            from app.database.sync_service import register_post_sync
+            register_post_sync(lambda: self.after(0, self._on_turso_pull))
+
     def _center_window(self):
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -665,6 +669,14 @@ class MainWindow(ctk.CTkToplevel):
             ok = scanner_service.start_serial(port, baud)
             return ok
         return True  # HID mode needs no action here
+
+    # ── Turso pull callback ───────────────────────────────────────────────────
+
+    def _on_turso_pull(self):
+        """Called (on main thread) after every successful sync_from_turso pull."""
+        if self.current_screen and hasattr(self.current_screen, "on_show"):
+            self.current_screen.on_show()
+        self._load_stats()
 
     # ── Auto-update ───────────────────────────────────────────────────────────
 

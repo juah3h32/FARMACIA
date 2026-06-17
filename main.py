@@ -50,7 +50,7 @@ def main():
     if cfg.TURSO_SYNC:
         from app.database.sync_service import import_from_turso, start_background_sync
         threading.Thread(target=import_from_turso, daemon=True, name="TursoImport").start()
-        start_background_sync(interval=60)
+        start_background_sync(interval=30)
 
     def _api_with_log():
         try:
