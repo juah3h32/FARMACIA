@@ -38,11 +38,16 @@ LOGO_PATH        = _LOGOS / "LOGO.png"
 LOGO_BLANCO_PATH = _LOGOS / "BLANCO_LOGO.png"
 LOGO_PROMO_PATH  = _PROMO / "espromo.webp"
 
-# Fuentes — Montserrat (busca sistema y carpeta usuario, fallback Arial)
-_SYS_FONTS  = Path("C:/Windows/Fonts")
-_USER_FONTS = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts"
+# Fuentes — busca primero en carpeta bundled, luego sistema, fallback Arial
+_SYS_FONTS      = Path("C:/Windows/Fonts")
+_USER_FONTS     = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts"
+_BUNDLED_FONTS  = _BASE / "Font Montserrat"
 
 def _font_path(name: str, fallback: str) -> str | None:
+    # Bundled fonts first — garantizan tipografía idéntica en cualquier PC
+    p = _BUNDLED_FONTS / name
+    if p.exists():
+        return str(p)
     for base in (_USER_FONTS, _SYS_FONTS):
         p = base / name
         if p.exists():
@@ -662,7 +667,7 @@ def _rounded_crop(img: Image.Image, w: int, h: int, radius: int = 32) -> Image.I
 
 
 def _wrap_name(text: str, max_chars: int) -> list:
-    """Wrap product name to lines of at most max_chars, respecting word boundaries."""
+    """Wrap product name by char count (legacy — only used by layout_azul)."""
     words = text.split()
     lines, cur = [], ""
     for w in words:
@@ -676,6 +681,43 @@ def _wrap_name(text: str, max_chars: int) -> list:
     if cur:
         lines.append(cur)
     return lines or [text[:max_chars]]
+
+
+def _fit_name(draw, text: str, font_path, max_w: int,
+              base_size: int = 58, min_size: int = 26, max_lines: int = 3):
+    """Wrap text to fit max_w pixels, auto-shrink font until all lines fit."""
+    for size in range(base_size, min_size - 1, -4):
+        f = _pil_font(font_path, size)
+        words = text.split()
+        lines: list[str] = []
+        cur = ""
+        for w in words:
+            test = (cur + " " + w).strip() if cur else w
+            if draw.textlength(test, font=f) <= max_w:
+                cur = test
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        if (len(lines) <= max_lines
+                and all(draw.textlength(ln, font=f) <= max_w for ln in lines)):
+            return lines, f
+    f = _pil_font(font_path, min_size)
+    words = text.split()
+    lines, cur = [], ""
+    for w in words:
+        test = (cur + " " + w).strip() if cur else w
+        if draw.textlength(test, font=f) <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines[:max_lines], f
 
 
 def _load_logo_pil() -> Image.Image | None:
@@ -726,13 +768,11 @@ def _generar_imagen_promo(producto, precio_promo: float,
     if usar_imagen and producto.imagen_url:
         prod_img = _fetch_cloudinary_image(producto.imagen_url)
 
-    if prod_img is not None:
-        return _layout_blanco(
-            producto, precio_promo, precio_tachado, texto_extra,
-            prod_img, dia_oferta, descripcion_promo,
-        )
-    else:
-        return _layout_azul(producto, precio_promo, precio_tachado, texto_extra)
+    # Siempre usa layout blanco — con foto si hay, sin foto el lado derecho queda blanco
+    return _layout_blanco(
+        producto, precio_promo, precio_tachado, texto_extra,
+        prod_img, dia_oferta, descripcion_promo,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -861,9 +901,9 @@ def _layout_azul(producto, precio_promo: float,
 
 def _layout_blanco(producto, precio_promo: float,
                     precio_tachado: float, texto_extra: str,
-                    prod_img: Image.Image, dia_oferta: str = "",
+                    prod_img: "Image.Image | None" = None, dia_oferta: str = "",
                     descripcion_promo: str = "") -> Image.Image:
-    """Layout horizontal: info a la izquierda, foto grande a la derecha."""
+    """Layout horizontal: info a la izquierda, foto grande a la derecha (o blanco si no hay foto)."""
     W, H   = 1080, 1080
     HEADER = 130
     FOOTER = 72
@@ -918,25 +958,25 @@ def _layout_blanco(producto, precio_promo: float,
               font=f_badge, fill=WHITE, anchor="mm")
     cy += bh + 26
 
-    # ── LEFT: nombre ─────────────────────────────────────────────────────────
-    f_name = _pil_font(FONT_BLACK, 58)
-    lines  = _wrap_name(producto.nombre.upper(), 13)
-    for i, line in enumerate(lines[:3]):
+    # ── LEFT: nombre (pixel-based wrap, auto-shrink font) ────────────────────
+    lines, f_name = _fit_name(draw, producto.nombre.upper(), FONT_BLACK,
+                               max_w=LXR - LX, base_size=58, min_size=26, max_lines=3)
+    for i, line in enumerate(lines):
         bb = draw.textbbox((LX, cy), line, font=f_name, anchor="lt")
         draw.text((LX, cy), line, font=f_name, fill=DARK, anchor="lt")
-        cy = bb[3] + (6 if i < len(lines[:3]) - 1 else 0)
+        cy = bb[3] + (6 if i < len(lines) - 1 else 0)
     cy += 16
 
-    # ── LEFT: descripción IA ─────────────────────────────────────────────────
+    # ── LEFT: descripción IA (completa, sin cortar) ───────────────────────────
     if descripcion_promo:
-        f_desc = _pil_font(FONT_REG, 17)
-        max_w  = LXR - LX   # 482 px
-        words  = descripcion_promo.split()
+        f_desc   = _pil_font(FONT_REG, 15)
+        desc_max = LXR - LX   # 482 px
+        words    = descripcion_promo.split()
         desc_lines: list[str] = []
         cur = ""
         for w in words:
             test = (cur + " " + w).strip() if cur else w
-            if draw.textlength(test, font=f_desc) <= max_w:
+            if draw.textlength(test, font=f_desc) <= desc_max:
                 cur = test
             else:
                 if cur:
@@ -944,18 +984,12 @@ def _layout_blanco(producto, precio_promo: float,
                 cur = w
         if cur:
             desc_lines.append(cur)
-        if len(desc_lines) > 3:
-            desc_lines = desc_lines[:3]
-            last = desc_lines[2]
-            while last and draw.textlength(last + "…", font=f_desc) > max_w:
-                last = last.rsplit(" ", 1)[0]
-            desc_lines[2] = (last + "…") if last else "…"
         cy += 10
         for i, dl in enumerate(desc_lines):
             draw.text((LX, cy), dl, font=f_desc, fill=GRAY, anchor="lt")
             bb = draw.textbbox((LX, cy), dl, font=f_desc, anchor="lt")
-            cy = bb[3] + (4 if i < len(desc_lines) - 1 else 0)
-        cy += 14
+            cy = bb[3] + (3 if i < len(desc_lines) - 1 else 0)
+        cy += 12
 
     # ── LEFT: presentación ───────────────────────────────────────────────────
     raw_sub = [producto.presentacion, producto.concentracion, producto.contenido]
@@ -1019,20 +1053,21 @@ def _layout_blanco(producto, precio_promo: float,
     if texto_extra:
         draw.text((LX, py + 8), texto_extra, font=f_extra, fill=GRAY, anchor="lt")
 
-    # ── RIGHT: foto grande centrada ───────────────────────────────────────────
+    # ── RIGHT: foto grande centrada (si hay imagen) ───────────────────────────
     RW = RXR - RX      # 500
     RH = H - FOOTER - CONTENT_Y - 20
-    try:
-        pimg   = prod_img.convert("RGBA")
-        iw, ih = pimg.size
-        scale  = min(RW / iw, RH / ih) * 0.90
-        nw, nh = int(iw * scale), int(ih * scale)
-        pfit   = pimg.resize((nw, nh), Image.LANCZOS)
-        px = RX + (RW - nw) // 2
-        py = CONTENT_Y + 20 + (RH - nh) // 2
-        img.paste(pfit.convert("RGB"), (px, py), pfit.split()[3])
-    except Exception:
-        pass
+    if prod_img is not None:
+        try:
+            pimg   = prod_img.convert("RGBA")
+            iw, ih = pimg.size
+            scale  = min(RW / iw, RH / ih) * 0.90
+            nw, nh = int(iw * scale), int(ih * scale)
+            pfit   = pimg.resize((nw, nh), Image.LANCZOS)
+            px_img = RX + (RW - nw) // 2
+            py_img = CONTENT_Y + 20 + (RH - nh) // 2
+            img.paste(pfit.convert("RGB"), (px_img, py_img), pfit.split()[3])
+        except Exception:
+            pass
 
     # ── Footer ────────────────────────────────────────────────────────────────
     draw.rectangle([(0, H - FOOTER), (W, H)], fill=NAVY)
