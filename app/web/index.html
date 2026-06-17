@@ -835,6 +835,22 @@
       <nav id="sidebar-nav" class="flex flex-col gap-0.5"></nav>
     </div>
 
+    <!-- Farmacito IA -->
+    <div class="px-3 pb-2">
+      <button onclick="toggleChat()"
+        class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all hover:opacity-90 active:scale-95"
+        style="background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;border:none;cursor:pointer">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.2)">
+          <i data-lucide="bot" style="width:14px;height:14px;color:#fff"></i>
+        </div>
+        <div class="text-left">
+          <p style="font-size:12px;font-weight:700;line-height:1.1">Farmacito IA</p>
+          <p style="font-size:9px;font-weight:400;opacity:.8;line-height:1.1">Asistente farmacéutico</p>
+        </div>
+        <i data-lucide="sparkles" style="width:13px;height:13px;margin-left:auto;opacity:.7"></i>
+      </button>
+    </div>
+
     <!-- User card -->
     <div class="p-3" style="border-top:1px solid rgba(255,255,255,.06)">
       <button onclick="openProfileModal()" title="Perfil y sesión"
@@ -8545,15 +8561,8 @@ function chatAddToCart(pid) {
 </script>
 
 <!-- ── Asistente Farmacéutico (FAB + panel) ─────────────────────────────── -->
-<button id="chat-fab" onclick="toggleChat()"
-  class="fixed z-50 flex items-center gap-2 px-4 h-10 rounded-2xl font-semibold text-white text-sm shadow-lg transition-all hover:scale-105 active:scale-95"
-  style="bottom:20px;left:210px;background:#1d2140;box-shadow:0 4px 20px rgba(29,33,64,.40)">
-  <i data-lucide="bot" style="width:16px;height:16px"></i>
-  <span>Asistente</span>
-</button>
-
 <div id="chat-panel" class="fixed z-50 flex-col rounded-2xl overflow-hidden shadow-2xl"
-     style="display:none;bottom:72px;left:210px;width:360px;height:530px;background:#fff;border:1px solid #E2E8F0">
+     style="display:none;bottom:20px;left:216px;width:360px;height:540px;background:#fff;border:1px solid #E2E8F0;box-shadow:0 8px 40px rgba(99,102,241,.18)">
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 flex-shrink-0" style="background:#1d2140">
     <div class="flex items-center gap-2">
