@@ -5,7 +5,7 @@ from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
 
-CHAR_LIMIT = 420
+CHAR_LIMIT = 500
 
 
 class DescripcionRequest(BaseModel):
@@ -53,6 +53,7 @@ def generar_descripcion(body: DescripcionRequest, payload: dict = Depends(get_cu
     prompt = f"""Genera una descripción farmacéutica breve y precisa para este medicamento.
 La descripción debe incluir: indicaciones principales, mecanismo de acción o grupo terapéutico, y advertencias clave.
 Usa lenguaje técnico-profesional en español. Máximo {CHAR_LIMIT} caracteres. Sin títulos, sin listas, texto corrido.
+IMPORTANTE: termina siempre en oración completa, nunca dejes la descripción cortada a la mitad.
 
 {info_producto}
 
@@ -61,7 +62,7 @@ Descripción:"""
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=300,
+            max_tokens=400,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
@@ -75,7 +76,13 @@ Descripción:"""
 
     text = (response.choices[0].message.content or "").strip()
     if len(text) > CHAR_LIMIT:
-        text = text[:CHAR_LIMIT].rsplit(" ", 1)[0] + "…"
+        # Cortar en el último punto de una oración completa dentro del límite
+        chunk = text[:CHAR_LIMIT]
+        last_end = max(chunk.rfind(". "), chunk.rfind("! "), chunk.rfind("? "))
+        if last_end > CHAR_LIMIT // 3:
+            text = chunk[:last_end + 1].strip()
+        else:
+            text = chunk.rsplit(" ", 1)[0].rstrip(",;:") + "."
 
     return {"descripcion": text}
 
