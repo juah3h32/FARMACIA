@@ -31,7 +31,7 @@ def _rate_limit(ip: str):
 
 def get_current_cliente_app(credentials: HTTPAuthorizationCredentials = Depends(security)):
     payload = verify_api_token(credentials.credentials)
-    if not payload or payload.get("rol") not in ("cliente_app", "admin_web"):
+    if not payload or payload.get("rol") not in ("cliente_app", "admin_web", "admin"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
     return payload
 

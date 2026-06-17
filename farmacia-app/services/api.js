@@ -3,7 +3,7 @@
 // Base URL: variable de entorno EXPO_PUBLIC_API_URL en Vercel, o dominio prod.
 // ─────────────────────────────────────────────────────────────────────────────
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "https://farmacia-ebenezer.com";
+  process.env.EXPO_PUBLIC_API_URL ?? "https://farmacia-iota-two.vercel.app";
 
 const DEFAULT_TIMEOUT = 30000;
 

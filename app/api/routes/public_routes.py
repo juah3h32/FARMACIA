@@ -1,16 +1,16 @@
 """
 Rutas públicas — sin autenticación.
-Catálogo web/app de Farmacia Eben-Ezer (ProductoWeb, separado del POS).
+Sirve directamente desde la tabla Producto del POS (sincronizada con Turso).
 """
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 from app.database.connection import get_db_session
-from app.database.models import ProductoWeb, CategoriaWeb
+from app.database.models import Producto, Categoria
 
 router = APIRouter()
 
 
-def _pub_product(p: ProductoWeb) -> dict:
+def _pub_product(p: Producto) -> dict:
     return {
         "id":              p.id,
         "nombre":          p.nombre,
@@ -19,16 +19,16 @@ def _pub_product(p: ProductoWeb) -> dict:
         "descripcion":     p.descripcion,
         "categoria_id":    p.categoria_id,
         "categoria_nombre": p.categoria.nombre if p.categoria else None,
-        "precio_venta":    p.precio,
-        "precio_tachado":  p.precio_tachado,
-        "aplica_iva":      False,
-        "stock":           None,
+        "precio_venta":    p.precio_venta,
+        "precio_tachado":  None,
+        "aplica_iva":      p.aplica_iva,
+        "stock":           p.stock,
         "requiere_receta": p.requiere_receta,
         "presentacion":    p.presentacion,
         "concentracion":   p.concentracion,
         "contenido":       p.contenido,
         "imagen_url":      p.imagen_url,
-        "destacado":       p.destacado,
+        "destacado":       False,
     }
 
 
@@ -41,20 +41,20 @@ def productos_publicos(
     from sqlalchemy.orm import joinedload
     db = get_db_session()
     try:
-        q = db.query(ProductoWeb).options(joinedload(ProductoWeb.categoria)).filter(
-            ProductoWeb.disponible == True,
+        q = (
+            db.query(Producto)
+            .options(joinedload(Producto.categoria))
+            .filter(Producto.activo == True, Producto.stock > 0)
         )
         if busqueda:
             q = q.filter(
-                ProductoWeb.nombre.ilike(f"%{busqueda}%") |
-                ProductoWeb.nombre_generico.ilike(f"%{busqueda}%") |
-                ProductoWeb.marca.ilike(f"%{busqueda}%")
+                Producto.nombre.ilike(f"%{busqueda}%") |
+                Producto.nombre_generico.ilike(f"%{busqueda}%") |
+                Producto.marca.ilike(f"%{busqueda}%")
             )
         if categoria_id:
-            q = q.filter(ProductoWeb.categoria_id == categoria_id)
-        if destacados:
-            q = q.filter(ProductoWeb.destacado == True)
-        return [_pub_product(p) for p in q.order_by(ProductoWeb.orden, ProductoWeb.nombre).all()]
+            q = q.filter(Producto.categoria_id == categoria_id)
+        return [_pub_product(p) for p in q.order_by(Producto.nombre).all()]
     finally:
         db.close()
 
@@ -64,10 +64,12 @@ def producto_publico(producto_id: int):
     from sqlalchemy.orm import joinedload
     db = get_db_session()
     try:
-        p = db.query(ProductoWeb).options(joinedload(ProductoWeb.categoria)).filter(
-            ProductoWeb.id == producto_id,
-            ProductoWeb.disponible == True,
-        ).first()
+        p = (
+            db.query(Producto)
+            .options(joinedload(Producto.categoria))
+            .filter(Producto.id == producto_id, Producto.activo == True)
+            .first()
+        )
         if not p:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
         return _pub_product(p)
@@ -79,11 +81,13 @@ def producto_publico(producto_id: int):
 def categorias_publicas():
     db = get_db_session()
     try:
-        cats = db.query(CategoriaWeb).filter(
-            CategoriaWeb.activo == True,
-        ).order_by(CategoriaWeb.orden, CategoriaWeb.nombre).all()
+        cats = (
+            db.query(Categoria)
+            .order_by(Categoria.nombre)
+            .all()
+        )
         return [
-            {"id": c.id, "nombre": c.nombre, "imagen_url": c.imagen_url}
+            {"id": c.id, "nombre": c.nombre, "imagen_url": None}
             for c in cats
         ]
     finally:
