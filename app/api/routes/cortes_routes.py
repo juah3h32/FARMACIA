@@ -70,6 +70,7 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
                 Venta.usuario_id == usuario_id,
                 Venta.creado_en >= c.abierto_en,
                 Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
             )
             .all()
         )
@@ -166,6 +167,7 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
                 Venta.usuario_id == usuario_id,
                 Venta.creado_en >= c.abierto_en,
                 Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
             )
             .all()
         )

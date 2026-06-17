@@ -401,14 +401,15 @@ class PrinterService:
             else:
                 qty_prefix = f"{cant:>2} PZ "  # always 6 chars
 
-            # First line: qty + first NAME_W chars + price
-            name_first = prod_full[:NAME_W]
-            lines.append(f"{qty_prefix}{name_first:<{NAME_W}}{price_str:>{PRICE_W}}")
-            # Continuation lines if name longer than NAME_W
-            resto = prod_full[NAME_W:]
+            # Adapt name width if price_str is longer than PRICE_W (prevents overflow)
+            eff_price_w = max(PRICE_W, len(price_str))
+            eff_name_w  = max(4, W - QTY_W - eff_price_w)
+            name_first = prod_full[:eff_name_w]
+            lines.append(f"{qty_prefix}{name_first:<{eff_name_w}}{price_str:>{eff_price_w}}")
+            resto = prod_full[eff_name_w:]
             indent = " " * QTY_W
             while resto:
-                chunk, resto = resto[:NAME_W], resto[NAME_W:]
+                chunk, resto = resto[:eff_name_w], resto[eff_name_w:]
                 lines.append(f"{indent}{chunk}")
 
         # ── Totales ───────────────────────────────────────────────────────────
@@ -556,39 +557,38 @@ class PrinterService:
             
             hDC = win32ui.CreateDC()
             hDC.CreatePrinterDC(self.printer_name)
-            
-            # Font size scales with paper width so text fits the printable area
-            # 80mm: font_size=11 | 58mm: font_size=9 | 50mm: font_size=7
-            if self.width > 40:
-                font_size = 11
-            elif self.width > 28:
-                font_size = 9
-            else:
-                font_size = 7
+
+            # Compute char height dynamically so self.width chars fit the printable area.
+            # HORZRES = printable page width in device pixels (respects actual paper size).
+            page_w = hDC.GetDeviceCaps(win32con.HORZRES)
+            margin = max(5, page_w // 50)          # ~2% left+right margin
+            usable = page_w - margin * 2
+            # Courier New monospace: char_width ~= char_height * 0.60
+            char_h = max(10, int(usable / self.width / 0.60))
+            line_h = int(char_h * 1.30)
 
             hDC.StartDoc("Ticket Farmacia")
             hDC.StartPage()
-            
+
             font = win32ui.CreateFont({
-                "name": "Courier New",
-                "height": -int(font_size * 2), # Aumentado para mayor legibilidad
-                "weight": 600, # Más negrita
+                "name":   "Courier New",
+                "height": -char_h,
+                "weight": 500,
             })
             hDC.SelectObject(font)
-            hDC.SetTextColor(0) # Forzar negro puro (RGB 0,0,0)
-            
-            y = 20
+            hDC.SetTextColor(0)
+
+            y = margin
             for line in ticket.split("\n"):
-                if not line.strip() and y > 20: 
-                    y += int(font_size * 1.5)
+                if not line.strip() and y > margin:
+                    y += line_h // 2
                     continue
-                hDC.TextOut(5, y, line)
-                y += int(font_size * 2.5) # Más espaciado entre líneas
-            
+                hDC.TextOut(margin, y, line)
+                y += line_h
+
             hDC.EndPage()
             hDC.EndDoc()
             hDC.DeleteDC()
-            
             return True
         except Exception:
             _log(f"EXCEPCION _print_windows: {traceback.format_exc()}")
