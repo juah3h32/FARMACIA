@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date as _date_type
 from sqlalchemy import func
 from app.database.connection import get_db_session
 from app.database.models import CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
@@ -175,14 +175,28 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
         tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
         tv = ef + tj + tr
+        venta_ids = [v.id for v in ventas]
 
-        c.monto_cierre       = body.monto_cierre
-        c.cerrado_en         = datetime.now()
-        c.total_ventas       = tv
-        c.total_efectivo     = ef
-        c.total_tarjeta      = tj
+        # Cost of goods sold
+        if venta_ids:
+            cost_rows = (
+                db.query(ItemVenta.cantidad, Producto.precio_compra)
+                .join(Producto, ItemVenta.producto_id == Producto.id)
+                .filter(ItemVenta.venta_id.in_(venta_ids))
+                .all()
+            )
+            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+        else:
+            total_costo = 0.0
+
+        c.monto_cierre        = body.monto_cierre
+        c.cerrado_en          = datetime.now()
+        c.total_ventas        = tv
+        c.total_efectivo      = ef
+        c.total_tarjeta       = tj
         c.total_transferencia = tr
-        c.num_ventas         = len(ventas)
+        c.total_costo         = total_costo
+        c.num_ventas          = len(ventas)
         if body.notas:
             c.notas = body.notas
 
@@ -194,16 +208,18 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             bg.add_task(sync_to_turso)
         diferencia = body.monto_cierre - (apertura + ef)
         return {
-            "ok":           True,
-            "num_ventas":   len(ventas),
-            "total_ventas": tv,
-            "efectivo":     ef,
-            "tarjeta":      tj,
+            "ok":            True,
+            "num_ventas":    len(ventas),
+            "total_ventas":  tv,
+            "efectivo":      ef,
+            "tarjeta":       tj,
             "transferencia": tr,
+            "total_costo":   total_costo,
+            "ganancia":      tv - total_costo,
             "monto_apertura": apertura,
-            "monto_cierre": body.monto_cierre,
-            "esperado":     apertura + ef,
-            "diferencia":   diferencia,
+            "monto_cierre":  body.monto_cierre,
+            "esperado":      apertura + ef,
+            "diferencia":    diferencia,
         }
     except HTTPException:
         raise
@@ -235,11 +251,12 @@ def historial_cajero(
             dur = None
             if c.cerrado_en and c.abierto_en:
                 dur = int((c.cerrado_en - c.abierto_en).total_seconds() / 60)
-            ef  = c.total_efectivo  or 0.0
-            tj  = c.total_tarjeta   or 0.0
-            tr  = c.total_transferencia or 0.0
-            tv  = c.total_ventas    or 0.0
-            ape = c.monto_apertura  or 0.0
+            ef  = c.total_efectivo       or 0.0
+            tj  = c.total_tarjeta        or 0.0
+            tr  = c.total_transferencia  or 0.0
+            tv  = c.total_ventas         or 0.0
+            tc  = c.total_costo          or 0.0
+            ape = c.monto_apertura       or 0.0
             dif = (c.monto_cierre - (ape + ef)) if c.monto_cierre is not None else None
             result.append({
                 "id":               c.id,
@@ -251,6 +268,8 @@ def historial_cajero(
                 "total_efectivo":   ef,
                 "total_tarjeta":    tj,
                 "total_transferencia": tr,
+                "total_costo":      tc,
+                "ganancia":         tv - tc,
                 "monto_apertura":   ape,
                 "monto_cierre":     c.monto_cierre,
                 "esperado_caja":    ape + ef,

@@ -212,10 +212,48 @@ class SettingsScreen(ctk.CTkFrame):
             font=ctk.CTkFont(size=11), text_color="gray60", justify="left",
         ).grid(row=5, column=0, columnspan=2, padx=16, pady=(0, 12), sticky="w")
 
+        # Seccion: Turno Automático
+        self._seccion(scroll, "⏰ Turno Automático", row=9)
+        turno_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        turno_frame.grid(row=10, column=0, sticky="ew", pady=(0, 16))
+        turno_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(turno_frame, text="Cierre automático activo:",
+                     anchor="e", font=ctk.CTkFont(size=12)).grid(
+            row=0, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.chk_turno_activo = ctk.CTkCheckBox(turno_frame, text="")
+        self.chk_turno_activo.grid(row=0, column=1, padx=(0, 16), pady=8, sticky="w")
+
+        ctk.CTkLabel(turno_frame, text="Hora de cierre (HH:MM):",
+                     anchor="e", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=0, padx=(16, 8), pady=8, sticky="e")
+        self.entry_turno_fin = ctk.CTkEntry(turno_frame, height=34, width=100,
+                                             placeholder_text="21:00")
+        self.entry_turno_fin.grid(row=1, column=1, padx=(0, 16), pady=8, sticky="w")
+
+        ctk.CTkLabel(turno_frame,
+                     text="El sistema cerrará automáticamente el turno activo a la hora indicada.\n"
+                          "También se cierra si cierras el programa con turno abierto.",
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     justify="left").grid(row=2, column=0, columnspan=2, padx=16, pady=(0, 4), sticky="w")
+
+        btn_turno_row = ctk.CTkFrame(turno_frame, fg_color="transparent")
+        btn_turno_row.grid(row=3, column=0, columnspan=2, padx=16, pady=(4, 16))
+        ctk.CTkButton(
+            btn_turno_row, text="💾 Guardar", height=36, width=160,
+            fg_color="#4CAF50", hover_color="#388E3C",
+            command=self._guardar_turno_auto,
+        ).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(
+            btn_turno_row, text="🔒 Cerrar turnos abiertos ahora", height=36,
+            fg_color="#F59E0B", hover_color="#D97706", text_color="white",
+            command=self._forzar_cierre_turnos,
+        ).pack(side="left")
+
         # Seccion: Sistema
-        self._seccion(scroll, "🖥️ Sistema", row=9)
+        self._seccion(scroll, "🖥️ Sistema", row=11)
         sys_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
-        sys_frame.grid(row=10, column=0, sticky="ew", pady=(0, 16))
+        sys_frame.grid(row=12, column=0, sticky="ew", pady=(0, 16))
 
         ctk.CTkLabel(sys_frame, text="Modo de apariencia:", font=ctk.CTkFont(size=12)).pack(
             anchor="w", padx=16, pady=(12, 4))
@@ -232,9 +270,9 @@ class SettingsScreen(ctk.CTkFrame):
         # ── Base de Datos + Zona de Peligro (solo admin) ──────────────────────
         from app.database.models import RolUsuario
         if self.user.rol == RolUsuario.admin:
-            self._seccion(scroll, "🗄️ Base de Datos", row=11)
+            self._seccion(scroll, "🗄️ Base de Datos", row=13)
             db_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
-            db_frame.grid(row=12, column=0, sticky="ew", pady=(0, 16))
+            db_frame.grid(row=14, column=0, sticky="ew", pady=(0, 16))
 
             ctk.CTkLabel(db_frame, text="Registros en base de datos local:",
                          font=ctk.CTkFont(size=12, weight="bold")).pack(
@@ -276,13 +314,13 @@ class SettingsScreen(ctk.CTkFrame):
 
             self._cargar_db_stats()
 
-            self._seccion(scroll, "⚠️ Zona de Peligro", row=13)
+            self._seccion(scroll, "⚠️ Zona de Peligro", row=15)
             danger_frame = ctk.CTkFrame(
                 scroll, corner_radius=10,
                 fg_color=("#fff", "#2b2b2b"),
                 border_width=2, border_color="#EF4444",
             )
-            danger_frame.grid(row=14, column=0, sticky="ew", pady=(0, 16))
+            danger_frame.grid(row=16, column=0, sticky="ew", pady=(0, 16))
 
             # ── Botón 1: ventas + historial + cierres ─────────────────────────
             ctk.CTkLabel(
@@ -504,6 +542,100 @@ class SettingsScreen(ctk.CTkFrame):
             self.opt_scanner_puerto.set(saved_port)
         self._on_scanner_mode_change(modo)
         self._update_scanner_status()
+
+        # Turno automático
+        activo = configs.get("turno_auto_activo", "false").lower() == "true"
+        if activo:
+            self.chk_turno_activo.select()
+        else:
+            self.chk_turno_activo.deselect()
+        self.entry_turno_fin.delete(0, "end")
+        self.entry_turno_fin.insert(0, configs.get("turno_auto_fin", "21:00"))
+
+    def _forzar_cierre_turnos(self):
+        """Cierra todos los turnos abiertos ahora mismo."""
+        from app.database.connection import get_db_session
+        from app.database.models import (
+            CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+        )
+        from datetime import datetime
+        db = get_db_session()
+        try:
+            cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+            if not cortes:
+                messagebox.showinfo("Turnos", "No hay turnos abiertos en este momento.")
+                return
+            ahora = datetime.now()
+            for c in cortes:
+                ventas = (
+                    db.query(Venta)
+                    .filter(
+                        Venta.usuario_id == c.usuario_id,
+                        Venta.creado_en  >= c.abierto_en,
+                        Venta.estado     == EstadoVenta.completada,
+                        Venta.eliminado.is_not(True),
+                    )
+                    .all()
+                )
+                ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+                tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+                tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                tv = ef + tj + tr
+                venta_ids = [v.id for v in ventas]
+                if venta_ids:
+                    cost_rows = (
+                        db.query(ItemVenta.cantidad, Producto.precio_compra)
+                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        .filter(ItemVenta.venta_id.in_(venta_ids))
+                        .all()
+                    )
+                    total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                else:
+                    total_costo = 0.0
+                c.cerrado_en          = ahora
+                c.total_ventas        = tv
+                c.total_efectivo      = ef
+                c.total_tarjeta       = tj
+                c.total_transferencia = tr
+                c.total_costo         = total_costo
+                c.num_ventas          = len(ventas)
+                c.monto_cierre        = c.monto_apertura + ef
+                notas_prev            = (c.notas or "").strip()
+                c.notas               = (notas_prev + " [Cierre forzado manual]").strip()
+            db.commit()
+            messagebox.showinfo(
+                "Turnos cerrados",
+                f"Se cerraron {len(cortes)} turno(s) abierto(s)."
+            )
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", str(e))
+        finally:
+            db.close()
+
+    def _guardar_turno_auto(self):
+        activo = "true" if self.chk_turno_activo.get() else "false"
+        hora   = self.entry_turno_fin.get().strip()
+        # Validate HH:MM
+        import re
+        if hora and not re.match(r"^\d{1,2}:\d{2}$", hora):
+            messagebox.showwarning("Formato inválido", "Hora debe tener formato HH:MM (ej: 21:00)")
+            return
+        db = get_db_session()
+        try:
+            for clave, valor in [("turno_auto_activo", activo), ("turno_auto_fin", hora)]:
+                c = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+                if c:
+                    c.valor = valor
+                else:
+                    db.add(Configuracion(clave=clave, valor=valor))
+            db.commit()
+            messagebox.showinfo("OK", "Configuración de turno guardada")
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", str(e))
+        finally:
+            db.close()
 
     def _guardar_seccion(self, entries: dict):
         db = get_db_session()

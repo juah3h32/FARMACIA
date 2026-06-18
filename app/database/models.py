@@ -238,6 +238,7 @@ class CortesCaja(Base):
     total_efectivo = Column(Float, default=0.0)
     total_tarjeta = Column(Float, default=0.0)
     total_transferencia = Column(Float, default=0.0)
+    total_costo = Column(Float, default=0.0)
     num_ventas = Column(Integer, default=0)
     abierto_en = Column(DateTime, default=_dt.now)
     cerrado_en = Column(DateTime, nullable=True)

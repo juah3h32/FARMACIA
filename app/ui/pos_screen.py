@@ -757,6 +757,7 @@ class PosScreen(ctk.CTkFrame):
             db.close()
 
     def _check_corte_caja(self):
+        from datetime import date
         db = get_db_session()
         try:
             abierto = db.query(CortesCaja).filter(
@@ -765,8 +766,57 @@ class PosScreen(ctk.CTkFrame):
             ).first()
             if not abierto:
                 self._abrir_corte_caja()
+            elif abierto.abierto_en and abierto.abierto_en.date() < date.today():
+                # Corte de día anterior sin cerrar — cierre automático silencioso
+                self._auto_cerrar_corte_anterior(abierto, db)
+                self._abrir_corte_caja()
         finally:
             db.close()
+
+    def _auto_cerrar_corte_anterior(self, corte, db):
+        """Cierra un corte de un día previo sin interacción del usuario."""
+        try:
+            ventas = (
+                db.query(Venta)
+                .filter(
+                    Venta.usuario_id == self.user.id,
+                    Venta.creado_en >= corte.abierto_en,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                )
+                .all()
+            )
+            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+            tv = ef + tj + tr
+
+            venta_ids = [v.id for v in ventas]
+            if venta_ids:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, Producto.precio_compra)
+                    .join(Producto, ItemVenta.producto_id == Producto.id)
+                    .filter(ItemVenta.venta_id.in_(venta_ids))
+                    .all()
+                )
+                total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            else:
+                total_costo = 0.0
+
+            corte.cerrado_en          = corte.abierto_en.replace(hour=23, minute=59, second=59)
+            corte.total_ventas        = tv
+            corte.total_efectivo      = ef
+            corte.total_tarjeta       = tj
+            corte.total_transferencia = tr
+            corte.total_costo         = total_costo
+            corte.num_ventas          = len(ventas)
+            corte.monto_cierre        = corte.monto_apertura + ef
+            notas_prev = (corte.notas or "").strip()
+            corte.notas = (notas_prev + " [Cierre automático — turno anterior]").strip()
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[Caja] Error al cerrar corte anterior: {e}")
 
     def _abrir_corte_caja(self):
         win = ctk.CTkToplevel(self)

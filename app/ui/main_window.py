@@ -107,6 +107,8 @@ class MainWindow(ctk.CTkToplevel):
         self._bind_shortcuts()
         self._init_scanner_service()
         updater_service.check_for_update_async(self._on_update_check)
+        self._auto_close_last_date = None
+        self.after(10000, self._check_auto_close_tick)  # first check 10s after startup
 
         if cfg.TURSO_SYNC:
             from app.database.sync_service import register_post_sync
@@ -918,7 +920,160 @@ class MainWindow(ctk.CTkToplevel):
         if self.on_logout:
             self.on_logout()
 
+    # ── Auto-close timer ─────────────────────────────────────────────────────
+
+    def _check_auto_close_tick(self):
+        """Fires every 60s — closes all open cortes if current time >= turno_auto_fin."""
+        try:
+            from app.database.connection import get_db_session
+            from app.database.models import Configuracion
+            db = get_db_session()
+            try:
+                cfgs = {c.clave: c.valor for c in db.query(Configuracion).all()}
+            finally:
+                db.close()
+
+            activo   = cfgs.get("turno_auto_activo", "false").lower() == "true"
+            hora_fin = cfgs.get("turno_auto_fin", "").strip()
+
+            if activo and hora_fin:
+                now = datetime.now()
+                h, m = hora_fin.split(":")
+                fin_hoy = now.replace(hour=int(h), minute=int(m), second=0, microsecond=0)
+                today   = now.date()
+                if now >= fin_hoy and self._auto_close_last_date != today:
+                    self._auto_close_last_date = today
+                    self._do_auto_close_cortes(before_dt=fin_hoy)
+        except Exception as e:
+            print(f"[AutoCierre] {e}")
+        self.after(60000, self._check_auto_close_tick)
+
+    def _do_auto_close_cortes(self, before_dt=None, monto_cierre=None, notas="[Cierre automático]"):
+        """Close all open cortes (optionally only those opened before before_dt)."""
+        from app.database.connection import get_db_session
+        from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+        db = get_db_session()
+        try:
+            q = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None)
+            cortes = q.all()
+            for c in cortes:
+                if before_dt and c.abierto_en and c.abierto_en > before_dt:
+                    continue  # opened after the scheduled close time — skip
+                ventas = (
+                    db.query(Venta)
+                    .filter(
+                        Venta.usuario_id == c.usuario_id,
+                        Venta.creado_en  >= c.abierto_en,
+                        Venta.estado     == EstadoVenta.completada,
+                        Venta.eliminado.is_not(True),
+                    )
+                    .all()
+                )
+                ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+                tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+                tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                tv = ef + tj + tr
+                venta_ids = [v.id for v in ventas]
+                if venta_ids:
+                    cost_rows = (
+                        db.query(ItemVenta.cantidad, Producto.precio_compra)
+                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        .filter(ItemVenta.venta_id.in_(venta_ids))
+                        .all()
+                    )
+                    total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                else:
+                    total_costo = 0.0
+
+                c.cerrado_en          = before_dt or datetime.now()
+                c.total_ventas        = tv
+                c.total_efectivo      = ef
+                c.total_tarjeta       = tj
+                c.total_transferencia = tr
+                c.total_costo         = total_costo
+                c.num_ventas          = len(ventas)
+                c.monto_cierre        = monto_cierre if monto_cierre is not None else (c.monto_apertura + ef)
+                notas_prev            = (c.notas or "").strip()
+                c.notas               = (notas_prev + " " + notas).strip()
+            db.commit()
+            if cortes:
+                import app.config as _cfg
+                if _cfg.TURSO_SYNC:
+                    from app.database.sync_service import sync_to_turso
+                    threading.Thread(target=sync_to_turso, daemon=True).start()
+                self.after(0, lambda: toast.show(
+                    f"Turno cerrado automáticamente ({len(cortes)} corte{'s' if len(cortes)>1 else ''})",
+                    kind="success", duration=6000))
+        except Exception as e:
+            db.rollback()
+            print(f"[AutoCierre] Error cerrando cortes: {e}")
+        finally:
+            db.close()
+
+    # ── Close window ─────────────────────────────────────────────────────────
+
     def _on_close(self):
+        from app.database.connection import get_db_session
+        from app.database.models import CortesCaja
+        db = get_db_session()
+        try:
+            abierto = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).first()
+        finally:
+            db.close()
+
+        if abierto:
+            self._dlg_cierre_al_salir()
+        else:
+            self._exit_app()
+
+    def _dlg_cierre_al_salir(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Cerrar turno")
+        dlg.geometry("400x240")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width()  - 400) // 2
+        y = self.winfo_y() + (self.winfo_height() - 240) // 2
+        dlg.geometry(f"400x240+{x}+{y}")
+
+        ctk.CTkLabel(dlg, text="⚠️  Hay un turno abierto",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color="#F59E0B").pack(pady=(22, 4))
+        ctk.CTkLabel(dlg,
+                     text="¿Deseas cerrar el turno antes de salir?\n"
+                          "Si sales sin cerrar, el turno quedará pendiente.",
+                     font=ctk.CTkFont(size=12), text_color=MUTED,
+                     justify="center", wraplength=360).pack(pady=(0, 16))
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack()
+
+        def _cerrar_y_salir():
+            dlg.destroy()
+            self._do_auto_close_cortes(notas="[Cierre al salir]")
+            self.after(300, self._exit_app)
+
+        def _salir_sin_cerrar():
+            dlg.destroy()
+            self._exit_app()
+
+        ctk.CTkButton(
+            btn_frame, text="Cerrar turno y salir",
+            width=180, height=38, corner_radius=8,
+            fg_color=GREEN, hover_color="#15803D", text_color="white",
+            command=_cerrar_y_salir,
+        ).pack(side="left", padx=8)
+
+        ctk.CTkButton(
+            btn_frame, text="Salir sin cerrar",
+            width=140, height=38, corner_radius=8,
+            fg_color="transparent", border_width=1, border_color=BORDER,
+            text_color=MUTED, hover_color="#FEE2E2",
+            command=_salir_sin_cerrar,
+        ).pack(side="left", padx=8)
+
+    def _exit_app(self):
         scanner_service.stop_hid_hook()
         scanner_service.stop_serial()
         logout()

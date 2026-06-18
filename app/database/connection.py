@@ -112,6 +112,7 @@ def _migrate():
         ("ventas",    "eliminado",          "INTEGER NOT NULL DEFAULT 0"),
         ("ventas",    "eliminado_en",       "TEXT"),
         ("retiros_caja", "tipo",            "VARCHAR(20) DEFAULT 'personal'"),
+        ("cortes_caja",  "total_costo",      "REAL DEFAULT 0.0"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
