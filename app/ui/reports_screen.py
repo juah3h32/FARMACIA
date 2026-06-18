@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox, filedialog
 import tkinter as tk
 from datetime import date, datetime, timedelta
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Lote, RolUsuario
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Lote, RolUsuario, MetodoPago, CortesCaja
 from sqlalchemy import func
 import app.config as cfg
 
@@ -579,7 +579,6 @@ class ReportsScreen(ctk.CTkFrame):
                     i, p["nombre"], p["cantidad"], f"${p['ingresos']:.2f}"
                 ))
 
-            from app.database.models import CortesCaja
             cortes = db.query(CortesCaja).filter(
                 CortesCaja.abierto_en >= desde,
                 CortesCaja.abierto_en <= hasta,
@@ -588,13 +587,29 @@ class ReportsScreen(ctk.CTkFrame):
             for row in self.cortes_tree.get_children():
                 self.cortes_tree.delete(row)
 
-            # Summary cards
-            tot_v  = sum(c.total_ventas       for c in cortes)
-            tot_ef = sum(c.total_efectivo      for c in cortes)
-            tot_tj = sum(c.total_tarjeta + c.total_transferencia for c in cortes)
+            # Recalculate each corte from actual ventas (fixes old stored zeros)
+            corte_calc = []  # (c, ef, tj, tr, tv, num_v)
+            for c in cortes:
+                hasta_c = c.cerrado_en or datetime.now()
+                vq = db.query(Venta).filter(
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= hasta_c,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+                c_ef = sum(v.total for v in vq if v.metodo_pago == MetodoPago.efectivo)
+                c_tj = sum(v.total for v in vq if v.metodo_pago == MetodoPago.tarjeta)
+                c_tr = sum(v.total for v in vq if v.metodo_pago == MetodoPago.transferencia)
+                c_tv = c_ef + c_tj + c_tr
+                corte_calc.append((c, c_ef, c_tj, c_tr, c_tv, len(vq)))
+
+            # Summary cards from recalculated values
+            tot_v   = sum(tv         for _, _, _, _, tv, _  in corte_calc)
+            tot_ef  = sum(ef         for _, ef, _, _, _, _  in corte_calc)
+            tot_tj  = sum(tj + tr    for _, _, tj, tr, _, _ in corte_calc)
             tot_dif = sum(
-                (c.monto_cierre or 0) - (c.monto_apertura + c.total_efectivo)
-                for c in cortes if c.cerrado_en
+                (c.monto_cierre or 0) - (c.monto_apertura + ef)
+                for c, ef, _, _, _, _ in corte_calc if c.cerrado_en
             )
             self._corte_cards["c_turnos"].configure(text=str(len(cortes)))
             self._corte_cards["c_total_ventas"].configure(text=f"${tot_v:.2f}")
@@ -604,38 +619,32 @@ class ReportsScreen(ctk.CTkFrame):
             self._corte_cards["c_diferencia"].configure(
                 text=f"${tot_dif:+.2f}", text_color=dif_color)
 
-            for i, c in enumerate(cortes):
-                # Duration
+            for c, c_ef, c_tj, c_tr, c_tv, num_v in corte_calc:
                 dur_str = "—"
                 if c.cerrado_en and c.abierto_en:
                     mins = int((c.cerrado_en - c.abierto_en).total_seconds() / 60)
                     dur_str = f"{mins // 60}h {mins % 60:02d}m"
 
-                # Cuadre
                 if c.cerrado_en:
-                    dif = (c.monto_cierre or 0) - (c.monto_apertura + c.total_efectivo)
+                    dif = (c.monto_cierre or 0) - (c.monto_apertura + c_ef)
                     dif_str = f"${dif:+.2f}"
-                    if abs(dif) > 0.01:
-                        tag = "descuadre"
-                        estado = "⛔ Descuadre"
-                    else:
-                        tag = "cuadrado" if i % 2 == 0 else "cuadrado"
-                        estado = "✓ Cuadrado"
+                    tag     = "descuadre" if abs(dif) > 0.01 else "cuadrado"
+                    estado  = "⛔ Descuadre" if abs(dif) > 0.01 else "✓ Cuadrado"
                 else:
                     dif_str = "—"
-                    tag = "abierto"
-                    estado = "🟡 Abierto"
+                    tag     = "abierto"
+                    estado  = "🟡 Abierto"
 
                 self.cortes_tree.insert("", "end", tags=(tag,), values=(
                     c.usuario.nombre if c.usuario else "",
                     c.abierto_en.strftime("%d/%m/%Y %H:%M") if c.abierto_en else "",
                     c.cerrado_en.strftime("%d/%m/%Y %H:%M") if c.cerrado_en else "—",
                     dur_str,
-                    c.num_ventas,
-                    f"${c.total_ventas:.2f}",
-                    f"${c.total_efectivo:.2f}",
-                    f"${c.total_tarjeta:.2f}",
-                    f"${c.total_transferencia:.2f}",
+                    num_v,
+                    f"${c_tv:.2f}",
+                    f"${c_ef:.2f}",
+                    f"${c_tj:.2f}",
+                    f"${c_tr:.2f}",
                     f"${c.monto_apertura:.2f}",
                     f"${c.monto_cierre:.2f}" if c.cerrado_en else "—",
                     dif_str,

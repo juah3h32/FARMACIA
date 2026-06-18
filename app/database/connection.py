@@ -155,6 +155,7 @@ def init_db():
     _seed_initial_data()
     _normalizar_nombres_productos()
     _actualizar_info_farmacia_v2()
+    _recalcular_cortes_v1()
 
 
 def _actualizar_info_farmacia_v2():
@@ -244,11 +245,127 @@ def _seed_initial_data():
             "impresora_ancho":          "32",
             "api_activa":               "true",
             "purge_password_hash":      _hp("171215"),
-            "turno_auto_activo":        "true",
+            "turno_auto_activo":        "false",
             "turno_auto_inicio":        "09:00",
-            "turno_auto_fin":           "10:00",
+            "turno_auto_fin":           "21:00",
         }
         existing_cfg = {c.clave for c in db.query(Configuracion.clave).all()}
         for clave, valor in configs_default.items():
             if clave not in existing_cfg:
                 db.add(Configuracion(clave=clave, valor=valor))
+
+
+def _recalcular_cortes_v1():
+    """
+    One-time migration:
+    1. Recalculate stored totals for all closed cortes from actual ventas.
+    2. For ventas NOT covered by any corte period, create synthetic daily cortes.
+    This repairs data from before the corte system was in use.
+    """
+    with get_db() as db:
+        if db.query(Configuracion).filter(Configuracion.clave == "recalculo_cortes_v1").first():
+            return
+
+        from datetime import date as _date, timedelta as _td
+        from collections import defaultdict
+        from app.database.models import (
+            CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto as _Prod
+        )
+
+        # ── Step 1: Recalculate stored totals for all closed cortes ──────────
+        closed_cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en != None).all()
+        covered_intervals = []
+        for c in closed_cortes:
+            if not c.abierto_en or not c.cerrado_en:
+                continue
+            ventas = db.query(Venta).filter(
+                Venta.creado_en >= c.abierto_en,
+                Venta.creado_en <= c.cerrado_en,
+                Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
+            ).all()
+            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+            tv = ef + tj + tr
+            vids = [v.id for v in ventas]
+            if vids:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, _Prod.precio_compra)
+                    .join(_Prod, ItemVenta.producto_id == _Prod.id)
+                    .filter(ItemVenta.venta_id.in_(vids))
+                    .all()
+                )
+                tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            else:
+                tc = 0.0
+            c.total_ventas        = tv
+            c.total_efectivo      = ef
+            c.total_tarjeta       = tj
+            c.total_transferencia = tr
+            c.total_costo         = tc
+            c.num_ventas          = len(ventas)
+            covered_intervals.append((c.abierto_en, c.cerrado_en))
+
+        # ── Step 2: Find ventas NOT in any corte period ───────────────────────
+        all_ventas = db.query(Venta).filter(
+            Venta.estado == EstadoVenta.completada,
+            Venta.eliminado.is_not(True),
+            Venta.creado_en != None,
+        ).all()
+
+        def _is_covered(v):
+            for ini, fin in covered_intervals:
+                if ini <= v.creado_en <= fin:
+                    return True
+            return False
+
+        orphans = [v for v in all_ventas if not _is_covered(v)]
+
+        # ── Step 3: Group orphan ventas by (usuario_id, day) ─────────────────
+        day_groups: dict = defaultdict(list)
+        for v in orphans:
+            day = v.creado_en.date()
+            if day >= _date.today():
+                continue  # skip today — active corte will handle it
+            day_groups[(v.usuario_id, day)].append(v)
+
+        # ── Step 4: Create synthetic closed cortes per day ───────────────────
+        from datetime import datetime as _dt
+        for (uid, day), day_ventas in sorted(day_groups.items()):
+            ef = sum(v.total for v in day_ventas if v.metodo_pago == MetodoPago.efectivo)
+            tj = sum(v.total for v in day_ventas if v.metodo_pago == MetodoPago.tarjeta)
+            tr = sum(v.total for v in day_ventas if v.metodo_pago == MetodoPago.transferencia)
+            tv = ef + tj + tr
+            vids = [v.id for v in day_ventas]
+            if vids:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, _Prod.precio_compra)
+                    .join(_Prod, ItemVenta.producto_id == _Prod.id)
+                    .filter(ItemVenta.venta_id.in_(vids))
+                    .all()
+                )
+                tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            else:
+                tc = 0.0
+
+            apertura = _dt.combine(day, _dt.min.time()).replace(hour=8,  minute=0, second=0)
+            cierre   = _dt.combine(day, _dt.min.time()).replace(hour=21, minute=0, second=0)
+            db.add(CortesCaja(
+                usuario_id        = uid,
+                monto_apertura    = 0.0,
+                monto_cierre      = ef,
+                total_ventas      = tv,
+                total_efectivo    = ef,
+                total_tarjeta     = tj,
+                total_transferencia = tr,
+                total_costo       = tc,
+                num_ventas        = len(day_ventas),
+                abierto_en        = apertura,
+                cerrado_en        = cierre,
+                notas             = "[Cierre histórico — generado automáticamente]",
+            ))
+
+        db.add(Configuracion(clave="recalculo_cortes_v1", valor="1"))
+        print(f"[Migration] recalculo_cortes_v1: recalculados={len(closed_cortes)} cortes, "
+              f"creados={len(day_groups)} cortes históricos")
