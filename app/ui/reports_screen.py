@@ -397,6 +397,7 @@ class ReportsScreen(ctk.CTkFrame):
         sel = self.cortes_tree.selection()
         if not sel:
             return
+        corte_id = int(sel[0])   # iid = str(c.id)
         vals = self.cortes_tree.item(sel[0], "values")
         if not vals:
             return
@@ -462,7 +463,72 @@ class ReportsScreen(ctk.CTkFrame):
             "#DC2626" if "Descuadre" in estado else "#16A34A")
         ctk.CTkLabel(win, text=estado,
                      font=ctk.CTkFont(size=14, weight="bold"),
-                     text_color=estado_color).pack(pady=(0, 16))
+                     text_color=estado_color).pack(pady=(0, 8))
+
+        # Botón de cierre manual (solo admin, solo turnos abiertos)
+        if "Abierto" in estado and self.user.rol == RolUsuario.admin:
+            def _cerrar_turno():
+                from app.database.connection import get_db_session
+                from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+                from datetime import datetime as _dt
+                db = get_db_session()
+                try:
+                    c = db.query(CortesCaja).filter(CortesCaja.id == corte_id).first()
+                    if not c or c.cerrado_en:
+                        messagebox.showinfo("", "El turno ya fue cerrado.")
+                        win.destroy()
+                        self._generar()
+                        return
+                    ahora = _dt.now()
+                    vq = db.query(Venta).filter(
+                        Venta.creado_en >= c.abierto_en,
+                        Venta.creado_en <= ahora,
+                        Venta.estado == EstadoVenta.completada,
+                        Venta.eliminado.is_not(True),
+                    ).all()
+                    c_ef = sum(v.total for v in vq if v.metodo_pago == MetodoPago.efectivo)
+                    c_tj = sum(v.total for v in vq if v.metodo_pago == MetodoPago.tarjeta)
+                    c_tr = sum(v.total for v in vq if v.metodo_pago == MetodoPago.transferencia)
+                    c_tv = c_ef + c_tj + c_tr
+                    vids = [v.id for v in vq]
+                    if vids:
+                        cost_rows = (
+                            db.query(ItemVenta.cantidad, Producto.precio_compra)
+                            .join(Producto, ItemVenta.producto_id == Producto.id)
+                            .filter(ItemVenta.venta_id.in_(vids))
+                            .all()
+                        )
+                        tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                    else:
+                        tc = 0.0
+                    c.cerrado_en          = ahora
+                    c.total_ventas        = c_tv
+                    c.total_efectivo      = c_ef
+                    c.total_tarjeta       = c_tj
+                    c.total_transferencia = c_tr
+                    c.total_costo         = tc
+                    c.num_ventas          = len(vq)
+                    c.monto_cierre        = c.monto_apertura + c_ef
+                    notas_prev            = (c.notas or "").strip()
+                    c.notas               = (notas_prev + " [Cierre manual desde reportes]").strip()
+                    db.commit()
+                    messagebox.showinfo("Turno cerrado",
+                                        f"Turno cerrado correctamente.\nVentas: {len(vq)}  |  Total: ${c_tv:.2f}")
+                    win.destroy()
+                    self._generar()
+                except Exception as exc:
+                    db.rollback()
+                    messagebox.showerror("Error", str(exc))
+                finally:
+                    db.close()
+
+            ctk.CTkButton(
+                win, text="🔒 Cerrar este turno ahora",
+                height=38, fg_color="#F59E0B", hover_color="#D97706",
+                text_color="white", font=ctk.CTkFont(size=13, weight="bold"),
+                corner_radius=8,
+                command=_cerrar_turno,
+            ).pack(fill="x", padx=24, pady=(0, 16))
 
     # ── Periodo helpers ───────────────────────────────────────────────────────
 
@@ -635,7 +701,7 @@ class ReportsScreen(ctk.CTkFrame):
                     tag     = "abierto"
                     estado  = "🟡 Abierto"
 
-                self.cortes_tree.insert("", "end", tags=(tag,), values=(
+                self.cortes_tree.insert("", "end", iid=str(c.id), tags=(tag,), values=(
                     c.usuario.nombre if c.usuario else "",
                     c.abierto_en.strftime("%d/%m/%Y %H:%M") if c.abierto_en else "",
                     c.cerrado_en.strftime("%d/%m/%Y %H:%M") if c.cerrado_en else "—",
