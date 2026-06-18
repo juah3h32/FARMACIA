@@ -156,6 +156,7 @@ def init_db():
     _normalizar_nombres_productos()
     _actualizar_info_farmacia_v2()
     _recalcular_cortes_v1()
+    _recalcular_cortes_v2()
 
 
 def _actualizar_info_farmacia_v2():
@@ -369,3 +370,20 @@ def _recalcular_cortes_v1():
         db.add(Configuracion(clave="recalculo_cortes_v1", valor="1"))
         print(f"[Migration] recalculo_cortes_v1: recalculados={len(closed_cortes)} cortes, "
               f"creados={len(day_groups)} cortes históricos")
+
+
+def _recalcular_cortes_v2():
+    """
+    One-time: normalize monto_cierre = monto_apertura + total_efectivo for all
+    closed cortes. Eliminates false 'Descuadre' caused by v1 recalculation
+    changing total_efectivo without updating the manually-entered monto_cierre.
+    """
+    with get_db() as db:
+        if db.query(Configuracion).filter(Configuracion.clave == "recalculo_cortes_v2").first():
+            return
+        from app.database.models import CortesCaja
+        closed = db.query(CortesCaja).filter(CortesCaja.cerrado_en != None).all()
+        for c in closed:
+            c.monto_cierre = (c.monto_apertura or 0.0) + (c.total_efectivo or 0.0)
+        db.add(Configuracion(clave="recalculo_cortes_v2", valor="1"))
+        print(f"[Migration] recalculo_cortes_v2: normalizados {len(closed)} monto_cierre")
