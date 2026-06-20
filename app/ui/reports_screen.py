@@ -486,144 +486,227 @@ class ReportsScreen(ctk.CTkFrame):
         sel = self.cortes_tree.selection()
         if not sel:
             return
-        corte_id = int(sel[0])   # iid = str(c.id)
-        vals = self.cortes_tree.item(sel[0], "values")
-        if not vals:
-            return
-        # vals: cajero, apertura_dt, cierre_dt, duracion, num_ventas, total_ventas,
-        #       efectivo, tarjeta, transferencia, fondo_apertura, fondo_cierre, diferencia, estado
-        cajero, ap_dt, ci_dt, dur, nv, tv, ef, tj, tr, fa, fc, dif, estado = vals
+        corte_id = int(sel[0])
 
-        is_open  = "abierto" in estado.lower()
-        is_admin = self.user.rol == RolUsuario.admin
-        h = 630 if (is_open and is_admin) else 520
+        # Fetch fresh data from DB (avoid reading stale string values from tree)
+        db = get_db_session()
+        try:
+            c = db.query(CortesCaja).filter(CortesCaja.id == corte_id).first()
+            if not c:
+                return
+            cajero   = c.usuario.nombre if c.usuario else f"#{corte_id}"
+            is_open  = c.cerrado_en is None
+            is_admin = self.user.rol == RolUsuario.admin
+            hasta_c  = c.cerrado_en or datetime.now()
+
+            ventas = (
+                db.query(Venta)
+                .filter(
+                    Venta.usuario_id == c.usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= hasta_c,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                )
+                .order_by(Venta.creado_en)
+                .all()
+            )
+            c_ef  = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+            c_tj  = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+            c_tr  = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+            c_tv  = c_ef + c_tj + c_tr
+            num_v = len(ventas)
+
+            ap_str = c.abierto_en.strftime("%d/%m/%Y %H:%M") if c.abierto_en else "—"
+            ci_str = c.cerrado_en.strftime("%d/%m/%Y %H:%M") if c.cerrado_en else "—"
+            if c.cerrado_en and c.abierto_en:
+                mins    = int((c.cerrado_en - c.abierto_en).total_seconds() / 60)
+                dur_str = f"{mins // 60}h {mins % 60:02d}m"
+            else:
+                dur_str = "En curso"
+
+            ape     = c.monto_apertura or 0.0
+            fc_val  = c.monto_cierre
+            esperado = ape + c_ef
+            dif_val  = (fc_val - esperado) if fc_val is not None else None
+
+            ventas_data = [
+                (v.folio or str(v.id),
+                 v.creado_en.strftime("%H:%M") if v.creado_en else "",
+                 v.metodo_pago.value,
+                 v.total)
+                for v in ventas
+            ]
+        finally:
+            db.close()
+
         win = ctk.CTkToplevel(self)
         win.title("Detalle de Corte de Caja")
-        win.geometry(f"480x{h}")
+        win.geometry("520x800")
         win.resizable(False, True)
         win.grab_set()
 
-        ctk.CTkLabel(win, text="🧾 Detalle de Corte",
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(18, 4))
-        ctk.CTkLabel(win, text=f"Cajero: {cajero}",
-                     font=ctk.CTkFont(size=13), text_color=MUTED).pack()
+        scroll = ctk.CTkScrollableFrame(win, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
 
-        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=12)
-
-        def row(parent, label, value, color=TEXT):
-            f = ctk.CTkFrame(parent, fg_color="transparent")
+        def row(label, value, color=TEXT):
+            f = ctk.CTkFrame(scroll, fg_color="transparent")
             f.pack(fill="x", padx=24, pady=3)
             ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=12),
-                         text_color=MUTED, anchor="w", width=200).pack(side="left")
+                         text_color=MUTED, anchor="w", width=210).pack(side="left")
             ctk.CTkLabel(f, text=value, font=ctk.CTkFont(size=12, weight="bold"),
                          text_color=color, anchor="e").pack(side="right")
 
-        ctk.CTkLabel(win, text="Horario", font=ctk.CTkFont(size=11, weight="bold"),
+        ctk.CTkLabel(scroll, text="🧾 Detalle de Corte",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(18, 4))
+        ctk.CTkLabel(scroll, text=f"Cajero: {cajero}",
+                     font=ctk.CTkFont(size=13), text_color=MUTED).pack()
+
+        ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=12)
+        ctk.CTkLabel(scroll, text="Horario", font=ctk.CTkFont(size=11, weight="bold"),
                      text_color=MUTED, anchor="w").pack(fill="x", padx=24, pady=(0, 2))
-        row(win, "Apertura", ap_dt)
-        row(win, "Cierre",   ci_dt)
-        row(win, "Duración", dur)
+        row("Apertura", ap_str)
+        row("Cierre",   ci_str)
+        row("Duración", dur_str)
 
-        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(win, text="Ventas del Turno", font=ctk.CTkFont(size=11, weight="bold"),
+        ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(scroll, text="Ventas del Turno", font=ctk.CTkFont(size=11, weight="bold"),
                      text_color=MUTED, anchor="w").pack(fill="x", padx=24, pady=(0, 2))
-        row(win, "# Transacciones", nv)
-        row(win, "Total Ventas",    tv,  BLUE)
-        row(win, "Efectivo",        ef,  GREEN)
-        row(win, "Tarjeta",         tj,  AMBER)
-        row(win, "Transferencia",   tr,  PURPLE)
+        row("# Transacciones", str(num_v))
+        row("Total Ventas",    f"${c_tv:.2f}", BLUE)
+        row("Efectivo",        f"${c_ef:.2f}", GREEN)
+        row("Tarjeta",         f"${c_tj:.2f}", AMBER)
+        row("Transferencia",   f"${c_tr:.2f}", PURPLE)
 
-        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(win, text="Cuadre de Efectivo", font=ctk.CTkFont(size=11, weight="bold"),
+        ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(scroll, text="Cuadre de Efectivo", font=ctk.CTkFont(size=11, weight="bold"),
                      text_color=MUTED, anchor="w").pack(fill="x", padx=24, pady=(0, 2))
-        row(win, "Fondo Apertura",          fa)
-        row(win, "Efectivo ingresado (ventas)", ef, GREEN)
+        row("Fondo Apertura",               f"${ape:.2f}")
+        row("Efectivo ingresado (ventas)",  f"${c_ef:.2f}", GREEN)
+        row("Total esperado en caja",       f"${esperado:.2f}")
+        if fc_val is not None:
+            row("Fondo Cierre (contado)", f"${fc_val:.2f}")
+            dif_color = "#EF4444" if abs(dif_val) > 0.01 else "#16A34A"
+            row("Diferencia", f"${dif_val:+.2f}", dif_color)
+        else:
+            row("Fondo Cierre (contado)", "—", MUTED)
+            row("Diferencia", "—", MUTED)
 
-        try:
-            fa_v = float(fa.replace("$", "").replace(",", ""))
-            ef_v = float(ef.replace("$", "").replace(",", ""))
-            esperado = fa_v + ef_v
-            row(win, "Total esperado en caja", f"${esperado:.2f}", TEXT)
-        except Exception:
-            row(win, "Total esperado en caja", "—", MUTED)
+        # ── Historial de ventas del turno ─────────────────────────────────────
+        ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(scroll, text="Historial de Ventas del Turno",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=MUTED, anchor="w").pack(fill="x", padx=24, pady=(0, 6))
 
-        row(win, "Fondo Cierre (contado)",  fc)
-        dif_color = "#EF4444" if dif.startswith("-") or (dif not in ("—", "$0.00", "$+0.00")) else "#16A34A"
-        row(win, "Diferencia", dif, dif_color)
+        tree_outer = ctk.CTkFrame(scroll, fg_color=CARD_BG, corner_radius=8,
+                                   border_width=1, border_color=BORDER)
+        tree_outer.pack(fill="x", padx=20, pady=(0, 8))
+        tree_outer.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
-        _e = estado.lower()
-        estado_color = "#D97706" if "abierto" in _e else (
-            "#DC2626" if "descuadre" in _e else "#16A34A")
-        ctk.CTkLabel(win, text=estado,
+        sty_dc = self._make_tree_style("DC")
+        v_cols = ("folio", "hora", "metodo", "total")
+        v_tree = ttk.Treeview(tree_outer, columns=v_cols, show="headings",
+                               style=sty_dc, height=min(max(len(ventas_data), 1), 8))
+        for col, heading, width, anchor in [
+            ("folio",  "Folio",  130, "w"),
+            ("hora",   "Hora",    60, "center"),
+            ("metodo", "Pago",    90, "center"),
+            ("total",  "Total",   90, "e"),
+        ]:
+            v_tree.heading(col, text=heading)
+            v_tree.column(col, width=width, anchor=anchor)
+        v_tree.tag_configure("even", background="#F8FAFF")
+        v_tree.tag_configure("odd",  background="#FFFFFF")
+
+        sc_v = ttk.Scrollbar(tree_outer, orient="vertical", command=v_tree.yview)
+        v_tree.configure(yscrollcommand=sc_v.set)
+        v_tree.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
+        sc_v.grid(row=0, column=1, sticky="ns", pady=4)
+
+        if ventas_data:
+            for idx, (folio, hora, metodo, total) in enumerate(ventas_data):
+                tag = "even" if idx % 2 == 0 else "odd"
+                v_tree.insert("", "end", tags=(tag,), values=(
+                    folio, hora, metodo.capitalize(), f"${total:.2f}"
+                ))
+        else:
+            ctk.CTkLabel(scroll, text="Sin ventas registradas en este turno",
+                         font=ctk.CTkFont(size=11), text_color=MUTED).pack(pady=(0, 6))
+
+        # ── Estado ────────────────────────────────────────────────────────────
+        ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
+        if is_open:
+            estado_txt, estado_color = "🟡 Turno Abierto", "#D97706"
+        elif dif_val is not None and abs(dif_val) > 0.01:
+            estado_txt, estado_color = "⛔ Descuadre", "#DC2626"
+        else:
+            estado_txt, estado_color = "✓ Cuadrado", "#16A34A"
+        ctk.CTkLabel(scroll, text=estado_txt,
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=estado_color).pack(pady=(0, 8))
 
-        # Botón de cierre manual (solo admin, solo turnos abiertos)
+        # Cierre manual (admin + abierto)
         if is_open and is_admin:
-            ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=(0, 8))
+            ctk.CTkFrame(scroll, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=(0, 8))
             def _cerrar_turno():
-                from app.database.connection import get_db_session
-                from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
                 from datetime import datetime as _dt
-                db = get_db_session()
+                _db = get_db_session()
                 try:
-                    c = db.query(CortesCaja).filter(CortesCaja.id == corte_id).first()
-                    if not c or c.cerrado_en:
+                    _c = _db.query(CortesCaja).filter(CortesCaja.id == corte_id).first()
+                    if not _c or _c.cerrado_en:
                         messagebox.showinfo("", "El turno ya fue cerrado.")
                         win.destroy()
                         self._generar()
                         return
                     ahora = _dt.now()
-                    vq = db.query(Venta).filter(
-                        Venta.usuario_id == c.usuario_id,
-                        Venta.creado_en >= c.abierto_en,
+                    _vq = _db.query(Venta).filter(
+                        Venta.usuario_id == _c.usuario_id,
+                        Venta.creado_en >= _c.abierto_en,
                         Venta.creado_en <= ahora,
                         Venta.estado == EstadoVenta.completada,
                         Venta.eliminado.is_not(True),
                     ).all()
-                    c_ef = sum(v.total for v in vq if v.metodo_pago == MetodoPago.efectivo)
-                    c_tj = sum(v.total for v in vq if v.metodo_pago == MetodoPago.tarjeta)
-                    c_tr = sum(v.total for v in vq if v.metodo_pago == MetodoPago.transferencia)
-                    c_tv = c_ef + c_tj + c_tr
-                    vids = [v.id for v in vq]
-                    if vids:
-                        cost_rows = (
-                            db.query(ItemVenta.cantidad, Producto.precio_compra)
+                    _ef = sum(v.total for v in _vq if v.metodo_pago == MetodoPago.efectivo)
+                    _tj = sum(v.total for v in _vq if v.metodo_pago == MetodoPago.tarjeta)
+                    _tr = sum(v.total for v in _vq if v.metodo_pago == MetodoPago.transferencia)
+                    _tv = _ef + _tj + _tr
+                    _vids = [v.id for v in _vq]
+                    if _vids:
+                        _cost = (
+                            _db.query(ItemVenta.cantidad, Producto.precio_compra)
                             .join(Producto, ItemVenta.producto_id == Producto.id)
-                            .filter(ItemVenta.venta_id.in_(vids))
+                            .filter(ItemVenta.venta_id.in_(_vids))
                             .all()
                         )
-                        tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                        _tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in _cost)
                     else:
-                        tc = 0.0
-                    c.cerrado_en          = ahora
-                    c.total_ventas        = c_tv
-                    c.total_efectivo      = c_ef
-                    c.total_tarjeta       = c_tj
-                    c.total_transferencia = c_tr
-                    c.total_costo         = tc
-                    c.num_ventas          = len(vq)
-                    c.monto_cierre        = c.monto_apertura + c_ef
-                    notas_prev            = (c.notas or "").strip()
-                    c.notas               = (notas_prev + " [Cierre manual desde reportes]").strip()
-                    db.commit()
+                        _tc = 0.0
+                    _c.cerrado_en          = ahora
+                    _c.total_ventas        = _tv
+                    _c.total_efectivo      = _ef
+                    _c.total_tarjeta       = _tj
+                    _c.total_transferencia = _tr
+                    _c.total_costo         = _tc
+                    _c.num_ventas          = len(_vq)
+                    _c.monto_cierre        = (_c.monto_apertura or 0) + _ef
+                    notas_prev             = (_c.notas or "").strip()
+                    _c.notas               = (notas_prev + " [Cierre manual desde reportes]").strip()
+                    _db.commit()
                     messagebox.showinfo("Turno cerrado",
-                                        f"Turno cerrado correctamente.\nVentas: {len(vq)}  |  Total: ${c_tv:.2f}")
+                                        f"Turno cerrado.\nVentas: {len(_vq)}  |  Total: ${_tv:.2f}")
                     win.destroy()
                     self._generar()
                 except Exception as exc:
-                    db.rollback()
+                    _db.rollback()
                     messagebox.showerror("Error", str(exc))
                 finally:
-                    db.close()
+                    _db.close()
 
             ctk.CTkButton(
-                win, text="🔒 Cerrar este turno ahora",
+                scroll, text="🔒 Cerrar este turno ahora",
                 height=38, fg_color="#F59E0B", hover_color="#D97706",
                 text_color="white", font=ctk.CTkFont(size=13, weight="bold"),
-                corner_radius=8,
-                command=_cerrar_turno,
+                corner_radius=8, command=_cerrar_turno,
             ).pack(fill="x", padx=24, pady=(0, 16))
 
     # ── Periodo helpers ───────────────────────────────────────────────────────
@@ -754,6 +837,7 @@ class ReportsScreen(ctk.CTkFrame):
             for c in cortes:
                 hasta_c = c.cerrado_en or datetime.now()
                 vq = db.query(Venta).filter(
+                    Venta.usuario_id == c.usuario_id,
                     Venta.creado_en >= c.abierto_en,
                     Venta.creado_en <= hasta_c,
                     Venta.estado == EstadoVenta.completada,

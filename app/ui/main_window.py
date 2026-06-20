@@ -114,6 +114,9 @@ class MainWindow(ctk.CTkToplevel):
             from app.database.sync_service import register_post_sync
             register_post_sync(lambda: self.after(0, self._on_turso_pull))
 
+        # Auto-refresh stats + live corte bar every 30s
+        self.after(30000, self._auto_refresh_tick)
+
     def _center_window(self):
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -243,7 +246,7 @@ class MainWindow(ctk.CTkToplevel):
         right = ctk.CTkFrame(self, corner_radius=0, fg_color=CONT_BG)
         right.grid(row=0, column=2, sticky="nsew")
         right.grid_columnconfigure(0, weight=1)
-        right.grid_rowconfigure(3, weight=1)
+        right.grid_rowconfigure(4, weight=1)
 
         # ── Header ────────────────────────────────────────────────────────────
         hdr = ctk.CTkFrame(right, height=58, corner_radius=0, fg_color=HDR_BG)
@@ -339,11 +342,142 @@ class MainWindow(ctk.CTkToplevel):
 
             setattr(self, attr, val)
 
+        # ── Live corte bar (admin only, auto-shown when turno abierto) ───────────
+        self._build_live_bar(right)
+
         # ── Content area ──────────────────────────────────────────────────────
         self.content = ctk.CTkFrame(right, corner_radius=0, fg_color=CONT_BG)
-        self.content.grid(row=3, column=0, sticky="nsew")
+        self.content.grid(row=4, column=0, sticky="nsew")
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
+
+    # ── Live corte bar ────────────────────────────────────────────────────────
+
+    def _build_live_bar(self, parent):
+        bar = ctk.CTkFrame(parent, corner_radius=0,
+                           fg_color="#F0FDF4", border_width=1, border_color="#BBF7D0")
+        bar.grid(row=3, column=0, sticky="ew")
+        bar.grid_columnconfigure(1, weight=1)
+
+        inner = ctk.CTkFrame(bar, fg_color="transparent")
+        inner.pack(fill="x", padx=14, pady=6)
+
+        self._lbl_live_cajero = ctk.CTkLabel(
+            inner, text="🟢 Turno activo",
+            font=ctk.CTkFont(size=11, weight="bold"), text_color="#15803D")
+        self._lbl_live_cajero.pack(side="left", padx=(0, 16))
+
+        self._lbl_live_ventas = ctk.CTkLabel(
+            inner, text="0 ventas",
+            font=ctk.CTkFont(size=11), text_color="#166534")
+        self._lbl_live_ventas.pack(side="left", padx=(0, 10))
+
+        self._lbl_live_total = ctk.CTkLabel(
+            inner, text="$0.00",
+            font=ctk.CTkFont(size=12, weight="bold"), text_color="#15803D")
+        self._lbl_live_total.pack(side="left", padx=(0, 16))
+
+        self._lbl_live_ef = ctk.CTkLabel(
+            inner, text="💵 $0.00",
+            font=ctk.CTkFont(size=11), text_color="#166534")
+        self._lbl_live_ef.pack(side="left", padx=(0, 8))
+
+        self._lbl_live_tj = ctk.CTkLabel(
+            inner, text="💳 $0.00",
+            font=ctk.CTkFont(size=11), text_color="#1D4ED8")
+        self._lbl_live_tj.pack(side="left", padx=(0, 8))
+
+        self._lbl_live_tr = ctk.CTkLabel(
+            inner, text="🏦 $0.00",
+            font=ctk.CTkFont(size=11), text_color="#7C3AED")
+        self._lbl_live_tr.pack(side="left", padx=(0, 16))
+
+        self._lbl_live_time = ctk.CTkLabel(
+            inner, text="",
+            font=ctk.CTkFont(size=10), text_color="#6B7280")
+        self._lbl_live_time.pack(side="right")
+
+        self._live_bar_frame = bar
+        bar.grid_remove()  # hidden until open corte detected
+
+        if self.user.rol == RolUsuario.admin:
+            self._load_live_corte()
+
+    def _load_live_corte(self):
+        if self.user.rol != RolUsuario.admin:
+            return
+
+        def fetch():
+            try:
+                from app.database.connection import get_db_session
+                from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago
+                db = get_db_session()
+                try:
+                    cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+                    if not cortes:
+                        return None
+                    now = datetime.now()
+                    cajeros = []
+                    tot_ef = tot_tj = tot_tr = 0.0
+                    tot_v  = 0
+                    for c in cortes:
+                        cajeros.append(c.usuario.nombre if c.usuario else f"#{c.id}")
+                        ventas = db.query(Venta).filter(
+                            Venta.usuario_id == c.usuario_id,
+                            Venta.creado_en  >= c.abierto_en,
+                            Venta.creado_en  <= now,
+                            Venta.estado     == EstadoVenta.completada,
+                            Venta.eliminado.is_not(True),
+                        ).all()
+                        tot_v  += len(ventas)
+                        tot_ef += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+                        tot_tj += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+                        tot_tr += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                    return {
+                        "cajeros": cajeros,
+                        "num_ventas": tot_v,
+                        "total": tot_ef + tot_tj + tot_tr,
+                        "efectivo": tot_ef,
+                        "tarjeta": tot_tj,
+                        "transferencia": tot_tr,
+                    }
+                finally:
+                    db.close()
+            except Exception:
+                return None
+
+        def apply(data):
+            try:
+                if not self.winfo_exists():
+                    return
+            except Exception:
+                return
+            if data is None:
+                self._live_bar_frame.grid_remove()
+                return
+            cajeros_str = ", ".join(data["cajeros"])
+            self._lbl_live_cajero.configure(text=f"🟢 Turno · {cajeros_str}")
+            self._lbl_live_ventas.configure(text=f"{data['num_ventas']} ventas")
+            self._lbl_live_total.configure(text=f"${data['total']:,.2f}")
+            self._lbl_live_ef.configure(text=f"💵 ${data['efectivo']:,.2f}")
+            self._lbl_live_tj.configure(text=f"💳 ${data['tarjeta']:,.2f}")
+            self._lbl_live_tr.configure(text=f"🏦 ${data['transferencia']:,.2f}")
+            self._lbl_live_time.configure(
+                text=f"Actualizado {datetime.now().strftime('%H:%M:%S')}")
+            self._live_bar_frame.grid()
+
+        threading.Thread(
+            target=lambda: self.after(0, lambda: apply(fetch())),
+            daemon=True,
+        ).start()
+
+    def _auto_refresh_tick(self):
+        now = datetime.now()
+        self._stats_last_refresh = now.timestamp()
+        self._load_stats()
+        if self.user.rol == RolUsuario.admin:
+            self._load_live_corte()
+        self.after(30000, self._auto_refresh_tick)
 
     # ── Stats loader (runs in background thread) ──────────────────────────────
 
@@ -679,6 +813,8 @@ class MainWindow(ctk.CTkToplevel):
         if self.current_screen and hasattr(self.current_screen, "on_show"):
             self.current_screen.on_show()
         self._load_stats()
+        if self.user.rol == RolUsuario.admin:
+            self._load_live_corte()
 
     # ── Auto-update ───────────────────────────────────────────────────────────
 

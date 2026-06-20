@@ -336,7 +336,7 @@ class ProductoDialog(ctk.CTkToplevel):
             ("Nombre Genérico:", "nombre_generico", "entry"),
             ("Marca:", "marca", "entry"),
             ("Precio de Venta:*", "precio_venta", "entry"),
-            ("Precio de Compra:", "precio_compra", "entry"),
+            ("Precio de Compra:*", "precio_compra", "entry"),
             ("Stock Actual:", "stock", "entry"),
             ("Stock Mínimo:", "stock_minimo", "entry"),
             ("Concentración:", "concentracion", "entry"),
@@ -389,12 +389,12 @@ class ProductoDialog(ctk.CTkToplevel):
         finally:
             db.close()
 
-        ctk.CTkLabel(scroll, text="Categoría:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
+        ctk.CTkLabel(scroll, text="Categoría:*", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
         self.opt_cat = ctk.CTkOptionMenu(scroll, values=cat_names if cat_names else ["Sin categorías"])
         self.opt_cat.grid(row=row, column=1, pady=5, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(scroll, text="Proveedor:", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
+        ctk.CTkLabel(scroll, text="Proveedor:*", anchor="e").grid(row=row, column=0, padx=(0, 8), pady=5, sticky="e")
         self.opt_prov = ctk.CTkOptionMenu(scroll, values=prov_names if prov_names else ["Sin proveedores"])
         self.opt_prov.grid(row=row, column=1, pady=5, sticky="ew")
 
@@ -501,14 +501,44 @@ class ProductoDialog(ctk.CTkToplevel):
             self._load_image_from_url(self.imagen_url)
 
     def _guardar(self):
+        is_new = not self.data.get("id")
+
         nombre = self.entries["nombre"].get().strip()
         if not nombre:
-            messagebox.showwarning("Error", "El nombre es obligatorio")
+            messagebox.showwarning("Campos obligatorios", "El nombre del producto es obligatorio")
             return
+
+        codigo_barras = self.entries["codigo_barras"].get().strip()
+
         try:
             precio_venta = float(self.entries["precio_venta"].get().strip() or "0")
+            if precio_venta <= 0:
+                raise ValueError
         except ValueError:
-            messagebox.showwarning("Error", "Precio de venta inválido")
+            messagebox.showwarning("Campos obligatorios", "Precio de venta inválido o vacío")
+            self.entries["precio_venta"].focus_set()
+            return
+
+        precio_compra_str = self.entries["precio_compra"].get().strip()
+        if not precio_compra_str:
+            messagebox.showwarning("Campos obligatorios", "El precio de compra es obligatorio")
+            self.entries["precio_compra"].focus_set()
+            return
+        try:
+            precio_compra = float(precio_compra_str)
+        except ValueError:
+            messagebox.showwarning("Campos obligatorios", "Precio de compra inválido")
+            self.entries["precio_compra"].focus_set()
+            return
+
+        categoria_id = self._cat_map.get(self.opt_cat.get())
+        if not categoria_id:
+            messagebox.showwarning("Campos obligatorios", "Selecciona una categoría válida")
+            return
+
+        proveedor_id = self._prov_map.get(self.opt_prov.get())
+        if not proveedor_id:
+            messagebox.showwarning("Campos obligatorios", "Selecciona un proveedor válido")
             return
 
         db = get_db_session()
@@ -520,11 +550,11 @@ class ProductoDialog(ctk.CTkToplevel):
                 db.add(prod)
 
             prod.nombre = nombre
-            prod.codigo_barras = self.entries["codigo_barras"].get().strip() or None
+            prod.codigo_barras = codigo_barras or None
             prod.nombre_generico = self.entries["nombre_generico"].get().strip() or None
             prod.marca = self.entries["marca"].get().strip() or None
             prod.precio_venta = precio_venta
-            prod.precio_compra = float(self.entries["precio_compra"].get().strip() or "0")
+            prod.precio_compra = precio_compra
             prod.stock = int(self.entries["stock"].get().strip() or "0")
             prod.stock_minimo = int(self.entries["stock_minimo"].get().strip() or "10")
             prod.concentracion = self.entries["concentracion"].get().strip() or None
@@ -534,8 +564,8 @@ class ProductoDialog(ctk.CTkToplevel):
             prod.requiere_receta = self.var_receta.get()
             prod.sustancia_controlada = self.var_controlada.get()
             prod.descripcion = self.txt_desc.get("1.0", "end").strip() or None
-            prod.categoria_id = self._cat_map.get(self.opt_cat.get())
-            prod.proveedor_id = self._prov_map.get(self.opt_prov.get())
+            prod.categoria_id = categoria_id
+            prod.proveedor_id = proveedor_id
             prod.imagen_url = self.imagen_url or None
 
             db.commit()
@@ -758,8 +788,8 @@ class EntradaStockDialog(ctk.CTkToplevel):
 
         fields = [
             ("Cantidad a ingresar:*", "cantidad"),
-            ("N° de Lote:", "numero_lote"),
-            ("Vencimiento (MM/AAAA):", "fecha_vencimiento"),
+            ("N° de Lote:*", "numero_lote"),
+            ("Vencimiento (MM/AAAA):*", "fecha_vencimiento"),
             ("Precio de Compra:", "precio_compra"),
         ]
         _placeholders = {"fecha_vencimiento": "06/2027"}
@@ -787,10 +817,22 @@ class EntradaStockDialog(ctk.CTkToplevel):
             if cantidad <= 0:
                 raise ValueError("Cantidad debe ser positiva")
         except ValueError as e:
-            messagebox.showwarning("Error", f"Cantidad inválida: {e}")
+            messagebox.showwarning("Campos obligatorios", f"Cantidad inválida: {e}")
+            self.entries["cantidad"].focus_set()
+            return
+
+        numero_lote = self.entries["numero_lote"].get().strip()
+        if not numero_lote:
+            messagebox.showwarning("Campos obligatorios", "El número de lote es obligatorio para llevar control de caducidades")
+            self.entries["numero_lote"].focus_set()
             return
 
         fecha_str = self.entries["fecha_vencimiento"].get().strip()
+        if not fecha_str:
+            messagebox.showwarning("Campos obligatorios", "La fecha de vencimiento es obligatoria para el control de caducidades")
+            self.entries["fecha_vencimiento"].focus_set()
+            return
+
         fecha_venc = None
         if fecha_str:
             import calendar as _cal
@@ -819,7 +861,7 @@ class EntradaStockDialog(ctk.CTkToplevel):
 
             lote = Lote(
                 producto_id=self.producto_id,
-                numero_lote=self.entries["numero_lote"].get().strip() or None,
+                numero_lote=numero_lote,
                 fecha_vencimiento=fecha_venc,
                 cantidad=cantidad,
                 precio_compra=float(self.entries["precio_compra"].get().strip() or "0"),
