@@ -399,18 +399,56 @@ class MarketingScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=9), text_color=MUTED).grid(
             row=1, column=0, sticky="w")
 
-        # Texto extra
-        ctk.CTkLabel(left, text="Texto adicional (opcional):",
+        # Día del badge
+        ctk.CTkLabel(left, text="Día del badge (opcional):",
                      font=ctk.CTkFont(size=11, weight="bold"),
                      text_color=MUTED).grid(row=14, column=0, padx=12, pady=(8, 0), sticky="w")
 
+        self._dia_oferta_var = tk.StringVar(value="")
+        ctk.CTkOptionMenu(
+            left,
+            values=["", "Lunes", "Martes", "Miércoles", "Jueves",
+                    "Viernes", "Sábado", "Domingo"],
+            variable=self._dia_oferta_var,
+            width=180, height=30, corner_radius=8,
+            fg_color=BLUE_L, text_color=TEXT,
+            button_color=BORDER, button_hover_color=BLUE_L,
+        ).grid(row=15, column=0, padx=12, pady=(2, 0), sticky="w")
+        ctk.CTkLabel(left, text="Aparece en el badge rojo de la imagen",
+                     font=ctk.CTkFont(size=9), text_color=MUTED).grid(
+            row=16, column=0, padx=12, pady=(1, 4), sticky="w")
+
+        # IA descripción
+        self._desc_ia = ""
+        ia_f = ctk.CTkFrame(left, fg_color="transparent")
+        ia_f.grid(row=17, column=0, padx=12, pady=(4, 2), sticky="ew")
+        ia_f.grid_columnconfigure(1, weight=1)
+        self._btn_ia = ctk.CTkButton(
+            ia_f, text="🤖 IA", width=64, height=30, corner_radius=8,
+            fg_color=BLUE, text_color=WHITE, hover_color=BLUE_D,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._generar_desc_ia,
+        )
+        self._btn_ia.grid(row=0, column=0, sticky="w")
+        self._lbl_desc_ia = ctk.CTkLabel(
+            ia_f, text="— sin descripción",
+            font=ctk.CTkFont(size=10), text_color=MUTED,
+            anchor="w", wraplength=210,
+        )
+        self._lbl_desc_ia.grid(row=0, column=1, padx=(8, 0), sticky="ew")
+
+        # Texto extra
+        ctk.CTkLabel(left, text="Texto adicional (opcional):",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=MUTED).grid(row=18, column=0, padx=12, pady=(8, 0), sticky="w")
+
         self._promo_texto_extra = ctk.CTkEntry(left, height=34,
                                                 placeholder_text="Ej: Por tiempo limitado")
-        self._promo_texto_extra.grid(row=15, column=0, padx=12, pady=(0, 8), sticky="ew")
+        self._promo_texto_extra.grid(row=19, column=0, padx=12, pady=(0, 8), sticky="ew")
 
         # Separador
         ctk.CTkFrame(left, height=1, fg_color=BORDER).grid(
-            row=16, column=0, sticky="ew", padx=12, pady=8)
+            row=20, column=0, sticky="ew", padx=12, pady=8)
 
         # Botones
         ctk.CTkButton(
@@ -419,7 +457,7 @@ class MarketingScreen(ctk.CTkFrame):
             fg_color=GREEN, text_color=WHITE, hover_color="#15803D",
             font=ctk.CTkFont(size=12, weight="bold"),
             command=self._preview_promo,
-        ).grid(row=17, column=0, padx=12, pady=(0, 6), sticky="ew")
+        ).grid(row=21, column=0, padx=12, pady=(0, 6), sticky="ew")
 
         ctk.CTkButton(
             left, text="💾 Guardar imagen PNG",
@@ -427,7 +465,7 @@ class MarketingScreen(ctk.CTkFrame):
             fg_color=BLUE, text_color=WHITE, hover_color=BLUE_D,
             font=ctk.CTkFont(size=12, weight="bold"),
             command=self._guardar_promo,
-        ).grid(row=18, column=0, padx=12, pady=(0, 12), sticky="ew")
+        ).grid(row=22, column=0, padx=12, pady=(0, 12), sticky="ew")
 
         # ── Panel derecho (preview) ───────────────────────────────────────────
         right = ctk.CTkFrame(frame, fg_color=CARD_BG,
@@ -498,6 +536,9 @@ class MarketingScreen(ctk.CTkFrame):
             self._chk_usar_imagen.configure(state="disabled")
             self._usar_imagen_var.set(False)
 
+        self._desc_ia = ""
+        if hasattr(self, "_lbl_desc_ia"):
+            self._lbl_desc_ia.configure(text="— sin descripción", text_color=MUTED)
         self._promo_search.delete(0, "end")
         for w in self._promo_listbox_frame.winfo_children():
             w.destroy()
@@ -526,11 +567,13 @@ class MarketingScreen(ctk.CTkFrame):
             precio_tachado = precio_promo + 5
 
         return {
-            "producto":       self._selected_prod,
-            "precio_promo":   precio_promo,
-            "precio_tachado": precio_tachado,
-            "texto_extra":    self._promo_texto_extra.get().strip(),
-            "usar_imagen":    self._usar_imagen_var.get() and bool(self._selected_prod.imagen_url),
+            "producto":          self._selected_prod,
+            "precio_promo":      precio_promo,
+            "precio_tachado":    precio_tachado,
+            "texto_extra":       self._promo_texto_extra.get().strip(),
+            "usar_imagen":       self._usar_imagen_var.get() and bool(self._selected_prod.imagen_url),
+            "dia_oferta":        self._dia_oferta_var.get().strip() if hasattr(self, "_dia_oferta_var") else "",
+            "descripcion_promo": self._desc_ia,
         }
 
     def _preview_promo(self):
@@ -583,6 +626,119 @@ class MarketingScreen(ctk.CTkFrame):
                     "Error imagen", f"No se pudo guardar:\n{err}"))
 
         threading.Thread(target=_build, daemon=True).start()
+
+    # ── IA descripción ────────────────────────────────────────────────────────
+
+    def _generar_desc_ia(self):
+        if not self._selected_prod:
+            messagebox.showwarning("Sin producto", "Selecciona un producto primero.")
+            return
+        import app.config as _cfg
+        key = _cfg.OPENAI_API_KEY
+        if not key:
+            self._pedir_openai_key(on_key=self._generar_desc_ia)
+            return
+
+        prod = self._selected_prod
+        self._btn_ia.configure(state="disabled", text="⏳")
+        self._lbl_desc_ia.configure(text="Generando...", text_color=MUTED)
+
+        def _run():
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=key)
+                partes = [f"Medicamento: {prod.nombre}"]
+                if getattr(prod, "nombre_generico", None):
+                    partes.append(f"Genérico: {prod.nombre_generico}")
+                if getattr(prod, "marca", None):
+                    partes.append(f"Marca: {prod.marca}")
+                if getattr(prod, "presentacion", None):
+                    partes.append(f"Presentación: {prod.presentacion}")
+                if getattr(prod, "concentracion", None):
+                    partes.append(f"Concentración: {prod.concentracion}")
+                prompt = (
+                    "Genera descripción farmacéutica breve y precisa. "
+                    "Incluye indicaciones principales y advertencia clave. "
+                    "Español profesional. Máx 300 caracteres. Sin títulos, texto corrido, oración completa.\n\n"
+                    + "\n".join(partes) + "\n\nDescripción:"
+                )
+                resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                texto = (resp.choices[0].message.content or "").strip()
+                if len(texto) > 300:
+                    chunk = texto[:300]
+                    cut = max(chunk.rfind(". "), chunk.rfind("! "), chunk.rfind("? "))
+                    texto = chunk[:cut + 1].strip() if cut > 80 else chunk.rsplit(" ", 1)[0] + "."
+                self._desc_ia = texto
+                preview = (texto[:55] + "…") if len(texto) > 55 else texto
+                self.after(0, lambda: self._lbl_desc_ia.configure(text=preview, text_color="#16A34A"))
+            except Exception as exc:
+                msg = str(exc)
+                if "429" in msg or "quota" in msg.lower() or "billing" in msg.lower():
+                    err = "Sin créditos OpenAI. Recarga en platform.openai.com/billing"
+                elif "api_key" in msg.lower() or "authentication" in msg.lower():
+                    err = "Clave API inválida"
+                else:
+                    err = f"Error: {msg[:50]}"
+                self._desc_ia = ""
+                self.after(0, lambda e=err: self._lbl_desc_ia.configure(text=e, text_color="#EF4444"))
+            finally:
+                self.after(0, lambda: self._btn_ia.configure(state="normal", text="🤖 IA"))
+
+        threading.Thread(target=_run, daemon=True, name="IADescGen").start()
+
+    def _pedir_openai_key(self, on_key=None):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Configurar clave OpenAI")
+        dlg.geometry("460x240")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width()  - 460) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 240) // 2
+        dlg.geometry(f"460x240+{x}+{y}")
+
+        ctk.CTkLabel(dlg, text="🔑 Clave API de OpenAI",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(18, 4))
+        ctk.CTkLabel(dlg,
+                     text="Necesaria para generar descripciones con IA.\n"
+                          "Obtén tu clave en platform.openai.com/api-keys",
+                     font=ctk.CTkFont(size=11), text_color=MUTED,
+                     justify="center").pack(pady=(0, 10))
+
+        entry = ctk.CTkEntry(dlg, width=380, height=36, placeholder_text="sk-...")
+        entry.pack(pady=(0, 4))
+        entry.focus()
+
+        lbl_err = ctk.CTkLabel(dlg, text="", text_color="#EF4444",
+                               font=ctk.CTkFont(size=11))
+        lbl_err.pack(pady=(0, 6))
+
+        def _guardar(event=None):
+            k = entry.get().strip()
+            if not k.startswith("sk-") or len(k) < 20:
+                lbl_err.configure(text="Clave inválida (debe empezar con sk-)")
+                return
+            import app.config as _cfg
+            key_file = _cfg.DATA_DIR / "openai.key"
+            key_file.write_text(k, encoding="utf-8")
+            _cfg.OPENAI_API_KEY = k
+            dlg.destroy()
+            if on_key:
+                self.after(100, on_key)
+
+        entry.bind("<Return>", _guardar)
+        bf = ctk.CTkFrame(dlg, fg_color="transparent")
+        bf.pack()
+        ctk.CTkButton(bf, text="Guardar", width=120, height=34,
+                      fg_color="#2563EB", hover_color="#1D4ED8", text_color="white",
+                      command=_guardar).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text="Cancelar", width=100, height=34,
+                      fg_color="transparent", border_width=1, border_color=BORDER,
+                      text_color=MUTED, command=dlg.destroy).pack(side="left", padx=4)
 
     # ── Carga de datos ─────────────────────────────────────────────────────────
 
