@@ -272,12 +272,56 @@ class SettingsScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=11), text_color="gray60").pack(
             padx=16, pady=(0, 12), anchor="w")
 
-        # ── Base de Datos + Zona de Peligro (solo admin) ──────────────────────
+        # ── Claves API (solo admin) ───────────────────────────────────────────
         from app.database.models import RolUsuario
         if self.user.rol == RolUsuario.admin:
-            self._seccion(scroll, "🗄️ Base de Datos", row=13)
+            self._seccion(scroll, "🔑 Claves API", row=13)
+            keys_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+            keys_frame.grid(row=14, column=0, sticky="ew", pady=(0, 16))
+            keys_frame.grid_columnconfigure(1, weight=1)
+
+            ctk.CTkLabel(
+                keys_frame,
+                text="Las claves se guardan localmente en el dispositivo.\n"
+                     "No se sincronizan con Turso ni con Vercel.",
+                font=ctk.CTkFont(size=10), text_color="gray60", justify="left",
+            ).grid(row=0, column=0, columnspan=2, padx=16, pady=(10, 6), sticky="w")
+
+            _KEY_FIELDS = [
+                ("OpenAI API Key:",        "openai.key",           True),
+                ("Turso Auth Token:",       "turso.key",            True),
+                ("Cloudinary Cloud Name:",  "cloudinary_cloud.key", False),
+                ("Cloudinary API Key:",     "cloudinary_api.key",   False),
+                ("Cloudinary API Secret:",  "cloudinary_secret.key",True),
+            ]
+            self._key_entries: dict[str, ctk.CTkEntry] = {}
+            for i, (label, filename, masked) in enumerate(_KEY_FIELDS):
+                ctk.CTkLabel(keys_frame, text=label, anchor="e",
+                             font=ctk.CTkFont(size=11)).grid(
+                    row=i + 1, column=0, padx=(16, 8), pady=5, sticky="e")
+                e = ctk.CTkEntry(keys_frame, height=32,
+                                 show="●" if masked else "",
+                                 placeholder_text="(no configurada)")
+                e.grid(row=i + 1, column=1, padx=(0, 16), pady=5, sticky="ew")
+                self._key_entries[filename] = e
+                # Pre-fill if file exists
+                kf = cfg.DATA_DIR / filename
+                if kf.exists():
+                    try:
+                        e.insert(0, kf.read_text(encoding="utf-8").strip())
+                    except Exception:
+                        pass
+
+            ctk.CTkButton(
+                keys_frame, text="💾 Guardar claves", height=34, width=180,
+                fg_color="#4CAF50", hover_color="#388E3C",
+                command=self._guardar_claves_api,
+            ).grid(row=len(_KEY_FIELDS) + 1, column=0, columnspan=2,
+                   padx=16, pady=(6, 14))
+
+            self._seccion(scroll, "🗄️ Base de Datos", row=15)
             db_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
-            db_frame.grid(row=14, column=0, sticky="ew", pady=(0, 16))
+            db_frame.grid(row=16, column=0, sticky="ew", pady=(0, 16))
 
             ctk.CTkLabel(db_frame, text="Registros en base de datos local:",
                          font=ctk.CTkFont(size=12, weight="bold")).pack(
@@ -319,13 +363,13 @@ class SettingsScreen(ctk.CTkFrame):
 
             self._cargar_db_stats()
 
-            self._seccion(scroll, "⚠️ Zona de Peligro", row=15)
+            self._seccion(scroll, "⚠️ Zona de Peligro", row=17)
             danger_frame = ctk.CTkFrame(
                 scroll, corner_radius=10,
                 fg_color=("#fff", "#2b2b2b"),
                 border_width=2, border_color="#EF4444",
             )
-            danger_frame.grid(row=16, column=0, sticky="ew", pady=(0, 16))
+            danger_frame.grid(row=18, column=0, sticky="ew", pady=(0, 16))
 
             # ── Botón 1: ventas + historial + cierres ─────────────────────────
             ctk.CTkLabel(
@@ -498,6 +542,29 @@ class SettingsScreen(ctk.CTkFrame):
 
         toast.show("Eliminando todos los registros…", kind="warning", duration=15000)
         threading.Thread(target=_run, daemon=True, name="PurgarTodo").start()
+
+    def _guardar_claves_api(self):
+        saved, empty = [], []
+        for filename, entry in self._key_entries.items():
+            val = entry.get().strip()
+            kf  = cfg.DATA_DIR / filename
+            if val:
+                kf.write_text(val, encoding="utf-8")
+                saved.append(filename)
+            elif kf.exists():
+                kf.unlink()
+                empty.append(filename)
+        # Hot-reload en cfg para que tome efecto sin reiniciar
+        cfg.OPENAI_API_KEY        = cfg._load_key("OPENAI_API_KEY",        "openai.key")
+        cfg.TURSO_AUTH_TOKEN      = cfg._load_key("TURSO_AUTH_TOKEN",       "turso.key")
+        cfg.CLOUDINARY_CLOUD_NAME = cfg._load_key("CLOUDINARY_CLOUD_NAME",  "cloudinary_cloud.key")
+        cfg.CLOUDINARY_API_KEY    = cfg._load_key("CLOUDINARY_API_KEY",     "cloudinary_api.key")
+        cfg.CLOUDINARY_API_SECRET = cfg._load_key("CLOUDINARY_API_SECRET",  "cloudinary_secret.key")
+        messagebox.showinfo(
+            "Claves guardadas",
+            f"Guardadas: {len(saved)} clave(s).\nActivas desde ahora sin reiniciar."
+            + (f"\nEliminadas: {len(empty)} clave(s) vacías." if empty else "")
+        )
 
     def _seccion(self, parent, titulo: str, row: int):
         ctk.CTkLabel(parent, text=titulo, font=ctk.CTkFont(size=14, weight="bold")).grid(

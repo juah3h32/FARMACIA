@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.2"
+VERSION = "2.3.3"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -53,13 +53,25 @@ else:
         SECRET_KEY = _secrets.token_hex(32)
         _key_file.write_text(SECRET_KEY)
 
+# -- Carga de claves desde archivos locales -----------------------------------
+# Prioridad: variable de entorno > archivo en DATA_DIR > vacío
+def _load_key(env_name: str, filename: str) -> str:
+    val = os.getenv(env_name, "")
+    if not val:
+        kf = DATA_DIR / filename
+        if kf.exists():
+            try:
+                val = kf.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+    return val
+
 # -- Turso (LibSQL) cloud DB --------------------------------------------------
-# Prioridad: variables de entorno (Vercel dashboard) > valores hardcoded (fallback local)
 TURSO_DATABASE_URL = os.getenv(
     "TURSO_DATABASE_URL",
     "libsql://farmacia-juanpa.aws-us-east-1.turso.io",
 )
-TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
+TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key")
 
 # Vercel: Turso es la BD primaria (no hay disco persistente)
 # EXE local: SQLite local + sync a Turso en background
@@ -87,16 +99,7 @@ GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
 GITHUB_TOKEN = ""
 
-CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
-CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
-CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
-
-def _load_openai_key() -> str:
-    key = os.getenv("OPENAI_API_KEY", "")
-    if not key:
-        _kf = DATA_DIR / "openai.key"
-        if _kf.exists():
-            key = _kf.read_text(encoding="utf-8").strip()
-    return key
-
-OPENAI_API_KEY = _load_openai_key()
+CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key")
+CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")
+CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key")
+OPENAI_API_KEY        = _load_key("OPENAI_API_KEY",        "openai.key")
