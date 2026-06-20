@@ -152,16 +152,40 @@ def purgar_historial(body: PurgarHistorialIn, payload: dict = Depends(get_curren
 
 
 @router.post("/purgar-datos")
-def purgar_datos(payload: dict = Depends(get_current_api_user)):
+def purgar_datos(body: PurgarHistorialIn, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    from app.auth.auth_service import verify_password
+    db = get_db_session()
+    try:
+        cfg_row = db.query(Configuracion).filter(
+            Configuracion.clave == "purge_password_hash"
+        ).first()
+        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
+            raise HTTPException(status_code=403, detail="Clave incorrecta")
+    finally:
+        db.close()
     from app.database.sync_service import purgar_todos_los_datos
     purgar_todos_los_datos()
     return {"ok": True}
 
 
 @router.post("/factory-reset")
-def factory_reset_endpoint(payload: dict = Depends(get_current_api_user)):
+def factory_reset_endpoint(body: PurgarHistorialIn, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    from app.auth.auth_service import verify_password
+    db = get_db_session()
+    try:
+        cfg_row = db.query(Configuracion).filter(
+            Configuracion.clave == "purge_password_hash"
+        ).first()
+        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
+            raise HTTPException(status_code=403, detail="Clave incorrecta")
+    finally:
+        db.close()
     from app.database.sync_service import factory_reset
     factory_reset()
     return {"ok": True}
@@ -357,9 +381,11 @@ async def restaurar_backup_upload(
     _require_admin(payload)
     if not (file.filename or "").endswith(".db"):
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos .db")
-    # Read upload into temp file
+    content = await file.read()
+    if len(content) > 100_000_000:  # 100 MB max
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 100 MB)")
+    # Write to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
     # Validate: check SQLite magic bytes

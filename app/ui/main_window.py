@@ -32,7 +32,7 @@ MUTED       = "#64748B"
 NAV_ITEMS = [
     ("🛒",  "Ventas",        "pos",       None),
     ("📦",  "Inventario",    "inventory", None),
-    ("🧾",  "Compras",       "compras",   None),
+    ("🧾",  "Compras",       "compras",   [RolUsuario.admin]),
     ("👥",  "Clientes",      "customers", None),
     ("🚚",  "Proveedores",   "suppliers", None),
     ("👤",  "Empleados",     "employees", [RolUsuario.admin]),
@@ -915,6 +915,15 @@ class MainWindow(ctk.CTkToplevel):
     # ── Session ───────────────────────────────────────────────────────────────
 
     def _logout(self):
+        from app.database.connection import get_db_session
+        from app.database.models import CortesCaja
+        db = get_db_session()
+        try:
+            abierto = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).first()
+        finally:
+            db.close()
+        if abierto:
+            self._do_auto_close_cortes(notas="[Cierre al cerrar sesión]")
         logout()
         self.destroy()
         if self.on_logout:
@@ -959,11 +968,13 @@ class MainWindow(ctk.CTkToplevel):
             for c in cortes:
                 if before_dt and c.abierto_en and c.abierto_en > before_dt:
                     continue  # opened after the scheduled close time — skip
+                cierre_dt = before_dt or datetime.now()
                 ventas = (
                     db.query(Venta)
                     .filter(
                         Venta.usuario_id == c.usuario_id,
                         Venta.creado_en  >= c.abierto_en,
+                        Venta.creado_en  <= cierre_dt,
                         Venta.estado     == EstadoVenta.completada,
                         Venta.eliminado.is_not(True),
                     )
@@ -985,7 +996,7 @@ class MainWindow(ctk.CTkToplevel):
                 else:
                     total_costo = 0.0
 
-                c.cerrado_en          = before_dt or datetime.now()
+                c.cerrado_en          = cierre_dt
                 c.total_ventas        = tv
                 c.total_efectivo      = ef
                 c.total_tarjeta       = tj

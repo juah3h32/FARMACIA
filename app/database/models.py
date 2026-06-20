@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime,
-    ForeignKey, Text, Date, Enum as SAEnum
+    ForeignKey, Text, Date, Enum as SAEnum, Index
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
@@ -179,6 +179,13 @@ class Venta(Base):
     cliente = relationship("Cliente", back_populates="ventas")
     items = relationship("ItemVenta", back_populates="venta", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index("ix_ventas_creado_en",  "creado_en"),
+        Index("ix_ventas_usuario_id", "usuario_id"),
+        Index("ix_ventas_estado",     "estado"),
+        Index("ix_ventas_eliminado",  "eliminado"),
+    )
+
 
 class ItemVenta(Base):
     __tablename__ = "items_venta"
@@ -247,6 +254,12 @@ class CortesCaja(Base):
     usuario = relationship("Usuario", back_populates="cortes")
     retiros = relationship("RetiroCaja", back_populates="corte", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index("ix_cortes_usuario_id",  "usuario_id"),
+        Index("ix_cortes_cerrado_en",  "cerrado_en"),
+        Index("ix_cortes_abierto_en",  "abierto_en"),
+    )
+
 
 class RetiroCaja(Base):
     """Retiro de efectivo de caja durante un turno (solo admin)"""
@@ -257,7 +270,7 @@ class RetiroCaja(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     monto = Column(Float, nullable=False)
     concepto = Column(Text)
-    tipo = Column(String(20), default="personal")   # 'personal' | 'inversion'
+    tipo = Column(SAEnum("personal", "inversion", name="tipo_retiro"), default="personal")
     creado_en = Column(DateTime, default=_dt.now)
 
     corte = relationship("CortesCaja", back_populates="retiros")

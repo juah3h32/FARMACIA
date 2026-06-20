@@ -248,6 +248,11 @@ class SettingsScreen(ctk.CTkFrame):
             btn_turno_row, text="🔒 Cerrar turnos abiertos ahora", height=36,
             fg_color="#F59E0B", hover_color="#D97706", text_color="white",
             command=self._forzar_cierre_turnos,
+        ).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(
+            btn_turno_row, text="🔄 Recalcular cortes históricos", height=36,
+            fg_color="#6366F1", hover_color="#4F46E5", text_color="white",
+            command=self._recalcular_cortes_historicos,
         ).pack(side="left")
 
         # Seccion: Sistema
@@ -606,6 +611,71 @@ class SettingsScreen(ctk.CTkFrame):
             messagebox.showinfo(
                 "Turnos cerrados",
                 f"Se cerraron {len(cortes)} turno(s) abierto(s)."
+            )
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", str(e))
+        finally:
+            db.close()
+
+    def _recalcular_cortes_historicos(self):
+        """Recalcula los totales de todos los cortes cerrados usando su rango de fechas correcto."""
+        from app.database.connection import get_db_session
+        from app.database.models import (
+            CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+        )
+        if not messagebox.askyesno(
+            "Recalcular cortes",
+            "Esto recalculará los totales (ventas, efectivo, tarjeta, costo) de todos los cortes\n"
+            "cerrados usando el rango correcto de fechas (abierto_en → cerrado_en).\n\n"
+            "¿Continuar?"
+        ):
+            return
+        db = get_db_session()
+        try:
+            cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en != None).all()
+            actualizados = 0
+            for c in cortes:
+                if not c.abierto_en or not c.cerrado_en:
+                    continue
+                ventas = (
+                    db.query(Venta)
+                    .filter(
+                        Venta.usuario_id == c.usuario_id,
+                        Venta.creado_en >= c.abierto_en,
+                        Venta.creado_en <= c.cerrado_en,
+                        Venta.estado == EstadoVenta.completada,
+                        Venta.eliminado.is_not(True),
+                    )
+                    .all()
+                )
+                ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+                tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+                tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                tv = ef + tj + tr
+                venta_ids = [v.id for v in ventas]
+                if venta_ids:
+                    cost_rows = (
+                        db.query(ItemVenta.cantidad, Producto.precio_compra)
+                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        .filter(ItemVenta.venta_id.in_(venta_ids))
+                        .all()
+                    )
+                    total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                else:
+                    total_costo = 0.0
+                c.total_ventas        = tv
+                c.total_efectivo      = ef
+                c.total_tarjeta       = tj
+                c.total_transferencia = tr
+                c.total_costo         = total_costo
+                c.num_ventas          = len(ventas)
+                actualizados += 1
+            db.commit()
+            messagebox.showinfo(
+                "Recalculación completa",
+                f"Se recalcularon {actualizados} corte(s) histórico(s).\n"
+                "Los totales ahora coinciden con las ventas de cada período."
             )
         except Exception as e:
             db.rollback()

@@ -105,6 +105,8 @@ def por_vencer(
 @router.post("/entrada")
 def registrar_entrada(body: EntradaStockIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    if body.cantidad <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
     db = get_db_session()
     try:
         prod = db.query(Producto).filter(Producto.id == body.producto_id).first()

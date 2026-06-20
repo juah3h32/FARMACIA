@@ -7,7 +7,19 @@ from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Lote, R
 from sqlalchemy import func
 import app.config as cfg
 
-_PIN_ADMIN = "171215"
+def _get_admin_pin() -> str:
+    """Lee el PIN admin desde DB; si no existe usa el valor por defecto."""
+    try:
+        from app.database.connection import get_db_session
+        from app.database.models import Configuracion
+        db = get_db_session()
+        try:
+            row = db.query(Configuracion).filter(Configuracion.clave == "admin_pin").first()
+            return row.valor if row and row.valor else "171215"
+        finally:
+            db.close()
+    except Exception:
+        return "171215"
 
 # Palette (matches main_window)
 CARD_BG = "#FFFFFF"
@@ -324,7 +336,7 @@ class ReportsScreen(ctk.CTkFrame):
     def _build_cortes_tab(self):
         tab = self.tabs.tab("Cortes de Caja")
         tab.grid_columnconfigure(0, weight=1)
-        tab.grid_rowconfigure(1, weight=1)
+        tab.grid_rowconfigure(2, weight=1)
 
         # ── Summary cards ─────────────────────────────────────────────────────
         cf = ctk.CTkFrame(tab, corner_radius=10, fg_color=CARD_BG,
@@ -387,11 +399,88 @@ class ReportsScreen(ctk.CTkFrame):
         scroll_y = ttk.Scrollbar(tab, orient="vertical",   command=self.cortes_tree.yview)
         scroll_x = ttk.Scrollbar(tab, orient="horizontal", command=self.cortes_tree.xview)
         self.cortes_tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
-        self.cortes_tree.grid(row=1, column=0, sticky="nsew")
-        scroll_y.grid(row=1, column=1, sticky="ns")
-        scroll_x.grid(row=2, column=0, columnspan=2, sticky="ew")
+        self.cortes_tree.grid(row=2, column=0, sticky="nsew")
+        scroll_y.grid(row=2, column=1, sticky="ns")
+        scroll_x.grid(row=3, column=0, columnspan=2, sticky="ew")
 
         self.cortes_tree.bind("<Double-1>", self._ver_detalle_corte)
+
+        # ── Botón cierre rápido (solo admin, visible solo cuando hay turno abierto) ──
+        if self.user.rol == RolUsuario.admin:
+            self._btn_cerrar_activo = ctk.CTkButton(
+                tab,
+                text="🔒 Cerrar turno abierto ahora",
+                height=38, corner_radius=8,
+                fg_color="#F59E0B", hover_color="#D97706", text_color="white",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                command=self._cerrar_turno_activo_rapido,
+            )
+            self._btn_cerrar_activo.grid(row=1, column=0, columnspan=2,
+                                          sticky="w", padx=4, pady=(0, 6))
+            self._btn_cerrar_activo.grid_remove()  # hidden until open turno detected
+
+    def _cerrar_turno_activo_rapido(self):
+        """Cierra todos los turnos abiertos directamente desde el botón en la pestaña."""
+        from app.database.connection import get_db_session
+        from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+        from datetime import datetime as _dt
+        db = get_db_session()
+        try:
+            cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+            if not cortes:
+                messagebox.showinfo("Turnos", "No hay turnos abiertos.")
+                return
+            nombres = ", ".join(c.usuario.nombre if c.usuario else f"#{c.id}" for c in cortes)
+            if not messagebox.askyesno(
+                "Cerrar turno",
+                f"¿Cerrar el turno activo de:\n{nombres}?\n\nEsta acción no se puede deshacer."
+            ):
+                return
+            ahora = _dt.now()
+            for c in cortes:
+                vq = db.query(Venta).filter(
+                    Venta.usuario_id == c.usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= ahora,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+                c_ef = sum(v.total for v in vq if v.metodo_pago == MetodoPago.efectivo)
+                c_tj = sum(v.total for v in vq if v.metodo_pago == MetodoPago.tarjeta)
+                c_tr = sum(v.total for v in vq if v.metodo_pago == MetodoPago.transferencia)
+                c_tv = c_ef + c_tj + c_tr
+                vids = [v.id for v in vq]
+                if vids:
+                    cost_rows = (
+                        db.query(ItemVenta.cantidad, Producto.precio_compra)
+                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        .filter(ItemVenta.venta_id.in_(vids))
+                        .all()
+                    )
+                    tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                else:
+                    tc = 0.0
+                c.cerrado_en          = ahora
+                c.total_ventas        = c_tv
+                c.total_efectivo      = c_ef
+                c.total_tarjeta       = c_tj
+                c.total_transferencia = c_tr
+                c.total_costo         = tc
+                c.num_ventas          = len(vq)
+                c.monto_cierre        = c.monto_apertura + c_ef
+                notas_prev            = (c.notas or "").strip()
+                c.notas               = (notas_prev + " [Cierre admin desde reportes]").strip()
+            db.commit()
+            messagebox.showinfo(
+                "Turno cerrado",
+                f"Turno(s) cerrado(s) correctamente.\nCajero(s): {nombres}"
+            )
+            self._generar()
+        except Exception as exc:
+            db.rollback()
+            messagebox.showerror("Error", str(exc))
+        finally:
+            db.close()
 
     def _ver_detalle_corte(self, event=None):
         sel = self.cortes_tree.selection()
@@ -481,6 +570,7 @@ class ReportsScreen(ctk.CTkFrame):
                         return
                     ahora = _dt.now()
                     vq = db.query(Venta).filter(
+                        Venta.usuario_id == c.usuario_id,
                         Venta.creado_en >= c.abierto_en,
                         Venta.creado_en <= ahora,
                         Venta.estado == EstadoVenta.completada,
@@ -677,6 +767,13 @@ class ReportsScreen(ctk.CTkFrame):
                 (c.monto_cierre or 0) - (c.monto_apertura + ef)
                 for c, ef, _, _, _, _ in corte_calc if c.cerrado_en
             )
+            hay_abierto = any(c.cerrado_en is None for c in cortes)
+            if hasattr(self, "_btn_cerrar_activo"):
+                if hay_abierto:
+                    self._btn_cerrar_activo.grid()
+                else:
+                    self._btn_cerrar_activo.grid_remove()
+
             self._corte_cards["c_turnos"].configure(text=str(len(cortes)))
             self._corte_cards["c_total_ventas"].configure(text=f"${tot_v:.2f}")
             self._corte_cards["c_efectivo"].configure(text=f"${tot_ef:.2f}")
@@ -1004,7 +1101,7 @@ class ReportsScreen(ctk.CTkFrame):
         lbl_err.pack(pady=(0, 6))
 
         def _ok(event=None):
-            if entry.get().strip() != _PIN_ADMIN:
+            if entry.get().strip() != _get_admin_pin():
                 lbl_err.configure(text="PIN incorrecto")
                 entry.delete(0, "end")
                 return
@@ -1110,7 +1207,7 @@ class ReportsScreen(ctk.CTkFrame):
         lbl_err.pack(pady=(0, 6))
 
         def _ok(event=None):
-            if entry.get().strip() != _PIN_ADMIN:
+            if entry.get().strip() != _get_admin_pin():
                 lbl_err.configure(text="PIN incorrecto")
                 entry.delete(0, "end")
                 return

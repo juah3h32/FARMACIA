@@ -277,7 +277,7 @@ class PosScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=11, weight="bold"),
                      text_color=MUTED).grid(row=0, column=0, padx=(0, 10), sticky="w")
 
-        self._pago_map = {"💵 Efectivo": "efectivo", "💳 Tarjeta": "tarjeta"}
+        self._pago_map = {"💵 Efectivo": "efectivo", "💳 Tarjeta": "tarjeta", "🏦 Transferencia": "transferencia"}
         self.seg_pago = ctk.CTkSegmentedButton(
             pago,
             values=list(self._pago_map.keys()),
@@ -336,7 +336,7 @@ class PosScreen(ctk.CTkFrame):
             ).first()
 
             if prod:
-                self._agregar_al_carrito(prod.id, prod.nombre, prod.precio_venta, prod.aplica_iva)
+                self._agregar_al_carrito(prod.id, prod.nombre, prod.precio_venta, prod.aplica_iva, prod.stock or 0)
                 self.entry_barcode.delete(0, "end")
                 self._mostrar_resultados([self._prod_to_dict(prod)], agregado=True)
                 return
@@ -471,8 +471,8 @@ class PosScreen(ctk.CTkFrame):
                          text_color=stock_color).pack()
 
             if not agregado:
-                def _add(p=pid, n=nombre, pr=precio, iv=aplica_iva):
-                    self._agregar_al_carrito(p, n, pr, iv)
+                def _add(p=pid, n=nombre, pr=precio, iv=aplica_iva, st=stock):
+                    self._agregar_al_carrito(p, n, pr, iv, st)
                     self._limpiar_resultados()
                     self.entry_barcode.delete(0, "end")
 
@@ -486,7 +486,12 @@ class PosScreen(ctk.CTkFrame):
         for w in self.search_frame.winfo_children():
             w.destroy()
 
-    def _agregar_al_carrito(self, producto_id: int, nombre: str, precio: float, aplica_iva: bool):
+    def _agregar_al_carrito(self, producto_id: int, nombre: str, precio: float, aplica_iva: bool, stock: int = 9999):
+        en_carrito = sum(i["cantidad"] for i in self.cart if i["producto_id"] == producto_id)
+        if en_carrito >= stock:
+            messagebox.showwarning("Stock insuficiente",
+                                    f"'{nombre}' solo tiene {stock} unidad(es) disponible(s).")
+            return
         for item in self.cart:
             if item["producto_id"] == producto_id:
                 item["cantidad"] += 1
@@ -650,7 +655,13 @@ class PosScreen(ctk.CTkFrame):
             finally:
                 db.close()
 
-        entry.bind("<KeyRelease>", buscar)
+        _debounce_timer = [None]
+        def _buscar_debounced(event=None):
+            if _debounce_timer[0]:
+                win.after_cancel(_debounce_timer[0])
+            _debounce_timer[0] = win.after(300, buscar)
+
+        entry.bind("<KeyRelease>", _buscar_debounced)
         buscar()
 
         ctk.CTkButton(
@@ -669,6 +680,21 @@ class PosScreen(ctk.CTkFrame):
             messagebox.showwarning("Carrito vacío", "Agrega productos antes de cobrar")
             return
 
+        # Validate open corte
+        _db_corte = get_db_session()
+        try:
+            _corte_activo = _db_corte.query(CortesCaja).filter(
+                CortesCaja.usuario_id == self.user.id,
+                CortesCaja.cerrado_en == None,
+            ).first()
+        finally:
+            _db_corte.close()
+        if not _corte_activo:
+            if messagebox.askyesno("Caja cerrada",
+                                    "No hay turno abierto.\n¿Deseas abrir la caja ahora para registrar la venta?"):
+                self._abrir_corte_caja(on_open=self._cobrar)
+            return
+
         subtotal, descuento, iva, total = self._actualizar_totales()
 
         try:
@@ -676,6 +702,8 @@ class PosScreen(ctk.CTkFrame):
         except ValueError:
             monto_pagado = 0.0
 
+        if monto_pagado < 0:
+            monto_pagado = 0.0
         metodo = self._pago_map.get(self.seg_pago.get(), "efectivo")
         if metodo == "efectivo" and monto_pagado < total:
             messagebox.showwarning("Monto insuficiente",
@@ -776,11 +804,13 @@ class PosScreen(ctk.CTkFrame):
     def _auto_cerrar_corte_anterior(self, corte, db):
         """Cierra un corte de un día previo sin interacción del usuario."""
         try:
+            cierre_dt = corte.abierto_en.replace(hour=23, minute=59, second=59, microsecond=0)
             ventas = (
                 db.query(Venta)
                 .filter(
                     Venta.usuario_id == self.user.id,
                     Venta.creado_en >= corte.abierto_en,
+                    Venta.creado_en <= cierre_dt,
                     Venta.estado == EstadoVenta.completada,
                     Venta.eliminado.is_not(True),
                 )
@@ -803,7 +833,7 @@ class PosScreen(ctk.CTkFrame):
             else:
                 total_costo = 0.0
 
-            corte.cerrado_en          = corte.abierto_en.replace(hour=23, minute=59, second=59)
+            corte.cerrado_en          = cierre_dt
             corte.total_ventas        = tv
             corte.total_efectivo      = ef
             corte.total_tarjeta       = tj
@@ -818,11 +848,21 @@ class PosScreen(ctk.CTkFrame):
             db.rollback()
             print(f"[Caja] Error al cerrar corte anterior: {e}")
 
-    def _abrir_corte_caja(self):
+    def _abrir_corte_caja(self, on_open=None):
+        if getattr(self, "_corte_dialog_open", False):
+            return
+        self._corte_dialog_open = True
+
         win = ctk.CTkToplevel(self)
         win.title("Apertura de Caja")
         win.geometry("360x270")
         win.grab_set()
+
+        def _on_cancel():
+            self._corte_dialog_open = False
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", _on_cancel)
 
         ctk.CTkLabel(win, text="💰 Apertura de Turno",
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(24, 4))
@@ -844,7 +884,15 @@ class PosScreen(ctk.CTkFrame):
                 db2.commit()
             finally:
                 db2.close()
+            self._corte_dialog_open = False
             win.destroy()
+            import app.config as _cfg
+            if _cfg.TURSO_SYNC:
+                import threading
+                from app.database.sync_service import sync_to_turso
+                threading.Thread(target=sync_to_turso, daemon=True).start()
+            if on_open:
+                self.after(50, on_open)
 
         ctk.CTkButton(win, text="Abrir Caja", height=44,
                       fg_color=GREEN, hover_color=GREEN_D, corner_radius=10,
@@ -852,4 +900,18 @@ class PosScreen(ctk.CTkFrame):
                       command=confirmar).pack(pady=12, fill="x", padx=30)
 
     def on_show(self):
+        self._verificar_corte_abierto()
         self.entry_barcode.focus()
+
+    def _verificar_corte_abierto(self):
+        """Si no hay corte abierto para este cajero, pide abrir uno nuevo."""
+        db = get_db_session()
+        try:
+            abierto = db.query(CortesCaja).filter(
+                CortesCaja.usuario_id == self.user.id,
+                CortesCaja.cerrado_en == None,
+            ).first()
+        finally:
+            db.close()
+        if not abierto:
+            self._abrir_corte_caja()

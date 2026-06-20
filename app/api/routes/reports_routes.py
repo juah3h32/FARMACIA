@@ -258,10 +258,16 @@ def export_csv(
     db = get_db_session()
     try:
         fi, ff = _rango(fecha_inicio, fecha_fin)
+        from app.database.models import EstadoVenta as _EV
         ventas = (
             db.query(Venta)
             .options(joinedload(Venta.items))
-            .filter(Venta.creado_en >= fi, Venta.creado_en <= ff)
+            .filter(
+                Venta.creado_en >= fi,
+                Venta.creado_en <= ff,
+                Venta.estado == _EV.completada,
+                Venta.eliminado.is_not(True),
+            )
             .order_by(Venta.creado_en)
             .all()
         )

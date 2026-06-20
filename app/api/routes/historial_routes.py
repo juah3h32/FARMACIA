@@ -11,6 +11,11 @@ from app.api.routes.auth_routes import get_current_api_user
 router = APIRouter()
 
 
+def _require_admin(payload: dict):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+
+
 class PacienteIn(BaseModel):
     nombre: str
     fecha_nacimiento: Optional[date] = None
@@ -93,6 +98,7 @@ def listar_pacientes(q: Optional[str] = None, payload: dict = Depends(get_curren
 
 @router.post("/pacientes")
 def crear_paciente(body: PacienteIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     db = get_db_session()
     try:
         p = Paciente(**body.model_dump())
@@ -127,6 +133,7 @@ def obtener_paciente(pid: int, payload: dict = Depends(get_current_api_user)):
 
 @router.put("/pacientes/{pid}")
 def actualizar_paciente(pid: int, body: PacienteIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     db = get_db_session()
     try:
         p = db.query(Paciente).filter(Paciente.id == pid).first()
@@ -147,6 +154,7 @@ def actualizar_paciente(pid: int, body: PacienteIn, payload: dict = Depends(get_
 
 @router.delete("/pacientes/{pid}")
 def eliminar_paciente(pid: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     db = get_db_session()
     try:
         p = db.query(Paciente).filter(Paciente.id == pid).first()
@@ -190,6 +198,7 @@ def agregar_registro(pid: int, body: RegistroIn, payload: dict = Depends(get_cur
 
 @router.delete("/registros/{rid}")
 def eliminar_registro(rid: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     db = get_db_session()
     try:
         r = db.query(RegistroClinico).filter(RegistroClinico.id == rid).first()

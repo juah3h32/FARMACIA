@@ -355,6 +355,15 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
         from app.services.printer_service import printer_service as _ps
         bg.add_task(_ps.print_retiro, retiro_ticket_data)
 
+        from app.auth.auth_service import _registrar_auditoria
+        _registrar_auditoria(
+            usuario_id,
+            "RETIRO_CAJA",
+            "retiros_caja",
+            r.id,
+            f"Monto:${r.monto:.2f} Tipo:{tipo} Concepto:{r.concepto or ''}"
+        )
+
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
@@ -515,5 +524,67 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
             "ganancia_disponible": ganancia_disponible,
             "capital_inversion":   capital_inversion,
         }
+    finally:
+        db.close()
+
+
+@router.post("/recalcular-historicos")
+def recalcular_historicos(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Admin: recalcula totales de todos los cortes cerrados usando el rango abierto_en..cerrado_en."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    db = get_db_session()
+    try:
+        cortes = (
+            db.query(CortesCaja)
+            .filter(CortesCaja.cerrado_en != None)
+            .all()
+        )
+        actualizados = 0
+        for c in cortes:
+            if not c.abierto_en or not c.cerrado_en:
+                continue
+            ventas = (
+                db.query(Venta)
+                .filter(
+                    Venta.usuario_id == c.usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= c.cerrado_en,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                )
+                .all()
+            )
+            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+            tv = ef + tj + tr
+            venta_ids = [v.id for v in ventas]
+            if venta_ids:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, Producto.precio_compra)
+                    .join(Producto, ItemVenta.producto_id == Producto.id)
+                    .filter(ItemVenta.venta_id.in_(venta_ids))
+                    .all()
+                )
+                total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            else:
+                total_costo = 0.0
+            c.total_ventas        = tv
+            c.total_efectivo      = ef
+            c.total_tarjeta       = tj
+            c.total_transferencia = tr
+            c.total_costo         = total_costo
+            c.num_ventas          = len(ventas)
+            actualizados += 1
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, "cortes_recalculados": actualizados}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
