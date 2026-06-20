@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.4"
+VERSION = "2.3.5"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -71,7 +71,11 @@ TURSO_DATABASE_URL = os.getenv(
     "TURSO_DATABASE_URL",
     "libsql://farmacia-juanpa.aws-us-east-1.turso.io",
 )
-TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key")
+TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key") or (
+    "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9"
+    ".eyJhIjoicnciLCJpYXQiOjE3NzkxNTUwOTQsImlkIjoiMDE5ZTNkZTctZjQwMS03NmViLWFkYjgtZTRkMzAxZGExMTdjIiwicmlkIjoiNDVkNDAzNjItNzg4Ni00MDViLWE0Y2QtNDUxMjY1YTgxMzQ0In0"
+    ".B3nY0-9gzbXkqNlj8MlzBjw44JP9OpVrG9QGrdx_tkB19QF8l7f5IgYoW3mLjOqUq4sTOVNQu78GEJMaVA0sDg"
+)
 
 # Vercel: Turso es la BD primaria (no hay disco persistente)
 # EXE local: SQLite local + sync a Turso en background
@@ -101,7 +105,19 @@ GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
 GITHUB_TOKEN = ""
 
-CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key")
-CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")
-CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key")
-OPENAI_API_KEY        = _load_key("OPENAI_API_KEY",        "openai.key")
+CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key") or "dcutrbbyw"
+CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")    or "717952968559447"
+CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key") or "gufXKh1BIUTfsdwKNzz95or4SI4"
+
+
+def _load_openai_key() -> str:
+    key = _load_key("OPENAI_API_KEY", "openai.key")
+    if not key:
+        key = (
+            "sk-proj-Yoq_JrjHgsJ9RuPMb2BrJHP83mVweP9-ZBR-ZcKx8DoYZEUoupZc1lcRE6LHP4Ch1aZ8NXfGA"
+            "CT3BlbkFJg8p-I6iOthjveaONV4Luj8UDfuH4Do-gu7YQqWJI-2BdHU_6rtUd4F2xeE28LgumO63vq4XDcA"
+        )
+    return key
+
+
+OPENAI_API_KEY = _load_openai_key()
