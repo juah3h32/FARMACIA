@@ -494,9 +494,13 @@ class ReportsScreen(ctk.CTkFrame):
         #       efectivo, tarjeta, transferencia, fondo_apertura, fondo_cierre, diferencia, estado
         cajero, ap_dt, ci_dt, dur, nv, tv, ef, tj, tr, fa, fc, dif, estado = vals
 
+        is_open  = "abierto" in estado.lower()
+        is_admin = self.user.rol == RolUsuario.admin
+        h = 630 if (is_open and is_admin) else 520
         win = ctk.CTkToplevel(self)
         win.title("Detalle de Corte de Caja")
-        win.geometry("480x520")
+        win.geometry(f"480x{h}")
+        win.resizable(False, True)
         win.grab_set()
 
         ctk.CTkLabel(win, text="🧾 Detalle de Corte",
@@ -548,14 +552,16 @@ class ReportsScreen(ctk.CTkFrame):
         row(win, "Diferencia", dif, dif_color)
 
         ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=10)
-        estado_color = "#D97706" if "Abierto" in estado else (
-            "#DC2626" if "Descuadre" in estado else "#16A34A")
+        _e = estado.lower()
+        estado_color = "#D97706" if "abierto" in _e else (
+            "#DC2626" if "descuadre" in _e else "#16A34A")
         ctk.CTkLabel(win, text=estado,
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=estado_color).pack(pady=(0, 8))
 
         # Botón de cierre manual (solo admin, solo turnos abiertos)
-        if "Abierto" in estado and self.user.rol == RolUsuario.admin:
+        if is_open and is_admin:
+            ctk.CTkFrame(win, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=(0, 8))
             def _cerrar_turno():
                 from app.database.connection import get_db_session
                 from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
