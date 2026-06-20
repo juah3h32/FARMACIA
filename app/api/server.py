@@ -5,7 +5,7 @@ from pathlib import Path
 from app.api.routes import auth_routes, products_routes, sales_routes, inventory_routes
 from app.api.routes import dashboard_routes, pos_routes, customers_routes, employees_routes
 from app.api.routes import admin_routes, reports_routes, cortes_routes, ai_routes, suppliers_routes
-from app.api.routes import historial_routes, marketing_routes
+from app.api.routes import historial_routes, marketing_routes, config_routes
 from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, catalogo_web_routes
 import uvicorn
 import app.config as cfg
@@ -51,6 +51,7 @@ app.include_router(ai_routes.router,        prefix="/api/ai",         tags=["AI"
 app.include_router(suppliers_routes.router, prefix="/api/proveedores", tags=["Proveedores"])
 app.include_router(historial_routes.router,    prefix="/api/historial",   tags=["Historial"])
 app.include_router(marketing_routes.router,    prefix="/api/marketing",   tags=["Marketing"])
+app.include_router(config_routes.router,       prefix="/api/config",      tags=["Config"])
 # App móvil/web — público (sin auth)
 app.include_router(public_routes.router,       prefix="/api/public",      tags=["Público"])
 # App móvil/web — clientes autenticados

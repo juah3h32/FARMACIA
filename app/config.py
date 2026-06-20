@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.3"
+VERSION = "2.3.4"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -94,6 +94,8 @@ WINDOW_HEIGHT = 820
 
 # DEV_MODE: False en EXE compilado y en Vercel (no exponer /docs en producción)
 DEV_MODE = not getattr(sys, 'frozen', False) and not _ON_VERCEL
+
+VERCEL_URL  = os.getenv("VERCEL_URL", "https://farmacia-ebenezer.com")
 
 GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
