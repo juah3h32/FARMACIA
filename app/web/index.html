@@ -1092,7 +1092,7 @@
             <div class="bg-white rounded-2xl border p-4 flex gap-2" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="relative flex-1">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
-                <input id="pos-search" type="text" placeholder="[F2] Buscar producto o código de barras..."
+                <input id="pos-search" type="text" placeholder="[F2/F3] Buscar producto o código de barras..."
                        class="w-full h-10 pl-9 pr-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#F8FAFF"
                        oninput="posSearch(this.value)"
                        onkeydown="posSearchKeydown(event)">
@@ -7680,8 +7680,8 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       navigate('pos');
       setTimeout(() => {
-        const el = document.getElementById('pos-customer');
-        if (el) el.focus();
+        const el = document.getElementById('pos-search');
+        if (el) { el.focus(); el.select(); }
       }, 80);
       break;
     case 'F5':
