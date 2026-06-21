@@ -6301,15 +6301,17 @@ async function forzarSyncCaja() {
   const btn = document.getElementById('caja-sync-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; }
   try {
-    const r = await api('/api/admin/db-sync', { method: 'POST' });
-    if (r.ok) {
+    const r = await api('/admin/db-sync', { method: 'POST' });
+    const data = r.ok || r.status === 200 ? await r.json().catch(()=>({})) : {};
+    if (r.ok && data.ok !== false) {
       toast('Sincronización completada ✓', 'success');
       await loadCajaAdmin();
     } else {
-      toast('Error al sincronizar', 'error');
+      const msg = data.error || data.detail || 'Error al sincronizar';
+      toast(msg, 'error');
     }
   } catch(e) {
-    toast('Error al sincronizar', 'error');
+    toast('Error de red al sincronizar', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync'; lucide.createIcons(); }
   }

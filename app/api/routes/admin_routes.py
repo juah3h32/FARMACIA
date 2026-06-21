@@ -239,6 +239,9 @@ def db_sync(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     from app.database.sync_service import force_sync
     stats = force_sync()
+    err = stats.pop("_error", None)
+    if err:
+        return {"ok": False, "error": err, "stats": stats}
     return {"ok": True, "stats": stats}
 
 

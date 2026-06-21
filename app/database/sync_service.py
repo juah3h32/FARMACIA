@@ -552,9 +552,21 @@ def sync_from_turso() -> int:
 
 def force_sync() -> dict:
     """Immediate bidirectional sync: push local → Turso, then pull Turso → local."""
-    sync_to_turso()
-    sync_from_turso()
-    return get_db_stats()
+    push_err = pull_err = None
+    try:
+        sync_to_turso()
+    except Exception as e:
+        push_err = str(e)
+        print(f"[Sync] force_sync push error: {e}")
+    try:
+        sync_from_turso()
+    except Exception as e:
+        pull_err = str(e)
+        print(f"[Sync] force_sync pull error: {e}")
+    stats = get_db_stats()
+    if push_err or pull_err:
+        stats["_error"] = (push_err or "") + (" | " + pull_err if pull_err else "")
+    return stats
 
 
 def get_db_stats() -> dict:
