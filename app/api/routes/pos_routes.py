@@ -304,11 +304,11 @@ def imprimir_ticket_prueba(body: ImprimirPruebaIn, bg: BackgroundTasks, payload:
 
         subtotal = sum((i.precio_unitario * i.cantidad) - i.descuento for i in body.items)
         iva_total = sum(
-            i.precio_unitario * i.cantidad * 0.16
+            ((i.precio_unitario * i.cantidad) - i.descuento) * 0.16
             for i in body.items
             if prods.get(i.producto_id) and prods[i.producto_id].aplica_iva
         )
-        total = subtotal + iva_total - body.descuento_global
+        total = (subtotal - body.descuento_global) + iva_total
         cambio = max(0.0, body.monto_pagado - total)
 
         from app.database.models import Usuario

@@ -109,7 +109,8 @@ def listar_productos(
             q = q.filter(
                 Producto.nombre.ilike(f"%{busqueda}%") |
                 Producto.codigo_barras.ilike(f"%{busqueda}%") |
-                Producto.nombre_generico.ilike(f"%{busqueda}%")
+                Producto.nombre_generico.ilike(f"%{busqueda}%") |
+                Producto.marca.ilike(f"%{busqueda}%")
             )
         if categoria_id:
             q = q.filter(Producto.categoria_id == categoria_id)

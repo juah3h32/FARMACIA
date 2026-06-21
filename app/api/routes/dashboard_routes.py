@@ -39,7 +39,11 @@ def dashboard_stats(payload: dict = Depends(get_current_api_user)):
             Producto.activo == True,
         ).scalar() or 0
 
-        recent_q = db.query(Venta).filter(Venta.eliminado.is_not(True)).order_by(Venta.creado_en.desc())
+        from sqlalchemy.orm import joinedload as _jl
+        recent_q = (db.query(Venta)
+                    .options(_jl(Venta.usuario))
+                    .filter(Venta.eliminado.is_not(True))
+                    .order_by(Venta.creado_en.desc()))
         if not is_admin:
             recent_q = recent_q.filter(Venta.usuario_id == user_id)
         recent = recent_q.limit(8).all()
