@@ -1013,117 +1013,78 @@
             <div id="kpi-track" style="display:flex;transition:transform .45s cubic-bezier(.4,0,.2,1)">
 
               <!-- ── Slide 0: HOY ──────────────────────── -->
-              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-                <!-- Ventas hoy -->
-                <div class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#1d2140"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-ventas" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ventas hoy</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#EEF1F9;margin-top:2px">
-                      <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#1d2140"></i>
-                    </div>
+              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#1d2140)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="shopping-cart" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-ventas" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ventas hoy</p>
                 </div>
-                <!-- Ingresos hoy -->
-                <div class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#16A34A"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-ingresos" class="text-2xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ingresos hoy</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#F0FDF4;margin-top:2px">
-                      <i data-lucide="dollar-sign" style="width:16px;height:16px;color:#16A34A"></i>
-                    </div>
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#22C55E,#16A34A)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="dollar-sign" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-ingresos" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ingresos hoy</p>
                 </div>
-                <!-- Stock bajo -->
-                <div class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#D97706"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-stock" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Stock bajo</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#FFFBEB;margin-top:2px">
-                      <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#D97706"></i>
-                    </div>
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-stock" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Stock bajo</p>
                 </div>
-                <!-- Productos -->
-                <div class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#7C3AED"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-total" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Productos</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#F5F3FF;margin-top:2px">
-                      <i data-lucide="package-2" style="width:16px;height:16px;color:#7C3AED"></i>
-                    </div>
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="package-2" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-total" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Productos</p>
                 </div>
               </div>
 
               <!-- ── Slide 1: INVENTARIO (admin) ───────── -->
-              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-                <!-- Inversión -->
-                <div id="kpi-card-costo" class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#1d2140"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-inv-costo" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Inversión inventario</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#EEF1F9;margin-top:2px">
-                      <i data-lucide="package" style="width:16px;height:16px;color:#1d2140"></i>
-                    </div>
+              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+                <div id="kpi-card-costo" class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#1d2140,#1e40af)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="package" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-inv-costo" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Inversión en inventario</p>
                 </div>
-                <!-- Valor en venta -->
-                <div id="kpi-card-venta" class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#0891B2"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-inv-venta" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Valor en venta</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#ECFEFF;margin-top:2px">
-                      <i data-lucide="trending-up" style="width:16px;height:16px;color:#0891B2"></i>
-                    </div>
+                <div id="kpi-card-venta" class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#059669,#047857)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="trending-up" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-inv-venta" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor total en venta</p>
                 </div>
-                <!-- Ganancia proy. -->
-                <div id="kpi-card-ganancia" class="kpi-card2">
-                  <div class="kpi-card2-accent" style="background:#16A34A"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-inv-ganancia" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ganancia proy.</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#F0FDF4;margin-top:2px">
-                      <i data-lucide="coins" style="width:16px;height:16px;color:#16A34A"></i>
-                    </div>
+                <div id="kpi-card-ganancia" class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="coins" style="width:20px;height:20px;color:#fff"></i>
                   </div>
+                  <p id="kpi-inv-ganancia" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ganancia proyectada</p>
                 </div>
-                <!-- Valor vencido -->
-                <div id="kpi-card-vencido" onclick="openVencidosModal()" class="kpi-card2" style="cursor:pointer">
-                  <div class="kpi-card2-accent" style="background:#DC2626"></div>
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <p id="kpi-inv-vencido" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Valor vencido</p>
-                    </div>
-                    <div class="kpi-card2-icon" style="background:#FEF2F2;margin-top:2px">
-                      <i data-lucide="package-x" style="width:16px;height:16px;color:#DC2626"></i>
-                    </div>
+                <div id="kpi-card-vencido" onclick="openVencidosModal()" class="kpi-card rounded-2xl p-4 relative overflow-hidden transition-all hover:scale-105 hover:shadow-xl" style="background:linear-gradient(135deg,#dc2626,#b91c1c);cursor:pointer">
+                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
+                  <div class="absolute bottom-2 right-3 flex items-center gap-1 opacity-60">
+                    <i data-lucide="chevron-right" style="width:12px;height:12px;color:#fff"></i>
+                    <span class="text-[10px] font-semibold text-white">Ver detalle</span>
                   </div>
-                  <p class="text-[10px] mt-2 flex items-center gap-1" style="color:#DC2626">
-                    <i data-lucide="chevron-right" style="width:10px;height:10px"></i> Ver detalle
-                  </p>
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
+                    <i data-lucide="package-x" style="width:20px;height:20px;color:#fff"></i>
+                  </div>
+                  <p id="kpi-inv-vencido" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
+                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor vencido</p>
                 </div>
               </div>
 
