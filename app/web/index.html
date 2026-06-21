@@ -3498,17 +3498,24 @@ async function startMpPayment(amount, reference, saleBody) {
   document.getElementById('modal-mp-terminal').classList.remove('hidden');
   document.getElementById('modal-mp-terminal').classList.add('flex');
 
-  const res = await api('/config/mp-intent', { method:'POST', body: JSON.stringify({ amount, reference }) });
-  if (!res.ok) {
+  try {
+    const res = await api('/config/mp-intent', { method:'POST', body: JSON.stringify({ amount, reference }) });
+    if (!res.ok) {
+      closeMpModal();
+      const e = await res.json();
+      toast(e.detail || 'No se pudo conectar con la terminal', 'error');
+      _enableCobrarBtn(true);
+      return;
+    }
+    const d = await res.json();
+    _mpIntentId = d.intent_id;
+    document.getElementById('mp-modal-status').textContent = 'El cliente debe insertar tarjeta y PIN en la terminal...';
+    _mpPollTimer = setInterval(pollMpIntent, 2500);
+  } catch(err) {
     closeMpModal();
-    const e = await res.json();
-    toast(e.detail || 'No se pudo conectar con la terminal', 'error');
-    return;
+    toast('Error de conexión con la terminal', 'error');
+    _enableCobrarBtn(true);
   }
-  const d = await res.json();
-  _mpIntentId = d.intent_id;
-  document.getElementById('mp-modal-status').textContent = 'El cliente debe insertar tarjeta y PIN en la terminal...';
-  _mpPollTimer = setInterval(pollMpIntent, 2500);
 }
 
 async function pollMpIntent() {

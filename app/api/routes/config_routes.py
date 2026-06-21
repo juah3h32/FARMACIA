@@ -33,7 +33,7 @@ class MpSaveIn(BaseModel):
 def mp_status(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
     device_id = mp_point.device_id
-    # Device IDs reales de MP contienen guiones (GERTEC-MP-...). Solo números = inválido.
+    # Device IDs reales de MP son alfanuméricos (NEWLAND_ME30SU__...). Solo dígitos = inválido.
     valid_device = bool(device_id and len(device_id) > 8 and not device_id.isdigit())
     return {
         "enabled":   mp_point.enabled and valid_device,
@@ -51,8 +51,8 @@ def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
     if not token:
         raise HTTPException(status_code=400, detail="Access Token requerido")
     (cfg.DATA_DIR / "mp_access_token.key").write_text(token, encoding="utf-8")
-    # Solo guarda device_id si tiene formato válido (contiene guiones)
-    valid_device = bool(device and "-" in device and len(device) > 10)
+    # Solo guarda device_id si tiene formato válido (alfanumérico, no solo dígitos)
+    valid_device = bool(device and len(device) > 8 and not device.isdigit())
     if valid_device:
         (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
     elif not device:
