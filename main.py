@@ -93,6 +93,25 @@ class _PyWebViewApi:
         except Exception:
             return ""
 
+    def get_pdf_save_path(self, default_name: str) -> str:
+        """Open native Save-As dialog for PDF files; return chosen path or empty string."""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            path = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("Archivo PDF", "*.pdf"), ("Todos los archivos", "*.*")],
+                initialfile=default_name,
+                title="Guardar reporte PDF",
+            )
+            root.destroy()
+            return path or ""
+        except Exception:
+            return ""
+
 
 def _start_ui(port: int) -> None:
     try:

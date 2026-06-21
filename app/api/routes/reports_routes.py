@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import date, datetime, timedelta
@@ -302,14 +303,8 @@ def export_csv(
         db.close()
 
 
-@router.get("/export-pdf")
-def export_pdf_ventas(  # noqa: C901
-    fecha_inicio: date = Query(...),
-    fecha_fin:    date = Query(...),
-    payload: dict = Depends(get_current_api_user),
-):
-    """Genera PDF de ventas del período con el mismo estilo del manual."""
-    _require_admin(payload)
+def _build_ventas_pdf_bytes(fecha_inicio: date, fecha_fin: date) -> bytes:  # noqa: C901
+    """Generate ventas PDF for given period; return raw bytes."""
     import app.config as cfg
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
@@ -613,9 +608,40 @@ def export_pdf_ventas(  # noqa: C901
         try: os.unlink(tmp.name)
         except Exception: pass
 
+    return data
+
+
+@router.get("/export-pdf")
+def export_pdf_ventas(
+    fecha_inicio: date = Query(...),
+    fecha_fin:    date = Query(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    data = _build_ventas_pdf_bytes(fecha_inicio, fecha_fin)
     filename = f"Ventas_{fecha_inicio}_{fecha_fin}.pdf"
     return StreamingResponse(
         io.BytesIO(data),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+class _SavePdfBody(BaseModel):
+    path: str
+
+
+@router.post("/save-pdf-to-path")
+def save_pdf_to_path(
+    body: _SavePdfBody,
+    fecha_inicio: date = Query(...),
+    fecha_fin:    date = Query(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path requerido")
+    data = _build_ventas_pdf_bytes(fecha_inicio, fecha_fin)
+    with open(body.path, "wb") as f:
+        f.write(data)
+    return {"ok": True, "path": body.path}

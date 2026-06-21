@@ -6475,15 +6475,39 @@ async function exportVentasPDF() {
   const desde = document.getElementById('rep-desde').value;
   const hasta  = document.getElementById('rep-hasta').value;
   if (!desde || !hasta) { toast('Selecciona un período primero', 'warning'); return; }
+  const defaultName = `Ventas_${desde}_${hasta}.pdf`;
+  const qs = `fecha_inicio=${desde}&fecha_fin=${hasta}`;
+
+  // Desktop: native Save-As dialog
+  if (window.pywebview?.api?.get_pdf_save_path) {
+    const savePath = await window.pywebview.api.get_pdf_save_path(defaultName);
+    if (!savePath) return;
+    toast('Generando PDF…', 'info');
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/reportes/save-pdf-to-path?${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ path: savePath }),
+      });
+      if (!res.ok) { toast('Error al guardar PDF', 'error'); return; }
+      toast(`PDF guardado: ${savePath.split(/[\\/]/).pop()} ✓`, 'success');
+    } catch(e) {
+      toast('Error de conexión', 'error');
+    }
+    return;
+  }
+
+  // Web fallback: blob download
   toast('Generando PDF de ventas…', 'info');
   try {
-    const res = await api(`/reportes/export-pdf?fecha_inicio=${desde}&fecha_fin=${hasta}`);
+    const res = await api(`/reportes/export-pdf?${qs}`);
     if (!res.ok) { toast('Error al generar PDF', 'error'); return; }
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `Ventas_${desde}_${hasta}.pdf`;
+    a.download = defaultName;
     a.click();
     URL.revokeObjectURL(url);
     toast('PDF descargado ✓', 'success');
