@@ -248,11 +248,6 @@ class SettingsScreen(ctk.CTkFrame):
             btn_turno_row, text="🔒 Cerrar turnos abiertos ahora", height=36,
             fg_color="#F59E0B", hover_color="#D97706", text_color="white",
             command=self._forzar_cierre_turnos,
-        ).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(
-            btn_turno_row, text="🔄 Recalcular cortes históricos", height=36,
-            fg_color="#6366F1", hover_color="#4F46E5", text_color="white",
-            command=self._recalcular_cortes_historicos,
         ).pack(side="left")
 
         # Seccion: Sistema
