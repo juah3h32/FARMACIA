@@ -901,8 +901,8 @@
       <nav id="sidebar-nav" class="flex flex-col gap-0.5"></nav>
     </div>
 
-    <!-- Farmacito IA -->
-    <div class="px-3 pb-2">
+    <!-- Farmacito IA (cajeros only) -->
+    <div id="farmacito-btn-wrap" class="px-3 pb-2">
       <button onclick="toggleChat()"
         class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all hover:opacity-90 active:scale-95"
         style="background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;border:none;cursor:pointer">
@@ -4163,6 +4163,8 @@ function launchApp() {
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').classList.add('flex');
   buildNav();
+  const farmEl = document.getElementById('farmacito-btn-wrap');
+  if (farmEl) farmEl.style.display = S.user?.rol === 'admin' ? 'none' : '';
   updateUserCard();
   tickClock();
   navigate('dashboard');
