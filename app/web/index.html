@@ -1985,10 +1985,14 @@
                 <i data-lucide="wifi" style="width:15px;height:15px"></i> Activar modo PDV
               </button>
             </div>
-            <p class="text-xs" style="color:#94A3B8">
-              <b>Primera vez:</b> Guarda el token → Detectar → Guardar con Device ID → Activar modo PDV.<br>
-              <b>Modo PDV</b> es el modo integración; la terminal recibe montos desde el POS automáticamente.
-            </p>
+            <div class="rounded-xl p-3 text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
+              <b>Pasos para la primera configuración:</b><br>
+              1. En tu celular: abre la app <b>Mercado Pago → Tu negocio → Cobrar con Point</b> y activa tu ME30S<br>
+              2. Regresa aquí → click <b>🔍 Detectar</b> → el Device ID aparece automático<br>
+              3. Click <b>💾 Guardar</b><br>
+              4. Click <b>📡 Activar modo PDV</b> (solo una vez — pone la terminal en modo integración)<br>
+              5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal
+            </div>
           </div>
         </div>
 
@@ -3388,17 +3392,22 @@ let _mpPollTimer  = null;
 let _mpIntentId   = null;
 let _mpSaleBody   = null;   // guardamos el body de venta para ejecutar después del pago
 
+function _mpDeviceIdValid(id) {
+  // Real MP device IDs contain dashes: GERTEC-MP-ME30S-xxx or PAX-MP-...
+  return id && id.includes('-') && id.length > 10;
+}
+
 async function loadMpStatus() {
   try {
     const res = await api('/config/mp-status');
     if (!res.ok) return;
     const d = await res.json();
-    const badge = document.getElementById('mp-status-badge');
-    const tokenEl  = document.getElementById('mp-token');
+    const badge    = document.getElementById('mp-status-badge');
     const deviceEl = document.getElementById('mp-device');
-    if (d.device_id && deviceEl) deviceEl.value = d.device_id;
+    const validDevice = _mpDeviceIdValid(d.device_id);
+    if (d.device_id && deviceEl && validDevice) deviceEl.value = d.device_id;
     if (badge) {
-      if (d.enabled) {
+      if (d.token_set && validDevice) {
         badge.textContent = '✓ LISTO';
         badge.style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
       } else if (d.token_set) {
@@ -3424,19 +3433,42 @@ async function saveMpConfig() {
 async function detectMpDevices() {
   const token = document.getElementById('mp-token')?.value.trim();
   if (!token) { toast('Primero ingresa el Access Token', 'warning'); return; }
-  // Guardar token temporalmente para que el endpoint pueda usarlo
-  await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id:'' }) });
-  const res = await api('/config/mp-devices');
-  if (!res.ok) { const e=await res.json(); toast(e.detail||'Error MP', 'error'); return; }
+  // Pasa el token como query param — NO guarda antes de detectar para no borrar device_id existente
+  const res = await api(`/config/mp-devices?token=${encodeURIComponent(token)}`);
+  if (!res.ok) {
+    const e = await res.json();
+    if (res.status === 401 || res.status === 403) {
+      toast(e.detail || 'Sin permisos de Point', 'error');
+    } else {
+      toast(e.detail || 'Error MP API', 'error');
+    }
+    return;
+  }
   const d = await res.json();
-  if (!d.devices?.length) { toast('No se encontraron terminales', 'warning'); return; }
+  if (!d.devices?.length) {
+    // No terminales vinculadas — mostrar instrucciones
+    const msg = [
+      '⚠ No se encontraron terminales en tu cuenta.',
+      '',
+      'Pasos para vincular tu ME30S:',
+      '1. Abre la app "Mercado Pago" en tu celular',
+      '2. Ve a Tu negocio → Cobrar con Point',
+      '3. Sigue los pasos para activar la terminal',
+      '4. Regresa aquí y haz click en Detectar nuevamente',
+      '',
+      'Si ya la tienes activa, entra a developers.mercadopago.com',
+      'y verifica que tu app tenga el alcance "point:read"'
+    ].join('\n');
+    alert(msg);
+    return;
+  }
   if (d.devices.length === 1) {
     const did = d.devices[0].id;
     document.getElementById('mp-device').value = did;
-    toast(`Terminal detectada: ${did.slice(0,30)}...`, 'success');
+    toast(`Terminal detectada ✓ Haz click en Guardar`, 'success');
   } else {
-    const list = d.devices.map(dv => `${dv.id} (${dv.operating_mode||''})`).join('\n');
-    alert(`Terminales encontradas:\n\n${list}\n\nCopia el ID deseado al campo Device ID.`);
+    const list = d.devices.map(dv => `${dv.id}  (${dv.operating_mode||''})`).join('\n');
+    alert(`Terminales encontradas — copia el ID al campo Device ID:\n\n${list}`);
   }
 }
 

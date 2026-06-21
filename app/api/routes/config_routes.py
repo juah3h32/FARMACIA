@@ -32,10 +32,13 @@ class MpSaveIn(BaseModel):
 @router.get("/mp-status")
 def mp_status(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
+    device_id = mp_point.device_id
+    # Device IDs reales de MP contienen guiones (GERTEC-MP-...). Solo números = inválido.
+    valid_device = bool(device_id and "-" in device_id and len(device_id) > 10)
     return {
-        "enabled":   mp_point.enabled,
+        "enabled":   mp_point.enabled and valid_device,
         "token_set": bool(mp_point.access_token),
-        "device_id": mp_point.device_id,
+        "device_id": device_id if valid_device else "",
     }
 
 
@@ -48,25 +51,45 @@ def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
     if not token:
         raise HTTPException(status_code=400, detail="Access Token requerido")
     (cfg.DATA_DIR / "mp_access_token.key").write_text(token, encoding="utf-8")
-    if device:
+    # Solo guarda device_id si tiene formato válido (contiene guiones)
+    valid_device = bool(device and "-" in device and len(device) > 10)
+    if valid_device:
         (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
+    elif not device:
+        # Limpiar archivo si se guardó sin device_id
+        kf = cfg.DATA_DIR / "mp_device_id.key"
+        if kf.exists():
+            kf.unlink()
     cfg.MP_ACCESS_TOKEN = token
-    cfg.MP_DEVICE_ID    = device
+    cfg.MP_DEVICE_ID    = device if valid_device else ""
     from app.services.mercadopago_service import mp_point
-    mp_point.configure(token, device)
-    return {"ok": True, "enabled": mp_point.enabled}
+    mp_point.configure(token, cfg.MP_DEVICE_ID)
+    return {"ok": True, "enabled": mp_point.enabled and valid_device}
 
 
 @router.get("/mp-devices")
-def mp_devices(payload: dict = Depends(get_current_api_user)):
+def mp_devices(token: Optional[str] = None, payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    from app.services.mercadopago_service import mp_point
-    if not mp_point.access_token:
+    from app.services.mercadopago_service import mp_point, MercadoPagoPointService
+    import requests as _req
+    # Usa token del query param (temporal, sin guardar) o el configurado
+    use_token = (token or "").strip() or mp_point.access_token
+    if not use_token:
         raise HTTPException(status_code=400, detail="Access Token no configurado")
     try:
-        devices = mp_point.get_devices()
+        headers = {"Authorization": f"Bearer {use_token}", "Content-Type": "application/json"}
+        r = _req.get("https://api.mercadopago.com/point/integration-api/devices", headers=headers, timeout=10)
+        if r.status_code == 401:
+            raise HTTPException(status_code=401, detail="Token inválido o sin permisos de Point")
+        if r.status_code == 403:
+            raise HTTPException(status_code=403, detail="La cuenta no tiene acceso a la API de Point. Activa la integración en developers.mercadopago.com")
+        r.raise_for_status()
+        data = r.json()
+        devices = data.get("devices", [])
         return {"devices": devices}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error MP API: {e}")
 
