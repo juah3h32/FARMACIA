@@ -34,7 +34,7 @@ def mp_status(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
     device_id = mp_point.device_id
     # Device IDs reales de MP contienen guiones (GERTEC-MP-...). Solo números = inválido.
-    valid_device = bool(device_id and "-" in device_id and len(device_id) > 10)
+    valid_device = bool(device_id and len(device_id) > 8 and not device_id.isdigit())
     return {
         "enabled":   mp_point.enabled and valid_device,
         "token_set": bool(mp_point.access_token),
@@ -94,22 +94,45 @@ def mp_devices(token: Optional[str] = None, payload: dict = Depends(get_current_
         raise HTTPException(status_code=502, detail=f"Error MP API: {e}")
 
 
+class MpPdvIn(BaseModel):
+    token: Optional[str] = ""
+    device_id: Optional[str] = ""
+
+
+_MP_ERRORS = {
+    "111": "Acción no soportada por la terminal",
+    "112": "Terminal no configurada para integración. Enciende la terminal, conéctala a WiFi y vuelve a intentarlo.",
+    "113": "Terminal no permite esta acción ahora. Asegúrate de que esté ENCENDIDA y conectada a WiFi/datos.",
+}
+
+
 @router.post("/mp-pdv")
-def mp_set_pdv(payload: dict = Depends(get_current_api_user)):
+def mp_set_pdv(body: MpPdvIn = MpPdvIn(), payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
+    import requests as _req
     from app.services.mercadopago_service import mp_point
-    if not mp_point.enabled:
-        raise HTTPException(status_code=400, detail="Configura token y device_id primero")
+    token     = (body.token or "").strip() or mp_point.access_token
+    device_id = (body.device_id or "").strip() or mp_point.device_id
+    if not token or not device_id:
+        raise HTTPException(status_code=400, detail="Guarda el Access Token y Device ID primero, luego activa PDV")
     try:
-        ok = mp_point.set_pdv_mode()
-        if not ok:
-            raise HTTPException(status_code=502, detail="Terminal no respondió correctamente")
-        return {"ok": True}
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        r = _req.patch(
+            f"https://api.mercadopago.com/point/integration-api/devices/{device_id}",
+            headers=headers, json={"operating_mode": "PDV"}, timeout=15,
+        )
+        if r.status_code == 200:
+            mp_point.configure(token, device_id)
+            return {"ok": True}
+        data = r.json()
+        mp_error = str(data.get("error", ""))
+        friendly = _MP_ERRORS.get(mp_error, data.get("message", "Error desconocido"))
+        raise HTTPException(status_code=502, detail=friendly)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error MP API: {e}")
+        raise HTTPException(status_code=502, detail=f"Error de red: {e}")
 
 
 # ── MP Payment Intent (usado por processSale en webview) ─────────────────────

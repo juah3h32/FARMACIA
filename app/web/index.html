@@ -3393,8 +3393,8 @@ let _mpIntentId   = null;
 let _mpSaleBody   = null;   // guardamos el body de venta para ejecutar después del pago
 
 function _mpDeviceIdValid(id) {
-  // Real MP device IDs contain dashes: GERTEC-MP-ME30S-xxx or PAX-MP-...
-  return id && id.includes('-') && id.length > 10;
+  // Valid: length > 8 y no es solo números (IDs reales son alfanuméricos)
+  return id && id.length > 8 && !/^\d+$/.test(id);
 }
 
 async function loadMpStatus() {
@@ -3473,9 +3473,22 @@ async function detectMpDevices() {
 }
 
 async function activateMpPdv() {
-  const res = await api('/config/mp-pdv', { method:'POST' });
-  if (res.ok) toast('Modo PDV activado ✓ La terminal ya puede recibir pagos desde el POS', 'success');
-  else { const e=await res.json(); toast(e.detail||'Error activando PDV', 'error'); }
+  const token  = document.getElementById('mp-token')?.value.trim();
+  const device = document.getElementById('mp-device')?.value.trim();
+  if (!token || !device) { toast('Ingresa Access Token y Device ID primero', 'warning'); return; }
+  // Auto-guarda primero para que el backend tenga los valores
+  await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device }) });
+  const res = await api('/config/mp-pdv', {
+    method: 'POST',
+    body: JSON.stringify({ token, device_id: device }),
+  });
+  if (res.ok) {
+    toast('Modo PDV activado ✓ La terminal ya recibe pagos desde el POS', 'success');
+    loadMpStatus();
+  } else {
+    const e = await res.json();
+    toast(e.detail || 'Error activando PDV', 'error');
+  }
 }
 
 async function startMpPayment(amount, reference, saleBody) {
@@ -3527,19 +3540,31 @@ async function pollMpIntent() {
 }
 
 async function completeMpSale() {
+  closeMpModal();
+  _enableCobrarBtn(true);
+
+  // Cajero de prueba: body es null → no registrar en BD, solo mostrar éxito
+  if (!_mpSaleBody) {
+    document.getElementById('pay-folio').textContent  = 'Folio: PRUEBA-MP ✓';
+    document.getElementById('pay-total').textContent  = document.getElementById('mp-modal-amount')?.textContent || '';
+    document.getElementById('pay-cambio').textContent = '$0.00';
+    const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
+    if (ticketWrap) ticketWrap.classList.add('hidden');
+    openModal('modal-payment');
+    S.cart=[]; renderCart();
+    document.getElementById('cart-pagado').value=''; updateCambio();
+    return;
+  }
+
   const body = { ..._mpSaleBody, metodo_pago: 'tarjeta', monto_pagado: _mpSaleBody._total };
   delete body._total;
   let res;
   try {
     res = await api('/pos/', { method:'POST', body: JSON.stringify(body) });
   } catch(e) {
-    closeMpModal();
     toast('Error de red al registrar venta', 'error');
-    _enableCobrarBtn(true);
     return;
   }
-  closeMpModal();
-  _enableCobrarBtn(true);
   if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al registrar venta','error'); return; }
   const data = await res.json();
   document.getElementById('pay-folio').textContent  = `Folio: ${data.folio}`;
@@ -4620,6 +4645,23 @@ async function processSale() {
   const pag = (!isNaN(pagInput) && pagInput > 0) ? pagInput : total;
 
   // Usuario de prueba — simular venta sin afectar BD ni stock
+  // Si método=tarjeta y MP configurada, SÍ manda a terminal real (para probar el flujo)
+  if (S.user?.username === 'cajero' && metodo === 'tarjeta') {
+    try {
+      const mpChk = await api('/config/mp-status');
+      if (mpChk.ok) {
+        const mpd = await mpChk.json();
+        if (mpd.enabled) {
+          toast('MODO PRUEBA — Monto enviado a terminal real (venta NO guardada en BD)','warning');
+          _saleInProgress = true; _enableCobrarBtn(false);
+          const folio = 'PRUEBA-' + Date.now().toString().slice(-6);
+          await startMpPayment(total, folio, null); // null = no guardar en BD
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
   if (S.user?.username === 'cajero') {
     toast('MODO PRUEBA — venta simulada, sin cambios reales','warning');
     document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
