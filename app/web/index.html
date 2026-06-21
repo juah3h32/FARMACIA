@@ -21,6 +21,30 @@
 <script src="/static/tailwind.js"></script>
 <script src="/static/lucide.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
+<!-- ═══════════ MODAL TERMINAL MP ═══════════ -->
+<div id="modal-mp-terminal" class="fixed inset-0 z-[999] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.7);backdrop-filter:blur(6px)"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col items-center gap-5 p-8" style="width:340px">
+    <div class="w-16 h-16 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#009EE3,#00BCFF)">
+      <i data-lucide="credit-card" style="width:32px;height:32px;color:#fff"></i>
+    </div>
+    <div class="text-center">
+      <p class="font-bold text-base" style="color:#0F172A">Terminal Mercado Pago</p>
+      <p id="mp-modal-amount" class="text-2xl font-black mt-1" style="color:#009EE3"></p>
+    </div>
+    <div id="mp-modal-status" class="text-sm text-center px-4 py-3 rounded-xl w-full" style="background:#F0F9FF;color:#0369A1;border:1px solid #BAE8FF">
+      Enviando monto a la terminal...
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full animate-pulse" style="background:#009EE3"></div>
+      <span class="text-xs" style="color:#64748B">Esperando que el cliente pague...</span>
+    </div>
+    <button onclick="cancelMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5">
+      ✕ Cancelar operación
+    </button>
+  </div>
+</div>
+
 <!-- ═══════════ AUDITORÍA STOCK MODAL ═══════════ -->
 <div id="modal-auditoria-stock" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeAuditoriaModal()"></div>
@@ -1922,6 +1946,52 @@
         </div>
 
 
+        <!-- ─── Terminal Mercado Pago Point ────────────────── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#009EE3,#00BCFF,#009EE3)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#E0F5FF">
+              <i data-lucide="credit-card" style="width:20px;height:20px;color:#009EE3"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Terminal Mercado Pago (ME30S)</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Cobro automático con tarjeta · el monto se envía a la terminal sin escribirlo</p>
+            </div>
+            <div id="mp-status-badge" class="ml-auto px-3 py-1.5 rounded-xl text-[10px] font-bold" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">
+              CARGANDO...
+            </div>
+          </div>
+          <div class="p-6 flex flex-col gap-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="lbl">Access Token</label>
+                <input id="mp-token" type="password" class="inp" placeholder="APP_USR-...">
+              </div>
+              <div>
+                <label class="lbl">Device ID</label>
+                <div class="flex gap-2">
+                  <input id="mp-device" class="inp flex-1" placeholder="GERTEC-MP-ME30S-...">
+                  <button onclick="detectMpDevices()" class="h-10 px-3 rounded-xl font-semibold text-xs transition hover:opacity-80 flex items-center gap-1.5 shrink-0" style="background:#EEF1F9;color:#1d2140">
+                    <i data-lucide="search" style="width:13px;height:13px"></i> Detectar
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+              <button onclick="saveMpConfig()" class="h-10 px-5 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#16A34A">
+                <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
+              </button>
+              <button onclick="activateMpPdv()" class="h-10 px-5 rounded-xl font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#E0F5FF;color:#009EE3;border:1px solid #BAE8FF">
+                <i data-lucide="wifi" style="width:15px;height:15px"></i> Activar modo PDV
+              </button>
+            </div>
+            <p class="text-xs" style="color:#94A3B8">
+              <b>Primera vez:</b> Guarda el token → Detectar → Guardar con Device ID → Activar modo PDV.<br>
+              <b>Modo PDV</b> es el modo integración; la terminal recibe montos desde el POS automáticamente.
+            </p>
+          </div>
+        </div>
+
       </div>
 
       <!-- ─── CONTROL DE CAJA (ADMIN) ──────────────── -->
@@ -3312,6 +3382,172 @@ function closeModal(id) {
 }
 
 // ══════════════════════════════════════════════════════════
+// MERCADO PAGO POINT
+// ══════════════════════════════════════════════════════════
+let _mpPollTimer  = null;
+let _mpIntentId   = null;
+let _mpSaleBody   = null;   // guardamos el body de venta para ejecutar después del pago
+
+async function loadMpStatus() {
+  try {
+    const res = await api('/config/mp-status');
+    if (!res.ok) return;
+    const d = await res.json();
+    const badge = document.getElementById('mp-status-badge');
+    const tokenEl  = document.getElementById('mp-token');
+    const deviceEl = document.getElementById('mp-device');
+    if (d.device_id && deviceEl) deviceEl.value = d.device_id;
+    if (badge) {
+      if (d.enabled) {
+        badge.textContent = '✓ LISTO';
+        badge.style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
+      } else if (d.token_set) {
+        badge.textContent = '⚠ FALTA DEVICE ID';
+        badge.style.cssText = 'background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
+      } else {
+        badge.textContent = 'SIN CONFIGURAR';
+        badge.style.cssText = 'background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
+      }
+    }
+  } catch(e) {}
+}
+
+async function saveMpConfig() {
+  const token  = document.getElementById('mp-token')?.value.trim();
+  const device = document.getElementById('mp-device')?.value.trim();
+  if (!token) { toast('Ingresa el Access Token', 'warning'); return; }
+  const res = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device||'' }) });
+  if (res.ok) { toast('Terminal MP configurada ✓', 'success'); loadMpStatus(); }
+  else { const e=await res.json(); toast(e.detail||'Error al guardar', 'error'); }
+}
+
+async function detectMpDevices() {
+  const token = document.getElementById('mp-token')?.value.trim();
+  if (!token) { toast('Primero ingresa el Access Token', 'warning'); return; }
+  // Guardar token temporalmente para que el endpoint pueda usarlo
+  await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id:'' }) });
+  const res = await api('/config/mp-devices');
+  if (!res.ok) { const e=await res.json(); toast(e.detail||'Error MP', 'error'); return; }
+  const d = await res.json();
+  if (!d.devices?.length) { toast('No se encontraron terminales', 'warning'); return; }
+  if (d.devices.length === 1) {
+    const did = d.devices[0].id;
+    document.getElementById('mp-device').value = did;
+    toast(`Terminal detectada: ${did.slice(0,30)}...`, 'success');
+  } else {
+    const list = d.devices.map(dv => `${dv.id} (${dv.operating_mode||''})`).join('\n');
+    alert(`Terminales encontradas:\n\n${list}\n\nCopia el ID deseado al campo Device ID.`);
+  }
+}
+
+async function activateMpPdv() {
+  const res = await api('/config/mp-pdv', { method:'POST' });
+  if (res.ok) toast('Modo PDV activado ✓ La terminal ya puede recibir pagos desde el POS', 'success');
+  else { const e=await res.json(); toast(e.detail||'Error activando PDV', 'error'); }
+}
+
+async function startMpPayment(amount, reference, saleBody) {
+  _mpSaleBody = saleBody;
+  document.getElementById('mp-modal-amount').textContent = fmt(amount);
+  document.getElementById('mp-modal-status').textContent = 'Enviando monto a la terminal...';
+  document.getElementById('modal-mp-terminal').classList.remove('hidden');
+  document.getElementById('modal-mp-terminal').classList.add('flex');
+
+  const res = await api('/config/mp-intent', { method:'POST', body: JSON.stringify({ amount, reference }) });
+  if (!res.ok) {
+    closeMpModal();
+    const e = await res.json();
+    toast(e.detail || 'No se pudo conectar con la terminal', 'error');
+    return;
+  }
+  const d = await res.json();
+  _mpIntentId = d.intent_id;
+  document.getElementById('mp-modal-status').textContent = 'El cliente debe insertar tarjeta y PIN en la terminal...';
+  _mpPollTimer = setInterval(pollMpIntent, 2500);
+}
+
+async function pollMpIntent() {
+  if (!_mpIntentId) return;
+  try {
+    const res = await api(`/config/mp-intent/${_mpIntentId}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const state = d.state;
+    if (state === 'PROCESSED') {
+      clearInterval(_mpPollTimer); _mpPollTimer = null;
+      const pState = d.payment?.state;
+      if (pState === 'APPROVED') {
+        document.getElementById('mp-modal-status').textContent = '✓ Pago aprobado — registrando venta...';
+        document.getElementById('mp-modal-status').style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:12px;padding:12px 16px;font-size:14px;text-align:center;width:100%';
+        await completeMpSale();
+      } else {
+        closeMpModal();
+        toast(`Pago rechazado: ${pState}`, 'error');
+        _enableCobrarBtn(true);
+      }
+    } else if (['CANCELED','ERROR','ABANDONED'].includes(state)) {
+      clearInterval(_mpPollTimer); _mpPollTimer = null;
+      closeMpModal();
+      toast(`Terminal: ${state}`, 'error');
+      _enableCobrarBtn(true);
+    }
+  } catch(e) {}
+}
+
+async function completeMpSale() {
+  const body = { ..._mpSaleBody, metodo_pago: 'tarjeta', monto_pagado: _mpSaleBody._total };
+  delete body._total;
+  let res;
+  try {
+    res = await api('/pos/', { method:'POST', body: JSON.stringify(body) });
+  } catch(e) {
+    closeMpModal();
+    toast('Error de red al registrar venta', 'error');
+    _enableCobrarBtn(true);
+    return;
+  }
+  closeMpModal();
+  _enableCobrarBtn(true);
+  if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al registrar venta','error'); return; }
+  const data = await res.json();
+  document.getElementById('pay-folio').textContent  = `Folio: ${data.folio}`;
+  document.getElementById('pay-total').textContent  = fmt(data.total);
+  document.getElementById('pay-cambio').textContent = fmt(0);
+  const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
+  const ticketEl   = document.getElementById('pay-ticket-texto');
+  if (data.ticket_texto && ticketWrap && ticketEl) {
+    ticketEl.textContent = data.ticket_texto;
+    ticketWrap.classList.remove('hidden');
+  } else if (ticketWrap) { ticketWrap.classList.add('hidden'); }
+  openModal('modal-payment');
+  S.cart = []; renderCart();
+  document.getElementById('cart-pagado').value = '';
+  updateCambio();
+  loadPOS(); loadDashboard();
+}
+
+async function cancelMpPayment() {
+  clearInterval(_mpPollTimer); _mpPollTimer = null;
+  _mpIntentId = null; _mpSaleBody = null;
+  await api('/config/mp-intent', { method:'DELETE' });
+  closeMpModal();
+  _enableCobrarBtn(true);
+  toast('Pago cancelado', 'warning');
+}
+
+function closeMpModal() {
+  clearInterval(_mpPollTimer); _mpPollTimer = null;
+  const m = document.getElementById('modal-mp-terminal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+}
+
+function _enableCobrarBtn(enable) {
+  _saleInProgress = !enable;
+  const btn = document.getElementById('btn-cobrar');
+  if (btn) { btn.disabled = !enable; btn.style.opacity = enable ? '' : '0.6'; }
+}
+
+// ══════════════════════════════════════════════════════════
 // AUDITORÍA STOCK
 // ══════════════════════════════════════════════════════════
 let _auditInterval = null;
@@ -4381,9 +4617,33 @@ async function processSale() {
     return;
   }
 
+  const saleItems = S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0,es_pieza:!!i._esPieza}));
+
+  // ── Terminal Mercado Pago: interceptar tarjeta si está configurada ──
+  if (metodo === 'tarjeta') {
+    try {
+      const mpRes = await api('/config/mp-status');
+      if (mpRes.ok) {
+        const mpData = await mpRes.json();
+        if (mpData.enabled) {
+          _saleInProgress = true;
+          _enableCobrarBtn(false);
+          const folio = 'F' + Date.now().toString().slice(-8);
+          await startMpPayment(total, folio, {
+            cliente_id:  S.posCustomer?.id||null,
+            items:       saleItems,
+            _total:      total,
+          });
+          return; // sale se completa en completeMpSale() cuando terminal aprueba
+        }
+      }
+    } catch(e) { /* MP no disponible — continuar flujo normal */ }
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   const body={
     cliente_id:  S.posCustomer?.id||null,
-    items:       S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0,es_pieza:!!i._esPieza})),
+    items:       saleItems,
     metodo_pago: metodo,
     monto_pagado:pag,
   };
@@ -7168,6 +7428,7 @@ function initSettings() {
     initTurnoConfig();
     loadAdminVentas();
   }
+  loadMpStatus();
   icons();
 }
 
