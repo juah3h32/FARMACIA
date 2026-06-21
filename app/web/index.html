@@ -718,10 +718,12 @@
   .page.active { display:flex !important; flex-direction:column; height:calc(100vh - 88px); overflow:hidden; animation:pageIn .22s ease both; }
   .page[data-page="dashboard"].active { gap:0.75rem; overflow-y:auto; }
   .page[data-page="settings"].active { display:block !important; overflow-y:auto; overflow-x:hidden; }
+  .page[data-page="reports"].active { overflow-y:auto; overflow-x:hidden; }
   .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
-  .nav-item { transition:background .15s,color .15s; border-radius:10px; }
+  .nav-item { transition:background .15s,color .15s,box-shadow .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
-  .nav-item.active { background:#1d2140 !important; color:#fff !important; }
+  .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
+  .nav-group-label { font-size:9px; font-weight:700; letter-spacing:.16em; color:rgba(148,163,184,.45); padding:0.6rem 0.5rem 0.25rem; }
 
   /* ── KPI cards ───────────────────────────────────────── */
   .kpi-card { transition:box-shadow .2s,transform .2s; }
@@ -864,8 +866,7 @@
     </div>
 
     <!-- Nav -->
-    <div class="flex-1 overflow-y-auto py-3 px-3">
-      <p class="text-[9px] font-bold tracking-[.18em] px-2 mb-2" style="color:rgba(148,163,184,.45)">MENÚ PRINCIPAL</p>
+    <div class="flex-1 overflow-y-auto py-2 px-2">
       <nav id="sidebar-nav" class="flex flex-col gap-0.5"></nav>
     </div>
 
@@ -1313,7 +1314,12 @@
           <button onclick="exportCSV()"
                   class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:bg-slate-50"
                   style="border-color:#E2E8F0;color:#374151">
-            <i data-lucide="download" style="width:14px;height:14px;color:#22C55E"></i> Exportar CSV
+            <i data-lucide="download" style="width:14px;height:14px;color:#22C55E"></i> CSV
+          </button>
+          <button onclick="exportVentasPDF()"
+                  class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:bg-slate-50"
+                  style="border-color:#E2E8F0;color:#374151">
+            <i data-lucide="file-text" style="width:14px;height:14px;color:#EF4444"></i> PDF
           </button>
         </div>
 
@@ -3389,17 +3395,21 @@ const S = {
 };
 
 const NAV = [
+  { type:'group', label:'PRINCIPAL' },
   { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',        admin:false },
   { key:'pos',       icon:'shopping-cart',    label:'Nueva Venta',      admin:false },
   { key:'inventory', icon:'package',          label:'Inventario',       admin:false },
+  { type:'group', label:'PACIENTES' },
   { key:'customers', icon:'users',            label:'Clientes',         admin:false },
+  { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
+  { type:'group', label:'ADMINISTRACIÓN',  admin:true },
   { key:'reports',   icon:'bar-chart-3',      label:'Reportes',         admin:true  },
   { key:'caja',      icon:'landmark',         label:'Control de Caja',  admin:true  },
   { key:'suppliers', icon:'truck',            label:'Proveedores',      admin:true  },
   { key:'employees', icon:'user-cog',         label:'Empleados',        admin:true  },
-  { key:'marketing', icon:'megaphone',         label:'Marketing',        admin:true  },
+  { type:'group', label:'SISTEMA',        admin:true },
+  { key:'marketing', icon:'megaphone',        label:'Marketing',        admin:true  },
   { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
-  { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -4097,13 +4107,22 @@ function launchApp() {
 function buildNav() {
   const nav = document.getElementById('sidebar-nav');
   nav.innerHTML = '';
-  NAV.forEach(({key,icon,label,admin}) => {
+  NAV.forEach(item => {
+    if (item.type === 'group') {
+      if (item.admin && S.user?.rol !== 'admin') return;
+      const el = document.createElement('div');
+      el.className = 'nav-group-label';
+      el.textContent = item.label;
+      nav.appendChild(el);
+      return;
+    }
+    const {key, icon, label, admin} = item;
     if (admin && S.user?.rol !== 'admin') return;
     const btn = document.createElement('button');
     btn.className = 'nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-left';
     btn.style.color = '#64748B';
     btn.dataset.nav = key;
-    btn.innerHTML = `<i data-lucide="${icon}" style="width:17px;height:17px;flex-shrink:0"></i><span>${label}</span>`;
+    btn.innerHTML = `<i data-lucide="${icon}" style="width:17px;height:17px;flex-shrink:0;opacity:.85"></i><span>${label}</span>`;
     btn.onclick = () => navigate(key);
     nav.appendChild(btn);
   });
@@ -6398,6 +6417,27 @@ async function exportCSV() {
   toast('CSV descargado','success');
 }
 
+async function exportVentasPDF() {
+  const desde = document.getElementById('rep-desde').value;
+  const hasta  = document.getElementById('rep-hasta').value;
+  if (!desde || !hasta) { toast('Selecciona un período primero', 'warning'); return; }
+  toast('Generando PDF de ventas…', 'info');
+  try {
+    const res = await api(`/reportes/export-pdf?fecha_inicio=${desde}&fecha_fin=${hasta}`);
+    if (!res.ok) { toast('Error al generar PDF', 'error'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `Ventas_${desde}_${hasta}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('PDF descargado ✓', 'success');
+  } catch(e) {
+    toast('Error de conexión', 'error');
+  }
+}
+
 // ══════════════════════════════════════════════════════════
 // CONTROL DE CAJA (ADMIN PAGE)
 // ══════════════════════════════════════════════════════════
@@ -6406,11 +6446,16 @@ let _cajaTurno   = null;
 
 async function forzarSyncCaja() {
   const btn = document.getElementById('caja-sync-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; lucide.createIcons(); }
   try {
     const r = await api('/admin/db-sync', { method: 'POST' });
-    const data = r.ok || r.status === 200 ? await r.json().catch(()=>({})) : {};
+    const data = r.ok ? await r.json().catch(()=>({})) : {};
     if (r.ok && data.ok !== false) {
+      // Reset date range so retiros from other PCs are visible
+      const desdeEl = document.getElementById('caja-desde');
+      const hastaEl = document.getElementById('caja-hasta');
+      if (desdeEl) desdeEl.value = '';
+      if (hastaEl) hastaEl.value = '';
       toast('Sincronización completada ✓', 'success');
       await loadCajaAdmin();
     } else {
@@ -6425,11 +6470,11 @@ async function forzarSyncCaja() {
 }
 
 async function loadCajaAdmin() {
-  // Default date range: last 30 days
+  // Default date range: last 90 days (wide enough to catch retiros from other PCs)
   const desdeEl = document.getElementById('caja-desde');
   const hastaEl = document.getElementById('caja-hasta');
   if (desdeEl && !desdeEl.value) {
-    const d = new Date(); d.setDate(d.getDate() - 30);
+    const d = new Date(); d.setDate(d.getDate() - 90);
     desdeEl.value = d.toISOString().slice(0, 10);
   }
   if (hastaEl && !hastaEl.value) {
@@ -6437,7 +6482,7 @@ async function loadCajaAdmin() {
   }
 
   const [retRes, turnoRes, ganRes] = await Promise.all([
-    api('/cortes/retiros?limite=500'),
+    api('/cortes/retiros?limite=1000'),
     api('/cortes/activo'),
     api('/cortes/ganancia'),
   ]);
