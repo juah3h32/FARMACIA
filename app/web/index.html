@@ -2280,6 +2280,9 @@
           <button id="mkt-tab-promo" onclick="mktSwitchTab('promo')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
             style="background:transparent;color:#64748B"><i data-lucide="megaphone" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Imagen Promo</button>
+          <button id="mkt-tab-manual" onclick="mktSwitchTab('manual')"
+            class="flex-1 h-11 text-sm font-semibold transition-all"
+            style="background:transparent;color:#64748B"><i data-lucide="book-open" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Manual PDF</button>
         </div>
 
         <!-- ── PDF Panel ── -->
@@ -2441,6 +2444,71 @@
               <p class="text-sm">Selecciona un producto<br>y pulsa Vista previa</p>
             </div>
             <img id="mkt-preview-img" style="display:none;max-height:calc(100vh - 200px);max-width:100%;object-fit:contain;border-radius:12px;padding:12px">
+          </div>
+        </div>
+
+        <!-- ── Manual Panel ── -->
+        <div id="mkt-panel-manual" class="hidden flex-col gap-4 flex-1 overflow-hidden" style="display:none">
+          <div class="bg-white rounded-2xl border p-5 flex flex-col gap-4 overflow-y-auto flex-1 scroll-light" style="border-color:#E2E8F0">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style="background:#EFF6FF">
+                <i data-lucide="book-open" style="width:24px;height:24px;color:#1d2140"></i>
+              </div>
+              <div>
+                <h2 class="font-bold text-base" style="color:#0F172A">Manual de Usuario — Farmacia POS</h2>
+                <p class="text-xs mt-0.5" style="color:#64748B">PDF completo con atajos de teclado, funciones del sistema, guías de uso y configuración. Se actualiza automáticamente con cada versión del programa.</p>
+              </div>
+            </div>
+
+            <!-- Secciones que incluye el manual -->
+            <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="keyboard" style="width:16px;height:16px;color:#1d2140;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Atajos de teclado</p><p class="text-[10px]" style="color:#64748B">F1–F10 y más</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#16A34A;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Cómo hacer ventas</p><p class="text-[10px]" style="color:#64748B">POS paso a paso</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="package" style="width:16px;height:16px;color:#7C3AED;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Inventario</p><p class="text-[10px]" style="color:#64748B">Stock, lotes, ajustes</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="banknote" style="width:16px;height:16px;color:#F59E0B;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Control de Caja</p><p class="text-[10px]" style="color:#64748B">Turnos y retiros</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="cloud" style="width:16px;height:16px;color:#0EA5E9;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Sync Multi-PC</p><p class="text-[10px]" style="color:#64748B">Turso Cloud</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="credit-card" style="width:16px;height:16px;color:#EC4899;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Métodos de pago</p><p class="text-[10px]" style="color:#64748B">Efectivo, tarjeta, MP</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="settings" style="width:16px;height:16px;color:#64748B;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Configuración</p><p class="text-[10px]" style="color:#64748B">API, respaldos, terminal</p></div>
+              </div>
+              <div class="rounded-xl p-3 flex items-center gap-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <i data-lucide="refresh-cw" style="width:16px;height:16px;color:#16A34A;flex-shrink:0"></i>
+                <div><p class="text-xs font-bold" style="color:#0F172A">Actualizaciones</p><p class="text-[10px]" style="color:#64748B">Cómo actualizar el sistema</p></div>
+              </div>
+            </div>
+
+            <div class="rounded-xl p-3 flex items-center gap-3" style="background:#FFFBEB;border:1px solid #FDE68A">
+              <i data-lucide="info" style="width:14px;height:14px;color:#92400E;flex-shrink:0"></i>
+              <p class="text-xs" style="color:#92400E">El manual se genera en el momento de la descarga — siempre refleja la versión <span id="mkt-manual-version" class="font-bold">actual</span> del sistema y los atajos vigentes.</p>
+            </div>
+
+            <div class="flex justify-center pt-2">
+              <button id="mkt-btn-manual" onclick="mktDescargarManual()"
+                class="h-12 px-8 rounded-2xl font-bold text-white text-sm flex items-center gap-2.5 transition-all hover:opacity-90"
+                style="background:#1d2140">
+                <i data-lucide="download" style="width:18px;height:18px"></i>
+                Descargar Manual PDF
+              </button>
+            </div>
           </div>
         </div>
 
@@ -8527,27 +8595,58 @@ function _mktUpdateDescStatus() {
 }
 
 function mktSwitchTab(tab) {
-  const isPdf = tab === 'pdf';
-  const panPdf   = document.getElementById('mkt-panel-pdf');
-  const panPromo = document.getElementById('mkt-panel-promo');
-  const btnPdf   = document.getElementById('mkt-tab-pdf');
-  const btnPromo = document.getElementById('mkt-tab-promo');
+  const tabs = ['pdf', 'promo', 'manual'];
+  tabs.forEach(t => {
+    const pan = document.getElementById(`mkt-panel-${t}`);
+    const btn = document.getElementById(`mkt-tab-${t}`);
+    if (!pan || !btn) return;
+    const active = t === tab;
+    pan.style.display = active ? 'flex' : 'none';
+    pan.classList.toggle('hidden', !active);
+    btn.style.background = active ? '#1d2140' : 'transparent';
+    btn.style.color      = active ? '#fff'    : '#64748B';
+  });
+  // Mostrar versión actual en el panel del manual
+  if (tab === 'manual') {
+    const vEl = document.getElementById('mkt-manual-version');
+    if (vEl) vEl.textContent = `v${S.version || '—'}`;
+  }
+}
 
-  panPdf.style.display   = isPdf ? 'flex' : 'none';
-  panPromo.style.display = isPdf ? 'none' : 'flex';
-  panPdf.classList.toggle('hidden', !isPdf);
-  panPromo.classList.toggle('hidden', isPdf);
-
-  btnPdf.style.background   = isPdf   ? '#1d2140' : 'transparent';
-  btnPdf.style.color         = isPdf   ? '#fff'    : '#64748B';
-  btnPromo.style.background  = !isPdf  ? '#1d2140' : 'transparent';
-  btnPromo.style.color       = !isPdf  ? '#fff'    : '#64748B';
+async function mktDescargarManual() {
+  const btn = document.getElementById('mkt-btn-manual');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:16px;height:16px"></i> Generando...'; lucide.createIcons(); }
+  toast('Generando manual PDF...', 'info');
+  try {
+    const res = await fetch('/api/marketing/manual-pdf', {
+      headers: { Authorization: `Bearer ${S.token}` }
+    });
+    if (!res.ok) { toast('Error al generar el manual', 'error'); return; }
+    const blob = await res.blob();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    await _saveFile(blob, `Manual_FarmaciaPos_${date}.pdf`, [
+      { description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }
+    ]);
+    toast('Manual descargado ✓', 'success');
+  } catch(e) {
+    toast('Error descargando manual', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i> Descargar Manual PDF'; lucide.createIcons(); }
+  }
 }
 
 async function loadMarketing() {
-  const res = await api('/productos/?solo_activos=false');
-  if (!res.ok) return;
-  _mktProds = await res.json();
+  const [prodRes, healthRes] = await Promise.all([
+    api('/productos/?solo_activos=false'),
+    fetch('/api/health').then(r => r.json()).catch(() => ({})),
+  ]);
+  if (healthRes.version) {
+    S.version = healthRes.version;
+    const vEl = document.getElementById('mkt-manual-version');
+    if (vEl) vEl.textContent = `v${healthRes.version}`;
+  }
+  if (!prodRes.ok) return;
+  _mktProds = await prodRes.json();
   _mktRenderProdList();
 }
 

@@ -86,6 +86,33 @@ def generar_catalogo_pdf(
         db.close()
 
 
+# ── Manual de Usuario PDF ────────────────────────────────────────────────────
+
+@router.get("/manual-pdf")
+def generar_manual(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    from app.ui.marketing_screen import generar_manual_pdf
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp.close()
+    try:
+        generar_manual_pdf(tmp.name)
+        with open(tmp.name, "rb") as f:
+            data = f.read()
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+
+    ts = datetime.now().strftime("%Y%m%d")
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Manual_FarmaciaPos_v{ts}.pdf"'},
+    )
+
+
 # ── Imagen promo ──────────────────────────────────────────────────────────────
 
 class PromoImageIn(BaseModel):
