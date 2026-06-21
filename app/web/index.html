@@ -515,22 +515,28 @@
   </div>
 </div>
 <!-- ═══════════ UPDATE DOWNLOAD PROGRESS (background) ═══════════ -->
-<div id="update-dl-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
-     background:#1d2140;padding:10px 20px;box-shadow:0 -2px 16px rgba(0,0,0,.2)">
-  <div style="max-width:800px;margin:0 auto;display:flex;align-items:center;gap:14px">
-    <i data-lucide="download-cloud" style="width:18px;height:18px;color:#93C5FD;flex-shrink:0"></i>
-    <div style="flex:1">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span id="dl-label" style="font-size:12px;color:#CBD5E1;font-weight:500">Descargando actualización...</span>
-        <span id="dl-pct" style="font-size:12px;color:#93C5FD;font-weight:600">0%</span>
-      </div>
-      <div style="background:rgba(255,255,255,.15);border-radius:4px;height:4px">
-        <div id="dl-bar" style="background:#60A5FA;height:4px;border-radius:4px;width:0%;transition:width .3s"></div>
-      </div>
+<!-- Update progress card — floating top-right -->
+<div id="update-dl-bar" style="display:none;position:fixed;top:58px;right:18px;z-index:400;
+     width:320px;background:#fff;border-radius:16px;border:1px solid #E2E8F0;
+     box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;
+     animation:slideDownIn .25s ease">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <div style="width:34px;height:34px;border-radius:10px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i data-lucide="download-cloud" style="width:17px;height:17px;color:#1d2140"></i>
     </div>
-    <button onclick="cancelUpdate()" class="h-8 px-3 rounded-lg text-[10px] font-bold transition-all hover:bg-white/10"
-            style="color:#FCA5A5;border:1px solid rgba(252,165,165,.3)">
-      CANCELAR
+    <div style="flex:1;min-width:0">
+      <p id="dl-label" style="font-size:12px;font-weight:700;color:#0F172A;margin:0;line-height:1.3">Descargando actualización...</p>
+      <p style="font-size:10px;color:#64748B;margin:0">La app se cerrará al terminar</p>
+    </div>
+    <span id="dl-pct" style="font-size:13px;font-weight:800;color:#1d2140;flex-shrink:0">0%</span>
+  </div>
+  <div style="background:#F1F5F9;border-radius:99px;height:6px;overflow:hidden;margin-bottom:10px">
+    <div id="dl-bar" style="background:#1d2140;height:6px;border-radius:99px;width:0%;transition:width .35s ease"></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end">
+    <button onclick="cancelUpdate()"
+            style="height:28px;padding:0 12px;border-radius:8px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;font-size:10px;font-weight:700;cursor:pointer">
+      Cancelar
     </button>
   </div>
 </div>
@@ -538,6 +544,10 @@
 <style>
 @keyframes slideUpIn {
   from { opacity:0; transform:translateY(20px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes slideDownIn {
+  from { opacity:0; transform:translateY(-12px); }
   to   { opacity:1; transform:translateY(0); }
 }
 </style>
@@ -3916,7 +3926,20 @@ async function startUpdate() {
     closeUpdateModal();
     _updDoneSeenAt = null;
     document.getElementById('update-banner').style.display = 'none';
+    // Reset card state before showing
     const dlBar = document.getElementById('update-dl-bar');
+    const dlBarEl = document.getElementById('dl-bar');
+    const dlLbl   = document.getElementById('dl-label');
+    const dlPct   = document.getElementById('dl-pct');
+    if (dlBarEl) { dlBarEl.style.width='0%'; dlBarEl.style.background='#1d2140'; }
+    if (dlLbl)   { dlLbl.textContent='Descargando actualización...'; dlLbl.style.color='#0F172A'; }
+    if (dlPct)   { dlPct.textContent='0%'; dlPct.style.color='#1d2140'; }
+    const cancelBtn = dlBar?.querySelector('button');
+    if (cancelBtn) cancelBtn.style.display = '';
+    const ico = dlBar?.querySelector('[data-lucide]');
+    if (ico) { ico.setAttribute('data-lucide','download-cloud'); ico.style.color='#1d2140'; }
+    const iconBox = ico?.parentElement;
+    if (iconBox) iconBox.style.background = '#EFF6FF';
     dlBar.style.display = 'block';
     icons();
     _updPollTimer = setInterval(_pollProgress, 600);
@@ -3945,9 +3968,25 @@ async function _pollProgress() {
     if (d.done && !_updDoneSeenAt) {
       _updDoneSeenAt = Date.now();
       clearInterval(_updPollTimer);
-      document.getElementById('dl-label').textContent = '✓ Instalando — la aplicación se cerrará y reabrirá automáticamente...';
-      document.getElementById('dl-bar').style.background = '#4ADE80';
-      document.getElementById('dl-pct').textContent = '100%';
+      const bar = document.getElementById('dl-bar');
+      const lbl = document.getElementById('dl-label');
+      const pct = document.getElementById('dl-pct');
+      const card = document.getElementById('update-dl-bar');
+      bar.style.background = '#16A34A';
+      bar.style.width = '100%';
+      pct.textContent = '100%';
+      pct.style.color = '#16A34A';
+      lbl.textContent = '✓ Descargado — instalando...';
+      lbl.style.color = '#16A34A';
+      // Ocultar botón cancelar y cambiar ícono a check
+      if (card) {
+        const btn = card.querySelector('button');
+        if (btn) btn.style.display = 'none';
+        const ico = card.querySelector('[data-lucide]');
+        if (ico) { ico.setAttribute('data-lucide','check-circle-2'); ico.style.color='#16A34A'; icons(); }
+        const iconBox = ico?.parentElement;
+        if (iconBox) iconBox.style.background = '#DCFCE7';
+      }
     }
     if (d.error) {
       clearInterval(_updPollTimer);
