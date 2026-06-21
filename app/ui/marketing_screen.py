@@ -1381,285 +1381,963 @@ def _generar_pdf_reportlab(productos, path: str,
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Manual de Usuario — PDF auto-generado con todos los atajos y funciones
+#  Manual de Usuario — PDF profesional multi-página con diagrams y guías
 # ══════════════════════════════════════════════════════════════════════════════
 
-def generar_manual_pdf(path: str) -> None:
-    """Genera el manual de usuario del sistema POS en PDF (ReportLab)."""
+def generar_manual_pdf(path: str) -> None:  # noqa: C901
+    """Genera el manual de usuario profesional — portada, índice, sección por página."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                     Paragraph, Spacer, HRFlowable,
-                                    Image as RLImage, KeepTogether)
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+                                    Image as RLImage, KeepTogether, PageBreak)
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 
-    BLUE_RL  = colors.HexColor("#1d2140")
-    BLUE_L   = colors.HexColor("#EFF6FF")
-    DARK_RL  = colors.HexColor("#0F172A")
-    MUTED_RL = colors.HexColor("#64748B")
-    GREEN_RL = colors.HexColor("#16A34A")
-    RED_RL   = colors.HexColor("#DC2626")
-    GRAY_RL  = colors.HexColor("#F1F5F9")
-    WHITE_RL = colors.white
+    W, H = letter
+    now_str  = datetime.now().strftime("%d/%m/%Y")
+    now_full = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # ── Paleta ────────────────────────────────────────────────────────────────
+    C_BLUE   = colors.HexColor("#1d2140")
+    C_BLUE_L = colors.HexColor("#EFF6FF")
+    C_BLUE_M = colors.HexColor("#BFDBFE")
+    C_DARK   = colors.HexColor("#0F172A")
+    C_MUTED  = colors.HexColor("#64748B")
+    C_GREEN  = colors.HexColor("#16A34A")
+    C_GRN_L  = colors.HexColor("#DCFCE7")
+    C_AMBER  = colors.HexColor("#D97706")
+    C_AMB_L  = colors.HexColor("#FFFBEB")
+    C_AMB_B  = colors.HexColor("#FDE68A")
+    C_RED    = colors.HexColor("#DC2626")
+    C_RED_L  = colors.HexColor("#FEF2F2")
+    C_GRAY   = colors.HexColor("#F1F5F9")
+    C_GRAY_B = colors.HexColor("#E2E8F0")
+    C_WHITE  = colors.white
+    C_CYAN   = colors.HexColor("#0EA5E9")
+    C_CYAN_L = colors.HexColor("#E0F2FE")
+
+    styles = getSampleStyleSheet()
+
+    def sty(name, **kw):
+        return ParagraphStyle(name, parent=styles["Normal"], **kw)
+
+    s_body  = sty("_b",  fontSize=9,  textColor=C_DARK,  fontName="Helvetica",      leading=14)
+    s_bold  = sty("_bb", fontSize=9,  textColor=C_DARK,  fontName="Helvetica-Bold", leading=14)
+    s_mut   = sty("_m",  fontSize=8,  textColor=C_MUTED, fontName="Helvetica",      leading=12)
+    s_just  = sty("_j",  fontSize=9,  textColor=C_DARK,  fontName="Helvetica",      leading=14, alignment=TA_JUSTIFY)
+    s_hdr   = sty("_h",  fontSize=9,  textColor=C_WHITE, fontName="Helvetica-Bold", leading=13, alignment=TA_CENTER)
+    s_ctrb  = sty("_cb", fontSize=9,  textColor=C_DARK,  fontName="Helvetica-Bold", leading=13, alignment=TA_CENTER)
+    s_green = sty("_g",  fontSize=9,  textColor=C_GREEN, fontName="Helvetica-Bold", leading=13, alignment=TA_CENTER)
+    s_white = sty("_w",  fontSize=9,  textColor=C_WHITE, fontName="Helvetica",      leading=13)
+    s_wb    = sty("_wb", fontSize=9,  textColor=C_WHITE, fontName="Helvetica-Bold", leading=13)
+
+    story = []
+    cw = W - 3.6 * cm  # usable width (margins 1.8cm each side)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # HELPERS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def sp(h=0.3):
+        story.append(Spacer(1, h * cm))
+
+    def hr(clr=C_GRAY_B, t=0.5):
+        story.append(HRFlowable(width="100%", thickness=t, color=clr, spaceAfter=6))
+
+    def pb():
+        story.append(PageBreak())
+
+    def section_banner(num: int, title: str, sub: str = ""):
+        t = Table([[
+            Paragraph(f"<b>{num:02d}</b>",
+                      sty(f"bn{num}", fontSize=30, textColor=C_WHITE,
+                          fontName="Helvetica-Bold", leading=34, alignment=TA_CENTER)),
+            [Paragraph(f"<b>{title}</b>",
+                       sty(f"bt{num}", fontSize=16, textColor=C_WHITE,
+                           fontName="Helvetica-Bold", leading=20)),
+             Spacer(1, 3),
+             Paragraph(sub,
+                       sty(f"bs{num}", fontSize=9, textColor=colors.HexColor("#93C5FD"),
+                           fontName="Helvetica", leading=12)) if sub else Spacer(0, 0)],
+        ]], colWidths=[2.4 * cm, None])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), C_BLUE),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("LINEAFTER",     (0, 0), (0, -1),  1, colors.HexColor("#FFFFFF25")),
+        ]))
+        story.append(t)
+        sp(0.35)
+
+    def sub_label(txt: str, clr=C_BLUE):
+        t = Table([[Paragraph(f"<b>{txt}</b>",
+                              sty(f"sl{txt[:4]}", fontSize=8, textColor=clr,
+                                  fontName="Helvetica-Bold", leading=11))]], colWidths=[cw])
+        t.setStyle(TableStyle([
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("LINEBELOW",     (0, 0), (-1, -1), 1, clr),
+        ]))
+        story.append(t)
+        sp(0.12)
+
+    def tip_box(text: str, kind="info"):
+        if kind == "warning":
+            bg, bd, lbl, tc = C_AMB_L,  C_AMB_B,  "⚠  ATENCIÓN",     C_AMBER
+        elif kind == "success":
+            bg, bd, lbl, tc = C_GRN_L,  C_GREEN,  "✓  CONSEJO",       C_GREEN
+        elif kind == "error":
+            bg, bd, lbl, tc = C_RED_L,  C_RED,    "✕  IMPORTANTE",    C_RED
+        else:
+            bg, bd, lbl, tc = C_BLUE_L, C_BLUE_M, "ℹ  INFORMACIÓN",   C_BLUE
+        cell = [
+            Paragraph(f"<b>{lbl}</b>",
+                      sty(f"tl{lbl[:2]}", fontSize=8, textColor=tc,
+                          fontName="Helvetica-Bold", leading=11)),
+            Spacer(1, 3),
+            Paragraph(text, sty(f"tb{lbl[:2]}", fontSize=9, textColor=C_DARK,
+                                fontName="Helvetica", leading=13)),
+        ]
+        t = Table([[cell]], colWidths=[cw])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), bg),
+            ("TOPPADDING",    (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+            ("LINEBEFORE",    (0, 0), (0, -1),  3, bd),
+            ("BOX",           (0, 0), (-1, -1), 0.5, bd),
+        ]))
+        story.append(KeepTogether(t))
+        sp(0.2)
+
+    def step_boxes(steps):
+        for i, (title, desc) in enumerate(steps):
+            num_t = Table(
+                [[Paragraph(f"<b>{i + 1}</b>",
+                            sty(f"sn{i}", fontSize=12, textColor=C_WHITE,
+                                fontName="Helvetica-Bold", leading=14, alignment=TA_CENTER))]],
+                colWidths=[0.85 * cm], rowHeights=[0.85 * cm],
+            )
+            num_t.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), C_BLUE),
+                ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ]))
+            row = Table([[num_t,
+                         [Paragraph(f"<b>{title}</b>",
+                                    sty(f"stit{i}", fontSize=9, textColor=C_DARK,
+                                        fontName="Helvetica-Bold", leading=13)),
+                          Paragraph(desc, s_just)]]],
+                        colWidths=[1.2 * cm, None])
+            row.setStyle(TableStyle([
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+                ("BOX",           (0, 0), (-1, -1), 0.5, C_GRAY_B),
+                ("LINEAFTER",     (0, 0), (0, -1),  2.5, C_BLUE),
+                ("BACKGROUND",    (0, 0), (-1, -1), C_WHITE),
+            ]))
+            story.append(KeepTogether(row))
+            if i < len(steps) - 1:
+                arr = Table([[Paragraph("↓", sty(f"ar{i}", fontSize=13, textColor=C_MUTED,
+                                                 alignment=TA_CENTER))]], colWidths=[1.2 * cm])
+                arr.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
+                                         ("LEFTPADDING",(0,0),(-1,-1),0)]))
+                outer = Table([[arr, ""]], colWidths=[1.2 * cm, None])
+                outer.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
+                                            ("LEFTPADDING",(0,0),(-1,-1),0)]))
+                story.append(outer)
+        sp(0.2)
+
+    def flow_diagram(steps):
+        n   = len(steps)
+        sw  = cw / (n * 2 - 1)  # step width unit
+        cells = []
+        widths = []
+        for i, (icon, label) in enumerate(steps):
+            cells.append([
+                Paragraph(icon, sty(f"fi{i}", fontSize=16, alignment=TA_CENTER)),
+                Spacer(1, 3),
+                Paragraph(f"<b>{label}</b>",
+                          sty(f"fl{i}", fontSize=8, textColor=C_DARK,
+                              fontName="Helvetica-Bold", alignment=TA_CENTER, leading=11)),
+            ])
+            widths.append(sw * 2)
+            if i < n - 1:
+                cells.append(Paragraph("→", sty(f"fa{i}", fontSize=16, textColor=C_MUTED,
+                                                alignment=TA_CENTER)))
+                widths.append(sw)
+        t = Table([cells], colWidths=widths)
+        bg_cmds = [("BACKGROUND", (i * 2, 0), (i * 2, 0), C_BLUE_L) for i in range(n)]
+        bx_cmds = [("BOX",        (i * 2, 0), (i * 2, 0), 0.5, C_BLUE_M) for i in range(n)]
+        t.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+        ] + bg_cmds + bx_cmds))
+        story.append(KeepTogether(t))
+        sp(0.25)
+
+    def key_table(rows):
+        """rows = [(key, function, description)]"""
+        data = [[Paragraph("<b>Tecla</b>", s_hdr),
+                 Paragraph("<b>Función</b>", s_hdr),
+                 Paragraph("<b>Descripción detallada</b>", s_hdr)]]
+        for key, func, desc in rows:
+            kb = Table([[Paragraph(f"<b>{key}</b>",
+                                   sty(f"k{key}", fontSize=8, textColor=C_DARK,
+                                       fontName="Helvetica-Bold", alignment=TA_CENTER))]],
+                       colWidths=[2.6 * cm])
+            kb.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), C_GRAY),
+                ("BOX",           (0, 0), (-1, -1), 0.75, C_GRAY_B),
+                ("TOPPADDING",    (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            data.append([kb, Paragraph(f"<b>{func}</b>", s_bold), Paragraph(desc, s_body)])
+        t = Table(data, colWidths=[3 * cm, 4 * cm, None])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",     (0, 0), (-1, 0),  C_BLUE),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C_WHITE, C_GRAY]),
+            ("GRID",           (0, 0), (-1, -1), 0.25, C_GRAY_B),
+            ("LINEBELOW",      (0, 0), (-1, 0),  1.5, C_BLUE),
+            ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",     (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
+        ]))
+        story.append(KeepTogether(t))
+        sp(0.25)
+
+    def feat_list(items):
+        for label, desc in items:
+            row = Table([[
+                Paragraph("●", sty(f"dt{label[:3]}", fontSize=11, textColor=C_BLUE,
+                                   fontName="Helvetica-Bold", alignment=TA_CENTER)),
+                [Paragraph(f"<b>{label}</b>",
+                           sty(f"fl{label[:3]}", fontSize=9, textColor=C_DARK,
+                               fontName="Helvetica-Bold", leading=13)),
+                 Paragraph(desc, s_mut) if desc else Spacer(0, 0)],
+            ]], colWidths=[0.55 * cm, None])
+            row.setStyle(TableStyle([
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ]))
+            story.append(row)
+        sp(0.15)
+
+    def grid_table(data, col_widths, header=True):
+        t = Table(data, colWidths=col_widths)
+        cmds = [
+            ("ROWBACKGROUNDS", (0, 1 if header else 0), (-1, -1), [C_WHITE, C_GRAY]),
+            ("GRID",           (0, 0), (-1, -1), 0.25, C_GRAY_B),
+            ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",     (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",   (0, 0), (-1, -1), 8),
+        ]
+        if header:
+            cmds += [
+                ("BACKGROUND", (0, 0), (-1, 0), C_BLUE),
+                ("LINEBELOW",  (0, 0), (-1, 0), 1.5, C_BLUE),
+                ("VALIGN",     (0, 0), (-1, 0), "MIDDLE"),
+            ]
+        t.setStyle(TableStyle(cmds))
+        story.append(KeepTogether(t))
+        sp(0.2)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ PORTADA ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    logo_img = ""
+    for lsrc in (LOGO_BLANCO_PATH, LOGO_PATH):
+        if lsrc.exists():
+            try:
+                rl = RLImage(str(lsrc))
+                rl._restrictSize(9 * cm, 3 * cm)
+                logo_img = rl
+                break
+            except Exception:
+                pass
+
+    cover = Table([[
+        logo_img if logo_img else Spacer(1, 3 * cm),
+        Spacer(1, 0.6 * cm),
+        Paragraph("MANUAL DE USUARIO",
+                  sty("ct", fontSize=30, textColor=C_WHITE, fontName="Helvetica-Bold",
+                      leading=36, alignment=TA_CENTER)),
+        Spacer(1, 0.25 * cm),
+        Paragraph(f"Sistema POS — {cfg.PHARMACY_NAME}",
+                  sty("cs", fontSize=13, textColor=colors.HexColor("#93C5FD"),
+                      fontName="Helvetica", leading=17, alignment=TA_CENTER)),
+        Spacer(1, 0.5 * cm),
+        HRFlowable(width="60%", thickness=1, color=colors.HexColor("#FFFFFF40")),
+        Spacer(1, 0.5 * cm),
+        Paragraph(f"Versión {cfg.VERSION}",
+                  sty("cv", fontSize=11, textColor=colors.HexColor("#CBD5E1"),
+                      fontName="Helvetica", alignment=TA_CENTER)),
+        Spacer(1, 0.12 * cm),
+        Paragraph(now_str,
+                  sty("cd", fontSize=10, textColor=colors.HexColor("#94A3B8"),
+                      fontName="Helvetica", alignment=TA_CENTER)),
+        Spacer(1, 1.8 * cm),
+        Paragraph(f"<b>{cfg.PHARMACY_NAME}</b>",
+                  sty("cn", fontSize=12, textColor=C_WHITE, fontName="Helvetica-Bold",
+                      alignment=TA_CENTER)),
+        Spacer(1, 0.1 * cm),
+        Paragraph(f"{cfg.PHARMACY_ADDRESS}  ·  {cfg.PHARMACY_PHONE}",
+                  sty("ca", fontSize=9, textColor=colors.HexColor("#94A3B8"),
+                      fontName="Helvetica", alignment=TA_CENTER)),
+    ]], colWidths=[cw])
+    cover.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), C_BLUE),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(cover)
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ ÍNDICE ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    story.append(Paragraph("Índice de Contenidos",
+                            sty("idx", fontSize=18, textColor=C_DARK,
+                                fontName="Helvetica-Bold", leading=24)))
+    sp(0.25)
+    hr(C_BLUE, 2)
+    sp(0.15)
+
+    toc_rows = [
+        ("01", "Atajos de Teclado",       "Referencia de todas las teclas de acceso directo del sistema"),
+        ("02", "Módulos del Sistema",      "Descripción de cada sección y sus funciones principales"),
+        ("03", "Punto de Venta (POS)",     "Cómo registrar ventas — guía paso a paso con flujo completo"),
+        ("04", "Inventario",               "Gestión de productos, stock, lotes de caducidad y ajustes"),
+        ("05", "Control de Caja",          "Turnos, retiros de efectivo y cálculo financiero"),
+        ("06", "Sincronización Multi-PC",  "Arquitectura en red con Turso Cloud — cómo fluyen los datos"),
+        ("07", "Métodos de Pago",          "Efectivo, tarjeta y configuración terminal Mercado Pago"),
+        ("08", "Gestión de Clientes",      "Expedientes, historial de compras y recetas médicas"),
+        ("09", "Configuración",            "Ajustes del sistema, APIs, usuarios y respaldos de base de datos"),
+        ("10", "Actualizaciones",          "Cómo mantener el sistema al día — proceso automático"),
+    ]
+    toc_data = [[Paragraph(f"<b>{n}</b>",
+                            sty(f"tn{n}", fontSize=16, textColor=C_BLUE,
+                                fontName="Helvetica-Bold", leading=20, alignment=TA_CENTER)),
+                 [Paragraph(f"<b>{t}</b>",
+                             sty(f"tt{n}", fontSize=11, textColor=C_DARK,
+                                 fontName="Helvetica-Bold", leading=15)),
+                  Paragraph(d, sty(f"td{n}", fontSize=8, textColor=C_MUTED,
+                                   fontName="Helvetica", leading=12))]]
+                for n, t, d in toc_rows]
+    toc_t = Table(toc_data, colWidths=[1.4 * cm, None])
+    toc_t.setStyle(TableStyle([
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [C_WHITE, C_GRAY]),
+        ("GRID",           (0, 0), (-1, -1), 0.25, C_GRAY_B),
+        ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",     (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING",  (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",    (0, 0), (-1, -1), 10),
+        ("LINEAFTER",      (0, 0), (0, -1),  2, C_BLUE),
+    ]))
+    story.append(KeepTogether(toc_t))
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 01 — ATAJOS DE TECLADO ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(1, "Atajos de Teclado", "Acceso rápido desde cualquier pantalla del sistema")
+    story.append(Paragraph(
+        "Los atajos funcionan en cualquier módulo mientras el usuario esté autenticado. "
+        "El sistema navega automáticamente al módulo correspondiente al presionar la tecla.",
+        s_just))
+    sp(0.25)
+    key_table([
+        ("F1",     "Ir al POS",            "Navega directamente al Punto de Venta desde cualquier sección del sistema."),
+        ("F2",     "Buscar producto",       "Abre el POS y coloca el cursor en el buscador para teclear nombre o código de barras."),
+        ("F3",     "Buscar producto",       "Igual que F2 — acceso alternativo al buscador. Útil para flujo de caja rápido."),
+        ("F5",     "Limpiar carrito",       "Elimina todos los productos del carrito activo. Solicita confirmación antes de borrar."),
+        ("F6",     "Inventario",            "Navega al módulo de Inventario para consultar o modificar productos y stock."),
+        ("F7",     "Reportes (admin)",      "Abre el módulo de Reportes. Solo disponible para usuarios con rol Administrador."),
+        ("F8",     "Campo de pago",         "Enfoca el campo 'Monto recibido' en el POS para cobrar con teclado sin usar el ratón."),
+        ("F10",    "Procesar venta",        "Confirma y procesa la venta actual. Equivale a presionar el botón 'Cobrar [F10]'."),
+        ("Enter",  "Agregar al carrito",    "En el buscador del POS: agrega el primer producto de la lista al carrito."),
+        ("Tab",    "Agregar al carrito",    "Alternativa a Enter en el buscador — mismo efecto para flujo continuo de captura."),
+        ("Escape", "Cerrar ventana",        "Cierra el modal o ventana emergente activa sin guardar cambios."),
+    ])
+    sp(0.15)
+    tip_box(
+        "<b>Flujo recomendado sin ratón:</b>  "
+        "<b>F3</b> → escribir producto → <b>Enter</b> (agregar) → repetir → "
+        "<b>F8</b> (monto) → ingresar cantidad → <b>F10</b> (cobrar). "
+        "Una venta completa en segundos usando solo el teclado.",
+        kind="success"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 02 — MÓDULOS DEL SISTEMA ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(2, "Módulos del Sistema", "Descripción de cada sección y sus funciones principales")
+    story.append(Paragraph(
+        "El sistema se organiza en módulos accesibles desde el menú lateral izquierdo. "
+        "Los módulos marcados con <b>🔒 Admin</b> solo están disponibles para usuarios con rol Administrador.",
+        s_just))
+    sp(0.25)
+    mod_data = [
+        [Paragraph("<b>Módulo</b>", s_hdr),
+         Paragraph("<b>Acceso</b>", s_hdr),
+         Paragraph("<b>Funciones principales</b>", s_hdr)],
+        [Paragraph("🛒 Nueva Venta — POS", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Registrar ventas, buscar productos, cobrar, imprimir tickets", s_body)],
+        [Paragraph("📦 Inventario", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Consultar stock, editar productos, agregar lotes, ajuste físico", s_body)],
+        [Paragraph("👥 Clientes", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Expedientes, historial de compras, alergias, recetas médicas", s_body)],
+        [Paragraph("🧠 IA Médica", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Asistente farmacéutico con inteligencia artificial (Farmacito)", s_body)],
+        [Paragraph("📋 Historial Clínico", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Consultas, prescripciones y seguimiento por paciente", s_body)],
+        [Paragraph("📈 Dashboard", s_bold),
+         Paragraph("Todos", s_green),
+         Paragraph("Métricas del día: ventas, ingresos, stock bajo, turno activo", s_body)],
+        [Paragraph("📊 Reportes", s_bold),
+         Paragraph("🔒 Admin", sty("adm1", fontSize=9, textColor=C_AMBER, fontName="Helvetica-Bold",
+                                   leading=13, alignment=TA_CENTER)),
+         Paragraph("Resumen de ventas, ganancias, exportar Excel/PDF por período", s_body)],
+        [Paragraph("🏦 Control de Caja", s_bold),
+         Paragraph("🔒 Admin", sty("adm2", fontSize=9, textColor=C_AMBER, fontName="Helvetica-Bold",
+                                   leading=13, alignment=TA_CENTER)),
+         Paragraph("Turnos, apertura/cierre, retiros, ganancia disponible, sincronización", s_body)],
+        [Paragraph("👤 Empleados", s_bold),
+         Paragraph("🔒 Admin", sty("adm3", fontSize=9, textColor=C_AMBER, fontName="Helvetica-Bold",
+                                   leading=13, alignment=TA_CENTER)),
+         Paragraph("Crear y gestionar cajeros, cambiar contraseñas, activar/desactivar", s_body)],
+        [Paragraph("🎯 Marketing", s_bold),
+         Paragraph("🔒 Admin", sty("adm4", fontSize=9, textColor=C_AMBER, fontName="Helvetica-Bold",
+                                   leading=13, alignment=TA_CENTER)),
+         Paragraph("Catálogo PDF, imágenes promo para redes sociales, manual PDF", s_body)],
+        [Paragraph("⚙️ Configuración", s_bold),
+         Paragraph("🔒 Admin", sty("adm5", fontSize=9, textColor=C_AMBER, fontName="Helvetica-Bold",
+                                   leading=13, alignment=TA_CENTER)),
+         Paragraph("Datos farmacia, APIs, terminal MP, respaldo y restauración de BD", s_body)],
+    ]
+    grid_table(mod_data, [5.5 * cm, 2.2 * cm, None])
+    tip_box(
+        "Al iniciar sesión como <b>Cajero</b>, el menú lateral solo muestra los módulos de acceso general. "
+        "Los módulos de administración quedan ocultos automáticamente por seguridad.",
+        kind="warning"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 03 — PUNTO DE VENTA ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(3, "Punto de Venta — POS", "Cómo registrar ventas de forma rápida y eficiente")
+    sub_label("Flujo completo de una venta")
+    flow_diagram([
+        ("🔍", "Buscar\nProducto"),
+        ("🛒", "Agregar\nCarrito"),
+        ("💰", "Elegir\nPago"),
+        ("✅", "Cobrar\nF10"),
+        ("🧾", "Ticket\nAutomatic"),
+    ])
+    sub_label("Pasos detallados")
+    step_boxes([
+        ("Abrir el POS",
+         "Presionar <b>F1</b> o hacer clic en 'Nueva Venta' en el menú lateral. "
+         "El sistema carga todos los productos activos con imagen, precio y stock."),
+        ("Buscar el producto",
+         "Presionar <b>F2</b> o <b>F3</b> para enfocar el buscador automáticamente. "
+         "Escribir nombre, marca, laboratorio o código de barras. La búsqueda es en tiempo real."),
+        ("Agregar al carrito",
+         "Presionar <b>Enter</b> o <b>Tab</b> para agregar el primer resultado. "
+         "También se puede hacer clic en la tarjeta del producto. "
+         "El carrito muestra cantidad, precio unitario y subtotal."),
+        ("Ajustar cantidad y descuento",
+         "En el carrito usar + / − para modificar la cantidad. "
+         "Doble clic en el precio de un ítem para aplicar descuento individual. "
+         "El campo '% Desc' en la parte superior aplica descuento global a toda la venta."),
+        ("Seleccionar método de pago",
+         "Hacer clic en <b>Efectivo</b>, <b>Tarjeta</b> o <b>Transferencia</b>. "
+         "Con terminal Mercado Pago configurada, el cobro con tarjeta va directo al dispositivo."),
+        ("Cobrar — F10",
+         "Para efectivo: presionar <b>F8</b> para ir al campo de monto, "
+         "ingresar el dinero recibido, el sistema calcula el cambio. "
+         "Presionar <b>F10</b> para confirmar y procesar la venta."),
+        ("Ticket automático",
+         "El ticket se genera automáticamente con folio, fecha, productos, subtotal, IVA 16% y total. "
+         "Se imprime si hay impresora configurada. También disponible como PDF."),
+    ])
+    sp(0.1)
+    tip_box(
+        "<b>Productos con receta:</b> Si un medicamento requiere receta médica, el sistema muestra una "
+        "alerta al agregarlo al carrito. Se puede asociar al expediente del cliente para el historial clínico.",
+        kind="info"
+    )
+    tip_box(
+        "<b>Cajero de prueba:</b> El usuario especial 'cajero' simula ventas completas sin registrarlas "
+        "en la base de datos ni descontar stock. Útil para capacitar nuevo personal.",
+        kind="warning"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 04 — INVENTARIO ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(4, "Inventario", "Gestión completa de productos, stock y caducidades")
+    story.append(Paragraph(
+        "El inventario centraliza toda la información de los medicamentos y productos de la farmacia. "
+        "El stock se actualiza automáticamente con cada venta desde cualquier PC conectada al sistema.",
+        s_just))
+    sp(0.25)
+    sub_label("Funciones del módulo")
+    feat_list([
+        ("Búsqueda avanzada",
+         "Buscar por nombre, marca, laboratorio, código de barras o categoría. Sin distinción de mayúsculas/minúsculas."),
+        ("Agregar producto",
+         "Botón '+' verde en la barra superior. Campos obligatorios: nombre, precio de venta, stock inicial. "
+         "Opcionales: marca, código de barras, precio de costo, stock mínimo, imagen."),
+        ("Editar producto",
+         "Clic en el ícono de lápiz ✏ en la fila del producto. Modificar cualquier campo: precio, descripción, imagen, etc."),
+        ("Gestión de lotes y caducidad",
+         "Cada producto puede tener múltiples lotes con fecha de caducidad y cantidad. "
+         "Alertas automáticas cuando un lote vence en menos de 30 días."),
+        ("Ajuste físico de inventario",
+         "Botón ◎ junto al producto. Corregir diferencia entre conteo físico y sistema. "
+         "Se registra el motivo y queda en el historial de movimientos."),
+        ("Descuento permanente",
+         "Campo '% Desc' en el detalle del producto. Se aplica automáticamente en el POS cada vez que se vende."),
+        ("Alertas de stock mínimo",
+         "Cuando el stock llega al nivel mínimo configurado, la fila se resalta en rojo como advertencia visual."),
+        ("Piezas sueltas",
+         "Productos que se venden por pieza individual (pastillas sueltas). "
+         "Campo separado de stock de cajas completas."),
+    ])
+    sp(0.2)
+    sub_label("Cómo gestionar lotes de caducidad")
+    lote_data = [
+        [Paragraph("<b>Paso</b>", s_hdr), Paragraph("<b>Acción</b>", s_hdr)],
+        [Paragraph("1", s_ctrb), Paragraph("En el inventario, hacer clic en el ícono de lotes 🗂 del producto.", s_body)],
+        [Paragraph("2", s_ctrb), Paragraph("Hacer clic en 'Agregar Lote'. Ingresar: número de lote, cantidad y fecha de caducidad.", s_body)],
+        [Paragraph("3", s_ctrb), Paragraph("El sistema registra el lote. Los que vencen en menos de 30 días se resaltan en amarillo.", s_body)],
+        [Paragraph("4", s_ctrb), Paragraph("Al realizar una venta, el sistema descuenta del lote más próximo a vencer (FIFO automático).", s_body)],
+        [Paragraph("5", s_ctrb), Paragraph("Los lotes vencidos se muestran en rojo. Se pueden eliminar manualmente cuando se retiren del inventario.", s_body)],
+    ]
+    grid_table(lote_data, [1.5 * cm, None])
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 05 — CONTROL DE CAJA ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(5, "Control de Caja", "Turnos, retiros de efectivo y resumen financiero")
+    sub_label("Ciclo de un turno de caja")
+    flow_diagram([
+        ("🔓", "Abrir\nTurno"),
+        ("💊", "Ventas\ndel día"),
+        ("💸", "Retiros"),
+        ("🔒", "Cerrar\nTurno"),
+        ("📋", "Reporte"),
+    ])
+    sub_label("Pasos del turno")
+    step_boxes([
+        ("Abrir turno",
+         "Ir a <b>Control de Caja</b> → botón 'Abrir Turno'. "
+         "Ingresar el monto de apertura (efectivo físico con el que inicia la caja). "
+         "El sistema registra la hora de inicio y el usuario que abre."),
+        ("Ventas del día",
+         "Registrar ventas normalmente desde el POS durante el turno. "
+         "El sistema acumula el total desglosado por método de pago: efectivo, tarjeta y transferencia."),
+        ("Registrar retiro de efectivo",
+         "Si se retira efectivo durante el turno, registrarlo como retiro. "
+         "<b>Tipo Personal:</b> ganancia retirada. "
+         "<b>Tipo Inversión:</b> dinero destinado a recomprar mercancía. "
+         "El sistema valida que el monto no exceda el disponible."),
+        ("Cerrar turno",
+         "Botón 'Cerrar Turno'. El sistema calcula ganancia bruta, total de retiros, "
+         "efectivo esperado y diferencia si se ingresa el conteo físico."),
+    ])
+    sp(0.1)
+    sub_label("Fórmulas de cálculo automático")
+    calc_data = [
+        [Paragraph("<b>Concepto</b>", s_hdr), Paragraph("<b>Fórmula</b>", s_hdr)],
+        [Paragraph("Ganancia bruta", s_bold),
+         Paragraph("Total ventas − Costo de productos vendidos", s_body)],
+        [Paragraph("Ganancia disponible", s_bold),
+         Paragraph("Ganancia bruta − Retiros personales ya registrados", s_body)],
+        [Paragraph("Efectivo esperado en caja", s_bold),
+         Paragraph("Monto apertura + Ventas en efectivo − Retiros del turno", s_body)],
+        [Paragraph("Capital de inversión disponible", s_bold),
+         Paragraph("Costo total vendido − Retiros de inversión registrados", s_body)],
+        [Paragraph("Diferencia de caja", s_bold),
+         Paragraph("Efectivo físico contado − Efectivo esperado  (0 = cuadre exacto)", s_body)],
+    ]
+    grid_table(calc_data, [6 * cm, None])
+    tip_box(
+        "Los retiros y cortes se sincronizan automáticamente entre todas las PCs conectadas. "
+        "Si hiciste un retiro en otra computadora y no aparece, presiona el botón <b>Sync</b> "
+        "en Control de Caja para forzar la actualización desde la nube.",
+        kind="info"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 06 — SINCRONIZACIÓN MULTI-PC ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(6, "Sincronización Multi-PC", "Arquitectura en red con Turso Cloud")
+    story.append(Paragraph(
+        "El sistema usa <b>Turso</b> (base de datos en la nube LibSQL) para sincronizar datos entre "
+        "múltiples computadoras. Cada PC mantiene una copia local para funcionar sin internet, "
+        "y los cambios se sincronizan automáticamente cada 30 segundos.",
+        s_just))
+    sp(0.3)
+    sub_label("Diagrama de arquitectura")
+
+    # Network diagram
+    pc_style = TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), C_BLUE),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ])
+    cloud_style = TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), C_CYAN),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ])
+
+    def net_box(txt, bg):
+        bt = Table([[Paragraph(txt, sty("nb", fontSize=9, textColor=C_WHITE,
+                                        fontName="Helvetica-Bold", alignment=TA_CENTER, leading=13))]],
+                   colWidths=[3.5 * cm], rowHeights=[1.4 * cm])
+        bt.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), bg),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return bt
+
+    net = Table([[
+        net_box("🖥️  PC-A\nCajero 1", C_BLUE),
+        Paragraph("⇄", sty("a1", fontSize=18, textColor=C_MUTED, alignment=TA_CENTER)),
+        net_box("☁️  TURSO\nCLOUD", C_CYAN),
+        Paragraph("⇄", sty("a2", fontSize=18, textColor=C_MUTED, alignment=TA_CENTER)),
+        net_box("🖥️  PC-B\nCajero 2", C_BLUE),
+    ]], colWidths=[3.5 * cm, None, 3.5 * cm, None, 3.5 * cm])
+    net.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+    ]))
+    story.append(KeepTogether(net))
+    sp(0.3)
+
+    sub_label("Qué se sincroniza y con qué frecuencia")
+    sync_data = [
+        [Paragraph("<b>Datos</b>", s_hdr),
+         Paragraph("<b>Descripción</b>", s_hdr),
+         Paragraph("<b>Frecuencia</b>", s_hdr)],
+        [Paragraph("Productos / Stock", s_bold),
+         Paragraph("Precios, stock, marca, imagen, descripción", s_body),
+         Paragraph("Inmediata tras venta", s_mut)],
+        [Paragraph("Ventas", s_bold),
+         Paragraph("Historial completo de todas las ventas por cualquier PC", s_body),
+         Paragraph("Inmediata", s_mut)],
+        [Paragraph("Retiros de caja", s_bold),
+         Paragraph("Retiros de efectivo de cualquier turno o PC", s_body),
+         Paragraph("Inmediata + Sync", s_mut)],
+        [Paragraph("Cortes de caja", s_bold),
+         Paragraph("Historial de turnos abiertos y cerrados", s_body),
+         Paragraph("Inmediata", s_mut)],
+        [Paragraph("Clientes", s_bold),
+         Paragraph("Expedientes, historial clínico y contactos", s_body),
+         Paragraph("Cada 30 segundos", s_mut)],
+        [Paragraph("Usuarios", s_bold),
+         Paragraph("Cuentas, roles y contraseñas de empleados", s_body),
+         Paragraph("Cada 30 segundos", s_mut)],
+        [Paragraph("Lotes / Caducidad", s_bold),
+         Paragraph("Lotes de productos con fecha de vencimiento", s_body),
+         Paragraph("Inmediata", s_mut)],
+    ]
+    grid_table(sync_data, [4 * cm, None, 3.8 * cm])
+    tip_box(
+        "<b>Sin internet:</b> El sistema funciona al 100% sin conexión. "
+        "Los datos se guardan localmente (SQLite) y se sincronizan automáticamente "
+        "con la nube en cuanto se restaura la conexión a internet.",
+        kind="success"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 07 — MÉTODOS DE PAGO ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(7, "Métodos de Pago", "Efectivo, tarjeta y terminal Mercado Pago Point")
+    sub_label("Comparación de métodos")
+    pay_data = [
+        [Paragraph("<b>💵  Efectivo</b>",
+                   sty("ph1", fontSize=10, textColor=C_WHITE, fontName="Helvetica-Bold",
+                       alignment=TA_CENTER)),
+         Paragraph("<b>💳  Tarjeta</b>",
+                   sty("ph2", fontSize=10, textColor=C_WHITE, fontName="Helvetica-Bold",
+                       alignment=TA_CENTER)),
+         Paragraph("<b>📲  Transferencia</b>",
+                   sty("ph3", fontSize=10, textColor=C_WHITE, fontName="Helvetica-Bold",
+                       alignment=TA_CENTER))],
+        [Paragraph("El cliente paga con billetes o monedas en mano.", s_body),
+         Paragraph("Cobro con tarjeta bancaria de débito o crédito.", s_body),
+         Paragraph("Pago por SPEI, CoDi o app bancaria del cliente.", s_body)],
+        [Paragraph("Ingresar monto recibido → el sistema calcula el cambio automáticamente.", s_body),
+         Paragraph("Con terminal MP: el monto se envía automáticamente al dispositivo.", s_body),
+         Paragraph("El cliente transfiere antes de confirmar la venta.", s_body)],
+        [Paragraph("<b>Atajo:</b> F8 enfoca el campo de monto directamente.", s_mut),
+         Paragraph("<b>Sin terminal:</b> cajero procesa en el dispositivo y confirma en sistema.", s_mut),
+         Paragraph("<b>No genera cambio</b> — verificar recepción antes de confirmar.", s_mut)],
+    ]
+    pay_t = Table(pay_data, colWidths=[cw / 3] * 3)
+    pay_t.setStyle(TableStyle([
+        ("BACKGROUND",     (0, 0), (-1, 0), C_BLUE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C_WHITE, C_GRAY, C_BLUE_L]),
+        ("GRID",           (0, 0), (-1, -1), 0.25, C_GRAY_B),
+        ("LINEBELOW",      (0, 0), (-1, 0),  1.5, C_BLUE),
+        ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",     (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING",  (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",    (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",   (0, 0), (-1, -1), 8),
+    ]))
+    story.append(KeepTogether(pay_t))
+    sp(0.3)
+
+    sub_label("Configurar terminal Mercado Pago Point")
+    step_boxes([
+        ("Obtener Access Token",
+         "Ingresar a <b>developers.mercadopago.com</b> con la cuenta de Mercado Pago de la farmacia. "
+         "En 'Credenciales de producción' copiar el Access Token."),
+        ("Configurar en el sistema",
+         "Ir a <b>Configuración → Terminal de Pago</b>. "
+         "Pegar el Access Token en el campo correspondiente y presionar 'Guardar'."),
+        ("Detectar el dispositivo",
+         "Presionar <b>'Detectar Terminales'</b>. El sistema consulta la API de Mercado Pago "
+         "y muestra los dispositivos vinculados. Copiar el Device ID del terminal."),
+        ("Activar modo PDV",
+         "Asegurarse de que la terminal esté encendida y conectada a WiFi. "
+         "Presionar <b>'Activar Modo PDV'</b>. La terminal queda lista para recibir cobros."),
+        ("Cobrar con tarjeta",
+         "En el POS seleccionar 'Tarjeta' y presionar 'Cobrar'. "
+         "El monto aparece automáticamente en la terminal. "
+         "El cliente inserta/acerca su tarjeta y el sistema recibe confirmación."),
+    ])
+    tip_box(
+        "<b>Modelo compatible:</b> <b>Point Smart 2</b> (SMART2). "
+        "El modelo Point Mini (ME30S / NEWLAND) no soporta la API de integración automática. "
+        "Con el Mini se cobra manualmente en el dispositivo y se registra 'Tarjeta' en el sistema.",
+        kind="warning"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 08 — GESTIÓN DE CLIENTES ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(8, "Gestión de Clientes", "Expedientes, historial de compras y recetas médicas")
+    story.append(Paragraph(
+        "El módulo de Clientes permite llevar un expediente médico completo de cada paciente, "
+        "incluyendo medicamentos actuales, alergias, antecedentes y recetas. "
+        "El historial de compras se actualiza automáticamente con cada venta asociada.",
+        s_just))
+    sp(0.25)
+    sub_label("Información del expediente")
+    clt_data = [
+        [Paragraph("<b>Campo</b>", s_hdr), Paragraph("<b>Descripción</b>", s_hdr)],
+        [Paragraph("Datos básicos", s_bold),
+         Paragraph("Nombre completo, teléfono, fecha de nacimiento, CURP, correo electrónico", s_body)],
+        [Paragraph("Historial de compras", s_bold),
+         Paragraph("Todas las ventas asociadas al cliente: fecha, productos comprados y monto", s_body)],
+        [Paragraph("Medicamentos actuales", s_bold),
+         Paragraph("Lista de medicamentos que toma el paciente regularmente con dosis y frecuencia", s_body)],
+        [Paragraph("Alergias", s_bold),
+         Paragraph("Alergias a medicamentos o sustancias. El sistema muestra alerta al vender productos relacionados", s_body)],
+        [Paragraph("Antecedentes médicos", s_bold),
+         Paragraph("Enfermedades crónicas, cirugías y otras condiciones relevantes para la atención", s_body)],
+        [Paragraph("Recetas médicas", s_bold),
+         Paragraph("Medicamento, dosis, frecuencia, duración y médico que prescribe. Se puede marcar con sello de receta", s_body)],
+        [Paragraph("Signos vitales", s_bold),
+         Paragraph("Registro de presión arterial y peso para seguimiento de pacientes crónicos", s_body)],
+    ]
+    grid_table(clt_data, [4.5 * cm, None])
+    tip_box(
+        "Al hacer una venta en el POS, se puede asociar al cliente desde el selector superior del carrito. "
+        "La venta queda registrada en su historial automáticamente para consultas futuras.",
+        kind="info"
+    )
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 09 — CONFIGURACIÓN ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(9, "Configuración del Sistema", "Ajustes, credenciales de APIs y respaldos de datos")
+    tip_box(
+        "Esta sección es exclusiva del Administrador. Los cambios en credenciales de API "
+        "afectan el funcionamiento completo del sistema. No compartir ni modificar tokens "
+        "sin conocimiento técnico. Siempre hacer un respaldo antes de cambios mayores.",
+        kind="error"
+    )
+    sp(0.1)
+    sub_label("Ajustes disponibles")
+    cfg_data = [
+        [Paragraph("<b>Ajuste</b>", s_hdr),
+         Paragraph("<b>Descripción</b>", s_hdr),
+         Paragraph("<b>Impacto</b>", s_hdr)],
+        [Paragraph("Datos de la farmacia", s_bold),
+         Paragraph("Nombre, dirección, teléfono, RFC — aparecen en todos los tickets impresos", s_body),
+         Paragraph("Tickets de venta", s_mut)],
+        [Paragraph("Turno automático", s_bold),
+         Paragraph("Hora de apertura y cierre automático del turno de caja (activar/desactivar)", s_body),
+         Paragraph("Control de caja", s_mut)],
+        [Paragraph("Turso / Nube", s_bold),
+         Paragraph("URL y token de acceso a la base de datos en la nube Turso (LibSQL)", s_body),
+         Paragraph("Sincronización multi-PC", s_mut)],
+        [Paragraph("Cloudinary", s_bold),
+         Paragraph("Cloud name, API Key y Secret para almacenar imágenes de productos en la nube", s_body),
+         Paragraph("Fotos de productos", s_mut)],
+        [Paragraph("Terminal MP", s_bold),
+         Paragraph("Access Token y Device ID de Mercado Pago Point para cobros automáticos con tarjeta", s_body),
+         Paragraph("Cobro con tarjeta", s_mut)],
+        [Paragraph("Respaldo de BD", s_bold),
+         Paragraph("Exportar copia de seguridad completa de todos los datos en formato .db (SQLite)", s_body),
+         Paragraph("Recuperación ante fallas", s_mut)],
+        [Paragraph("Restaurar BD", s_bold),
+         Paragraph("Cargar un archivo .db de respaldo. REEMPLAZA TODOS los datos actuales sin excepción", s_body),
+         Paragraph("⚠ Irreversible", sty("irr1", fontSize=8, textColor=C_RED,
+                                          fontName="Helvetica-Bold", leading=12))],
+        [Paragraph("Purgar datos", s_bold),
+         Paragraph("Eliminar ventas/historial o todos los datos incluyendo Turso. Confirmar con contraseña", s_body),
+         Paragraph("⚠ Irreversible", sty("irr2", fontSize=8, textColor=C_RED,
+                                          fontName="Helvetica-Bold", leading=12))],
+    ]
+    grid_table(cfg_data, [4.5 * cm, None, 3.2 * cm])
+
+    sub_label("Gestión de empleados")
+    step_boxes([
+        ("Crear nuevo usuario",
+         "Ir a <b>Empleados</b> → botón '+'. Completar: nombre completo, nombre de usuario y contraseña. "
+         "Rol <b>Cajero</b>: acceso al POS, inventario y clientes. "
+         "Rol <b>Administrador</b>: acceso completo al sistema."),
+        ("Cambiar contraseña",
+         "En la lista de empleados, clic en el ícono de contraseña 🔑. "
+         "El administrador puede cambiar la contraseña de cualquier usuario sin necesitar la contraseña actual."),
+        ("Desactivar empleado",
+         "Al desactivar un usuario, no puede iniciar sesión pero su historial de ventas se conserva íntegro. "
+         "Recomendado cuando un empleado deja de trabajar en la farmacia."),
+    ])
+    pb()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ═══ 10 — ACTUALIZACIONES ═══
+    # ─────────────────────────────────────────────────────────────────────────
+    section_banner(10, "Actualizaciones del Sistema", "Cómo mantener el POS siempre al día")
+    story.append(Paragraph(
+        "El sistema verifica automáticamente si hay nuevas versiones disponibles cada vez que se inicia. "
+        "Las actualizaciones se distribuyen como instalador (.exe) y se aplican sin intervención técnica.",
+        s_just))
+    sp(0.25)
+    sub_label("Proceso de actualización paso a paso")
+    step_boxes([
+        ("Detección automática",
+         "Al iniciar sesión, el sistema consulta GitHub Releases silenciosamente. "
+         "Si hay una versión más reciente disponible, el botón <b>'Actualizar'</b> en la barra superior "
+         "se resalta en amarillo mostrando el número de versión disponible (ej. ⬆ v2.3.19)."),
+        ("Revisar versiones disponibles",
+         "Hacer clic en el botón 'Actualizar'. Se abre una ventana con la lista de versiones disponibles, "
+         "la versión instalada actualmente y las notas de cada actualización."),
+        ("Seleccionar e instalar",
+         "Seleccionar la versión deseada en la lista (la más reciente está pre-seleccionada) "
+         "y presionar <b>'Instalar'</b>. La descarga inicia en segundo plano."),
+        ("Progreso de descarga",
+         "Una tarjeta de progreso aparece en la esquina superior derecha mostrando el porcentaje de descarga. "
+         "El sistema sigue funcionando normalmente durante la descarga."),
+        ("Instalación y reinicio automático",
+         "Al completar la descarga (100%), el instalador se ejecuta automáticamente. "
+         "La aplicación se cierra y reabre con la nueva versión instalada. "
+         "Los datos de la base de datos <b>no se eliminan</b> con la actualización."),
+        ("Verificar la versión",
+         "Tras reiniciar, el botón 'Actualizar' desaparece si ya se tiene la versión más reciente. "
+         "La versión instalada se muestra en el PDF del Manual (sección de portada)."),
+    ])
+    sp(0.15)
+    tip_box(
+        f"<b>Versión actual del sistema:</b>  v{cfg.VERSION}"
+        f"  ·  <b>Manual generado:</b>  {now_str}<br/>"
+        "Para soporte técnico o reportar errores, contactar al administrador del sistema.",
+        kind="success"
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # PAGE HEADER / FOOTER (todas excepto portada)
+    # ─────────────────────────────────────────────────────────────────────────
+    def _on_cover(canvas, doc):
+        pass
+
+    def _on_page(canvas, doc):
+        canvas.saveState()
+        # Header
+        canvas.setStrokeColorRGB(0.886, 0.91, 0.941)
+        canvas.setLineWidth(0.5)
+        canvas.line(1.8 * cm, H - 1.7 * cm, W - 1.8 * cm, H - 1.7 * cm)
+        canvas.setFont("Helvetica-Bold", 7.5)
+        canvas.setFillColorRGB(0.114, 0.129, 0.251)
+        canvas.drawString(1.8 * cm, H - 1.4 * cm, cfg.PHARMACY_NAME)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColorRGB(0.392, 0.455, 0.545)
+        canvas.drawRightString(W - 1.8 * cm, H - 1.4 * cm,
+                               f"Manual de Usuario  ·  v{cfg.VERSION}")
+        # Footer
+        canvas.setStrokeColorRGB(0.886, 0.91, 0.941)
+        canvas.line(1.8 * cm, 1.6 * cm, W - 1.8 * cm, 1.6 * cm)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColorRGB(0.392, 0.455, 0.545)
+        canvas.drawString(1.8 * cm, 1.2 * cm, now_str)
+        canvas.drawCentredString(
+            W / 2, 1.2 * cm,
+            f"{cfg.PHARMACY_ADDRESS}  ·  {cfg.PHARMACY_PHONE}"
+        )
+        canvas.drawRightString(W - 1.8 * cm, 1.2 * cm, f"Página {doc.page}")
+        canvas.restoreState()
 
     doc = SimpleDocTemplate(
         path,
         pagesize=letter,
         rightMargin=1.8 * cm, leftMargin=1.8 * cm,
-        topMargin=2 * cm, bottomMargin=2 * cm,
+        topMargin=2.2 * cm, bottomMargin=2.4 * cm,
         title=f"Manual de Usuario — {cfg.PHARMACY_NAME}",
+        author=cfg.PHARMACY_NAME,
     )
-    styles = getSampleStyleSheet()
-    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-    def sty(name, **kw):
-        return ParagraphStyle(name, parent=styles["Normal"], **kw)
-
-    body  = sty("body",  fontSize=9,  textColor=DARK_RL,  fontName="Helvetica",       leading=13)
-    bold9 = sty("bold9", fontSize=9,  textColor=DARK_RL,  fontName="Helvetica-Bold",  leading=13)
-    mut9  = sty("mut9",  fontSize=9,  textColor=MUTED_RL, fontName="Helvetica",       leading=13)
-    grn9  = sty("grn9",  fontSize=9,  textColor=GREEN_RL, fontName="Helvetica-Bold",  leading=13, alignment=TA_CENTER)
-    ctr   = sty("ctr",   fontSize=9,  textColor=DARK_RL,  fontName="Helvetica",       leading=13, alignment=TA_CENTER)
-    hdr_c = sty("hdr_c", fontSize=9,  textColor=WHITE_RL, fontName="Helvetica-Bold",  leading=13, alignment=TA_CENTER)
-
-    story = []
-
-    # ── Portada / Header ──────────────────────────────────────────────────────
-    logo_cell = ""
-    for logo_src in (LOGO_PATH, LOGO_BLANCO_PATH):
-        if logo_src.exists():
-            try:
-                rl = RLImage(str(logo_src))
-                rl._restrictSize(6 * cm, 2 * cm)
-                logo_cell = rl
-                break
-            except Exception:
-                pass
-
-    hdr_data = [[
-        logo_cell,
-        Paragraph(
-            f"<b>Manual de Usuario</b><br/>"
-            f"<font color='#64748B' size='9'>v{cfg.VERSION}  ·  Generado: {now_str}</font>",
-            sty("rh", fontSize=14, textColor=DARK_RL, alignment=TA_RIGHT,
-                fontName="Helvetica-Bold", leading=18)
-        ),
-    ]]
-    hdr_t = Table(hdr_data, colWidths=[7 * cm, None])
-    hdr_t.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING",    (0, 0), (-1, -1), 6),
-    ]))
-    story.append(hdr_t)
-    story.append(HRFlowable(width="100%", thickness=2, color=BLUE_RL, spaceAfter=6))
-    story.append(Paragraph(
-        f"{cfg.PHARMACY_NAME}  ·  {cfg.PHARMACY_ADDRESS}  ·  {cfg.PHARMACY_PHONE}",
-        mut9
-    ))
-    story.append(Spacer(1, 0.5 * cm))
-
-    # ── Utilidades ────────────────────────────────────────────────────────────
-    def section_title(txt, icon=""):
-        story.append(Spacer(1, 0.35 * cm))
-        t = Table(
-            [[Paragraph(f"<b>{icon}  {txt}</b>" if icon else f"<b>{txt}</b>",
-                        sty("st", fontSize=11, textColor=WHITE_RL,
-                            fontName="Helvetica-Bold", leading=14))]],
-            colWidths=["100%"],
-        )
-        t.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1, -1), BLUE_RL),
-            ("TOPPADDING",     (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 10),
-            ("RIGHTPADDING",   (0, 0), (-1, -1), 10),
-            ("ROUNDEDCORNERS", (0, 0), (-1, -1), [4, 4, 4, 4]),
-        ]))
-        story.append(t)
-        story.append(Spacer(1, 0.2 * cm))
-
-    def key_table(rows):
-        """rows = [(key_label, description), ...]"""
-        data = [
-            [Paragraph("<b>Tecla</b>", hdr_c), Paragraph("<b>Acción</b>", hdr_c)]
-        ] + [
-            [Paragraph(f"<b>{k}</b>", grn9), Paragraph(d, body)]
-            for k, d in rows
-        ]
-        t = Table(data, colWidths=[3 * cm, None])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1, 0),  BLUE_RL),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE_RL, GRAY_RL]),
-            ("GRID",           (0, 0), (-1, -1), 0.25, colors.HexColor("#E2E8F0")),
-            ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
-            ("LINEBELOW",      (0, 0), (-1, 0),  1.5, BLUE_RL),
-        ]))
-        story.append(KeepTogether(t))
-        story.append(Spacer(1, 0.25 * cm))
-
-    def info_table(rows):
-        """rows = [(label, value), ...]"""
-        data = [[Paragraph(f"<b>{l}</b>", bold9), Paragraph(v, body)] for l, v in rows]
-        t = Table(data, colWidths=[5 * cm, None])
-        t.setStyle(TableStyle([
-            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [WHITE_RL, GRAY_RL]),
-            ("GRID",           (0, 0), (-1, -1), 0.25, colors.HexColor("#E2E8F0")),
-            ("VALIGN",         (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
-        ]))
-        story.append(KeepTogether(t))
-        story.append(Spacer(1, 0.25 * cm))
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  1. ATAJOS DE TECLADO
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("ATAJOS DE TECLADO — Acceso rápido global")
-    key_table([
-        ("F1",  "Ir al módulo POS (Punto de Venta)"),
-        ("F2 / F3", "POS → enfocar campo de búsqueda de producto para teclear inmediatamente"),
-        ("F5",  "Limpiar el carrito de venta actual (pide confirmación)"),
-        ("F6",  "Ir al módulo de Inventario"),
-        ("F7",  "Ir al módulo de Reportes (solo administrador)"),
-        ("F8",  "POS → enfocar campo de monto pagado (cobrar efectivo)"),
-        ("F10", "Procesar y confirmar la venta actual"),
-        ("Enter (en buscador)", "Agregar el primer resultado al carrito automáticamente"),
-        ("Tab (en buscador)",   "Mismo efecto que Enter — agrega el producto al carrito"),
-        ("Esc (en modal)",      "Cerrar ventana emergente activa"),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  2. SECCIONES DEL SISTEMA
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("SECCIONES DEL SISTEMA")
-    info_table([
-        ("POS (Punto de Venta)",  "Registrar ventas, buscar productos por nombre/código de barras, cobrar en efectivo, tarjeta o transferencia, imprimir ticket."),
-        ("Inventario",            "Ver stock, buscar por nombre/marca/código, editar producto, gestionar lotes de caducidad, ajuste físico de inventario."),
-        ("Ventas",                "Historial completo de ventas, filtrar por fecha/cajero/método de pago, cancelar venta (restaura stock automáticamente)."),
-        ("Reportes",              "Resumen de ventas por período, ganancias, productos más vendidos, exportar a Excel/PDF (solo administrador)."),
-        ("Clientes",              "Base de datos de clientes, historial de compras, recetas médicas, alergias y antecedentes."),
-        ("Control de Caja",       "Abrir/cerrar turnos, registrar retiros (personal o inversión), ver ganancia disponible del período."),
-        ("Empleados",             "Crear y gestionar usuarios (cajeros y administradores), cambiar contraseña."),
-        ("Configuración",         "Datos de la farmacia, credenciales API (Turso, Cloudinary), terminal Mercado Pago, respaldo y restauración de BD."),
-        ("Marketing",             "Generar catálogo PDF de productos, crear imágenes promocionales para redes sociales, descargar este manual."),
-        ("IA Médica",             "Asistente de inteligencia artificial para consultas farmacéuticas y verificación de medicamentos."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  3. CÓMO HACER UNA VENTA (POS)
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("CÓMO HACER UNA VENTA — POS")
-    info_table([
-        ("1. Abrir POS",         "Presionar F1 o hacer clic en 'POS' en el menú lateral izquierdo."),
-        ("2. Buscar producto",    "Presionar F2 o F3 y teclear el nombre, marca o código de barras. El sistema busca en tiempo real."),
-        ("3. Agregar al carrito", "Presionar Enter o Tab para agregar el primer resultado. También se puede hacer clic en el producto."),
-        ("4. Ajustar cantidad",   "En el carrito, hacer clic en + / − o editar el número directamente. Doble clic en el precio para aplicar descuento."),
-        ("5. Seleccionar pago",   "Elegir Efectivo, Tarjeta o Transferencia en los botones de método de pago."),
-        ("6. Cobrar",             "Presionar F10 o el botón 'Cobrar'. Para efectivo: ingresar el monto recibido (F8 enfoca ese campo)."),
-        ("7. Ticket",             "El ticket se imprime automáticamente si hay impresora configurada. También se puede guardar como PDF."),
-        ("Descuento global",      "Ingresar porcentaje en el campo '% Desc' del carrito para aplicar descuento a toda la venta."),
-        ("Receta requerida",      "Si el producto requiere receta, el sistema muestra alerta. Se puede asociar al expediente del cliente."),
-        ("Cajero de prueba",      "Modo especial (usuario 'cajero') para simular ventas sin registrarlas en la base de datos."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  4. INVENTARIO
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("INVENTARIO")
-    info_table([
-        ("Ver stock",          "Menú lateral → Inventario (o F6). Lista todos los productos con stock, precio y código."),
-        ("Buscar producto",    "Campo de búsqueda superior: busca por nombre, marca, código de barras o categoría."),
-        ("Agregar producto",   "Botón '+' (verde) en la barra superior. Completar campos obligatorios: nombre, precio, stock inicial."),
-        ("Editar producto",    "Clic en el ícono de lápiz (✏) en la fila del producto. Se puede cambiar precio, stock mínimo, imagen, etc."),
-        ("Lotes/Caducidad",    "Clic en ícono de lotes (🗂) para agregar lotes con fecha de caducidad. El sistema alerta cuando están próximos a vencer."),
-        ("Ajuste físico",      "Clic en ícono de ajuste (◎) para corregir stock cuando hay diferencia entre el conteo físico y el sistema."),
-        ("Stock bajo",         "Los productos con stock ≤ stock mínimo se resaltan en rojo automáticamente."),
-        ("Descuento",          "Campo 'Desc %' en el detalle del producto para aplicar descuento permanente en POS."),
-        ("Sync automático",    "El stock se descuenta automáticamente con cada venta en todas las PCs conectadas a la nube."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  5. CONTROL DE CAJA
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("CONTROL DE CAJA")
-    info_table([
-        ("Abrir turno",        "Módulo 'Caja' → botón 'Abrir Turno'. Ingresar monto de apertura (efectivo inicial en caja)."),
-        ("Cerrar turno",       "Botón 'Cerrar Turno'. El sistema calcula ganancia bruta, retiros y efectivo esperado en caja."),
-        ("Retiro personal",    "Registrar retirada de ganancia personal. El sistema valida que no exceda la ganancia disponible."),
-        ("Retiro inversión",   "Registrar recompra de mercancía. Se descuenta del capital de inversión calculado."),
-        ("Ganancia disponible","Ganancia bruta del período menos los retiros personales ya registrados."),
-        ("Efectivo en caja",   "Monto de apertura + ventas en efectivo − retiros. Lo que debería haber físicamente."),
-        ("Sync multi-PC",      "Los retiros de cualquier PC se sincronizan automáticamente. Botón 'Sync' fuerza actualización inmediata."),
-        ("Corte histórico",    "Desde 'Cortes históricos' se puede ver y crear cierres con fecha retroactiva (solo admin)."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  6. SINCRONIZACIÓN MULTI-PC (TURSO)
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("SINCRONIZACIÓN MULTI-PC — Turso Cloud")
-    info_table([
-        ("Cómo funciona",     "Cada PC tiene una copia local (SQLite). Los datos se sincronizan automáticamente con la nube (Turso) cada 30 segundos."),
-        ("Al hacer una venta","Los datos se envían a la nube inmediatamente después de cada venta."),
-        ("Sync forzado",      "En Control de Caja → botón 'Sync' para forzar sincronización bidireccional de inmediato."),
-        ("Sin internet",      "El sistema sigue funcionando localmente. Los cambios se suben cuando se restaura la conexión."),
-        ("Primer inicio",     "Si la BD local está vacía, el sistema importa todos los datos desde la nube automáticamente."),
-        ("Tablas sincronizadas", "Productos, inventario, ventas, clientes, usuarios, cortes, retiros, lotes, compras."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  7. MÉTODOS DE PAGO
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("MÉTODOS DE PAGO")
-    info_table([
-        ("Efectivo",          "Ingresar monto recibido → el sistema calcula el cambio automáticamente. F8 enfoca este campo."),
-        ("Tarjeta",           "Registra el cobro con tarjeta. Si hay terminal Mercado Pago configurada, envía el monto automáticamente."),
-        ("Transferencia",     "Para pagos por transferencia bancaria (SPEI, CoDi, etc.). Se registra igual que efectivo pero sin cambio."),
-        ("Terminal MP",       "Mercado Pago Point (modelo Point Smart 2). Se configura en Configuración → Terminal de Pago."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  8. CONFIGURACIÓN
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("CONFIGURACIÓN (solo administrador)")
-    info_table([
-        ("Datos farmacia",    "Nombre, dirección, teléfono, RFC — aparecen en los tickets de venta."),
-        ("Turno automático",  "Configura hora de apertura y cierre automático de turno (activa en configuración)."),
-        ("Turso / Nube",      "Token de acceso a la base de datos en la nube. No modificar sin conocimiento técnico."),
-        ("Cloudinary",        "Servicio de imágenes para fotos de productos. Se configura con API Key y Secret."),
-        ("Terminal MP",       "Access Token y Device ID de Mercado Pago Point para cobros con tarjeta automáticos."),
-        ("Respaldo BD",       "Exportar copia de seguridad (.db) de la base de datos local. Recomendado: semanal."),
-        ("Restaurar BD",      "Cargar archivo .db de respaldo. ADVERTENCIA: reemplaza todos los datos actuales."),
-        ("Purgar datos",      "Opciones para eliminar ventas/historial o todos los datos. Operación irreversible."),
-    ])
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  9. ACTUALIZACIONES
-    # ═══════════════════════════════════════════════════════════════════════
-    section_title("ACTUALIZACIONES DEL SISTEMA")
-    info_table([
-        ("Verificación",      "El sistema verifica automáticamente si hay versión nueva al iniciar."),
-        ("Actualizar",        "Notificación en la barra superior → clic en 'Actualizar'. El sistema descarga e instala automáticamente."),
-        ("Versión actual",    f"v{cfg.VERSION}"),
-        ("Repositorio",       "Las actualizaciones se publican en GitHub y se distribuyen como instalador (.exe)."),
-    ])
-
-    # ── Footer ────────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 0.5 * cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=MUTED_RL))
-    story.append(Spacer(1, 0.15 * cm))
-    story.append(Paragraph(
-        f"<font color='#64748B' size='8'>"
-        f"{cfg.PHARMACY_NAME}  ·  {cfg.PHARMACY_ADDRESS}  ·  {cfg.PHARMACY_PHONE}  ·  "
-        f"Manual v{cfg.VERSION} — {now_str}"
-        f"</font>",
-        sty("foot", fontSize=8, alignment=TA_CENTER)
-    ))
-
-    doc.build(story)
+    doc.build(story, onFirstPage=_on_cover, onLaterPages=_on_page)
