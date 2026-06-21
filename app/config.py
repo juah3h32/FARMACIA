@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.9"
+VERSION = "2.3.10"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -110,7 +110,9 @@ CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")
 CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key") or "gufXKh1BIUTfsdwKNzz95or4SI4"
 
 # -- Mercado Pago Point (terminal de pago ME30S) ------------------------------
-MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key")
+MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key") or (
+    "APP_USR-6410994072397818-062114-f98cacf3ef24f92ce1941c5545cc7e03-3486812391"
+)
 MP_DEVICE_ID    = _load_key("MP_DEVICE_ID",    "mp_device_id.key")
 
 

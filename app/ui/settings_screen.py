@@ -619,30 +619,41 @@ class SettingsScreen(ctk.CTkFrame):
     def _actualizar_estado_mp(self):
         from app.services.mercadopago_service import mp_point
         if mp_point.enabled:
+            did = mp_point.device_id
+            short = (did[:32] + "...") if len(did) > 32 else did
             self.lbl_mp_status.configure(
-                text=f"✓ Terminal configurada: {mp_point.device_id[:30]}...",
+                text=f"✓ Listo para cobrar  |  {short}",
                 text_color="#16A34A",
+            )
+        elif mp_point.access_token:
+            self.lbl_mp_status.configure(
+                text="⚠ Token OK — falta Device ID. Haz click en 🔍 Detectar.",
+                text_color="#D97706",
             )
         else:
             self.lbl_mp_status.configure(
-                text="⚠ Sin configurar — pagos con tarjeta usarán flujo manual",
-                text_color="#D97706",
+                text="✗ Sin configurar — pagos con tarjeta usan flujo manual",
+                text_color="#DC2626",
             )
 
     def _guardar_mp(self):
         from app.services.mercadopago_service import mp_point
         token  = self.entry_mp_token.get().strip()
         device = self.entry_mp_device.get().strip()
-        if not token or not device:
-            messagebox.showwarning("Mercado Pago", "Ingresa Access Token y Device ID")
+        if not token:
+            messagebox.showwarning("Mercado Pago", "Access Token requerido")
             return
-        (cfg.DATA_DIR / "mp_access_token.key").write_text(token,  encoding="utf-8")
-        (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
+        (cfg.DATA_DIR / "mp_access_token.key").write_text(token, encoding="utf-8")
+        if device:
+            (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
         cfg.MP_ACCESS_TOKEN = token
         cfg.MP_DEVICE_ID    = device
         mp_point.configure(token, device)
         self._actualizar_estado_mp()
-        messagebox.showinfo("Mercado Pago", "Terminal configurada. Activa el modo PDV si es la primera vez.")
+        if device:
+            messagebox.showinfo("Mercado Pago", "Terminal configurada ✓\nActiva modo PDV si es la primera vez.")
+        else:
+            messagebox.showinfo("Mercado Pago", "Token guardado.\nUsa 🔍 Detectar para obtener el Device ID.")
 
     def _detectar_terminal_mp(self):
         from app.services.mercadopago_service import mp_point
