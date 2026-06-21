@@ -515,31 +515,61 @@
   </div>
 </div>
 <!-- ═══════════ UPDATE DOWNLOAD PROGRESS (background) ═══════════ -->
-<!-- Update progress card — floating top-right -->
 <div id="update-dl-bar" style="display:none;position:fixed;top:58px;right:18px;z-index:400;
      width:320px;background:#fff;border-radius:16px;border:1px solid #E2E8F0;
-     box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;
+     box-shadow:0 8px 32px rgba(0,0,0,.14);overflow:hidden;
      animation:slideDownIn .25s ease">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-    <div style="width:34px;height:34px;border-radius:10px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-      <i data-lucide="download-cloud" style="width:17px;height:17px;color:#1d2140"></i>
+
+  <!-- ── Panel: Progreso ───────────────────────────────────────── -->
+  <div id="dl-progress-panel" style="padding:14px 16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:34px;height:34px;border-radius:10px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="download-cloud" style="width:17px;height:17px;color:#1d2140"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <p id="dl-label" style="font-size:12px;font-weight:700;color:#0F172A;margin:0;line-height:1.3">Descargando actualización...</p>
+        <p style="font-size:10px;color:#64748B;margin:0">La app se cerrará al terminar</p>
+      </div>
+      <span id="dl-pct" style="font-size:13px;font-weight:800;color:#1d2140;flex-shrink:0">0%</span>
     </div>
-    <div style="flex:1;min-width:0">
-      <p id="dl-label" style="font-size:12px;font-weight:700;color:#0F172A;margin:0;line-height:1.3">Descargando actualización...</p>
-      <p style="font-size:10px;color:#64748B;margin:0">La app se cerrará al terminar</p>
+    <div style="background:#F1F5F9;border-radius:99px;height:6px;overflow:hidden;margin-bottom:10px">
+      <div id="dl-bar" style="background:#1d2140;height:6px;border-radius:99px;width:0%;transition:width .35s ease"></div>
     </div>
-    <span id="dl-pct" style="font-size:13px;font-weight:800;color:#1d2140;flex-shrink:0">0%</span>
+    <div style="display:flex;justify-content:flex-end">
+      <button onclick="askCancelUpdate()"
+              style="height:28px;padding:0 12px;border-radius:8px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s"
+              onmouseenter="this.style.background='#FEE2E2'" onmouseleave="this.style.background='#FEF2F2'">
+        Cancelar
+      </button>
+    </div>
   </div>
-  <div style="background:#F1F5F9;border-radius:99px;height:6px;overflow:hidden;margin-bottom:10px">
-    <div id="dl-bar" style="background:#1d2140;height:6px;border-radius:99px;width:0%;transition:width .35s ease"></div>
+
+  <!-- ── Panel: Confirmación de cancelación ───────────────────── -->
+  <div id="dl-cancel-panel" style="display:none;padding:20px 20px 18px;animation:slideDownIn .2s ease">
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
+      <div style="width:38px;height:38px;border-radius:12px;background:#FEF2F2;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#DC2626"></i>
+      </div>
+      <div>
+        <p style="font-size:13px;font-weight:700;color:#0F172A;margin:0 0 4px">¿Cancelar la descarga?</p>
+        <p style="font-size:11px;color:#64748B;margin:0;line-height:1.5">
+          La actualización se interrumpirá y tendrás que iniciarla de nuevo.
+        </p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="doCancelUpdate()"
+              style="flex:1;height:34px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s"
+              onmouseenter="this.style.background='#B91C1C'" onmouseleave="this.style.background='#DC2626'">
+        Sí, cancelar
+      </button>
+      <button onclick="hideCancelConfirm()"
+              style="flex:1;height:34px;border-radius:10px;border:1px solid #E2E8F0;background:#F8FAFC;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s"
+              onmouseenter="this.style.background='#F1F5F9'" onmouseleave="this.style.background='#F8FAFC'">
+        No, continuar
+      </button>
+    </div>
   </div>
-  <div style="display:flex;justify-content:flex-end">
-    <button onclick="cancelUpdate()"
-            style="height:28px;padding:0 12px;border-radius:8px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;font-size:10px;font-weight:700;cursor:pointer">
-      Cancelar
-    </button>
-  </div>
-</div>
 </div>
 <style>
 @keyframes slideUpIn {
@@ -3944,9 +3974,14 @@ async function startUpdate() {
     if (dlBarEl) { dlBarEl.style.width='0%'; dlBarEl.style.background='#1d2140'; }
     if (dlLbl)   { dlLbl.textContent='Descargando actualización...'; dlLbl.style.color='#0F172A'; }
     if (dlPct)   { dlPct.textContent='0%'; dlPct.style.color='#1d2140'; }
-    const cancelBtn = dlBar?.querySelector('button');
+    // Ensure progress panel is visible and confirm panel is hidden
+    const prog = document.getElementById('dl-progress-panel');
+    const conf = document.getElementById('dl-cancel-panel');
+    if (prog) prog.style.display = 'block';
+    if (conf) conf.style.display = 'none';
+    const cancelBtn = dlBar?.querySelector('#dl-progress-panel button');
     if (cancelBtn) cancelBtn.style.display = '';
-    const ico = dlBar?.querySelector('[data-lucide]');
+    const ico = document.querySelector('#update-dl-bar [data-lucide]');
     if (ico) { ico.setAttribute('data-lucide','download-cloud'); ico.style.color='#1d2140'; }
     const iconBox = ico?.parentElement;
     if (iconBox) iconBox.style.background = '#EFF6FF';
@@ -3961,12 +3996,27 @@ async function startUpdate() {
   }
 }
 
-async function cancelUpdate() {
-  if (!confirm('¿Seguro que quieres cancelar la actualización?')) return;
+function askCancelUpdate() {
+  document.getElementById('dl-progress-panel').style.display = 'none';
+  document.getElementById('dl-cancel-panel').style.display   = 'block';
+  lucide.createIcons();
+}
+
+function hideCancelConfirm() {
+  document.getElementById('dl-cancel-panel').style.display   = 'none';
+  document.getElementById('dl-progress-panel').style.display = 'block';
+}
+
+async function doCancelUpdate() {
   try {
     await api('/admin/update/cancel', { method:'POST' });
+    document.getElementById('update-dl-bar').style.display = 'none';
+    document.getElementById('dl-cancel-panel').style.display   = 'none';
+    document.getElementById('dl-progress-panel').style.display = 'block';
     toast('Actualización cancelada', 'info');
-  } catch(e) {}
+  } catch(e) {
+    toast('Error al cancelar', 'error');
+  }
 }
 
 async function _pollProgress() {
@@ -3988,11 +4038,15 @@ async function _pollProgress() {
       pct.style.color = '#16A34A';
       lbl.textContent = '✓ Descargado — instalando...';
       lbl.style.color = '#16A34A';
-      // Ocultar botón cancelar y cambiar ícono a check
+      // Hide cancel button, show success state
       if (card) {
-        const btn = card.querySelector('button');
+        const prog = document.getElementById('dl-progress-panel');
+        const conf = document.getElementById('dl-cancel-panel');
+        if (conf) conf.style.display = 'none';
+        if (prog) prog.style.display = 'block';
+        const btn = prog?.querySelector('button');
         if (btn) btn.style.display = 'none';
-        const ico = card.querySelector('[data-lucide]');
+        const ico = prog?.querySelector('[data-lucide]');
         if (ico) { ico.setAttribute('data-lucide','check-circle-2'); ico.style.color='#16A34A'; icons(); }
         const iconBox = ico?.parentElement;
         if (iconBox) iconBox.style.background = '#DCFCE7';
