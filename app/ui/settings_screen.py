@@ -412,6 +412,59 @@ class SettingsScreen(ctk.CTkFrame):
                 ),
             ).pack(padx=16, pady=(0, 16), anchor="w")
 
+        # ── Terminal de Pago Mercado Pago Point ───────────────────────────────
+        self._seccion(scroll, "💳 Terminal Mercado Pago (ME30S)", row=19)
+        mp_frame = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
+        mp_frame.grid(row=20, column=0, sticky="ew", pady=(0, 16))
+        mp_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            mp_frame,
+            text="Access Token y Device ID se guardan localmente.\n"
+                 "Activa modo PDV en la terminal antes de cobrar.",
+            font=ctk.CTkFont(size=10), text_color="gray60", justify="left",
+        ).grid(row=0, column=0, columnspan=3, padx=16, pady=(10, 6), sticky="w")
+
+        # Access Token
+        ctk.CTkLabel(mp_frame, text="Access Token:", anchor="e",
+                     font=ctk.CTkFont(size=11)).grid(row=1, column=0, padx=(16, 8), pady=5, sticky="e")
+        self.entry_mp_token = ctk.CTkEntry(mp_frame, height=32, show="●",
+                                            placeholder_text="APP_USR-...")
+        self.entry_mp_token.grid(row=1, column=1, columnspan=2, padx=(0, 16), pady=5, sticky="ew")
+
+        # Device ID
+        ctk.CTkLabel(mp_frame, text="Device ID:", anchor="e",
+                     font=ctk.CTkFont(size=11)).grid(row=2, column=0, padx=(16, 8), pady=5, sticky="e")
+        self.entry_mp_device = ctk.CTkEntry(mp_frame, height=32,
+                                             placeholder_text="GERTEC-MP-ME30S-...")
+        self.entry_mp_device.grid(row=2, column=1, padx=(0, 8), pady=5, sticky="ew")
+        ctk.CTkButton(mp_frame, text="🔍 Detectar", width=90, height=32,
+                      fg_color="#2563EB", hover_color="#1D4ED8",
+                      command=self._detectar_terminal_mp).grid(row=2, column=2, padx=(0, 16), pady=5)
+
+        # Pre-fill saved values
+        for filename, entry in (("mp_access_token.key", self.entry_mp_token),
+                                  ("mp_device_id.key",    self.entry_mp_device)):
+            kf = cfg.DATA_DIR / filename
+            if kf.exists():
+                try:
+                    entry.insert(0, kf.read_text(encoding="utf-8").strip())
+                except Exception:
+                    pass
+
+        mp_btn_row = ctk.CTkFrame(mp_frame, fg_color="transparent")
+        mp_btn_row.grid(row=3, column=0, columnspan=3, padx=16, pady=(4, 4))
+        ctk.CTkButton(mp_btn_row, text="💾 Guardar", height=34, fg_color="#16A34A",
+                      hover_color="#15803D", command=self._guardar_mp).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(mp_btn_row, text="📡 Activar modo PDV", height=34,
+                      fg_color="#2563EB", hover_color="#1D4ED8",
+                      command=self._activar_pdv_mp).pack(side="left")
+
+        self.lbl_mp_status = ctk.CTkLabel(mp_frame, text="", font=ctk.CTkFont(size=11))
+        self.lbl_mp_status.grid(row=4, column=0, columnspan=3, padx=16, pady=(0, 12))
+        self._actualizar_estado_mp()
+        # ─────────────────────────────────────────────────────────────────────
+
         self._cargar_config()
 
     _PIN_ADMIN = "171215"
@@ -560,6 +613,81 @@ class SettingsScreen(ctk.CTkFrame):
             f"Guardadas: {len(saved)} clave(s).\nActivas desde ahora sin reiniciar."
             + (f"\nEliminadas: {len(empty)} clave(s) vacías." if empty else "")
         )
+
+    # ── Mercado Pago Point ────────────────────────────────────────────────────
+
+    def _actualizar_estado_mp(self):
+        from app.services.mercadopago_service import mp_point
+        if mp_point.enabled:
+            self.lbl_mp_status.configure(
+                text=f"✓ Terminal configurada: {mp_point.device_id[:30]}...",
+                text_color="#16A34A",
+            )
+        else:
+            self.lbl_mp_status.configure(
+                text="⚠ Sin configurar — pagos con tarjeta usarán flujo manual",
+                text_color="#D97706",
+            )
+
+    def _guardar_mp(self):
+        from app.services.mercadopago_service import mp_point
+        token  = self.entry_mp_token.get().strip()
+        device = self.entry_mp_device.get().strip()
+        if not token or not device:
+            messagebox.showwarning("Mercado Pago", "Ingresa Access Token y Device ID")
+            return
+        (cfg.DATA_DIR / "mp_access_token.key").write_text(token,  encoding="utf-8")
+        (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
+        cfg.MP_ACCESS_TOKEN = token
+        cfg.MP_DEVICE_ID    = device
+        mp_point.configure(token, device)
+        self._actualizar_estado_mp()
+        messagebox.showinfo("Mercado Pago", "Terminal configurada. Activa el modo PDV si es la primera vez.")
+
+    def _detectar_terminal_mp(self):
+        from app.services.mercadopago_service import mp_point
+        token = self.entry_mp_token.get().strip()
+        if not token:
+            messagebox.showwarning("Mercado Pago", "Primero ingresa el Access Token")
+            return
+        mp_point.configure(token, mp_point.device_id)
+        try:
+            devices = mp_point.get_devices()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo conectar con MP:\n{e}")
+            return
+        if not devices:
+            messagebox.showinfo("Mercado Pago", "No se encontraron terminales asociadas a este token.")
+            return
+        # Si hay una sola, la pone directo; si hay varias, muestra lista
+        if len(devices) == 1:
+            did = devices[0].get("id", "")
+            self.entry_mp_device.delete(0, "end")
+            self.entry_mp_device.insert(0, did)
+            messagebox.showinfo("Terminal detectada", f"Device ID:\n{did}")
+        else:
+            names = "\n".join(f"• {d.get('id','')}  ({d.get('operating_mode','')})" for d in devices)
+            messagebox.showinfo("Terminales encontradas", f"Copia el ID deseado:\n\n{names}")
+
+    def _activar_pdv_mp(self):
+        from app.services.mercadopago_service import mp_point
+        token  = self.entry_mp_token.get().strip()
+        device = self.entry_mp_device.get().strip()
+        if not token or not device:
+            messagebox.showwarning("Mercado Pago", "Guarda el Access Token y Device ID primero")
+            return
+        mp_point.configure(token, device)
+        try:
+            ok = mp_point.set_pdv_mode()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo activar modo PDV:\n{e}")
+            return
+        if ok:
+            messagebox.showinfo("Modo PDV", "Terminal en modo PDV ✓\nYa puede recibir pagos desde el POS.")
+        else:
+            messagebox.showwarning("Modo PDV", "La terminal no respondió correctamente.\nVerifica que esté encendida y con señal.")
+
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _seccion(self, parent, titulo: str, row: int):
         ctk.CTkLabel(parent, text=titulo, font=ctk.CTkFont(size=14, weight="bold")).grid(

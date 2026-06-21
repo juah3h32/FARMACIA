@@ -63,6 +63,11 @@ def main():
     from app.services import updater_service
     updater_service.start_background_check()
 
+    # Cargar configuración Mercado Pago Point si existe
+    if cfg.MP_ACCESS_TOKEN and cfg.MP_DEVICE_ID:
+        from app.services.mercadopago_service import mp_point
+        mp_point.configure(cfg.MP_ACCESS_TOKEN, cfg.MP_DEVICE_ID)
+
     _start_ui(port)
 
 

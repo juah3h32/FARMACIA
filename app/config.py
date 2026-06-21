@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.8"
+VERSION = "2.3.9"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 000-000-0000"
@@ -108,6 +108,10 @@ GITHUB_TOKEN = ""
 CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key") or "dcutrbbyw"
 CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")    or "717952968559447"
 CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key") or "gufXKh1BIUTfsdwKNzz95or4SI4"
+
+# -- Mercado Pago Point (terminal de pago ME30S) ------------------------------
+MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key")
+MP_DEVICE_ID    = _load_key("MP_DEVICE_ID",    "mp_device_id.key")
 
 
 def _load_openai_key() -> str:

@@ -8,6 +8,7 @@ from app.database.models import (
     MovimientoStock, TipoMovimiento, MetodoPago, EstadoVenta
 )
 from app.services.printer_service import printer_service
+from app.services.mercadopago_service import mp_point
 from app.auth.auth_service import registrar_accion
 import app.config as cfg
 
@@ -710,6 +711,19 @@ class PosScreen(ctk.CTkFrame):
                                     f"Recibido (${monto_pagado:.2f}) < Total (${total:.2f})")
             return
 
+        # ── Terminal MP ──────────────────────────────────────────────────────
+        if metodo == "tarjeta" and mp_point.enabled:
+            monto_pagado = total
+            cambio = 0.0
+            if not messagebox.askyesno(
+                "Cobrar con terminal",
+                f"Total: ${total:.2f}\nSe enviará el monto a la terminal Mercado Pago.\n¿Continuar?",
+            ):
+                return
+            self._cobrar_con_terminal(subtotal, descuento, iva, total)
+            return
+        # ─────────────────────────────────────────────────────────────────────
+
         cambio = max(0, monto_pagado - total)
         msg = f"Total: ${total:.2f}\nMétodo: {metodo.upper()}"
         if metodo == "efectivo":
@@ -783,6 +797,164 @@ class PosScreen(ctk.CTkFrame):
             messagebox.showerror("Error", f"Error al procesar venta:\n{e}")
         finally:
             db.close()
+
+    # ── Terminal Mercado Pago Point ───────────────────────────────────────────
+
+    def _cobrar_con_terminal(self, subtotal: float, descuento: float, iva: float, total: float):
+        """Envía monto a terminal ME30S y espera confirmación."""
+        now = datetime.now()
+        folio = f"V{now.strftime('%Y%m%d%H%M%S%f')[:-3]}"
+
+        mp_point.cancel_current_intent()
+
+        try:
+            intent = mp_point.create_payment_intent(total, folio)
+        except Exception as e:
+            messagebox.showerror("Error terminal", f"No se pudo conectar con la terminal:\n{e}")
+            return
+
+        intent_id = intent.get("id")
+        if not intent_id:
+            messagebox.showerror("Error terminal", "Respuesta inválida de Mercado Pago")
+            return
+
+        dlg = self._dlg_esperando_terminal(total, intent_id)
+
+        def _on_approved(info):
+            self.after(0, lambda: self._completar_venta_terminal(
+                dlg, subtotal, descuento, iva, total, folio, now, info))
+
+        def _on_rejected(reason):
+            self.after(0, lambda: self._terminal_error(dlg, f"Pago rechazado\n{reason}"))
+
+        def _on_error(msg):
+            self.after(0, lambda: self._terminal_error(dlg, msg))
+
+        mp_point.poll_payment(intent_id, _on_approved, _on_rejected, _on_error)
+
+    def _dlg_esperando_terminal(self, total: float, intent_id: str):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Terminal Mercado Pago")
+        dlg.geometry("360x220")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - 360) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 220) // 2
+        dlg.geometry(f"360x220+{x}+{y}")
+        dlg.protocol("WM_DELETE_WINDOW", lambda: None)  # no cerrar con X
+
+        ctk.CTkLabel(
+            dlg, text="💳 Terminal Mercado Pago",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(pady=(22, 4))
+
+        ctk.CTkLabel(
+            dlg, text=f"Monto enviado: ${total:.2f}",
+            font=ctk.CTkFont(size=13), text_color="#16A34A",
+        ).pack(pady=(0, 8))
+
+        dlg._status_lbl = ctk.CTkLabel(
+            dlg, text="Esperando que el cliente pague en la terminal...",
+            font=ctk.CTkFont(size=11), text_color="#64748B", wraplength=320,
+        )
+        dlg._status_lbl.pack(pady=(0, 16))
+
+        def _cancelar():
+            mp_point.cancel_current_intent()
+            try:
+                dlg.grab_release()
+                dlg.destroy()
+            except Exception:
+                pass
+
+        ctk.CTkButton(
+            dlg, text="✕ Cancelar operación", height=36,
+            fg_color="#DC2626", hover_color="#B91C1C",
+            command=_cancelar,
+        ).pack(pady=(0, 16))
+
+        return dlg
+
+    def _completar_venta_terminal(
+        self, dlg, subtotal, descuento, iva, total, folio, now, mp_info
+    ):
+        try:
+            dlg.grab_release()
+            dlg.destroy()
+        except Exception:
+            pass
+
+        db = get_db_session()
+        try:
+            venta = Venta(
+                folio=folio,
+                usuario_id=self.user.id,
+                cliente_id=self.cliente_seleccionado["id"] if self.cliente_seleccionado else None,
+                subtotal=subtotal,
+                descuento=descuento,
+                iva=iva,
+                total=total,
+                metodo_pago=MetodoPago.tarjeta,
+                monto_pagado=total,
+                cambio=0.0,
+                estado=EstadoVenta.completada,
+                creado_en=now,
+            )
+            db.add(venta)
+            db.flush()
+
+            for item in self.cart:
+                db.add(ItemVenta(
+                    venta_id=venta.id,
+                    producto_id=item["producto_id"],
+                    cantidad=item["cantidad"],
+                    precio_unitario=item["precio"],
+                    subtotal=item["subtotal"],
+                ))
+                prod = db.query(Producto).filter(Producto.id == item["producto_id"]).first()
+                if prod:
+                    stock_ant = prod.stock
+                    prod.stock = max(0, prod.stock - item["cantidad"])
+                    db.add(MovimientoStock(
+                        producto_id=prod.id,
+                        tipo=TipoMovimiento.salida,
+                        cantidad=item["cantidad"],
+                        stock_anterior=stock_ant,
+                        stock_nuevo=prod.stock,
+                        referencia_id=venta.id,
+                        referencia_tipo="venta",
+                        usuario_id=self.user.id,
+                    ))
+
+            db.commit()
+
+            printer_service.print_receipt({
+                "folio": folio, "cajero": self.user.nombre,
+                "cliente": self.cliente_seleccionado["nombre"] if self.cliente_seleccionado else None,
+                "items": [{"nombre": i["nombre"], "cantidad": i["cantidad"], "subtotal": i["subtotal"]} for i in self.cart],
+                "subtotal": subtotal, "descuento": descuento, "iva": iva,
+                "total": total, "metodo_pago": "tarjeta", "monto_pagado": total, "cambio": 0.0,
+            })
+            registrar_accion("VENTA", "ventas", venta.id, f"Folio:{folio} Total:${total:.2f} MP:{mp_info.get('mp_payment_id','?')}")
+            messagebox.showinfo("Venta exitosa", f"Folio: {folio}\nPago aprobado en terminal ✓")
+            self._limpiar_carrito()
+
+        except Exception as e:
+            db.rollback()
+            messagebox.showerror("Error", f"Pago aprobado en terminal pero error al guardar:\n{e}")
+        finally:
+            db.close()
+
+    def _terminal_error(self, dlg, msg: str):
+        try:
+            dlg.grab_release()
+            dlg.destroy()
+        except Exception:
+            pass
+        messagebox.showerror("Terminal", msg)
+
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _check_corte_caja(self):
         from datetime import date
