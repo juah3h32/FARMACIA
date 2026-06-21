@@ -405,19 +405,33 @@ class ReportsScreen(ctk.CTkFrame):
 
         self.cortes_tree.bind("<Double-1>", self._ver_detalle_corte)
 
-        # ── Botón cierre rápido (solo admin, visible solo cuando hay turno abierto) ──
+        # ── Barra de botones admin ────────────────────────────────────────────
         if self.user.rol == RolUsuario.admin:
+            admin_btn_row = ctk.CTkFrame(tab, fg_color="transparent")
+            admin_btn_row.grid(row=1, column=0, columnspan=2,
+                               sticky="ew", padx=4, pady=(0, 6))
+
             self._btn_cerrar_activo = ctk.CTkButton(
-                tab,
+                admin_btn_row,
                 text="🔒 Cerrar turno abierto ahora",
-                height=38, corner_radius=8,
+                height=34, corner_radius=8,
                 fg_color="#F59E0B", hover_color="#D97706", text_color="white",
-                font=ctk.CTkFont(size=12, weight="bold"),
+                font=ctk.CTkFont(size=11, weight="bold"),
                 command=self._cerrar_turno_activo_rapido,
             )
-            self._btn_cerrar_activo.grid(row=1, column=0, columnspan=2,
-                                          sticky="w", padx=4, pady=(0, 6))
-            self._btn_cerrar_activo.grid_remove()  # hidden until open turno detected
+            # pack_forget until turno abierto detected
+            self._btn_cerrar_activo.pack(side="left", padx=(0, 6))
+            self._btn_cerrar_activo.pack_forget()
+
+            ctk.CTkButton(
+                admin_btn_row,
+                text="➕ Crear cierre retroactivo",
+                height=34, corner_radius=8,
+                fg_color=BLUE_L, hover_color="#DBEAFE", text_color=BLUE,
+                border_width=1, border_color="#BFDBFE",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                command=self._crear_corte_retroactivo,
+            ).pack(side="left")
 
     def _cerrar_turno_activo_rapido(self):
         """Cierra todos los turnos abiertos directamente desde el botón en la pestaña."""
@@ -481,6 +495,209 @@ class ReportsScreen(ctk.CTkFrame):
             messagebox.showerror("Error", str(exc))
         finally:
             db.close()
+
+    def _crear_corte_retroactivo(self):
+        """Diálogo para crear un corte cerrado para una fecha pasada sin cierre registrado."""
+        from app.database.models import Usuario as _Usr
+
+        db = get_db_session()
+        try:
+            usuarios = db.query(_Usr).filter(_Usr.activo == True).all()
+            usr_map  = {u.nombre: u.id for u in usuarios}
+            usr_names = list(usr_map.keys())
+        finally:
+            db.close()
+
+        if not usr_names:
+            messagebox.showwarning("Sin usuarios", "No hay usuarios activos.")
+            return
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Crear Cierre Retroactivo")
+        dlg.geometry("460x520")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+
+        ctk.CTkLabel(dlg, text="➕ Crear Cierre Retroactivo",
+                     font=ctk.CTkFont(size=15, weight="bold"), text_color=TEXT).pack(pady=(18, 4))
+        ctk.CTkLabel(dlg, text="Crea un corte cerrado para una fecha pasada\ncalculando las ventas de ese rango automáticamente.",
+                     font=ctk.CTkFont(size=11), text_color=MUTED,
+                     justify="center").pack(pady=(0, 12))
+
+        ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=(0, 12))
+
+        frm = ctk.CTkFrame(dlg, fg_color="transparent")
+        frm.pack(fill="x", padx=24)
+        frm.grid_columnconfigure(1, weight=1)
+
+        def lbl(row, text):
+            ctk.CTkLabel(frm, text=text, font=ctk.CTkFont(size=12),
+                         text_color=MUTED, anchor="e").grid(
+                row=row, column=0, padx=(0, 10), pady=6, sticky="e")
+
+        lbl(0, "Cajero:")
+        opt_cajero = ctk.CTkOptionMenu(frm, values=usr_names)
+        opt_cajero.grid(row=0, column=1, pady=6, sticky="ew")
+
+        lbl(1, "Fecha (DD/MM/YYYY):")
+        e_fecha = ctk.CTkEntry(frm, placeholder_text="18/06/2026")
+        e_fecha.grid(row=1, column=1, pady=6, sticky="ew")
+
+        lbl(2, "Hora apertura (HH:MM):")
+        e_apertura = ctk.CTkEntry(frm, placeholder_text="08:00")
+        e_apertura.grid(row=2, column=1, pady=6, sticky="ew")
+        e_apertura.insert(0, "08:00")
+
+        lbl(3, "Hora cierre (HH:MM):")
+        e_cierre = ctk.CTkEntry(frm, placeholder_text="20:00")
+        e_cierre.grid(row=3, column=1, pady=6, sticky="ew")
+        e_cierre.insert(0, "20:00")
+
+        lbl(4, "Fondo apertura ($):")
+        e_fondo = ctk.CTkEntry(frm, placeholder_text="0.00")
+        e_fondo.grid(row=4, column=1, pady=6, sticky="ew")
+        e_fondo.insert(0, "0.00")
+
+        ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(fill="x", padx=20, pady=12)
+
+        # Preview box
+        lbl_preview = ctk.CTkLabel(dlg, text="Ingresa los datos y presiona Vista Previa",
+                                   font=ctk.CTkFont(size=11), text_color=MUTED,
+                                   justify="center", wraplength=400)
+        lbl_preview.pack(pady=(0, 8))
+
+        self._retro_preview = None  # cache ventas/totals for confirm
+
+        def _preview():
+            try:
+                fecha_str   = e_fecha.get().strip()
+                hora_ap_str = e_apertura.get().strip() or "00:00"
+                hora_ci_str = e_cierre.get().strip() or "23:59"
+                d = datetime.strptime(fecha_str, "%d/%m/%Y")
+                hap = [int(x) for x in hora_ap_str.split(":")]
+                hci = [int(x) for x in hora_ci_str.split(":")]
+                dt_ap = d.replace(hour=hap[0], minute=hap[1], second=0)
+                dt_ci = d.replace(hour=hci[0], minute=hci[1], second=59)
+            except Exception:
+                lbl_preview.configure(text="⚠ Fecha u hora inválida.\nUsa DD/MM/YYYY y HH:MM", text_color="#DC2626")
+                return
+
+            uid = usr_map.get(opt_cajero.get())
+            _db = get_db_session()
+            try:
+                ventas = _db.query(Venta).filter(
+                    Venta.usuario_id == uid,
+                    Venta.creado_en  >= dt_ap,
+                    Venta.creado_en  <= dt_ci,
+                    Venta.estado     == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+                ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+                tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+                tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                tv = ef + tj + tr
+                self._retro_preview = dict(
+                    uid=uid, dt_ap=dt_ap, dt_ci=dt_ci,
+                    ventas=len(ventas), ef=ef, tj=tj, tr=tr, tv=tv,
+                )
+                lbl_preview.configure(
+                    text=(f"✅  {len(ventas)} ventas encontradas\n"
+                          f"Total: ${tv:.2f}  |  Efectivo: ${ef:.2f}  |  Tarjeta: ${tj:.2f}  |  Transf.: ${tr:.2f}"),
+                    text_color="#16A34A" if ventas else MUTED,
+                )
+            finally:
+                _db.close()
+
+        def _confirmar():
+            if not self._retro_preview:
+                messagebox.showwarning("Vista previa", "Primero genera la vista previa.")
+                return
+            try:
+                fondo = float(e_fondo.get().strip() or "0")
+            except ValueError:
+                messagebox.showwarning("Error", "Fondo apertura inválido.")
+                return
+
+            p = self._retro_preview
+            _db = get_db_session()
+            try:
+                # Verificar que no exista ya un corte en ese rango para ese cajero
+                existente = _db.query(CortesCaja).filter(
+                    CortesCaja.usuario_id == p["uid"],
+                    CortesCaja.abierto_en >= p["dt_ap"] - __import__("datetime").timedelta(hours=1),
+                    CortesCaja.abierto_en <= p["dt_ci"],
+                ).first()
+                if existente:
+                    if not messagebox.askyesno(
+                        "Corte existente",
+                        f"Ya existe un corte para ese cajero en ese rango (ID #{existente.id}).\n¿Crear igualmente?"
+                    ):
+                        return
+
+                # Recalcular costo
+                ventas_obj = _db.query(Venta).filter(
+                    Venta.usuario_id == p["uid"],
+                    Venta.creado_en  >= p["dt_ap"],
+                    Venta.creado_en  <= p["dt_ci"],
+                    Venta.estado     == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+                vids = [v.id for v in ventas_obj]
+                if vids:
+                    cost_rows = (
+                        _db.query(ItemVenta.cantidad, Producto.precio_compra)
+                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        .filter(ItemVenta.venta_id.in_(vids))
+                        .all()
+                    )
+                    tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                else:
+                    tc = 0.0
+
+                nuevo = CortesCaja(
+                    usuario_id         = p["uid"],
+                    monto_apertura     = fondo,
+                    monto_cierre       = fondo + p["ef"],
+                    total_ventas       = p["tv"],
+                    total_efectivo     = p["ef"],
+                    total_tarjeta      = p["tj"],
+                    total_transferencia= p["tr"],
+                    total_costo        = tc,
+                    num_ventas         = p["ventas"],
+                    abierto_en         = p["dt_ap"],
+                    cerrado_en         = p["dt_ci"],
+                    notas              = "[Corte retroactivo creado manualmente]",
+                )
+                _db.add(nuevo)
+                _db.commit()
+                messagebox.showinfo(
+                    "Corte creado",
+                    f"Corte retroactivo creado.\n"
+                    f"Ventas: {p['ventas']}  |  Total: ${p['tv']:.2f}\n"
+                    f"ID: #{nuevo.id}"
+                )
+                dlg.destroy()
+                self._generar()
+            except Exception as exc:
+                _db.rollback()
+                messagebox.showerror("Error", str(exc))
+            finally:
+                _db.close()
+
+        btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_row.pack(pady=8)
+        ctk.CTkButton(btn_row, text="🔍 Vista Previa", width=140, height=34,
+                      fg_color=BLUE_L, hover_color="#DBEAFE", text_color=BLUE,
+                      border_width=1, border_color="#BFDBFE",
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=_preview).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_row, text="✅ Crear Corte", width=140, height=34,
+                      fg_color="#16A34A", hover_color="#15803D", text_color="white",
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=_confirmar).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_row, text="Cancelar", width=90, height=34,
+                      fg_color="transparent", border_width=1, border_color=BORDER,
+                      text_color=MUTED, command=dlg.destroy).pack(side="left")
 
     def _ver_detalle_corte(self, event=None):
         sel = self.cortes_tree.selection()
@@ -860,9 +1077,9 @@ class ReportsScreen(ctk.CTkFrame):
             hay_abierto = any(c.cerrado_en is None for c in cortes)
             if hasattr(self, "_btn_cerrar_activo"):
                 if hay_abierto:
-                    self._btn_cerrar_activo.grid()
+                    self._btn_cerrar_activo.pack(side="left", padx=(0, 6))
                 else:
-                    self._btn_cerrar_activo.grid_remove()
+                    self._btn_cerrar_activo.pack_forget()
 
             self._corte_cards["c_turnos"].configure(text=str(len(cortes)))
             self._corte_cards["c_total_ventas"].configure(text=f"${tot_v:.2f}")
