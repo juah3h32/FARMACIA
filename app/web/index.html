@@ -755,13 +755,14 @@
   .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
   .nav-group-label { font-size:9px; font-weight:700; letter-spacing:.16em; color:rgba(148,163,184,.45); padding:0.6rem 0.5rem 0.25rem; }
 
-  /* ── KPI cards ───────────────────────────────────────── */
-  .kpi-card { transition:box-shadow .2s,transform .2s; }
-  .kpi-card:hover { box-shadow:0 12px 28px rgba(0,0,0,.15); transform:translateY(-2px); }
-  .kpi-card:nth-child(1) { animation:cardIn .4s .04s both ease; }
-  .kpi-card:nth-child(2) { animation:cardIn .4s .09s both ease; }
-  .kpi-card:nth-child(3) { animation:cardIn .4s .14s both ease; }
-  .kpi-card:nth-child(4) { animation:cardIn .4s .19s both ease; }
+  /* ── KPI cards v2 (carousel) ─────────────────────────── */
+  .kpi-card2 { background:#fff;border-radius:16px;border:1px solid #E2E8F0;padding:14px 16px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.04); }
+  .kpi-card2:hover { box-shadow:0 6px 20px rgba(0,0,0,.09);transform:translateY(-1px); }
+  .kpi-card2-accent { position:absolute;top:0;left:0;width:100%;height:3px;border-radius:16px 16px 0 0; }
+  .kpi-card2-icon { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .kpi-dot-btn { width:7px;height:7px;border-radius:50%;border:none;background:#CBD5E1;cursor:pointer;padding:0;transition:all .25s;flex-shrink:0; }
+  .kpi-dot-btn.active { width:22px;border-radius:4px;background:#1d2140; }
+  .kpi-slide-lbl { font-size:9px;font-weight:700;letter-spacing:.14em;color:#94A3B8;text-transform:uppercase;margin-bottom:8px; }
 
   /* ── Table rows ──────────────────────────────────────── */
   tr.hovrow:hover td { background:#F0F7FF !important; }
@@ -996,82 +997,141 @@
           </button>
         </div>
 
-        <!-- KPI cards (fila 1 siempre + fila 2 admin) -->
-        <div class="grid grid-cols-4 gap-4" style="flex-shrink:0">
-          <!-- Fila 1: operacional -->
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#1d2140)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="shopping-cart" style="width:20px;height:20px;color:#fff"></i>
+        <!-- KPI Carousel -->
+        <div style="flex-shrink:0">
+          <!-- Slide label row -->
+          <div class="flex items-center justify-between" style="margin-bottom:8px">
+            <p id="kpi-slide-lbl" class="kpi-slide-lbl">Métricas de hoy</p>
+            <!-- Dot nav (admin only, shown by JS) -->
+            <div id="kpi-dots" style="display:none;align-items:center;gap:5px">
+              <button onclick="kpiGoTo(0)" class="kpi-dot-btn active"></button>
+              <button onclick="kpiGoTo(1)" class="kpi-dot-btn"></button>
             </div>
-            <p id="kpi-ventas" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ventas hoy</p>
           </div>
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#22C55E,#16A34A)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="dollar-sign" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-ingresos" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ingresos hoy</p>
-          </div>
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-stock" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Stock bajo</p>
-          </div>
-          <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="package-2" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-total" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Productos</p>
-          </div>
+          <!-- Track -->
+          <div style="overflow:hidden;border-radius:4px">
+            <div id="kpi-track" style="display:flex;transition:transform .45s cubic-bezier(.4,0,.2,1)">
 
-          <!-- Fila 2: financiero — admin only, hidden por defecto -->
-          <div id="kpi-card-costo" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#1d2140,#1e40af)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="package" style="width:20px;height:20px;color:#fff"></i>
+              <!-- ── Slide 0: HOY ──────────────────────── -->
+              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <!-- Ventas hoy -->
+                <div class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#1d2140"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-ventas" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ventas hoy</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#EEF1F9;margin-top:2px">
+                      <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#1d2140"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Ingresos hoy -->
+                <div class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#16A34A"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-ingresos" class="text-2xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ingresos hoy</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#F0FDF4;margin-top:2px">
+                      <i data-lucide="dollar-sign" style="width:16px;height:16px;color:#16A34A"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Stock bajo -->
+                <div class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#D97706"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-stock" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Stock bajo</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#FFFBEB;margin-top:2px">
+                      <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#D97706"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Productos -->
+                <div class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#7C3AED"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-total" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Productos</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#F5F3FF;margin-top:2px">
+                      <i data-lucide="package-2" style="width:16px;height:16px;color:#7C3AED"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Slide 1: INVENTARIO (admin) ───────── -->
+              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <!-- Inversión -->
+                <div id="kpi-card-costo" class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#1d2140"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-inv-costo" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Inversión inventario</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#EEF1F9;margin-top:2px">
+                      <i data-lucide="package" style="width:16px;height:16px;color:#1d2140"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Valor en venta -->
+                <div id="kpi-card-venta" class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#0891B2"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-inv-venta" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Valor en venta</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#ECFEFF;margin-top:2px">
+                      <i data-lucide="trending-up" style="width:16px;height:16px;color:#0891B2"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Ganancia proy. -->
+                <div id="kpi-card-ganancia" class="kpi-card2">
+                  <div class="kpi-card2-accent" style="background:#16A34A"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-inv-ganancia" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Ganancia proy.</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#F0FDF4;margin-top:2px">
+                      <i data-lucide="coins" style="width:16px;height:16px;color:#16A34A"></i>
+                    </div>
+                  </div>
+                </div>
+                <!-- Valor vencido -->
+                <div id="kpi-card-vencido" onclick="openVencidosModal()" class="kpi-card2" style="cursor:pointer">
+                  <div class="kpi-card2-accent" style="background:#DC2626"></div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p id="kpi-inv-vencido" class="text-xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                      <p class="text-xs font-medium mt-1.5" style="color:#64748B">Valor vencido</p>
+                    </div>
+                    <div class="kpi-card2-icon" style="background:#FEF2F2;margin-top:2px">
+                      <i data-lucide="package-x" style="width:16px;height:16px;color:#DC2626"></i>
+                    </div>
+                  </div>
+                  <p class="text-[10px] mt-2 flex items-center gap-1" style="color:#DC2626">
+                    <i data-lucide="chevron-right" style="width:10px;height:10px"></i> Ver detalle
+                  </p>
+                </div>
+              </div>
+
             </div>
-            <p id="kpi-inv-costo" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Inversión en inventario</p>
-          </div>
-          <div id="kpi-card-venta" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#059669,#047857)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="trending-up" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-inv-venta" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor total en venta</p>
-          </div>
-          <div id="kpi-card-ganancia" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="coins" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-inv-ganancia" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ganancia proyectada</p>
-          </div>
-          <div id="kpi-card-vencido" onclick="openVencidosModal()" class="kpi-card rounded-2xl p-4 relative overflow-hidden hidden transition-all hover:scale-105 hover:shadow-xl" style="background:linear-gradient(135deg,#dc2626,#b91c1c);cursor:pointer">
-            <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-            <div class="absolute bottom-2 right-3 flex items-center gap-1 opacity-60">
-              <i data-lucide="chevron-right" style="width:12px;height:12px;color:#fff"></i>
-              <span class="text-[10px] font-semibold text-white">Ver detalle</span>
-            </div>
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-              <i data-lucide="package-x" style="width:20px;height:20px;color:#fff"></i>
-            </div>
-            <p id="kpi-inv-vencido" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-            <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Valor vencido</p>
           </div>
         </div>
 
-        <!-- Inventory KPI bar -->
+        <!-- Inventory alert bar -->
         <div id="inv-kpi-bar" class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));flex-shrink:0"></div>
 
         <!-- Bottom row -->
@@ -4336,12 +4396,33 @@ function navigate(page) {
 
 let _dashInterval = null;
 let _invInterval  = null;
+let _kpiCurrent   = 0;
+let _kpiAutoTimer = null;
+
+function kpiGoTo(idx) {
+  const track = document.getElementById('kpi-track');
+  if (!track) return;
+  _kpiCurrent = idx;
+  track.style.transform = `translateX(-${idx * 100}%)`;
+  document.querySelectorAll('#kpi-dots .kpi-dot-btn').forEach((d,i) => d.classList.toggle('active', i===idx));
+  const lbl = document.getElementById('kpi-slide-lbl');
+  if (lbl) lbl.textContent = idx === 0 ? 'Métricas de hoy' : 'Inventario financiero';
+}
+
+function _kpiStartAuto() {
+  if (_kpiAutoTimer) clearInterval(_kpiAutoTimer);
+  _kpiAutoTimer = setInterval(() => kpiGoTo(_kpiCurrent === 0 ? 1 : 0), 7000);
+}
 
 function loadPage(page) {
   // Stop dashboard auto-refresh when leaving
   if (_dashInterval && page !== 'dashboard') {
     clearInterval(_dashInterval);
     _dashInterval = null;
+  }
+  if (_kpiAutoTimer && page !== 'dashboard') {
+    clearInterval(_kpiAutoTimer);
+    _kpiAutoTimer = null;
   }
   // Stop inventory auto-refresh when leaving
   if (_invInterval && page !== 'inventory') {
@@ -4444,27 +4525,26 @@ async function loadDashboard() {
   _animNum('kpi-stock',    d.stock_bajo,       false);
   _animNum('kpi-total',    d.total_productos,  false);
 
-  // Inventory KPIs — financial values admin-only
-  // Always enforce hidden state first — prevents cross-session leakage
-  ['kpi-card-costo','kpi-card-venta','kpi-card-ganancia','kpi-card-vencido'].forEach(id=>
-    document.getElementById(id)?.classList.add('hidden')
-  );
+  // Carousel: go to slide 0 on every load, init auto only for admin
+  kpiGoTo(0);
+  if (_kpiAutoTimer) { clearInterval(_kpiAutoTimer); _kpiAutoTimer = null; }
+  const dotsEl = document.getElementById('kpi-dots');
+  if (dotsEl) dotsEl.style.display = isAdmin ? 'flex' : 'none';
+
+  // Inventory KPIs — admin only
   if (!isAdmin) { const b=document.getElementById('inv-kpi-bar'); if(b) b.innerHTML=''; }
   try {
     const ir = isAdmin ? await api('/inventario/resumen-inventario') : null;
     if (ir && ir.ok) {
       const inv = await ir.json();
 
-      // Big KPI cards fila 2 (admin only)
       if (inv.valor_costo !== undefined) {
         document.getElementById('kpi-inv-costo').textContent    = fmt(inv.valor_costo);
         document.getElementById('kpi-inv-venta').textContent    = fmt(inv.valor_venta);
         document.getElementById('kpi-inv-ganancia').textContent = fmt(inv.ganancia_est);
         document.getElementById('kpi-inv-vencido').textContent  = fmt(inv.valor_vencido || 0);
-        ['kpi-card-costo','kpi-card-venta','kpi-card-ganancia','kpi-card-vencido'].forEach(id=>{
-          document.getElementById(id)?.classList.remove('hidden');
-        });
         icons();
+        _kpiStartAuto();
       }
 
       const invKpi = document.getElementById('inv-kpi-bar');
@@ -6484,10 +6564,9 @@ async function exportVentasPDF() {
     if (!savePath) return;
     toast('Generando PDF…', 'info');
     try {
-      const token = localStorage.getItem('auth_token');
       const res = await fetch(`/api/reportes/save-pdf-to-path?${qs}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${S.token}` },
         body: JSON.stringify({ path: savePath }),
       });
       if (!res.ok) { toast('Error al guardar PDF', 'error'); return; }
