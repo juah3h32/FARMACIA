@@ -1703,54 +1703,7 @@
           </div>
           <div>
             <h2 class="text-xl font-black" style="color:#0F172A">Configuración del Sistema</h2>
-            <p class="text-sm" style="color:#64748B">Gestión de ventas · respaldo de datos · acceso API · configuración operativa</p>
-          </div>
-        </div>
-
-        <!-- ─── Gestión de ventas (admin) ─────────────────── -->
-        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#EF4444,#DC2626,#B91C1C)"></div>
-          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FEF2F2">
-              <i data-lucide="receipt" style="width:20px;height:20px;color:#DC2626"></i>
-            </div>
-            <div>
-              <h2 class="font-bold" style="color:#0F172A">Gestión de Ventas</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">Ver todas las ventas · eliminar registros de prueba · restaurar stock</p>
-            </div>
-            <div class="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl" style="background:#FEF3C7;border:1px solid #FDE68A">
-              <i data-lucide="shield-check" style="width:13px;height:13px;color:#D97706"></i>
-              <span class="text-[10px] font-bold" style="color:#D97706">SOLO ADMIN</span>
-            </div>
-          </div>
-          <div class="p-6">
-            <div class="flex gap-3 mb-4 flex-wrap">
-              <input id="av-desde" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
-              <input id="av-hasta" type="date" class="inp" style="width:150px" oninput="loadAdminVentas()">
-              <input id="av-buscar" type="text" class="inp flex-1" placeholder="Buscar folio, cajero o producto..." style="min-width:160px" oninput="renderAdminVentas()">
-              <button onclick="loadAdminVentas()" class="h-10 px-4 rounded-xl font-semibold text-sm transition-all hover:opacity-80 flex items-center gap-1.5" style="background:#EEF1F9;color:#1d2140">
-                <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
-              </button>
-            </div>
-            <div class="rounded-xl border overflow-hidden" style="border-color:#E2E8F0">
-              <table class="w-full text-xs">
-                <thead>
-                  <tr style="background:#F8FAFF">
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Folio</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Fecha</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Cajero</th>
-                    <th class="px-3 py-2.5 text-left font-semibold" style="color:#64748B">Productos</th>
-                    <th class="px-3 py-2.5 text-right font-semibold" style="color:#64748B">Total</th>
-                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Método</th>
-                    <th class="px-3 py-2.5 text-center font-semibold" style="color:#64748B">Acción</th>
-                  </tr>
-                </thead>
-                <tbody id="av-tbody">
-                  <tr><td colspan="7" class="text-center py-8" style="color:#94A3B8">Cargando...</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p id="av-count" class="text-xs mt-2" style="color:#94A3B8"></p>
+            <p class="text-sm" style="color:#64748B">Respaldo de datos · acceso API · configuración operativa</p>
           </div>
         </div>
 
