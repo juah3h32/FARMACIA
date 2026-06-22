@@ -14,6 +14,7 @@ class RolUsuario(str, enum.Enum):
     admin = "admin"
     cajero = "cajero"
     farmaceutico = "farmaceutico"
+    cajero_prueba = "cajero_prueba"
 
 
 class MetodoPago(str, enum.Enum):

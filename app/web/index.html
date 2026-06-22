@@ -3161,6 +3161,7 @@
           <option value="cajero">Cajero</option>
           <option value="farmaceutico">Farmacéutico</option>
           <option value="admin">Administrador</option>
+          <option value="cajero_prueba">Cajero Prueba</option>
         </select>
       </div>
       <div><label class="lbl">Teléfono</label><input id="em-tel" class="inp" placeholder="000-000-0000"></div>
@@ -4164,13 +4165,13 @@ function launchApp() {
   document.getElementById('app').classList.add('flex');
   buildNav();
   const farmEl = document.getElementById('farmacito-btn-wrap');
-  if (farmEl) farmEl.style.display = S.user?.rol === 'admin' ? 'none' : '';
+  if (farmEl) farmEl.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
   updateUserCard();
   tickClock();
   navigate('dashboard');
   // Show turno button only for cajero/farmaceutico; admins use reports for oversight
   const turnoBtn = document.getElementById('turno-btn');
-  if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.username === 'cajero') ? 'none' : '';
+  if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
   loadTurnoStatus();
   autoAbrirTurnoSiCorresponde();
   loadAlertasCaducidad();
@@ -4243,7 +4244,8 @@ function openProfileModal() {
   const initials    = (displayName||'?')[0].toUpperCase();
 
   document.getElementById('profile-username').textContent   = displayName;
-  document.getElementById('profile-rol-badge').textContent  = u.rol || '—';
+  const _RL={admin:'Administrador',cajero:'Cajero',farmaceutico:'Farmacéutico',cajero_prueba:'Cajero Prueba'};
+  document.getElementById('profile-rol-badge').textContent  = _RL[u.rol] || u.rol || '—';
 
   const photo = u.foto_url || localStorage.getItem('profile_photo_' + u.id) || null;
   const prev  = document.getElementById('profile-photo-preview');
@@ -4876,7 +4878,7 @@ async function processSale() {
 
   // Usuario de prueba — simular venta sin afectar BD ni stock
   // Si método=tarjeta y MP configurada, SÍ manda a terminal real (para probar el flujo)
-  if (S.user?.username === 'cajero' && metodo === 'tarjeta') {
+  if (S.user?.rol === 'cajero_prueba' && metodo === 'tarjeta') {
     try {
       const mpChk = await api('/config/mp-status');
       if (mpChk.ok) {
@@ -4892,7 +4894,7 @@ async function processSale() {
     } catch(e) {}
   }
 
-  if (S.user?.username === 'cajero') {
+  if (S.user?.rol === 'cajero_prueba') {
     toast('MODO PRUEBA — venta simulada, sin cambios reales','warning');
     document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
     document.getElementById('pay-total').textContent=fmt(total);
@@ -6814,7 +6816,7 @@ async function registrarRetiroCaja() {
 // TURNO AUTO-APERTURA
 // ══════════════════════════════════════════════════════════
 async function autoAbrirTurnoSiCorresponde() {
-  if (!S.user || S.user.rol === 'admin' || S.user.username === 'cajero') return;
+  if (!S.user || S.user.rol === 'admin' || S.user.rol === 'cajero_prueba') return;
   try {
     const cfgRes = await api('/admin/config');
     if (!cfgRes.ok) return;
@@ -7008,7 +7010,7 @@ async function confirmarRetiro() {
 }
 
 async function abrirTurno() {
-  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
+  if (S.user?.rol === 'cajero_prueba') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const monto = parseFloat(document.getElementById('turno-monto-apertura').value) || 0;
   const notas = document.getElementById('turno-notas-apertura').value.trim();
   const res = await api('/cortes/abrir', {method:'POST', body:JSON.stringify({monto_apertura:monto, notas:notas||null})});
@@ -7039,7 +7041,7 @@ function usarEsperado() {
 }
 
 async function cerrarTurnoAuto() {
-  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
+  if (S.user?.rol === 'cajero_prueba') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const btn = document.getElementById('btn-cierre-auto');
   btn.disabled = true;
   btn.textContent = 'Cerrando...';
@@ -7053,7 +7055,7 @@ async function cerrarTurnoAuto() {
 }
 
 async function cerrarTurno() {
-  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
+  if (S.user?.rol === 'cajero_prueba') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const monto = parseFloat(document.getElementById('turno-monto-cierre').value);
   if (isNaN(monto) || monto < 0) { toast('Ingresa el monto contado en caja','warning'); return; }
   const btn = document.getElementById('btn-cerrar-manual');
@@ -7131,13 +7133,14 @@ async function loadEmployees() {
   if (!res.ok) return;
   const emps=await res.json();
   const tbody=document.getElementById('emp-tbody');
-  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EEF1F9;color:#1d2140',farmaceutico:'background:#F0FDF4;color:#16A34A'};
+  const rolColors={admin:'background:#FEF2F2;color:#DC2626',cajero:'background:#EEF1F9;color:#1d2140',farmaceutico:'background:#F0FDF4;color:#16A34A',cajero_prueba:'background:#FFF7ED;color:#D97706'};
+  const rolLabel={admin:'Administrador',cajero:'Cajero',farmaceutico:'Farmacéutico',cajero_prueba:'Cajero Prueba'};
   tbody.innerHTML=emps.length?emps.map(e=>`
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
       <td class="px-5 py-3">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
-               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':'#1d2140'}">
+               style="background:${e.rol==='admin'?'#EF4444':e.rol==='farmaceutico'?'#22C55E':e.rol==='cajero_prueba'?'#D97706':'#1d2140'}">
             ${(e.nombre||'?')[0].toUpperCase()}
           </div>
           <span class="font-medium text-sm" style="color:#0F172A">${e.nombre}</span>
@@ -7145,7 +7148,7 @@ async function loadEmployees() {
       </td>
       <td class="px-5 py-3 font-mono text-sm" style="color:#64748B">${e.username}</td>
       <td class="px-5 py-3">
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium" style="${rolColors[e.rol]||rolColors.cajero}">${e.rol}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium" style="${rolColors[e.rol]||rolColors.cajero}">${rolLabel[e.rol]||e.rol}</span>
       </td>
       <td class="px-5 py-3 text-sm" style="color:#64748B">${e.telefono||'—'}</td>
       <td class="px-5 py-3 text-sm" style="color:#64748B">${e.email||'—'}</td>
