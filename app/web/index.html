@@ -7619,6 +7619,24 @@ async function loadEndpoints() {
   const endpoints = await res.json();
   const mc = {GET:'#22C55E', POST:'#1d2140', PUT:'#F59E0B', DELETE:'#EF4444'};
   const el = document.getElementById('endpoints-list');
+
+  // Paths considered "most important"
+  const KEY = ['/auth/login','/auth/me','/productos/','/ventas/','/ventas/resumen',
+               '/reportes/resumen','/reportes/export-pdf','/reportes/export-csv',
+               '/cortes/abrir','/cortes/cerrar','/admin/db-sync','/clientes/'];
+  const isKey = e => KEY.some(k => e.path.includes(k));
+  const main = endpoints.filter(isKey);
+  const rest = endpoints.filter(e => !isKey(e));
+
+  const rowHtml = e => `
+    <tr class="hovrow border-b" style="border-color:#F8FAFF">
+      <td class="px-4 py-2.5">
+        <span class="px-2 py-1 rounded-lg font-bold text-white text-[10px]" style="background:${mc[e.method]||'#64748B'}">${e.method}</span>
+      </td>
+      <td class="px-4 py-2.5 font-mono text-xs" style="color:#1d2140">${e.path}</td>
+      <td class="px-4 py-2.5 text-xs" style="color:#64748B">${e.desc}</td>
+    </tr>`;
+
   el.innerHTML = `
     <div class="overflow-x-auto rounded-xl" style="border:1px solid #F1F5F9">
       <table class="w-full text-xs">
@@ -7630,17 +7648,32 @@ async function loadEndpoints() {
           </tr>
         </thead>
         <tbody>
-          ${endpoints.map(e=>`
-            <tr class="hovrow border-b" style="border-color:#F8FAFF">
-              <td class="px-4 py-2.5">
-                <span class="px-2 py-1 rounded-lg font-bold text-white text-[10px]" style="background:${mc[e.method]||'#64748B'}">${e.method}</span>
-              </td>
-              <td class="px-4 py-2.5 font-mono" style="color:#1d2140">${e.path}</td>
-              <td class="px-4 py-2.5" style="color:#64748B">${e.desc}</td>
-            </tr>`).join('')}
+          ${main.map(rowHtml).join('')}
         </tbody>
+        <tbody id="ep-extra-rows" style="display:none">${rest.map(rowHtml).join('')}</tbody>
       </table>
-    </div>`;
+    </div>
+    ${rest.length ? `
+    <button id="ep-toggle-btn" onclick="toggleExtraEndpoints()" class="mt-3 w-full h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">
+      <i data-lucide="chevron-down" id="ep-toggle-icon" style="width:13px;height:13px"></i>
+      Ver ${rest.length} endpoints más
+    </button>` : ''}`;
+  icons();
+}
+
+function toggleExtraEndpoints() {
+  const rows = document.getElementById('ep-extra-rows');
+  const icon = document.getElementById('ep-toggle-icon');
+  const btn  = document.getElementById('ep-toggle-btn');
+  if (!rows) return;
+  const open = rows.style.display === 'none';
+  rows.style.display = open ? '' : 'none';
+  const count = rows.querySelectorAll('tr').length;
+  if (icon) { icon.setAttribute('data-lucide', open ? 'chevron-up' : 'chevron-down'); icons(); }
+  if (btn) {
+    const txt = btn.querySelector('span') || btn;
+    btn.childNodes[btn.childNodes.length-1].textContent = open ? ' Ocultar endpoints adicionales' : ` Ver ${count} endpoints más`;
+  }
 }
 
 async function descargarBackup() {
