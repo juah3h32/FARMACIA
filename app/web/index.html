@@ -4170,7 +4170,7 @@ function launchApp() {
   navigate('dashboard');
   // Show turno button only for cajero/farmaceutico; admins use reports for oversight
   const turnoBtn = document.getElementById('turno-btn');
-  if (turnoBtn) turnoBtn.style.display = S.user?.rol === 'admin' ? 'none' : '';
+  if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.username === 'cajero') ? 'none' : '';
   loadTurnoStatus();
   autoAbrirTurnoSiCorresponde();
   loadAlertasCaducidad();
@@ -6814,7 +6814,7 @@ async function registrarRetiroCaja() {
 // TURNO AUTO-APERTURA
 // ══════════════════════════════════════════════════════════
 async function autoAbrirTurnoSiCorresponde() {
-  if (!S.user || S.user.rol === 'admin') return;
+  if (!S.user || S.user.rol === 'admin' || S.user.username === 'cajero') return;
   try {
     const cfgRes = await api('/admin/config');
     if (!cfgRes.ok) return;
@@ -7008,6 +7008,7 @@ async function confirmarRetiro() {
 }
 
 async function abrirTurno() {
+  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const monto = parseFloat(document.getElementById('turno-monto-apertura').value) || 0;
   const notas = document.getElementById('turno-notas-apertura').value.trim();
   const res = await api('/cortes/abrir', {method:'POST', body:JSON.stringify({monto_apertura:monto, notas:notas||null})});
@@ -7038,6 +7039,7 @@ function usarEsperado() {
 }
 
 async function cerrarTurnoAuto() {
+  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const btn = document.getElementById('btn-cierre-auto');
   btn.disabled = true;
   btn.textContent = 'Cerrando...';
@@ -7051,6 +7053,7 @@ async function cerrarTurnoAuto() {
 }
 
 async function cerrarTurno() {
+  if (S.user?.username === 'cajero') { toast('Modo prueba — turnos deshabilitados','warning'); return; }
   const monto = parseFloat(document.getElementById('turno-monto-cierre').value);
   if (isNaN(monto) || monto < 0) { toast('Ingresa el monto contado en caja','warning'); return; }
   const btn = document.getElementById('btn-cerrar-manual');
