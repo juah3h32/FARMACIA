@@ -94,6 +94,54 @@
   </div>
 </div>
 
+<!-- ═══════════ DEVOLUCIÓN / AJUSTE MODAL ═══════════ -->
+<div id="modal-devolucion" class="fixed inset-0 z-[90] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(6px)" onclick="closeDevolucion()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:520px;max-height:88vh">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 rounded-t-2xl flex-shrink-0" style="background:linear-gradient(135deg,#D97706,#B45309)">
+      <div class="flex items-center gap-2">
+        <i data-lucide="rotate-ccw" style="width:18px;height:18px;color:#fff"></i>
+        <span class="font-bold text-white text-base">Devolución / Ajuste de Venta</span>
+      </div>
+      <button onclick="closeDevolucion()" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/20" style="color:#fff">
+        <i data-lucide="x" style="width:15px;height:15px"></i>
+      </button>
+    </div>
+    <!-- Folio search -->
+    <div class="px-5 pt-4 pb-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <p class="text-xs font-semibold mb-2" style="color:#64748B">Busca la venta por número de folio</p>
+      <div class="flex gap-2">
+        <input id="dev-folio" type="text" placeholder="Ej: V20250622143022..."
+               class="flex-1 h-10 px-3 rounded-xl border text-sm uppercase outline-none"
+               style="border-color:#E2E8F0;font-family:Inter,sans-serif"
+               onkeydown="if(event.key==='Enter')devBuscar()">
+        <button onclick="devBuscar()" id="dev-buscar-btn" class="h-10 px-4 rounded-xl text-sm font-semibold text-white" style="background:#D97706">
+          Buscar
+        </button>
+      </div>
+      <p id="dev-folio-status" class="text-xs mt-1 min-h-[16px]" style="color:#94A3B8"></p>
+    </div>
+    <!-- Items de la venta -->
+    <div id="dev-items-wrap" class="flex-1 overflow-y-auto px-5 py-3">
+      <p class="text-center py-8 text-sm" style="color:#94A3B8">Ingresa un folio y presiona Buscar</p>
+    </div>
+    <!-- Motivo -->
+    <div class="px-5 pb-3 flex-shrink-0">
+      <input id="dev-motivo" type="text" placeholder="Motivo (opcional — ej: producto incorrecto, cobré de más...)"
+             class="w-full h-9 px-3 rounded-xl border text-xs outline-none"
+             style="border-color:#E2E8F0;color:#374151">
+    </div>
+    <!-- Botones -->
+    <div class="flex gap-2 px-5 pb-4 flex-shrink-0 border-t pt-3" style="border-color:#E2E8F0">
+      <button onclick="closeDevolucion()" class="h-10 px-4 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cancelar</button>
+      <button onclick="devConfirmar()" id="dev-confirm-btn" class="flex-1 h-10 rounded-xl text-sm font-bold text-white" style="background:#16A34A">
+        ✓ Registrar Devolución
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ AUDITORÍA STOCK MODAL ═══════════ -->
 <div id="modal-auditoria-stock" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeAuditoriaModal()"></div>
@@ -1284,6 +1332,11 @@
                 <button id="btn-cobrar" onclick="processSale()" class="w-full h-12 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg shadow-blue-900/10"
                         style="background:linear-gradient(135deg,#1d2140,#1d2140)">
                   <i data-lucide="shopping-bag" style="width:18px;height:18px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
+                </button>
+                <!-- Devolución button — visible to all cashiers -->
+                <button onclick="openDevolucion()" class="w-full h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
+                        style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A">
+                  <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> Devolución / Ajuste
                 </button>
               </div>
             </div>
@@ -9286,6 +9339,139 @@ function chatAddToCart(pid) {
 </div>
 
 <script>
+// ══════════════════════════════════════════════════════════
+// DEVOLUCIÓN / AJUSTE DE VENTA
+// ══════════════════════════════════════════════════════════
+(function() {
+  let devVenta = null; // {id, folio, items:[{producto_id,nombre,cantidad,precio_unitario}]}
+  let devEntries = []; // {producto_id, nombre, qty_orig, qty_dev (from input)}
+
+  window.openDevolucion = function() {
+    devVenta = null;
+    devEntries = [];
+    const m = document.getElementById('modal-devolucion');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    document.getElementById('dev-folio').value = '';
+    document.getElementById('dev-folio-status').textContent = '';
+    document.getElementById('dev-motivo').value = '';
+    document.getElementById('dev-items-wrap').innerHTML = '<p class="text-center py-8 text-sm" style="color:#94A3B8">Ingresa un folio y presiona Buscar</p>';
+    setTimeout(() => document.getElementById('dev-folio').focus(), 80);
+    icons();
+  };
+
+  window.closeDevolucion = function() {
+    const m = document.getElementById('modal-devolucion');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+  };
+
+  window.devBuscar = async function() {
+    const folio = (document.getElementById('dev-folio').value || '').trim().toUpperCase();
+    if (!folio) return;
+    const statusEl = document.getElementById('dev-folio-status');
+    const wrap = document.getElementById('dev-items-wrap');
+    statusEl.textContent = 'Buscando...';
+    statusEl.style.color = '#94A3B8';
+    wrap.innerHTML = '<p class="text-center py-6 text-sm" style="color:#94A3B8">Cargando...</p>';
+    devVenta = null;
+    devEntries = [];
+
+    try {
+      const r = await api('/ventas/?folio=' + encodeURIComponent(folio) + '&limite=1');
+      if (!r.ok) throw new Error('Error de red');
+      const list = await r.json();
+      if (!list.length) {
+        statusEl.textContent = '❌ Folio no encontrado';
+        statusEl.style.color = '#DC2626';
+        wrap.innerHTML = '<p class="text-center py-8 text-sm" style="color:#DC2626">Venta no encontrada. Verifica el folio.</p>';
+        return;
+      }
+      const v = list[0];
+      if (v.estado === 'devolucion') {
+        statusEl.textContent = '⚠ Esta venta ya fue devuelta completamente';
+        statusEl.style.color = '#D97706';
+      } else {
+        statusEl.textContent = `✓ $${Number(v.total).toFixed(2)}  ·  ${v.cajero}  ·  ${v.creado_en ? new Date(v.creado_en).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : ''}`;
+        statusEl.style.color = '#16A34A';
+      }
+      devVenta = { id: v.id, folio: v.folio };
+      devEntries = v.items.map(i => ({ producto_id: i.producto_id, nombre: i.nombre, qty_orig: i.cantidad, precio: i.precio_unitario }));
+      devRenderItems();
+    } catch (err) {
+      statusEl.textContent = '❌ Error al buscar';
+      statusEl.style.color = '#DC2626';
+      wrap.innerHTML = '<p class="text-center py-8 text-sm" style="color:#DC2626">Error de conexión</p>';
+    }
+  };
+
+  function devRenderItems() {
+    const wrap = document.getElementById('dev-items-wrap');
+    if (!devEntries.length) { wrap.innerHTML = '<p class="text-center py-8 text-sm" style="color:#94A3B8">Sin productos en esta venta</p>'; return; }
+    wrap.innerHTML = `
+      <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wide mb-2 pb-1 border-b" style="color:#64748B;border-color:#F1F5F9">
+        <span class="flex-1">Producto</span>
+        <span class="w-16 text-center">Vendido</span>
+        <span class="w-20 text-center">Devolver</span>
+      </div>
+      ${devEntries.map((item, i) => {
+        const bg = i % 2 === 0 ? '#FAFBFF' : '#fff';
+        return `<div class="flex items-center gap-2 py-2 px-2 rounded-xl mb-1" style="background:${bg}">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold truncate" style="color:#0F172A">${item.nombre}</p>
+            <p class="text-xs" style="color:#94A3B8">$${Number(item.precio).toFixed(2)} c/u</p>
+          </div>
+          <span class="w-16 text-center text-sm font-bold" style="color:#64748B">×${item.qty_orig}</span>
+          <input type="number" min="0" max="${item.qty_orig}" value="0"
+                 id="dev-qty-${item.producto_id}"
+                 class="w-20 h-8 text-center text-sm font-bold border rounded-xl outline-none"
+                 style="border-color:#E2E8F0;color:#D97706">
+        </div>`;
+      }).join('')}
+    `;
+  }
+
+  window.devConfirmar = async function() {
+    if (!devVenta) { toast('Busca una venta primero','warning'); return; }
+    const motivo = (document.getElementById('dev-motivo').value || '').trim();
+    const items = [];
+    for (const e of devEntries) {
+      const inp = document.getElementById('dev-qty-' + e.producto_id);
+      const qty = inp ? parseInt(inp.value) || 0 : 0;
+      if (qty < 0 || qty > e.qty_orig) { toast(`Cantidad inválida para: ${e.nombre}`,'warning'); return; }
+      if (qty > 0) items.push({ producto_id: e.producto_id, cantidad: qty });
+    }
+    if (!items.length) { toast('Indica al menos 1 unidad a devolver','warning'); return; }
+
+    const resumen = devEntries
+      .filter(e => items.find(x => x.producto_id === e.producto_id))
+      .map(e => `${e.nombre}: ×${items.find(x=>x.producto_id===e.producto_id).cantidad}`)
+      .join('\n');
+
+    if (!confirm(`Folio: ${devVenta.folio}\n\nDevolver:\n${resumen}${motivo ? '\n\nMotivo: ' + motivo : ''}\n\n¿Confirmar? Se restaurará el stock.`)) return;
+
+    const btn = document.getElementById('dev-confirm-btn');
+    if (btn) { btn.textContent = 'Registrando...'; btn.disabled = true; }
+    try {
+      const r = await api('/ventas/' + devVenta.id + '/devolucion', {
+        method: 'POST',
+        body: JSON.stringify({ items, motivo })
+      });
+      const data = await r.json();
+      if (r.ok && data.ok) {
+        toast(`✓ Devolución registrada — Folio: ${data.folio}  /  Total devuelto: $${Number(data.total_devuelto).toFixed(2)}`, 'success');
+        closeDevolucion();
+      } else {
+        toast(data.detail || 'Error al registrar devolución', 'error');
+      }
+    } catch (err) {
+      toast('Error de conexión', 'error');
+    } finally {
+      if (btn) { btn.textContent = '✓ Registrar Devolución'; btn.disabled = false; }
+    }
+  };
+})();
+
 // ══════════════════════════════════════════════════════════
 // COTIZACIÓN / CONSULTA DE PRECIOS (F9)
 // ══════════════════════════════════════════════════════════

@@ -19,6 +19,7 @@ def listar_ventas(
     fecha_inicio: Optional[date] = Query(None),
     fecha_fin: Optional[date] = Query(None),
     limite: int = Query(50),
+    folio: Optional[str] = Query(None),
     payload: dict = Depends(get_current_api_user),
 ):
     limite = min(max(1, limite), 500)
@@ -27,6 +28,8 @@ def listar_ventas(
         q = db.query(Venta).filter(Venta.eliminado.is_not(True))
         if payload.get("rol") != "admin":
             q = q.filter(Venta.usuario_id == int(payload["sub"]))
+        if folio:
+            q = q.filter(Venta.folio == folio.upper().strip())
         if fecha_inicio:
             q = q.filter(Venta.creado_en >= datetime.combine(fecha_inicio, datetime.min.time()))
         if fecha_fin:
