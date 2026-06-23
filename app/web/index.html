@@ -45,6 +45,55 @@
   </div>
 </div>
 
+<!-- ═══════════ COTIZACIÓN / CONSULTA DE PRECIOS MODAL (F9) ═══════════ -->
+<div id="modal-cotizacion" class="fixed inset-0 z-[90] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(6px)" onclick="closeCotizacion()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:540px;max-height:88vh">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 rounded-t-2xl flex-shrink-0" style="background:linear-gradient(135deg,#7C3AED,#6D28D9)">
+      <div class="flex items-center gap-2">
+        <i data-lucide="search" style="width:18px;height:18px;color:#fff"></i>
+        <span class="font-bold text-white text-base">Consulta de Precios</span>
+        <span class="text-xs text-purple-200 ml-1">— No agrega al carrito</span>
+      </div>
+      <button onclick="closeCotizacion()" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/20" style="color:#fff">
+        <i data-lucide="x" style="width:15px;height:15px"></i>
+      </button>
+    </div>
+    <!-- Search bar -->
+    <div class="flex gap-2 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <input id="cotiz-search" type="text" placeholder="Escanear código o escribir nombre..."
+             class="flex-1 h-10 px-3 rounded-xl border text-sm outline-none"
+             style="border-color:#E2E8F0;font-family:Inter,sans-serif"
+             onkeydown="cotizSearchKeydown(event)"
+             oninput="cotizSearchInput(this.value)">
+      <button onclick="cotizSearch()" class="h-10 px-4 rounded-xl text-sm font-semibold text-white" style="background:#7C3AED">Buscar</button>
+    </div>
+    <!-- Search results (dropdown-style) -->
+    <div id="cotiz-results" class="flex-shrink-0 overflow-y-auto" style="max-height:180px;border-bottom:1px solid #E2E8F0;display:none"></div>
+    <!-- Items en cotización -->
+    <div class="px-4 pt-3 pb-1 flex-shrink-0">
+      <p class="text-xs font-bold uppercase tracking-wide" style="color:#7C3AED">Productos consultados</p>
+    </div>
+    <div id="cotiz-list" class="flex-1 overflow-y-auto px-4 pb-2">
+      <p id="cotiz-empty" class="text-center py-8 text-sm" style="color:#94A3B8">Escanea o escribe para agregar productos</p>
+    </div>
+    <!-- Total + botones -->
+    <div class="flex-shrink-0 border-t" style="border-color:#E2E8F0">
+      <div class="flex items-center justify-between px-5 py-3" style="background:#F5F3FF">
+        <span class="text-sm font-bold" style="color:#7C3AED">Total estimado</span>
+        <span id="cotiz-total" class="text-lg font-black" style="color:#7C3AED">$0.00</span>
+      </div>
+      <div class="flex gap-2 px-4 py-3">
+        <button onclick="cotizLimpiar()" class="h-10 px-4 rounded-xl text-sm font-semibold flex-shrink-0" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA">✕ Limpiar</button>
+        <button onclick="cotizImprimir()" id="cotiz-print-btn" class="h-10 flex-1 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style="background:#7C3AED">
+          <i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir Cotización [F9]
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ AUDITORÍA STOCK MODAL ═══════════ -->
 <div id="modal-auditoria-stock" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeAuditoriaModal()"></div>
@@ -7970,6 +8019,10 @@ document.addEventListener('keydown', (e) => {
         if (el) { el.focus(); el.select(); }
       }, 80);
       break;
+    case 'F9':
+      e.preventDefault();
+      openCotizacion();
+      break;
     case 'F10':
       e.preventDefault();
       processSale();
@@ -9231,5 +9284,188 @@ function chatAddToCart(pid) {
     </button>
   </div>
 </div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// COTIZACIÓN / CONSULTA DE PRECIOS (F9)
+// ══════════════════════════════════════════════════════════
+(function() {
+  const cotizItems = []; // {id, nombre, precio, aplica_iva, stock, cantidad}
+  let cotizSearchTimer = null;
+
+  window.openCotizacion = function() {
+    const m = document.getElementById('modal-cotizacion');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    document.getElementById('cotiz-search').value = '';
+    document.getElementById('cotiz-results').style.display = 'none';
+    document.getElementById('cotiz-results').innerHTML = '';
+    setTimeout(() => document.getElementById('cotiz-search').focus(), 80);
+    cotizRenderItems();
+    icons();
+  };
+
+  window.closeCotizacion = function() {
+    const m = document.getElementById('modal-cotizacion');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    // F9 inside cotización also closes / prints — stop propagation handled by keydown on input
+    document.getElementById('cotiz-results').style.display = 'none';
+  };
+
+  window.cotizSearchKeydown = function(e) {
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); cotizSearch(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeCotizacion(); }
+    if (e.key === 'F9') { e.preventDefault(); cotizImprimir(); }
+    if (e.key === 'F10') { e.preventDefault(); /* don't cobrar while inside cotiz */ }
+  };
+
+  window.cotizSearchInput = function(v) {
+    clearTimeout(cotizSearchTimer);
+    if (!v.trim()) { document.getElementById('cotiz-results').style.display = 'none'; return; }
+    cotizSearchTimer = setTimeout(() => cotizSearchQuery(v), 200);
+  };
+
+  window.cotizSearch = function() {
+    const q = (document.getElementById('cotiz-search').value || '').trim();
+    if (!q) return;
+    // Exact barcode match → add directly
+    const exact = (S.allProducts || []).find(p => p.codigo_barras === q);
+    if (exact) {
+      cotizAddItem(exact);
+      document.getElementById('cotiz-search').value = '';
+      document.getElementById('cotiz-results').style.display = 'none';
+      return;
+    }
+    cotizSearchQuery(q);
+  };
+
+  function cotizSearchQuery(q) {
+    const f = q.toLowerCase();
+    const matches = (S.allProducts || []).filter(p =>
+      p.nombre.toLowerCase().includes(f) ||
+      (p.nombre_generico || '').toLowerCase().includes(f) ||
+      (p.codigo_barras || '').toLowerCase().includes(f)
+    ).slice(0, 8);
+
+    const el = document.getElementById('cotiz-results');
+    if (!matches.length) {
+      el.innerHTML = '<p class="text-center text-sm py-4" style="color:#94A3B8">Sin resultados</p>';
+      el.style.display = 'block';
+      return;
+    }
+    el.innerHTML = matches.map(p => {
+      const precioFinal = p.precio_venta * (p.aplica_iva ? 1.16 : 1);
+      const stockColor = p.stock <= 0 ? '#DC2626' : p.stock <= 5 ? '#D97706' : '#16A34A';
+      return `<div onclick="cotizAddItemById(${p.id})" class="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-purple-50 border-b" style="border-color:#F3F4F6">
+        <div>
+          <p class="text-sm font-semibold" style="color:#0F172A">${p.nombre}</p>
+          ${p.nombre_generico ? `<p class="text-xs" style="color:#64748B">${p.nombre_generico}</p>` : ''}
+        </div>
+        <div class="text-right flex-shrink-0 ml-3">
+          <p class="text-sm font-bold" style="color:#7C3AED">$${precioFinal.toFixed(2)}</p>
+          <p class="text-xs font-semibold" style="color:${stockColor}">Stock: ${p.stock}</p>
+        </div>
+      </div>`;
+    }).join('');
+    el.style.display = 'block';
+    icons();
+  }
+
+  window.cotizAddItemById = function(pid) {
+    const p = (S.allProducts || []).find(x => x.id === pid);
+    if (p) { cotizAddItem(p); document.getElementById('cotiz-search').value = ''; document.getElementById('cotiz-results').style.display = 'none'; }
+  };
+
+  function cotizAddItem(p) {
+    const existing = cotizItems.find(x => x.id === p.id);
+    if (existing) {
+      existing.cantidad++;
+    } else {
+      cotizItems.push({ id: p.id, nombre: p.nombre, precio: p.precio_venta, aplica_iva: !!p.aplica_iva, stock: p.stock || 0, cantidad: 1 });
+    }
+    cotizRenderItems();
+  }
+
+  window.cotizQty = function(pid, delta) {
+    const item = cotizItems.find(x => x.id === pid);
+    if (!item) return;
+    item.cantidad = Math.max(1, item.cantidad + delta);
+    cotizRenderItems();
+  };
+
+  window.cotizRemove = function(pid) {
+    const idx = cotizItems.findIndex(x => x.id === pid);
+    if (idx >= 0) cotizItems.splice(idx, 1);
+    cotizRenderItems();
+  };
+
+  function cotizRenderItems() {
+    const el = document.getElementById('cotiz-list');
+    const emptyEl = document.getElementById('cotiz-empty');
+    if (!cotizItems.length) {
+      if (emptyEl) emptyEl.style.display = '';
+      el.innerHTML = '<p id="cotiz-empty" class="text-center py-8 text-sm" style="color:#94A3B8">Escanea o escribe para agregar productos</p>';
+      document.getElementById('cotiz-total').textContent = '$0.00';
+      return;
+    }
+    let total = 0;
+    el.innerHTML = cotizItems.map((item, i) => {
+      const precioFinal = item.precio * (item.aplica_iva ? 1.16 : 1);
+      const subtotal = precioFinal * item.cantidad;
+      total += subtotal;
+      const bg = i % 2 === 0 ? '#FAFBFF' : '#fff';
+      return `<div class="flex items-center gap-2 py-2 px-2 rounded-xl mb-1" style="background:${bg}">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold truncate" style="color:#0F172A">${item.nombre}</p>
+          <p class="text-xs" style="color:#7C3AED">$${precioFinal.toFixed(2)}${item.aplica_iva ? ' c/IVA' : ''} c/u</p>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button onclick="cotizQty(${item.id},-1)" class="w-7 h-7 rounded-lg text-sm font-bold flex items-center justify-center" style="background:#EDE9FE;color:#7C3AED">−</button>
+          <span class="w-8 text-center text-sm font-bold" style="color:#0F172A">${item.cantidad}</span>
+          <button onclick="cotizQty(${item.id},+1)" class="w-7 h-7 rounded-lg text-sm font-bold flex items-center justify-center" style="background:#EDE9FE;color:#7C3AED">+</button>
+        </div>
+        <span class="text-sm font-bold w-20 text-right flex-shrink-0" style="color:#0F172A">$${subtotal.toFixed(2)}</span>
+        <button onclick="cotizRemove(${item.id})" class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2;color:#DC2626">
+          <i data-lucide="x" style="width:12px;height:12px"></i>
+        </button>
+      </div>`;
+    }).join('');
+    document.getElementById('cotiz-total').textContent = '$' + total.toFixed(2);
+    icons();
+  }
+
+  window.cotizLimpiar = function() {
+    cotizItems.length = 0;
+    cotizRenderItems();
+    document.getElementById('cotiz-search').focus();
+  };
+
+  window.cotizImprimir = async function() {
+    if (!cotizItems.length) { toast('Agrega al menos un producto', 'warning'); return; }
+    const btn = document.getElementById('cotiz-print-btn');
+    if (btn) { btn.textContent = 'Imprimiendo...'; btn.disabled = true; }
+    try {
+      const r = await api('/pos/cotizacion-imprimir', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: cotizItems.map(i => ({ producto_id: i.id, cantidad: i.cantidad, precio_unitario: i.precio }))
+        })
+      });
+      if (r.ok) toast('Cotización enviada a la impresora', 'success');
+      else { const e = await r.json(); toast(e.detail || 'Error al imprimir', 'error'); }
+    } catch (err) {
+      toast('Error de conexión', 'error');
+    } finally {
+      if (btn) {
+        btn.innerHTML = '<i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir Cotización [F9]';
+        btn.disabled = false;
+        icons();
+      }
+    }
+  };
+})();
+</script>
+
 </body>
 </html>

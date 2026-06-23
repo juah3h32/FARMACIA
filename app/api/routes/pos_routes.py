@@ -347,3 +347,50 @@ def imprimir_ticket_prueba(body: ImprimirPruebaIn, bg: BackgroundTasks, payload:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+class CotizacionItemIn(BaseModel):
+    producto_id: int
+    cantidad: int = 1
+    precio_unitario: float
+
+
+class CotizacionIn(BaseModel):
+    items: list[CotizacionItemIn]
+
+
+@router.post("/cotizacion-imprimir")
+def imprimir_cotizacion(body: CotizacionIn, payload: dict = Depends(get_current_api_user)):
+    """Print a price-check / cotizacion ticket — no DB writes, no stock changes."""
+    db = get_db_session()
+    try:
+        producto_ids = [i.producto_id for i in body.items]
+        prods = {p.id: p for p in db.query(Producto).filter(Producto.id.in_(producto_ids)).all()}
+
+        from app.database.models import Usuario
+        cajero_obj = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+        cajero_nombre = cajero_obj.nombre if cajero_obj else "Cajero"
+
+        items_print = []
+        for i in body.items:
+            p = prods.get(i.producto_id)
+            precio = i.precio_unitario
+            aplica_iva = p.aplica_iva if p else False
+            items_print.append({
+                "producto_id": i.producto_id,
+                "nombre": p.nombre if p else f"Producto {i.producto_id}",
+                "precio": precio,
+                "aplica_iva": aplica_iva,
+                "stock": p.stock if p else 0,
+                "cantidad": i.cantidad,
+            })
+
+        from app.services.printer_service import printer_service
+        ok = printer_service.print_price_check(items_print, cajero_nombre)
+        return {"ok": ok}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
