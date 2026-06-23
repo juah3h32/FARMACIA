@@ -91,8 +91,11 @@
       </div>
       <div class="flex gap-2 px-4 py-3">
         <button onclick="cotizLimpiar()" class="h-10 px-4 rounded-xl text-sm font-semibold flex-shrink-0" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA">✕ Limpiar</button>
+        <button onclick="cotizAgregarCarrito()" class="h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 flex-shrink-0" style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0">
+          <i data-lucide="shopping-cart" style="width:14px;height:14px"></i> Agregar al carrito
+        </button>
         <button onclick="cotizImprimir()" id="cotiz-print-btn" class="h-10 flex-1 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style="background:#1d2140">
-          <i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir Cotización [F9]
+          <i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir [F9]
         </button>
       </div>
     </div>
@@ -1365,9 +1368,9 @@
                         style="background:linear-gradient(135deg,#1d2140,#1d2140)">
                   <i data-lucide="shopping-bag" style="width:18px;height:18px"></i> Cobrar <span class="text-xs font-normal opacity-75 ml-1">[F10]</span>
                 </button>
-                <!-- Devolución button — visible to all cashiers -->
-                <button onclick="openDevolucion()" class="w-full h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
-                        style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A">
+                <!-- Devolución button — admin only -->
+                <button id="btn-devolucion" onclick="openDevolucion()" class="w-full h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
+                        style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A;display:none">
                   <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> Devolución / Ajuste
                 </button>
               </div>
@@ -4259,6 +4262,8 @@ function launchApp() {
   // Show turno button only for cajero/farmaceutico; admins use reports for oversight
   const turnoBtn = document.getElementById('turno-btn');
   if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
+  const devBtn = document.getElementById('btn-devolucion');
+  if (devBtn) devBtn.style.display = S.user?.rol === 'admin' ? '' : 'none';
   loadTurnoStatus();
   autoAbrirTurnoSiCorresponde();
   loadAlertasCaducidad();
@@ -9388,6 +9393,7 @@ function chatAddToCart(pid) {
   }
 
   window.openDevolucion = async function() {
+    if (S.user?.rol !== 'admin') { toast('Solo administradores pueden registrar devoluciones', 'warning'); return; }
     devVenta = null;
     devEntries = [];
     const m = document.getElementById('modal-devolucion');
@@ -9747,8 +9753,30 @@ function chatAddToCart(pid) {
       else { const e = await r.json(); toast(e.detail || 'Error al imprimir', 'error'); }
     } catch (_) { toast('Error de conexión', 'error'); }
     finally {
-      if (btn) { btn.innerHTML = '<i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir Cotización [F9]'; btn.disabled = false; icons(); }
+      if (btn) { btn.innerHTML = '<i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir [F9]'; btn.disabled = false; icons(); }
     }
+  };
+
+  window.cotizAgregarCarrito = function() {
+    if (!cotizItems.length) { toast('Agrega al menos un producto', 'warning'); return; }
+    let added = 0;
+    for (const ci of cotizItems) {
+      const p = (S.allProducts || []).find(x => x.id === ci.id);
+      if (!p) continue;
+      const cartKey = `${p.id}`;
+      const ex = S.cart.find(i => (i._cartKey || String(i.id)) === cartKey);
+      if (ex) {
+        ex.cantidad += ci.cantidad;
+      } else {
+        S.cart.push({ ...p, _cartKey: cartKey, precio_venta: p.precio_venta, _esPieza: false, _label: null, cantidad: ci.cantidad });
+      }
+      added++;
+    }
+    if (!added) { toast('No se encontraron productos en catálogo', 'warning'); return; }
+    closeCotizacion();
+    navigate('pos');
+    renderCart();
+    toast(`${added} producto${added > 1 ? 's' : ''} agregado${added > 1 ? 's' : ''} al carrito`, 'success');
   };
 })();
 </script>
