@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload, selectinload
 import io, csv, os, tempfile
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, CortesCaja, Lote
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, CortesCaja, Lote, MovimientoStock, TipoMovimiento
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -66,19 +66,37 @@ def resumen(
             total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
         else:
             total_costo = 0.0
-        ganancia = total - total_costo
+        # Partial devoluciones in period (full returns excluded via estado=devolucion filter)
+        dev_movs = db.query(MovimientoStock).filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_tipo == "devolucion",
+            MovimientoStock.creado_en >= fi,
+            MovimientoStock.creado_en <= ff,
+        ).all()
+        total_devoluciones = 0.0
+        for mov in dev_movs:
+            orig = db.query(ItemVenta).filter(
+                ItemVenta.venta_id == mov.referencia_id,
+                ItemVenta.producto_id == mov.producto_id,
+            ).first()
+            if orig:
+                total_devoluciones += orig.precio_unitario * mov.cantidad
+        ventas_netas = total - total_devoluciones
+        ganancia = ventas_netas - total_costo
 
         return {
-            "total":            total,
-            "num_ventas":       num,
-            "ticket_promedio":  total / num if num else 0.0,
-            "mejor_dia_fecha":  mejor_dia,
-            "mejor_dia_monto":  mejor_monto,
-            "efectivo":         sum(v.total for v in ventas if v.metodo_pago.value == "efectivo"),
-            "tarjeta":          sum(v.total for v in ventas if v.metodo_pago.value == "tarjeta"),
-            "transferencia":    sum(v.total for v in ventas if v.metodo_pago.value == "transferencia"),
-            "total_costo":      total_costo,
-            "ganancia":         ganancia,
+            "total":               total,
+            "total_devoluciones":  round(total_devoluciones, 2),
+            "ventas_netas":        round(ventas_netas, 2),
+            "num_ventas":          num,
+            "ticket_promedio":     total / num if num else 0.0,
+            "mejor_dia_fecha":     mejor_dia,
+            "mejor_dia_monto":     mejor_monto,
+            "efectivo":            sum(v.total for v in ventas if v.metodo_pago.value == "efectivo"),
+            "tarjeta":             sum(v.total for v in ventas if v.metodo_pago.value == "tarjeta"),
+            "transferencia":       sum(v.total for v in ventas if v.metodo_pago.value == "transferencia"),
+            "total_costo":         total_costo,
+            "ganancia":            round(ganancia, 2),
             "por_dia": [{"fecha": k, "total": v} for k, v in sorted(por_dia.items())],
         }
     finally:

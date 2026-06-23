@@ -558,20 +558,38 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
         retiros_personales = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "personal")
         retiros_inversion  = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "inversion")
         total_retiros      = retiros_personales + retiros_inversion
-        ganancia           = tv - total_costo
+
+        # Subtract all-time partial returns
+        dev_movs = db.query(MovimientoStock).filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_tipo == "devolucion",
+        ).all()
+        total_devoluciones = 0.0
+        for mov in dev_movs:
+            orig = db.query(ItemVenta).filter(
+                ItemVenta.venta_id == mov.referencia_id,
+                ItemVenta.producto_id == mov.producto_id,
+            ).first()
+            if orig:
+                total_devoluciones += orig.precio_unitario * mov.cantidad
+
+        ventas_netas        = tv - total_devoluciones
+        ganancia            = ventas_netas - total_costo
         ganancia_disponible = ganancia - retiros_personales
         capital_inversion   = max(0.0, total_costo - retiros_inversion)
 
         return {
             "num_ventas":          len(ventas),
             "total_ventas":        tv,
+            "total_devoluciones":  round(total_devoluciones, 2),
+            "ventas_netas":        round(ventas_netas, 2),
             "total_costo":         total_costo,
-            "ganancia":            ganancia,
+            "ganancia":            round(ganancia, 2),
             "total_retiros":       total_retiros,
             "retiros_personales":  retiros_personales,
             "retiros_inversion":   retiros_inversion,
-            "disponible":          ganancia_disponible,
-            "ganancia_disponible": ganancia_disponible,
+            "disponible":          round(ganancia_disponible, 2),
+            "ganancia_disponible": round(ganancia_disponible, 2),
             "capital_inversion":   capital_inversion,
         }
     finally:
