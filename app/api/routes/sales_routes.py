@@ -110,9 +110,23 @@ def resumen_ventas(
 def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
-        venta = db.query(Venta).filter(Venta.id == venta_id, Venta.eliminado.is_not(True)).first()
+        venta = (
+            db.query(Venta)
+            .options(selectinload(Venta.items).selectinload(ItemVenta.producto))
+            .filter(Venta.id == venta_id, Venta.eliminado.is_not(True))
+            .first()
+        )
         if not venta:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
+        # ya_devuelto: sum of all prior devoluciones for each item in this venta
+        dev_movs = db.query(MovimientoStock).filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_id == venta_id,
+            MovimientoStock.referencia_tipo == "devolucion",
+        ).all()
+        ya_devuelto: dict[int, int] = {}
+        for m in dev_movs:
+            ya_devuelto[m.producto_id] = ya_devuelto.get(m.producto_id, 0) + m.cantidad
         return {
             "id": venta.id,
             "folio": venta.folio,
@@ -122,14 +136,16 @@ def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
             "total": venta.total,
             "metodo_pago": venta.metodo_pago.value,
             "estado": venta.estado.value,
+            "cajero": venta.usuario.nombre if venta.usuario else "—",
             "creado_en": venta.creado_en.isoformat() if venta.creado_en else None,
             "items": [
                 {
-                    "producto_id": i.producto_id,
-                    "nombre": i.producto.nombre if i.producto else "",
-                    "cantidad": i.cantidad,
+                    "producto_id":    i.producto_id,
+                    "nombre":         i.producto.nombre if i.producto else "",
+                    "cantidad":       i.cantidad,
+                    "ya_devuelto":    ya_devuelto.get(i.producto_id, 0),
                     "precio_unitario": i.precio_unitario,
-                    "subtotal": i.subtotal,
+                    "subtotal":       i.subtotal,
                 }
                 for i in venta.items
             ],

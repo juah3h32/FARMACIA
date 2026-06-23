@@ -9385,42 +9385,77 @@ function chatAddToCart(pid) {
 // ══════════════════════════════════════════════════════════
 (function() {
   let devVenta = null;
-  let devEntries = [];
+  let devEntries = []; // {producto_id, nombre, qty_orig, ya_devuelto, max_dev, precio}
 
   function showPanel(name) {
     document.getElementById('dev-panel-buscar').style.display = name === 'buscar' ? '' : 'none';
     document.getElementById('dev-panel-items').style.display  = name === 'items'  ? ''  : 'none';
   }
 
+  // ── Custom confirm dialog (replaces browser confirm()) ──────────────────
+  function devShowConfirm(lines, motivo, onConfirm) {
+    const rows = lines.map(l =>
+      `<div class="flex items-center gap-2 py-1.5 border-b" style="border-color:#F1F5F9">
+        <i data-lucide="rotate-ccw" style="width:13px;height:13px;color:#D97706;flex-shrink:0"></i>
+        <span class="text-sm font-semibold" style="color:#0F172A">${l.nombre}</span>
+        <span class="ml-auto text-sm font-bold" style="color:#1d2140">×${l.cantidad}</span>
+      </div>`
+    ).join('');
+    const motivoRow = motivo
+      ? `<div class="mt-3 px-3 py-2 rounded-xl text-xs" style="background:#FEF3C7;color:#92400E"><strong>Motivo:</strong> ${motivo}</div>`
+      : '';
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `
+      <div style="position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(6px)" id="dev-cfm-bg"></div>
+      <div style="position:relative;background:#fff;border-radius:24px;padding:32px 28px 24px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(0,0,0,.28)">
+        <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <i data-lucide="alert-triangle" style="width:26px;height:26px;color:#D97706"></i>
+        </div>
+        <h3 style="font-size:17px;font-weight:800;color:#0F172A;text-align:center;margin-bottom:4px">Confirmar devolución</h3>
+        <p style="text-align:center;font-size:12px;color:#94A3B8;margin-bottom:16px">Folio <strong style="color:#1d2140">${devVenta.folio}</strong> · Se restaurará el stock</p>
+        <div style="background:#F8FAFF;border-radius:14px;padding:8px 12px;margin-bottom:4px">${rows}</div>
+        ${motivoRow}
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <button id="dev-cfm-cancel" style="flex:1;height:46px;border-radius:14px;border:1.5px solid #E2E8F0;background:#fff;font-size:14px;font-weight:600;color:#64748B;cursor:pointer">Cancelar</button>
+          <button id="dev-cfm-ok" style="flex:2;height:46px;border-radius:14px;border:none;background:linear-gradient(135deg,#16A34A,#15803D);font-size:14px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            <i data-lucide="check-circle" style="width:16px;height:16px"></i> Confirmar devolución
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    icons();
+    overlay.querySelector('#dev-cfm-cancel').onclick = () => document.body.removeChild(overlay);
+    overlay.querySelector('#dev-cfm-bg').onclick    = () => document.body.removeChild(overlay);
+    overlay.querySelector('#dev-cfm-ok').onclick    = () => { document.body.removeChild(overlay); onConfirm(); };
+  }
+
+  // ── Main open/close ─────────────────────────────────────────────────────
   window.openDevolucion = async function() {
     if (S.user?.rol !== 'admin') { toast('Solo administradores pueden registrar devoluciones', 'warning'); return; }
-    devVenta = null;
-    devEntries = [];
+    devVenta = null; devEntries = [];
     const m = document.getElementById('modal-devolucion');
-    m.classList.remove('hidden');
-    m.classList.add('flex');
+    m.classList.remove('hidden'); m.classList.add('flex');
     document.getElementById('dev-folio').value = '';
     document.getElementById('dev-motivo').value = '';
     document.getElementById('dev-selected-folio').style.display = 'none';
-    showPanel('buscar');
-    icons();
+    showPanel('buscar'); icons();
     setTimeout(() => document.getElementById('dev-folio').focus(), 80);
     await devCargarHistorial();
   };
 
   window.closeDevolucion = function() {
     const m = document.getElementById('modal-devolucion');
-    m.classList.add('hidden');
-    m.classList.remove('flex');
+    m.classList.add('hidden'); m.classList.remove('flex');
   };
 
   window.devVolverHistorial = function() {
-    devVenta = null;
-    devEntries = [];
+    devVenta = null; devEntries = [];
     document.getElementById('dev-selected-folio').style.display = 'none';
     showPanel('buscar');
   };
 
+  // ── History list (Panel A) ───────────────────────────────────────────────
   async function devCargarHistorial() {
     const listEl = document.getElementById('dev-hist-list');
     const loadEl = document.getElementById('dev-hist-loading');
@@ -9462,6 +9497,15 @@ function chatAddToCart(pid) {
     }
   }
 
+  // ── Load single venta with ya_devuelto (Panel B) ─────────────────────────
+  async function devCargarVenta(id) {
+    try {
+      const r = await api('/ventas/' + id);
+      if (!r.ok) throw new Error();
+      return await r.json();
+    } catch (_) { toast('Error al cargar venta', 'error'); return null; }
+  }
+
   window.devBuscarFolio = async function() {
     const folio = (document.getElementById('dev-folio').value || '').trim().toUpperCase();
     if (!folio) return;
@@ -9470,35 +9514,33 @@ function chatAddToCart(pid) {
       if (!r.ok) throw new Error();
       const list = await r.json();
       if (!list.length) { toast('Folio no encontrado', 'warning'); return; }
-      devSeleccionarVentaObj(list[0]);
+      const v = await devCargarVenta(list[0].id);
+      if (v) devMostrarPanel(v);
     } catch (_) { toast('Error al buscar folio', 'error'); }
   };
 
   window.devSeleccionarVenta = async function(id) {
-    try {
-      const r = await api('/ventas/?limite=20');
-      if (!r.ok) throw new Error();
-      const list = await r.json();
-      const v = list.find(x => x.id === id);
-      if (v) devSeleccionarVentaObj(v);
-    } catch (_) { toast('Error al cargar venta', 'error'); }
+    const v = await devCargarVenta(id);
+    if (v) devMostrarPanel(v);
   };
 
-  function devSeleccionarVentaObj(v) {
+  function devMostrarPanel(v) {
     if (v.estado === 'devolucion') { toast('Esta venta ya fue devuelta completamente', 'warning'); return; }
     devVenta = { id: v.id, folio: v.folio };
-    devEntries = (v.items || []).map(i => ({ producto_id: i.producto_id, nombre: i.nombre, qty_orig: i.cantidad, precio: i.precio_unitario }));
+    devEntries = (v.items || []).map(i => {
+      const ya = i.ya_devuelto || 0;
+      return { producto_id: i.producto_id, nombre: i.nombre, qty_orig: i.cantidad, ya_devuelto: ya, max_dev: i.cantidad - ya, precio: i.precio_unitario };
+    });
     const folioEl = document.getElementById('dev-selected-folio');
-    folioEl.textContent = v.folio;
-    folioEl.style.display = '';
+    folioEl.textContent = v.folio; folioEl.style.display = '';
     const infoEl = document.getElementById('dev-venta-info');
     const fecha = v.creado_en ? new Date(v.creado_en).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '';
     if (infoEl) infoEl.textContent = `$${Number(v.total).toFixed(2)}  ·  ${v.cajero}  ·  ${fecha}`;
     devRenderItems();
-    showPanel('items');
-    icons();
+    showPanel('items'); icons();
   }
 
+  // ── Items list (Panel B) ─────────────────────────────────────────────────
   function devRenderItems() {
     const wrap = document.getElementById('dev-items-wrap');
     if (!devEntries.length) {
@@ -9507,65 +9549,74 @@ function chatAddToCart(pid) {
     }
     wrap.innerHTML = devEntries.map((item, i) => {
       const bg = i % 2 === 0 ? '#F8FAFF' : '#fff';
+      const fullReturned = item.max_dev <= 0;
+      if (fullReturned) {
+        // Already fully returned → strikethrough row, disabled
+        return `<div class="flex items-center gap-2 py-2.5 px-2 rounded-xl mb-1" style="background:#F1F5F9;opacity:.65">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold truncate" style="color:#94A3B8;text-decoration:line-through">${item.nombre}</p>
+            <p class="text-xs" style="color:#CBD5E1">$${Number(item.precio).toFixed(2)} c/u</p>
+          </div>
+          <span class="text-xs px-2 py-1 rounded-full font-bold" style="background:#DCFCE7;color:#15803D;white-space:nowrap">✓ Devuelto ×${item.qty_orig}</span>
+        </div>`;
+      }
+      const partial = item.ya_devuelto > 0;
       return `<div class="flex items-center gap-2 py-2.5 px-2 rounded-xl mb-1" style="background:${bg}">
         <div class="flex-1 min-w-0">
           <p class="text-sm font-semibold truncate" style="color:#0F172A">${item.nombre}</p>
-          <p class="text-xs" style="color:#94A3B8">$${Number(item.precio).toFixed(2)} c/u</p>
+          <p class="text-xs" style="color:#94A3B8">$${Number(item.precio).toFixed(2)} c/u${partial ? ` · <span style="color:#D97706">ya devuelto ×${item.ya_devuelto}</span>` : ''}</p>
         </div>
-        <span class="w-16 text-center text-sm font-bold" style="color:#64748B">×${item.qty_orig}</span>
-        <input type="number" min="0" max="${item.qty_orig}" value="0"
+        <span class="w-14 text-center text-sm font-bold" style="color:#64748B">×${item.qty_orig}</span>
+        <input type="number" min="0" max="${item.max_dev}" value="0"
                id="dev-qty-${item.producto_id}"
-               class="w-20 h-8 text-center text-sm font-bold border rounded-xl outline-none"
+               class="w-16 h-8 text-center text-sm font-bold border rounded-xl outline-none"
                style="border-color:#E2E8F0;color:#1d2140">
-        <button onclick="devQuitarTodo(${item.producto_id},${item.qty_orig})" title="Devolver todo"
-                class="w-16 h-8 rounded-lg text-xs font-bold flex items-center justify-center gap-1"
+        <button onclick="devEliminarProducto(${item.producto_id})" title="Quitar de la lista"
+                class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA">
-          <i data-lucide="trash-2" style="width:11px;height:11px"></i> Todo
+          <i data-lucide="x" style="width:14px;height:14px"></i>
         </button>
       </div>`;
     }).join('');
     icons();
   }
 
-  window.devQuitarTodo = function(pid, maxQty) {
-    const inp = document.getElementById('dev-qty-' + pid);
-    if (inp) inp.value = maxQty;
+  window.devEliminarProducto = function(pid) {
+    devEntries = devEntries.filter(e => e.producto_id !== pid);
+    devRenderItems();
   };
 
-  window.devConfirmar = async function() {
+  // ── Confirm ──────────────────────────────────────────────────────────────
+  window.devConfirmar = function() {
     if (!devVenta) { toast('Selecciona una venta primero', 'warning'); return; }
     const motivo = (document.getElementById('dev-motivo').value || '').trim();
     const items = [];
     for (const e of devEntries) {
+      if (e.max_dev <= 0) continue;
       const inp = document.getElementById('dev-qty-' + e.producto_id);
       const qty = inp ? parseInt(inp.value) || 0 : 0;
-      if (qty < 0 || qty > e.qty_orig) { toast(`Cantidad inválida: ${e.nombre}`, 'warning'); return; }
-      if (qty > 0) items.push({ producto_id: e.producto_id, cantidad: qty });
+      if (qty < 0 || qty > e.max_dev) { toast(`Cantidad inválida: ${e.nombre} (máx ${e.max_dev})`, 'warning'); return; }
+      if (qty > 0) items.push({ producto_id: e.producto_id, cantidad: qty, nombre: e.nombre });
     }
     if (!items.length) { toast('Indica al menos 1 unidad a devolver', 'warning'); return; }
-
-    const resumen = devEntries
-      .filter(e => items.find(x => x.producto_id === e.producto_id))
-      .map(e => `• ${e.nombre}: ×${items.find(x => x.producto_id === e.producto_id).cantidad}`)
-      .join('\n');
-    if (!confirm(`Folio: ${devVenta.folio}\n\nDevolver:\n${resumen}${motivo ? '\n\nMotivo: ' + motivo : ''}\n\n¿Confirmar? Se restaurará el stock.`)) return;
-
-    const btn = document.getElementById('dev-confirm-btn');
-    if (btn) { btn.textContent = 'Registrando...'; btn.disabled = true; }
-    try {
-      const r = await api('/ventas/' + devVenta.id + '/devolucion', {
-        method: 'POST',
-        body: JSON.stringify({ items, motivo })
-      });
-      const data = await r.json();
-      if (r.ok && data.ok) {
-        toast(`✓ Devolución — Folio: ${data.folio}  ·  Devuelto: $${Number(data.total_devuelto).toFixed(2)}`, 'success');
-        closeDevolucion();
-      } else {
-        toast(data.detail || 'Error al registrar devolución', 'error');
-      }
-    } catch (_) { toast('Error de conexión', 'error'); }
-    finally { if (btn) { btn.textContent = '✓ Registrar Devolución'; btn.disabled = false; } }
+    devShowConfirm(items, motivo, async () => {
+      const btn = document.getElementById('dev-confirm-btn');
+      if (btn) { btn.textContent = 'Registrando...'; btn.disabled = true; }
+      try {
+        const r = await api('/ventas/' + devVenta.id + '/devolucion', {
+          method: 'POST',
+          body: JSON.stringify({ items: items.map(x => ({ producto_id: x.producto_id, cantidad: x.cantidad })), motivo })
+        });
+        const data = await r.json();
+        if (r.ok && data.ok) {
+          toast(`✓ Devolución — Folio: ${data.folio}  ·  Devuelto: $${Number(data.total_devuelto).toFixed(2)}`, 'success');
+          closeDevolucion();
+        } else {
+          toast(data.detail || 'Error al registrar devolución', 'error');
+        }
+      } catch (_) { toast('Error de conexión', 'error'); }
+      finally { if (btn) { btn.textContent = '✓ Registrar Devolución'; btn.disabled = false; } }
+    });
   };
 })();
 
