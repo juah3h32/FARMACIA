@@ -693,9 +693,11 @@ class MainWindow(ctk.CTkToplevel):
             pos._cobrar()
 
     def _sc_pos_consulta_precios(self):
+        if self.current_screen is not self.screens.get("pos"):
+            self._show_screen("pos")
         pos = self._get_pos()
-        if pos and self.current_screen is pos:
-            pos._abrir_consulta_precios()
+        if pos:
+            self.after(50, pos._abrir_consulta_precios)
 
     def _scanner_key_handler(self, event):
         # ── Ignorar si diálogo hijo tiene foco ───────────────────────────────
