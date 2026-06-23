@@ -1,8 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, Usuario, Cliente
+from app.database.models import (
+    Venta, ItemVenta, Producto, EstadoVenta, Usuario, Cliente,
+    MovimientoStock, TipoMovimiento,
+)
 from app.api.routes.auth_routes import get_current_api_user
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -143,6 +147,114 @@ def eliminar_venta_endpoint(venta_id: int, payload: dict = Depends(get_current_a
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class DevolucionItemIn(BaseModel):
+    producto_id: int
+    cantidad: int
+
+
+class DevolucionIn(BaseModel):
+    items: list[DevolucionItemIn]
+    motivo: str = ""
+
+
+@router.post("/{venta_id}/devolucion")
+def registrar_devolucion(
+    venta_id: int,
+    body: DevolucionIn,
+    payload: dict = Depends(get_current_api_user),
+):
+    """
+    Partial or full return: restore stock for each returned item,
+    log a devolucion movement, and mark the sale as devolucion if all items returned.
+    """
+    db = get_db_session()
+    try:
+        venta = (
+            db.query(Venta)
+            .options(selectinload(Venta.items).selectinload(ItemVenta.producto))
+            .filter(Venta.id == venta_id, Venta.eliminado.is_not(True))
+            .first()
+        )
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        if venta.estado == EstadoVenta.devolucion:
+            raise HTTPException(status_code=400, detail="Venta ya marcada como devolución completa")
+
+        orig_items = {i.producto_id: i for i in venta.items}
+        usuario_id = int(payload["sub"])
+        total_devuelto = 0.0
+        nota_parts = []
+
+        for dev in body.items:
+            if dev.cantidad <= 0:
+                continue
+            orig = orig_items.get(dev.producto_id)
+            if not orig:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Producto {dev.producto_id} no estaba en la venta original",
+                )
+            if dev.cantidad > orig.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No puedes devolver {dev.cantidad} — vendido {orig.cantidad} (prod {dev.producto_id})",
+                )
+            prod = db.query(Producto).filter(Producto.id == dev.producto_id).first()
+            if prod:
+                stock_ant = prod.stock
+                prod.stock += dev.cantidad
+                db.add(MovimientoStock(
+                    producto_id=dev.producto_id,
+                    tipo=TipoMovimiento.devolucion,
+                    cantidad=dev.cantidad,
+                    stock_anterior=stock_ant,
+                    stock_nuevo=prod.stock,
+                    referencia_id=venta_id,
+                    referencia_tipo="devolucion",
+                    usuario_id=usuario_id,
+                    notas=f"Dev. {venta.folio}" + (f" | {body.motivo}" if body.motivo else ""),
+                ))
+            total_devuelto += orig.precio_unitario * dev.cantidad
+            nombre = orig.producto.nombre if orig.producto else str(dev.producto_id)
+            nota_parts.append(f"{nombre[:20]} x{dev.cantidad}")
+
+        # Full return → mark sale as devolucion
+        dev_map = {d.producto_id: d.cantidad for d in body.items if d.cantidad > 0}
+        all_returned = all(
+            dev_map.get(pid, 0) >= orig.cantidad
+            for pid, orig in orig_items.items()
+        )
+        if all_returned:
+            venta.estado = EstadoVenta.devolucion
+
+        nota_dev = f"[DEV {datetime.now().strftime('%d/%m %H:%M')}: {', '.join(nota_parts)}]"
+        if body.motivo:
+            nota_dev += f" Motivo:{body.motivo}"
+        venta.notas = ((venta.notas or "").strip() + " " + nota_dev).strip()
+
+        db.commit()
+
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            import threading
+            threading.Thread(target=sync_to_turso, daemon=True).start()
+
+        return {
+            "ok": True,
+            "folio": venta.folio,
+            "total_devuelto": round(total_devuelto, 2),
+            "estado_venta": venta.estado.value,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @router.post("/eliminar-lote")

@@ -19,19 +19,24 @@ class InventoryScreen(ctk.CTkFrame):
 
     def _build_ui(self):
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        # Header
-        hdr = ctk.CTkFrame(self, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
-        hdr.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-        hdr.grid_columnconfigure(2, weight=1)
+        # ── Fila 0: búsqueda + controles + agregar ────────────────────────────
+        hdr = ctk.CTkFrame(self, corner_radius=10, fg_color="#FFFFFF",
+                           border_width=1, border_color="#E2E8F0")
+        hdr.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
+        hdr.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(hdr, text="📦 Inventario", font=ctk.CTkFont(size=18, weight="bold")).grid(
-            row=0, column=0, padx=14, pady=10, sticky="w"
+        ctrl = ctk.CTkFrame(hdr, fg_color="transparent")
+        ctrl.pack(fill="x", padx=12, pady=8)
+        ctrl.grid_columnconfigure(0, weight=1)
+
+        self.entry_search = ctk.CTkEntry(
+            ctrl,
+            placeholder_text="🔍 Nombre, genérico, código, marca...",
+            height=36,
         )
-
-        self.entry_search = ctk.CTkEntry(hdr, placeholder_text="🔍 Buscar o escanear código...", height=36, width=300)
-        self.entry_search.grid(row=0, column=1, padx=8, pady=10)
+        self.entry_search.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.entry_search.bind("<KeyRelease>", lambda e: self._load_products())
         for event in ("<Return>", "<KP_Enter>", "<Tab>"):
             self.entry_search.bind(event, lambda e: self._on_scan_enter())
@@ -40,34 +45,65 @@ class InventoryScreen(ctk.CTkFrame):
             except Exception:
                 pass
 
-        self.var_filter = tk.StringVar(value="todos")
-        ctk.CTkSegmentedButton(
-            hdr, values=["Todos", "Stock Bajo", "Por Vencer"],
-            variable=self.var_filter, command=lambda v: self._load_products()
-        ).grid(row=0, column=2, padx=8)
+        self._sort_var = tk.StringVar(value="A → Z")
+        ctk.CTkOptionMenu(
+            ctrl, variable=self._sort_var,
+            values=["A → Z", "Z → A", "Mayor stock", "Menor stock", "Precio ↑", "Precio ↓"],
+            width=115, height=36,
+            command=lambda v: self._load_products(),
+        ).grid(row=0, column=1, padx=(0, 8))
 
-        # Botones accion
-        btns = ctk.CTkFrame(hdr, fg_color="transparent")
-        btns.grid(row=0, column=3, padx=14, pady=10)
+        self._filter_var = tk.StringVar(value="Todos")
+        ctk.CTkOptionMenu(
+            ctrl, variable=self._filter_var,
+            values=["Todos", "Stock Bajo", "Sin Stock", "Por Vencer"],
+            width=110, height=36,
+            command=lambda v: self._load_products(),
+        ).grid(row=0, column=2, padx=(0, 8))
 
-        ctk.CTkButton(btns, text="+ Agregar", width=90, height=34,
-                      fg_color="#4CAF50", hover_color="#388E3C",
-                      command=self._agregar_producto).pack(side="left", padx=3)
-        ctk.CTkButton(btns, text="✏️ Editar", width=80, height=34,
-                      command=self._editar_producto).pack(side="left", padx=3)
-        ctk.CTkButton(btns, text="📥 Entrada", width=90, height=34,
-                      fg_color="#2196F3", hover_color="#1976D2",
-                      command=self._entrada_stock).pack(side="left", padx=3)
-        ctk.CTkButton(btns, text="🗑 Eliminar", width=80, height=34,
-                      fg_color="#e74c3c", hover_color="#c0392b",
-                      command=self._eliminar_producto).pack(side="left", padx=3)
-        ctk.CTkButton(btns, text="🗓 Lotes", width=80, height=34,
-                      fg_color="#9C27B0", hover_color="#7B1FA2",
-                      command=self._ver_lotes).pack(side="left", padx=3)
+        self.lbl_count = ctk.CTkLabel(ctrl, text="", font=ctk.CTkFont(size=12),
+                                       text_color="#64748B")
+        self.lbl_count.grid(row=0, column=3, padx=(0, 12))
 
-        # Tabla
-        table_frame = ctk.CTkFrame(self, corner_radius=10, fg_color=("#fff", "#2b2b2b"))
-        table_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        ctk.CTkButton(
+            ctrl, text="+ Agregar producto", height=36,
+            fg_color="#2563EB", hover_color="#1D4ED8",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=self._agregar_producto,
+        ).grid(row=0, column=4)
+
+        # ── Fila 1: toolbar de acciones (actúa sobre fila seleccionada) ────────
+        toolbar = ctk.CTkFrame(self, corner_radius=8, fg_color="#F8FAFF",
+                               border_width=1, border_color="#E2E8F0")
+        toolbar.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 4))
+
+        tool_inner = ctk.CTkFrame(toolbar, fg_color="transparent")
+        tool_inner.pack(fill="x", padx=10, pady=5)
+
+        self.lbl_selected = ctk.CTkLabel(
+            tool_inner,
+            text="Selecciona un producto para usar las acciones →",
+            font=ctk.CTkFont(size=11), text_color="#94A3B8",
+        )
+        self.lbl_selected.pack(side="left", padx=(0, 12))
+
+        for text, fg, hov, cmd in [
+            ("✏️ Editar",   "#2563EB", "#1D4ED8", self._editar_producto),
+            ("📥 Entrada",  "#16A34A", "#15803D", self._entrada_stock),
+            ("🗓 Lotes",    "#7C3AED", "#6D28D9", self._ver_lotes),
+            ("🗑 Eliminar", "#DC2626", "#B91C1C", self._eliminar_producto),
+        ]:
+            ctk.CTkButton(
+                tool_inner, text=text, height=30, width=100,
+                fg_color=fg, hover_color=hov,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                command=cmd,
+            ).pack(side="right", padx=3)
+
+        # ── Fila 2: tabla (sin scroll horizontal) ─────────────────────────────
+        table_frame = ctk.CTkFrame(self, corner_radius=10, fg_color="#FFFFFF",
+                                   border_width=1, border_color="#E2E8F0")
+        table_frame.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 4))
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
 
@@ -75,7 +111,7 @@ class InventoryScreen(ctk.CTkFrame):
         style.theme_use("clam")
         style.configure("Inv.Treeview",
                         background="#FFFFFF", foreground="#0F172A",
-                        rowheight=30, fieldbackground="#FFFFFF",
+                        rowheight=32, fieldbackground="#FFFFFF",
                         borderwidth=0, font=("Segoe UI", 11))
         style.configure("Inv.Treeview.Heading",
                         background="#F1F5F9", foreground="#64748B",
@@ -85,42 +121,63 @@ class InventoryScreen(ctk.CTkFrame):
                   foreground=[("selected", "#2563EB")])
         style.layout("Inv.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
-        cols = ("id", "barcode", "nombre", "categoria", "precio", "stock", "minimo", "vencimiento", "estado")
+        cols = ("barcode", "nombre", "stock", "minimo", "proveedor", "precio", "vencimiento", "estado")
         self.tree = ttk.Treeview(table_frame, columns=cols, show="headings",
                                   style="Inv.Treeview", selectmode="browse")
 
-        headers = {
-            "id": ("ID", 40), "barcode": ("Código", 100), "nombre": ("Producto", 210),
-            "categoria": ("Categoría", 110), "precio": ("Precio", 70),
-            "stock": ("Stock", 55), "minimo": ("Mín.", 55),
-            "vencimiento": ("Vencimiento", 100), "estado": ("Estado", 90),
-        }
-        for col, (heading, width) in headers.items():
+        # nombre stretch=True absorbe el espacio sobrante → sin scroll horizontal
+        for col, heading, width, anchor, stretch in [
+            ("barcode",     "Código",            115, "center", False),
+            ("nombre",      "Nombre",            220, "w",      True),
+            ("stock",       "Stock",              55, "center", False),
+            ("minimo",      "Mín.",               50, "center", False),
+            ("proveedor",   "Proveedor",         120, "w",      False),
+            ("precio",      "Precio venta",       82, "e",      False),
+            ("vencimiento", "Próx. vencimiento", 108, "center", False),
+            ("estado",      "Estado",             90, "center", False),
+        ]:
             self.tree.heading(col, text=heading)
-            self.tree.column(col, width=width, minwidth=width, 
-                             anchor="center" if col not in ("nombre",) else "w",
-                             stretch=True if col == "nombre" else False)
+            self.tree.column(col, width=width, minwidth=40,
+                             anchor=anchor, stretch=stretch)
 
-        self.tree.tag_configure("low_stock", foreground="#D97706", background="#FFFBEB")
-        self.tree.tag_configure("expiring",  foreground="#DC2626", background="#FEF2F2")
-        self.tree.tag_configure("ok",        foreground="#16A34A")
+        self.tree.tag_configure("low_stock", background="#FFFBEB", foreground="#D97706")
+        self.tree.tag_configure("expiring",  background="#FEF2F2", foreground="#DC2626")
+        self.tree.tag_configure("ok",        background="#FFFFFF")
+        self.tree.tag_configure("alt",       background="#F8FAFF")
 
         scroll_y = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        scroll_x = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
+        self.tree.configure(yscrollcommand=scroll_y.set)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         scroll_y.grid(row=0, column=1, sticky="ns")
-        scroll_x.grid(row=1, column=0, sticky="ew")
 
-        self.tree.bind("<Double-1>", lambda e: self._editar_producto())
+        self.tree.bind("<Double-1>",         lambda e: self._editar_producto())
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-        # Status bar
+        # ── Fila 3: barra de estado ───────────────────────────────────────────
         self.lbl_status = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=11),
-                                        text_color="gray60")
-        self.lbl_status.grid(row=2, column=0, padx=12, pady=(0, 4), sticky="w")
+                                        text_color="#94A3B8")
+        self.lbl_status.grid(row=3, column=0, padx=14, pady=(0, 6), sticky="w")
 
         self._load_products()
+
+    def _on_tree_select(self, event=None):
+        sel = self.tree.selection()
+        if sel:
+            pid = int(sel[0])
+            db = get_db_session()
+            try:
+                p = db.query(Producto).filter(Producto.id == pid).first()
+                if p:
+                    nombre = p.nombre[:45] + ("…" if len(p.nombre) > 45 else "")
+                    self.lbl_selected.configure(
+                        text=f"📦 {nombre}", text_color="#0F172A")
+            finally:
+                db.close()
+        else:
+            self.lbl_selected.configure(
+                text="Selecciona un producto para usar las acciones →",
+                text_color="#94A3B8")
 
     def _load_products(self):
         for row in self.tree.get_children():
@@ -141,25 +198,46 @@ class InventoryScreen(ctk.CTkFrame):
                     )
                 )
 
-            filtro = self.var_filter.get()
+            filtro = self._filter_var.get()
             if filtro == "Stock Bajo":
-                q = q.filter(Producto.stock <= Producto.stock_minimo)
+                q = q.filter(Producto.stock < Producto.stock_minimo, Producto.stock > 0)
+            elif filtro == "Sin Stock":
+                q = q.filter(Producto.stock <= 0)
 
-            productos = q.order_by(Producto.nombre).all()
+            sort = self._sort_var.get()
+            if sort == "Z → A":
+                q = q.order_by(Producto.nombre.desc())
+            elif sort == "Mayor stock":
+                q = q.order_by(Producto.stock.desc())
+            elif sort == "Menor stock":
+                q = q.order_by(Producto.stock.asc())
+            elif sort == "Precio ↑":
+                q = q.order_by(Producto.precio_venta.asc())
+            elif sort == "Precio ↓":
+                q = q.order_by(Producto.precio_venta.desc())
+            else:
+                q = q.order_by(Producto.nombre.asc())
+
+            productos = q.all()
 
             hoy = date.today()
             alerta_dias = hoy + timedelta(days=cfg.EXPIRY_ALERT_DAYS)
 
-            for p in productos:
-                # Lote con vencimiento mas proximo
-                lote_prox = None
-                if p.lotes:
-                    lotes_validos = [l for l in p.lotes if l.fecha_vencimiento and l.cantidad > 0]
-                    if lotes_validos:
-                        lote_prox = min(lotes_validos, key=lambda l: l.fecha_vencimiento)
+            # Filtro Por Vencer requiere datos de lotes
+            if filtro == "Por Vencer":
+                productos = [p for p in productos if any(
+                    l.fecha_vencimiento and l.cantidad > 0 and l.fecha_vencimiento <= alerta_dias
+                    for l in p.lotes
+                )]
 
-                vencim_str = ""
-                tag = "ok"
+            for i, p in enumerate(productos):
+                lote_prox = None
+                lotes_validos = [l for l in p.lotes if l.fecha_vencimiento and l.cantidad > 0]
+                if lotes_validos:
+                    lote_prox = min(lotes_validos, key=lambda l: l.fecha_vencimiento)
+
+                vencim_str = "Sin fecha"
+                tag = "alt" if i % 2 else "ok"
 
                 if lote_prox:
                     vencim_str = lote_prox.fecha_vencimiento.strftime("%d/%m/%Y")
@@ -169,15 +247,10 @@ class InventoryScreen(ctk.CTkFrame):
                     elif lote_prox.fecha_vencimiento <= alerta_dias:
                         tag = "expiring"
 
-                if p.stock <= p.stock_minimo:
+                if tag not in ("expiring",) and p.stock <= p.stock_minimo:
                     tag = "low_stock"
 
-                # Skip si filtro por vencer
-                if filtro == "Por Vencer":
-                    if not lote_prox or lote_prox.fecha_vencimiento > alerta_dias:
-                        continue
-
-                estado = "OK"
+                estado = "Activo"
                 if p.stock <= 0:
                     estado = "⛔ Sin stock"
                 elif p.stock <= p.stock_minimo:
@@ -185,21 +258,24 @@ class InventoryScreen(ctk.CTkFrame):
                 elif lote_prox and lote_prox.fecha_vencimiento <= alerta_dias:
                     estado = "⚠ Por vencer"
 
+                proveedor = (p.proveedor.nombre[:18] if p.proveedor else "—")
+
                 self.tree.insert("", "end", iid=str(p.id), values=(
-                    p.id,
-                    p.codigo_barras or "",
+                    p.codigo_barras or "–",
                     p.nombre,
-                    p.categoria.nombre if p.categoria else "",
-                    f"${p.precio_venta:.2f}",
                     p.stock,
                     p.stock_minimo,
+                    proveedor,
+                    f"${p.precio_venta:.2f}",
                     vencim_str,
                     estado,
                 ), tags=(tag,))
 
             total = len(productos)
-            low = sum(1 for p in productos if p.stock <= p.stock_minimo)
-            self.lbl_status.configure(text=f"Total: {total} productos  |  Stock bajo: {low}")
+            low   = sum(1 for p in productos if p.stock <= p.stock_minimo)
+            self.lbl_count.configure(text=f"{total} producto(s)")
+            self.lbl_status.configure(text=f"Total: {total}  |  Stock bajo: {low}"
+                                          + (f"  |  Filtro: {filtro}" if filtro != "Todos" else ""))
 
         finally:
             db.close()

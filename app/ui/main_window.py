@@ -390,7 +390,12 @@ class MainWindow(ctk.CTkToplevel):
         self._lbl_live_tr = ctk.CTkLabel(
             inner, text="🏦 $0.00",
             font=ctk.CTkFont(size=11), text_color="#7C3AED")
-        self._lbl_live_tr.pack(side="left", padx=(0, 16))
+        self._lbl_live_tr.pack(side="left", padx=(0, 8))
+
+        self._lbl_live_dev = ctk.CTkLabel(
+            inner, text="",
+            font=ctk.CTkFont(size=11), text_color="#DC2626")
+        self._lbl_live_dev.pack(side="left", padx=(0, 8))
 
         self._lbl_live_time = ctk.CTkLabel(
             inner, text="",
@@ -410,7 +415,10 @@ class MainWindow(ctk.CTkToplevel):
         def fetch():
             try:
                 from app.database.connection import get_db_session
-                from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago
+                from app.database.models import (
+                    CortesCaja, Venta, EstadoVenta, MetodoPago,
+                    MovimientoStock, TipoMovimiento, ItemVenta,
+                )
                 db = get_db_session()
                 try:
                     cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
@@ -420,6 +428,7 @@ class MainWindow(ctk.CTkToplevel):
                     cajeros = []
                     tot_ef = tot_tj = tot_tr = 0.0
                     tot_v  = 0
+                    tot_dev = 0.0
                     for c in cortes:
                         cajeros.append(c.usuario.nombre if c.usuario else f"#{c.id}")
                         ventas = db.query(Venta).filter(
@@ -433,13 +442,30 @@ class MainWindow(ctk.CTkToplevel):
                         tot_ef += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
                         tot_tj += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
                         tot_tr += sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+                        # Devoluciones parciales del turno
+                        dev_movs = db.query(MovimientoStock).filter(
+                            MovimientoStock.tipo == TipoMovimiento.devolucion,
+                            MovimientoStock.referencia_tipo == "devolucion",
+                            MovimientoStock.usuario_id == c.usuario_id,
+                            MovimientoStock.creado_en >= c.abierto_en,
+                            MovimientoStock.creado_en <= now,
+                        ).all()
+                        for mov in dev_movs:
+                            orig = db.query(ItemVenta).filter(
+                                ItemVenta.venta_id == mov.referencia_id,
+                                ItemVenta.producto_id == mov.producto_id,
+                            ).first()
+                            if orig:
+                                tot_dev += orig.precio_unitario * mov.cantidad
+                    bruto = tot_ef + tot_tj + tot_tr
                     return {
                         "cajeros": cajeros,
                         "num_ventas": tot_v,
-                        "total": tot_ef + tot_tj + tot_tr,
+                        "total": bruto - tot_dev,
                         "efectivo": tot_ef,
                         "tarjeta": tot_tj,
                         "transferencia": tot_tr,
+                        "devoluciones": tot_dev,
                     }
                 finally:
                     db.close()
@@ -462,6 +488,11 @@ class MainWindow(ctk.CTkToplevel):
             self._lbl_live_ef.configure(text=f"💵 ${data['efectivo']:,.2f}")
             self._lbl_live_tj.configure(text=f"💳 ${data['tarjeta']:,.2f}")
             self._lbl_live_tr.configure(text=f"🏦 ${data['transferencia']:,.2f}")
+            dev = data.get("devoluciones", 0.0)
+            if dev > 0:
+                self._lbl_live_dev.configure(text=f"🔄 -${dev:,.2f}")
+            else:
+                self._lbl_live_dev.configure(text="")
             self._lbl_live_time.configure(
                 text=f"Actualizado {datetime.now().strftime('%H:%M:%S')}")
             self._live_bar_frame.grid()
@@ -620,8 +651,8 @@ class MainWindow(ctk.CTkToplevel):
         self.bind_all("<F6>",  lambda e: self._show_screen("inventory"))
         self.bind_all("<F7>",  lambda e: self._show_screen("reports"))
         self.bind_all("<F8>",  lambda e: self._sc_pos_discount())
-        self.bind_all("<F9>",  lambda e: self._sc_pos_cobrar())
-        self.bind_all("<F10>", lambda e: self._sc_pos_consulta_precios())
+        self.bind_all("<F9>",  lambda e: self._sc_pos_consulta_precios())
+        self.bind_all("<F10>", lambda e: self._sc_pos_cobrar())
         self.bind_all("<Key>", self._scanner_key_handler)
 
     def _get_pos(self):

@@ -4,10 +4,46 @@ from typing import Optional
 from datetime import datetime, date as _date_type
 from sqlalchemy import func
 from app.database.connection import get_db_session
-from app.database.models import CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
+from app.database.models import (
+    CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago,
+    ItemVenta, Producto, MovimientoStock, TipoMovimiento,
+)
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
+
+
+def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) -> float:
+    """
+    Monetary value of partial returns processed by usuario_id in [desde, hasta].
+    Full returns already excluded via venta.estado=devolucion filter.
+    Partial returns leave the original venta as completada but generate
+    MovimientoStock(tipo=devolucion) entries — we price those here.
+    """
+    dev_movs = (
+        db.query(MovimientoStock)
+        .filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_tipo == "devolucion",
+            MovimientoStock.usuario_id == usuario_id,
+            MovimientoStock.creado_en >= desde,
+            MovimientoStock.creado_en <= hasta,
+        )
+        .all()
+    )
+    total = 0.0
+    for mov in dev_movs:
+        orig = (
+            db.query(ItemVenta)
+            .filter(
+                ItemVenta.venta_id == mov.referencia_id,
+                ItemVenta.producto_id == mov.producto_id,
+            )
+            .first()
+        )
+        if orig:
+            total += orig.precio_unitario * mov.cantidad
+    return total
 
 
 def _calc_disponibles(db):
@@ -95,6 +131,9 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
         ganancia   = tv - total_costo
         disponible = ganancia - total_retiros
 
+        total_devoluciones = _calc_devoluciones(db, usuario_id, c.abierto_en, datetime.now())
+        ventas_netas = tv - total_devoluciones
+
         return {
             "abierto":          True,
             "id":               c.id,
@@ -111,6 +150,8 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             "disponible":       disponible,
             "esperado_caja":    c.monto_apertura + ef - total_retiros,
             "notas":            c.notas or "",
+            "total_devoluciones": total_devoluciones,
+            "ventas_netas":       ventas_netas,
             "retiros": [
                 {"id": r.id, "monto": r.monto, "concepto": r.concepto or "",
                  "creado_en": r.creado_en.isoformat() if r.creado_en else None}
@@ -202,6 +243,8 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             c.notas = body.notas
 
         apertura = c.monto_apertura  # cache before commit (object expires after commit)
+        total_devoluciones = _calc_devoluciones(db, usuario_id, c.abierto_en, ahora)
+        ventas_netas = tv - total_devoluciones
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
@@ -209,18 +252,20 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             bg.add_task(sync_to_turso)
         diferencia = body.monto_cierre - (apertura + ef)
         return {
-            "ok":            True,
-            "num_ventas":    len(ventas),
-            "total_ventas":  tv,
-            "efectivo":      ef,
-            "tarjeta":       tj,
-            "transferencia": tr,
-            "total_costo":   total_costo,
-            "ganancia":      tv - total_costo,
-            "monto_apertura": apertura,
-            "monto_cierre":  body.monto_cierre,
-            "esperado":      apertura + ef,
-            "diferencia":    diferencia,
+            "ok":                 True,
+            "num_ventas":         len(ventas),
+            "total_ventas":       tv,
+            "efectivo":           ef,
+            "tarjeta":            tj,
+            "transferencia":      tr,
+            "total_costo":        total_costo,
+            "ganancia":           tv - total_costo,
+            "monto_apertura":     apertura,
+            "monto_cierre":       body.monto_cierre,
+            "esperado":           apertura + ef,
+            "diferencia":         diferencia,
+            "total_devoluciones": total_devoluciones,
+            "ventas_netas":       ventas_netas,
         }
     except HTTPException:
         raise
@@ -259,6 +304,8 @@ def historial_cajero(
             tc  = c.total_costo          or 0.0
             ape = c.monto_apertura       or 0.0
             dif = (c.monto_cierre - (ape + ef)) if c.monto_cierre is not None else None
+            hasta = c.cerrado_en or datetime.now()
+            total_dev = _calc_devoluciones(db, usuario_id, c.abierto_en, hasta) if c.abierto_en else 0.0
             result.append({
                 "id":               c.id,
                 "abierto_en":       c.abierto_en.isoformat() if c.abierto_en else None,
@@ -276,6 +323,8 @@ def historial_cajero(
                 "esperado_caja":    ape + ef,
                 "diferencia":       dif,
                 "abierto":          c.cerrado_en is None,
+                "total_devoluciones": total_dev,
+                "ventas_netas":       tv - total_dev,
             })
         return result
     finally:

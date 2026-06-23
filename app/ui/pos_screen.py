@@ -316,18 +316,26 @@ class PosScreen(ctk.CTkFrame):
         btn_row.grid_columnconfigure(0, weight=1)
 
         ctk.CTkButton(
-            btn_row, text="🔍 Precios F10", height=50, width=110,
+            btn_row, text="🔍 Precios F9", height=50, width=110,
             font=ctk.CTkFont(size=12, weight="bold"),
             fg_color="#7C3AED", hover_color="#6D28D9", corner_radius=0,
             command=self._abrir_consulta_precios,
         ).grid(row=0, column=1, sticky="ew")
 
         ctk.CTkButton(
-            btn_row, text="💰  COBRAR  F9", height=50,
+            btn_row, text="💰  COBRAR  F10", height=50,
             font=ctk.CTkFont(size=16, weight="bold"),
             fg_color=GREEN, hover_color=GREEN_D, corner_radius=0,
             command=self._cobrar,
         ).grid(row=0, column=0, sticky="ew")
+
+        ctk.CTkButton(
+            bottom, text="🔄  Devolución / Ajuste", height=32,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#F59E0B", hover_color="#D97706", corner_radius=0,
+            text_color=WHITE,
+            command=self._abrir_devolucion,
+        ).grid(row=7, column=0, sticky="ew")
 
     # ── Lógica ────────────────────────────────────────────────────────────────
 
@@ -1243,7 +1251,7 @@ class PosScreen(ctk.CTkFrame):
         ).pack(side="left", padx=(0, 6))
 
         ctk.CTkButton(
-            btn_frame, text="🖨 Imprimir Cotización  [F10]", height=38,
+            btn_frame, text="🖨 Imprimir Cotización  [F9]", height=38,
             fg_color="#7C3AED", hover_color="#6D28D9", text_color=WHITE,
             font=ctk.CTkFont(size=13, weight="bold"),
             command=_imprimir,
@@ -1368,9 +1376,267 @@ class PosScreen(ctk.CTkFrame):
             except Exception:
                 pass
 
-        win.bind("<F10>", lambda e: _imprimir())
+        win.bind("<F9>", lambda e: _imprimir())
         win.bind("<Escape>", lambda e: win.destroy())
         entry_scan.focus()
+
+    # ── Devolución / Ajuste ───────────────────────────────────────────────────
+
+    def _abrir_devolucion(self):
+        win = ctk.CTkToplevel(self)
+        win.title("Devolución / Ajuste de Venta")
+        win.geometry("540x560")
+        win.grab_set()
+        win.resizable(False, True)
+
+        win._venta = None
+        win._dev_entries = []  # (producto_id, nombre, qty_orig, entry_widget)
+
+        # ── Title ─────────────────────────────────────────────────────────────
+        ctk.CTkLabel(win, text="🔄  Devolución / Ajuste de Venta",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color=TEXT).pack(anchor="w", padx=16, pady=(16, 0))
+        ctk.CTkLabel(win, text="Busca la venta por folio y ajusta las cantidades a devolver",
+                     font=ctk.CTkFont(size=11), text_color=MUTED).pack(anchor="w", padx=16, pady=(2, 10))
+
+        # ── Folio search row ──────────────────────────────────────────────────
+        search_row = ctk.CTkFrame(win, fg_color="transparent")
+        search_row.pack(fill="x", padx=16, pady=(0, 8))
+
+        ctk.CTkLabel(search_row, text="Folio:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        entry_folio = ctk.CTkEntry(search_row, placeholder_text="V20250622143022...", width=210, height=34)
+        entry_folio.pack(side="left", padx=(8, 4))
+        lbl_estado = ctk.CTkLabel(search_row, text="", font=ctk.CTkFont(size=11))
+        lbl_estado.pack(side="left", padx=4)
+
+        # ── Items area ────────────────────────────────────────────────────────
+        items_outer = ctk.CTkFrame(win, corner_radius=10, fg_color=SURF,
+                                   border_width=1, border_color=BORDER)
+        items_outer.pack(fill="both", expand=True, padx=16, pady=(0, 8))
+        lbl_hint = ctk.CTkLabel(items_outer,
+                                text="Ingresa un folio y presiona Buscar",
+                                text_color=MUTED_L, font=ctk.CTkFont(size=12))
+        lbl_hint.pack(pady=30)
+
+        # ── Motivo ────────────────────────────────────────────────────────────
+        mot_row = ctk.CTkFrame(win, fg_color="transparent")
+        mot_row.pack(fill="x", padx=16, pady=(0, 6))
+        ctk.CTkLabel(mot_row, text="Motivo:", font=ctk.CTkFont(size=12)).pack(side="left")
+        entry_motivo = ctk.CTkEntry(mot_row,
+                                    placeholder_text="Opcional (ej: producto incorrecto, cobré de más...)",
+                                    height=30)
+        entry_motivo.pack(side="left", fill="x", expand=True, padx=8)
+
+        # ── Functions ─────────────────────────────────────────────────────────
+
+        def _buscar():
+            folio = entry_folio.get().strip().upper()
+            if not folio:
+                return
+            for w in items_outer.winfo_children():
+                w.destroy()
+            win._venta = None
+            win._dev_entries = []
+
+            db = get_db_session()
+            try:
+                from sqlalchemy.orm import selectinload as _sl
+                venta = (
+                    db.query(Venta)
+                    .options(_sl(Venta.items).selectinload(ItemVenta.producto))
+                    .filter(Venta.folio == folio, Venta.eliminado.is_not(True))
+                    .first()
+                )
+                if not venta:
+                    lbl_estado.configure(text="❌ No encontrado", text_color=RED)
+                    ctk.CTkLabel(items_outer, text="Folio no encontrado",
+                                 text_color=RED, font=ctk.CTkFont(size=12)).pack(pady=30)
+                    return
+
+                fecha_str = venta.creado_en.strftime("%d/%m %H:%M") if venta.creado_en else ""
+                lbl_estado.configure(
+                    text=f"✓ ${venta.total:.2f}  {fecha_str}",
+                    text_color=GREEN,
+                )
+                win._venta = {"id": venta.id, "folio": venta.folio}
+
+                # Column headers
+                hdr_f = ctk.CTkFrame(items_outer, fg_color=CONT, corner_radius=0)
+                hdr_f.pack(fill="x")
+                hdr_f.grid_columnconfigure(0, weight=1)
+                ctk.CTkLabel(hdr_f, text="Producto", font=ctk.CTkFont(size=10, weight="bold"),
+                             text_color=MUTED, anchor="w").grid(row=0, column=0, padx=8, pady=4, sticky="w")
+                ctk.CTkLabel(hdr_f, text="Vendido", font=ctk.CTkFont(size=10, weight="bold"),
+                             text_color=MUTED, width=65).grid(row=0, column=1, padx=4, pady=4)
+                ctk.CTkLabel(hdr_f, text="Devolver", font=ctk.CTkFont(size=10, weight="bold"),
+                             text_color=MUTED, width=68).grid(row=0, column=2, padx=(0, 8), pady=4)
+
+                scroll = ctk.CTkScrollableFrame(items_outer, fg_color="transparent")
+                scroll.pack(fill="both", expand=True, padx=4, pady=4)
+                scroll.grid_columnconfigure(0, weight=1)
+
+                for i, item in enumerate(venta.items):
+                    nombre = item.producto.nombre if item.producto else f"Producto {item.producto_id}"
+                    bg = "#F8FAFF" if i % 2 == 0 else WHITE
+
+                    row_f = ctk.CTkFrame(scroll, fg_color=bg, corner_radius=6)
+                    row_f.pack(fill="x", pady=2)
+                    row_f.grid_columnconfigure(0, weight=1)
+
+                    ctk.CTkLabel(row_f, text=nombre[:40],
+                                 font=ctk.CTkFont(size=11), anchor="w").grid(
+                        row=0, column=0, padx=8, pady=6, sticky="w")
+
+                    ctk.CTkLabel(row_f, text=f"×{item.cantidad}",
+                                 font=ctk.CTkFont(size=11), text_color=MUTED,
+                                 width=65).grid(row=0, column=1, padx=4)
+
+                    e = ctk.CTkEntry(row_f, width=62, height=28, justify="center")
+                    e.insert(0, "0")
+                    e.grid(row=0, column=2, padx=(0, 8), pady=4)
+
+                    win._dev_entries.append((item.producto_id, nombre, item.cantidad, e))
+            finally:
+                db.close()
+
+        def _confirmar():
+            if not win._venta:
+                messagebox.showwarning("Sin venta", "Busca una venta primero", parent=win)
+                return
+
+            items_dev = []
+            for prod_id, nombre, qty_orig, e in win._dev_entries:
+                raw = e.get().strip()
+                try:
+                    qty = int(raw) if raw else 0
+                except ValueError:
+                    messagebox.showwarning("Error", f"Cantidad inválida en '{nombre}'", parent=win)
+                    return
+                if qty < 0:
+                    messagebox.showwarning("Error", f"Cantidad negativa en '{nombre}'", parent=win)
+                    return
+                if qty > qty_orig:
+                    messagebox.showwarning("Error",
+                        f"'{nombre[:30]}': máximo {qty_orig} (vendido)", parent=win)
+                    return
+                if qty > 0:
+                    items_dev.append({"producto_id": prod_id, "cantidad": qty, "nombre": nombre})
+
+            if not items_dev:
+                messagebox.showwarning("Sin items",
+                    "Indica al menos 1 unidad a devolver", parent=win)
+                return
+
+            motivo = entry_motivo.get().strip()
+            resumen = "\n".join(f"  • {d['nombre'][:32]}: {d['cantidad']}" for d in items_dev)
+            if not messagebox.askyesno(
+                "Confirmar devolución",
+                f"Folio: {win._venta['folio']}\n\nDevolver:\n{resumen}"
+                + (f"\n\nMotivo: {motivo}" if motivo else "")
+                + "\n\n¿Confirmar? Se restaurará el stock.",
+                parent=win,
+            ):
+                return
+
+            db = get_db_session()
+            try:
+                from sqlalchemy.orm import selectinload as _sl
+                venta = (
+                    db.query(Venta)
+                    .options(_sl(Venta.items).selectinload(ItemVenta.producto))
+                    .filter(Venta.id == win._venta["id"])
+                    .first()
+                )
+                if not venta:
+                    raise ValueError("Venta no encontrada")
+
+                orig_items = {i.producto_id: i for i in venta.items}
+                total_dev = 0.0
+                nota_parts = []
+
+                for d in items_dev:
+                    orig = orig_items.get(d["producto_id"])
+                    prod = db.query(Producto).filter(Producto.id == d["producto_id"]).first()
+                    if prod:
+                        stock_ant = prod.stock
+                        prod.stock += d["cantidad"]
+                        db.add(MovimientoStock(
+                            producto_id=d["producto_id"],
+                            tipo=TipoMovimiento.devolucion,
+                            cantidad=d["cantidad"],
+                            stock_anterior=stock_ant,
+                            stock_nuevo=prod.stock,
+                            referencia_id=venta.id,
+                            referencia_tipo="devolucion",
+                            usuario_id=self.user.id,
+                            notas=f"Dev. {venta.folio}" + (f" | {motivo}" if motivo else ""),
+                        ))
+                    if orig:
+                        total_dev += orig.precio_unitario * d["cantidad"]
+                    nota_parts.append(f"{d['nombre'][:20]} x{d['cantidad']}")
+
+                # Mark sale as devolucion if all items fully returned
+                dev_map = {d["producto_id"]: d["cantidad"] for d in items_dev}
+                if all(dev_map.get(pid, 0) >= orig.cantidad for pid, orig in orig_items.items()):
+                    venta.estado = EstadoVenta.devolucion
+
+                nota_dev = (
+                    f"[DEV {datetime.now().strftime('%d/%m %H:%M')}: {', '.join(nota_parts)}]"
+                )
+                if motivo:
+                    nota_dev += f" Motivo:{motivo}"
+                venta.notas = ((venta.notas or "").strip() + " " + nota_dev).strip()
+
+                db.commit()
+
+                import app.config as _cfg
+                if _cfg.TURSO_SYNC:
+                    from app.database.sync_service import sync_to_turso
+                    import threading as _t
+                    _t.Thread(target=sync_to_turso, daemon=True).start()
+
+                registrar_accion(
+                    "DEVOLUCION", "ventas", venta.id,
+                    f"Folio:{venta.folio} Dev:${total_dev:.2f}",
+                )
+                messagebox.showinfo(
+                    "Devolución registrada",
+                    f"✓ Folio: {venta.folio}\n\n"
+                    + "Stock restaurado:\n"
+                    + "\n".join(f"  • {d['nombre'][:30]}: +{d['cantidad']}" for d in items_dev)
+                    + f"\n\nTotal devuelto: ${total_dev:.2f}",
+                    parent=win,
+                )
+                win.destroy()
+
+            except Exception as ex:
+                db.rollback()
+                messagebox.showerror("Error",
+                    f"Error al registrar devolución:\n{ex}", parent=win)
+            finally:
+                db.close()
+
+        # ── Buttons ───────────────────────────────────────────────────────────
+        ctk.CTkButton(search_row, text="🔍 Buscar", width=88, height=34,
+                      fg_color=BLUE, hover_color=BLUE_D,
+                      command=_buscar).pack(side="left", padx=(0, 4))
+
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=16, pady=(0, 16))
+
+        ctk.CTkButton(btn_row, text="✕ Cancelar", height=36, width=110,
+                      fg_color=SURF, hover_color=BORDER, text_color=MUTED,
+                      border_width=1, border_color=BORDER,
+                      command=win.destroy).pack(side="left")
+
+        ctk.CTkButton(btn_row, text="✓ Registrar Devolución", height=36,
+                      fg_color=GREEN, hover_color=GREEN_D,
+                      font=ctk.CTkFont(size=13, weight="bold"),
+                      command=_confirmar).pack(side="right")
+
+        entry_folio.bind("<Return>", lambda e: _buscar())
+        win.bind("<Escape>", lambda e: win.destroy())
+        entry_folio.focus_set()
 
     def on_show(self):
         self._verificar_corte_abierto()
