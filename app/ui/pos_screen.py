@@ -311,12 +311,23 @@ class PosScreen(ctk.CTkFrame):
         self.lbl_cambio.pack(side="left", padx=8)
 
         # Botón cobrar
+        btn_row = ctk.CTkFrame(bottom, corner_radius=0, fg_color="transparent")
+        btn_row.grid(row=6, column=0, sticky="ew")
+        btn_row.grid_columnconfigure(0, weight=1)
+
         ctk.CTkButton(
-            bottom, text="💰   COBRAR  [F10]", height=50,
+            btn_row, text="🔍 Precios F10", height=50, width=110,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#7C3AED", hover_color="#6D28D9", corner_radius=0,
+            command=self._abrir_consulta_precios,
+        ).grid(row=0, column=1, sticky="ew")
+
+        ctk.CTkButton(
+            btn_row, text="💰  COBRAR  F9", height=50,
             font=ctk.CTkFont(size=16, weight="bold"),
             fg_color=GREEN, hover_color=GREEN_D, corner_radius=0,
             command=self._cobrar,
-        ).grid(row=6, column=0, sticky="ew")
+        ).grid(row=0, column=0, sticky="ew")
 
     # ── Lógica ────────────────────────────────────────────────────────────────
 
@@ -1070,6 +1081,296 @@ class PosScreen(ctk.CTkFrame):
                       fg_color=GREEN, hover_color=GREEN_D, corner_radius=10,
                       font=ctk.CTkFont(size=13, weight="bold"),
                       command=confirmar).pack(pady=12, fill="x", padx=30)
+
+    # ── Consulta de Precios ───────────────────────────────────────────────────
+
+    def _abrir_consulta_precios(self):
+        from sqlalchemy.orm import joinedload
+        consulta_items: list[dict] = []
+
+        win = ctk.CTkToplevel(self)
+        win.title("Consulta de Precios")
+        win.geometry("520x560")
+        win.resizable(False, True)
+        win.grab_set()
+        win.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - 520) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 560) // 2
+        win.geometry(f"520x560+{x}+{y}")
+
+        # ── Header ────────────────────────────────────────────────────────────
+        hdr = ctk.CTkFrame(win, corner_radius=0, fg_color="#7C3AED", height=52)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        ctk.CTkLabel(hdr, text="🔍  Consulta de Precios",
+                     font=ctk.CTkFont(size=15, weight="bold"),
+                     text_color=WHITE).pack(side="left", padx=16, pady=12)
+        ctk.CTkLabel(hdr, text="No agrega al carrito",
+                     font=ctk.CTkFont(size=11),
+                     text_color="#C4B5FD").pack(side="left")
+
+        # ── Barra escaneo ─────────────────────────────────────────────────────
+        scan_bar = ctk.CTkFrame(win, fg_color=WHITE,
+                                border_width=1, border_color=BORDER, corner_radius=0)
+        scan_bar.pack(fill="x")
+        scan_bar.grid_columnconfigure(0, weight=1)
+
+        entry_scan = ctk.CTkEntry(
+            scan_bar,
+            placeholder_text="Escanear código o escribir nombre...",
+            height=42, font=ctk.CTkFont(size=13),
+            corner_radius=0, border_width=0,
+        )
+        entry_scan.grid(row=0, column=0, padx=(12, 0), pady=8, sticky="ew")
+
+        ctk.CTkButton(
+            scan_bar, text="Buscar", width=80, height=36,
+            fg_color="#7C3AED", hover_color="#6D28D9",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            corner_radius=8,
+            command=lambda: _buscar(),
+        ).grid(row=0, column=1, padx=(6, 12), pady=8)
+
+        # ── Lista de resultados de búsqueda ───────────────────────────────────
+        results_frame = ctk.CTkScrollableFrame(
+            win, corner_radius=0, fg_color=SURF,
+            border_width=1, border_color=BORDER,
+            height=140,
+        )
+        results_frame.pack(fill="x", padx=0, pady=0)
+        results_frame.grid_columnconfigure(0, weight=1)
+
+        lbl_results_hint = ctk.CTkLabel(
+            results_frame, text="Escanea o escribe para buscar",
+            text_color=MUTED_L, font=ctk.CTkFont(size=12),
+        )
+        lbl_results_hint.pack(pady=20)
+
+        # ── Separador ─────────────────────────────────────────────────────────
+        ctk.CTkFrame(win, height=1, fg_color="#7C3AED", corner_radius=0).pack(fill="x")
+
+        # ── Tabla de items consultados ─────────────────────────────────────────
+        ctk.CTkLabel(win, text="Productos consultados:",
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=MUTED, anchor="w").pack(fill="x", padx=12, pady=(8, 2))
+
+        import app.config as _cfg
+        cols_c = ("nombre", "precio", "iva", "stock")
+        style2 = ttk.Style()
+        style2.configure("Consulta.Treeview",
+                         background=WHITE, foreground=TEXT,
+                         rowheight=30, fieldbackground=WHITE,
+                         borderwidth=0, font=("Segoe UI", 11))
+        style2.configure("Consulta.Treeview.Heading",
+                         background="#F5F3FF", foreground="#7C3AED",
+                         relief="flat", font=("Segoe UI", 11, "bold"), padding=(4, 4))
+        style2.map("Consulta.Treeview",
+                   background=[("selected", "#EDE9FE")],
+                   foreground=[("selected", "#7C3AED")])
+        style2.layout("Consulta.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+        tree_frame = ctk.CTkFrame(win, fg_color="transparent")
+        tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 4))
+        tree_frame.grid_columnconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(0, weight=1)
+
+        consulta_tree = ttk.Treeview(tree_frame, columns=cols_c, show="headings",
+                                     style="Consulta.Treeview", selectmode="browse")
+        consulta_tree.heading("nombre",  text="Producto")
+        consulta_tree.heading("precio",  text="Precio")
+        consulta_tree.heading("iva",     text="IVA")
+        consulta_tree.heading("stock",   text="Stock")
+        consulta_tree.column("nombre", width=240, anchor="w")
+        consulta_tree.column("precio", width=80,  anchor="e")
+        consulta_tree.column("iva",    width=60,  anchor="center")
+        consulta_tree.column("stock",  width=60,  anchor="center")
+        consulta_tree.tag_configure("even", background="#F5F3FF")
+        consulta_tree.tag_configure("odd",  background=WHITE)
+
+        scroll_c = ttk.Scrollbar(tree_frame, orient="vertical", command=consulta_tree.yview)
+        consulta_tree.configure(yscrollcommand=scroll_c.set)
+        consulta_tree.grid(row=0, column=0, sticky="nsew")
+        scroll_c.grid(row=0, column=1, sticky="ns")
+
+        # Delete key removes from consulta list
+        def _quitar_item(e=None):
+            sel = consulta_tree.selection()
+            if not sel:
+                return
+            idx = consulta_tree.index(sel[0])
+            if idx < len(consulta_items):
+                consulta_items.pop(idx)
+                _refresh_consulta()
+
+        consulta_tree.bind("<Delete>", _quitar_item)
+
+        # ── Totales ───────────────────────────────────────────────────────────
+        tot_frame = ctk.CTkFrame(win, fg_color=SURF, corner_radius=0,
+                                 border_width=1, border_color=BORDER)
+        tot_frame.pack(fill="x", padx=0, pady=0)
+
+        lbl_total_consulta = ctk.CTkLabel(
+            tot_frame, text="Total estimado: $0.00",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#7C3AED",
+        )
+        lbl_total_consulta.pack(side="left", padx=16, pady=10)
+
+        ctk.CTkLabel(tot_frame, text="(precios con IVA donde aplica)",
+                     font=ctk.CTkFont(size=10), text_color=MUTED_L).pack(side="left")
+
+        # ── Botones inferiores ────────────────────────────────────────────────
+        btn_frame = ctk.CTkFrame(win, corner_radius=0, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=8, padx=8)
+
+        def _imprimir():
+            if not consulta_items:
+                from tkinter import messagebox as mb
+                mb.showwarning("Sin items", "Agrega al menos un producto antes de imprimir.", parent=win)
+                return
+            ok = printer_service.print_price_check(consulta_items, self.user.nombre)
+            from tkinter import messagebox as mb
+            if ok:
+                mb.showinfo("Ticket impreso", "Cotización impresa correctamente.", parent=win)
+            else:
+                mb.showwarning("Impresora", "Cotización no imprimió — revisa la impresora en Configuración.", parent=win)
+
+        ctk.CTkButton(
+            btn_frame, text="✕ Limpiar", width=90, height=38,
+            fg_color=RED_L, hover_color="#FECACA", text_color=RED,
+            font=ctk.CTkFont(size=12),
+            command=lambda: (consulta_items.clear(), _refresh_consulta()),
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(
+            btn_frame, text="🖨 Imprimir Cotización  [F10]", height=38,
+            fg_color="#7C3AED", hover_color="#6D28D9", text_color=WHITE,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=_imprimir,
+        ).pack(side="right")
+
+        # ── Helpers internos ──────────────────────────────────────────────────
+
+        def _refresh_consulta():
+            for row in consulta_tree.get_children():
+                consulta_tree.delete(row)
+            total = 0.0
+            for idx, item in enumerate(consulta_items):
+                precio_final = item["precio"] * (1 + _cfg.TAX_RATE) if item["aplica_iva"] else item["precio"]
+                total += precio_final
+                tag = "even" if idx % 2 == 0 else "odd"
+                consulta_tree.insert("", "end", tags=(tag,), values=(
+                    item["nombre"][:32],
+                    f"${precio_final:.2f}",
+                    "Si" if item["aplica_iva"] else "No",
+                    item.get("stock", "?"),
+                ))
+            lbl_total_consulta.configure(text=f"Total estimado: ${total:.2f}")
+
+        def _mostrar_resultados_busqueda(productos: list):
+            for w2 in results_frame.winfo_children():
+                w2.destroy()
+            if not productos:
+                ctk.CTkLabel(results_frame, text="Sin resultados",
+                             text_color=MUTED_L, font=ctk.CTkFont(size=12)).pack(pady=16)
+                return
+            for d in productos:
+                precio_final = d["precio"] * (1 + _cfg.TAX_RATE) if d["aplica_iva"] else d["precio"]
+                stock_color = RED if d["stock"] <= 0 else ("#F59E0B" if d["stock"] <= 5 else GREEN)
+                row = ctk.CTkFrame(results_frame, corner_radius=8, fg_color=WHITE,
+                                   border_width=1, border_color=BORDER, cursor="hand2")
+                row.pack(fill="x", padx=4, pady=2)
+                row.grid_columnconfigure(0, weight=1)
+
+                ctk.CTkLabel(row, text=d["nombre"],
+                             font=ctk.CTkFont(size=12, weight="bold"),
+                             text_color=TEXT, anchor="w").grid(row=0, column=0, padx=10, pady=(6, 1), sticky="w")
+
+                info_txt = f"${precio_final:.2f}" + ("  +IVA" if d["aplica_iva"] else "")
+                if d.get("nombre_generico"):
+                    info_txt = d["nombre_generico"] + "  |  " + info_txt
+                ctk.CTkLabel(row, text=info_txt,
+                             font=ctk.CTkFont(size=11), text_color=MUTED, anchor="w").grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
+
+                stock_lbl = ctk.CTkFrame(row, corner_radius=6,
+                                         fg_color=GREEN_L if d["stock"] > 5 else ("#FEF9C3" if d["stock"] > 0 else RED_L))
+                stock_lbl.grid(row=0, column=1, rowspan=2, padx=(0, 10), pady=4)
+                ctk.CTkLabel(stock_lbl, text=f"  {d['stock']}  ",
+                             font=ctk.CTkFont(size=11, weight="bold"),
+                             text_color=stock_color).pack()
+
+                def _add_to_consulta(item=d):
+                    for existing in consulta_items:
+                        if existing["producto_id"] == item["id"]:
+                            return
+                    consulta_items.append({
+                        "producto_id": item["id"],
+                        "nombre": item["nombre"],
+                        "precio": item["precio"],
+                        "aplica_iva": item["aplica_iva"],
+                        "stock": item["stock"],
+                    })
+                    _refresh_consulta()
+                    for w2 in results_frame.winfo_children():
+                        w2.destroy()
+                    entry_scan.delete(0, "end")
+                    entry_scan.focus()
+
+                row.bind("<Button-1>", lambda e, fn=_add_to_consulta: fn())
+                for child in row.winfo_children():
+                    child.bind("<Button-1>", lambda e, fn=_add_to_consulta: fn())
+                    for grandchild in child.winfo_children():
+                        grandchild.bind("<Button-1>", lambda e, fn=_add_to_consulta: fn())
+
+        def _buscar():
+            query = entry_scan.get().strip()
+            if not query:
+                return
+            db = get_db_session()
+            try:
+                from sqlalchemy.orm import joinedload as _jl
+                prod = db.query(Producto).options(_jl(Producto.categoria)).filter(
+                    Producto.codigo_barras == query,
+                    Producto.activo == True,
+                ).first()
+                if prod:
+                    d = self._prod_to_dict(prod)
+                    for existing in consulta_items:
+                        if existing["producto_id"] == d["id"]:
+                            entry_scan.delete(0, "end")
+                            return
+                    consulta_items.append({
+                        "producto_id": d["id"],
+                        "nombre": d["nombre"],
+                        "precio": d["precio"],
+                        "aplica_iva": d["aplica_iva"],
+                        "stock": d["stock"],
+                    })
+                    _refresh_consulta()
+                    entry_scan.delete(0, "end")
+                    for w2 in results_frame.winfo_children():
+                        w2.destroy()
+                    return
+
+                productos = db.query(Producto).options(_jl(Producto.categoria)).filter(
+                    Producto.activo == True,
+                    Producto.nombre.ilike(f"%{query}%") |
+                    Producto.nombre_generico.ilike(f"%{query}%"),
+                ).limit(10).all()
+                _mostrar_resultados_busqueda([self._prod_to_dict(p) for p in productos])
+            finally:
+                db.close()
+
+        for event in ("<Return>", "<KP_Enter>", "<Tab>"):
+            entry_scan.bind(event, lambda e: _buscar())
+            try:
+                entry_scan._entry.bind(event, lambda e: _buscar())
+            except Exception:
+                pass
+
+        win.bind("<F10>", lambda e: _imprimir())
+        win.bind("<Escape>", lambda e: win.destroy())
+        entry_scan.focus()
 
     def on_show(self):
         self._verificar_corte_abierto()

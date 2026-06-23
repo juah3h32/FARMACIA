@@ -690,4 +690,86 @@ class PrinterService:
         return False
 
 
+    def print_price_check(self, items: list, cajero: str, farmacia_config: dict = None) -> bool:
+        """Print a price-check ticket (cotizacion). No sale is recorded."""
+        if farmacia_config is None:
+            farmacia_config = self._load_farmacia_config()
+
+        w = farmacia_config.get("impresora_ancho", "32")
+        self.width = int(w) if str(w).isdigit() else 32
+        tipo   = farmacia_config.get("impresora_tipo",   "windows")
+        puerto = farmacia_config.get("impresora_nombre") or farmacia_config.get("impresora_puerto", "")
+
+        if not self.connected:
+            self.connect(tipo, puerto or None)
+
+        ticket = self._build_price_check_ticket(items, cajero, farmacia_config)
+
+        if not self.connected:
+            _log("print_price_check: no conectada — mostrando en consola")
+            print(ticket)
+            return False
+
+        try:
+            if self.printer_type == "windows":
+                return self._print_raw_text(ticket, "Cotizacion Precios")
+            if self.printer:
+                self.printer.set(align="left", bold=False, height=1, width=1)
+                self.printer.text(ticket + "\n")
+                self.printer.cut()
+                return True
+        except Exception:
+            _log(f"print_price_check error: {traceback.format_exc()}")
+        return False
+
+    def _build_price_check_ticket(self, items: list, cajero: str, farmacia_config: dict) -> str:
+        cfg_d = farmacia_config or {}
+        nombre   = _s(cfg_d.get("farmacia_nombre", cfg.PHARMACY_NAME)).upper()
+        telefono = _s(cfg_d.get("farmacia_telefono", cfg.PHARMACY_PHONE))
+        W = self.width
+        sep  = "=" * W
+        sep2 = "-" * W
+
+        lines = [sep]
+        for ln in self._word_wrap(nombre, W):
+            lines.append(ln.center(W))
+        if telefono:
+            lines.append(f"TEL: {_s(telefono)}".center(W))
+        lines.append(sep)
+        lines.append("CONSULTA DE PRECIOS".center(W))
+        lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(W))
+        lines.append(f"ATIENDE: {_s(cajero).upper()}".center(W))
+        lines.append(sep)
+
+        col_p = 8
+        col_n = W - col_p - 1
+        lines.append(f"{'PRODUCTO':<{col_n}} {'PRECIO':>{col_p}}")
+        lines.append(sep2)
+
+        total = 0.0
+        for item in items:
+            nombre_p = _s(item.get("nombre", ""))
+            precio   = float(item.get("precio", 0.0))
+            aplica_iva = item.get("aplica_iva", False)
+            precio_final = precio * (1 + cfg.TAX_RATE) if aplica_iva else precio
+            total += precio_final
+            precio_str = f"${precio_final:.2f}"
+            for i, ln in enumerate(self._word_wrap(nombre_p, col_n)):
+                if i == 0:
+                    lines.append(f"{ln:<{col_n}} {precio_str:>{col_p}}")
+                else:
+                    lines.append(f"  {ln}")
+            if aplica_iva:
+                lines.append(f"{'  +IVA incluido':<{col_n}}")
+
+        lines.append(sep)
+        total_str = f"${total:.2f}"
+        room = W - len(total_str)
+        lines.append(f"{'TOTAL ESTIMADO:':<{room}}{total_str}")
+        lines.append(sep)
+        lines.append("* Solo cotizacion, no es factura *".center(W))
+        lines += [sep, "", "", ""]
+        return "\n".join(lines)
+
+
 printer_service = PrinterService()

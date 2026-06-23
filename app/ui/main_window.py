@@ -620,7 +620,8 @@ class MainWindow(ctk.CTkToplevel):
         self.bind_all("<F6>",  lambda e: self._show_screen("inventory"))
         self.bind_all("<F7>",  lambda e: self._show_screen("reports"))
         self.bind_all("<F8>",  lambda e: self._sc_pos_discount())
-        self.bind_all("<F10>", lambda e: self._sc_pos_cobrar())
+        self.bind_all("<F9>",  lambda e: self._sc_pos_cobrar())
+        self.bind_all("<F10>", lambda e: self._sc_pos_consulta_precios())
         self.bind_all("<Key>", self._scanner_key_handler)
 
     def _get_pos(self):
@@ -659,6 +660,11 @@ class MainWindow(ctk.CTkToplevel):
         pos = self._get_pos()
         if pos and self.current_screen is pos:
             pos._cobrar()
+
+    def _sc_pos_consulta_precios(self):
+        pos = self._get_pos()
+        if pos and self.current_screen is pos:
+            pos._abrir_consulta_precios()
 
     def _scanner_key_handler(self, event):
         # ── Ignorar si diálogo hijo tiene foco ───────────────────────────────
