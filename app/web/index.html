@@ -6960,35 +6960,68 @@ async function autoAbrirTurnoSiCorresponde() {
 
 
 // ══════════════════════════════════════════════════════════
-// CIERRE AUTOMÁTICO 21:00 — CLIENTE
+// CIERRE AUTOMÁTICO — CLIENTE (21:00 + cortes viejos al cargar)
 // ══════════════════════════════════════════════════════════
+async function _cerrarCorteViejo() {
+  // Called on login and periodically. If there is an open shift from yesterday, close it.
+  if (!S.user || S.user.rol === 'admin' || S.user.rol === 'cajero_prueba') return;
+  try {
+    const res = await api('/cortes/activo');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d.abierto || !d.abierto_en) return;
+    const apertura = new Date(d.abierto_en);
+    const hoy = new Date();
+    const esDeAyer = apertura.toDateString() !== hoy.toDateString();
+    if (!esDeAyer) return;
+    const closeRes = await api('/cortes/cerrar', {
+      method: 'POST',
+      body: JSON.stringify({
+        monto_cierre: d.esperado_caja || 0,
+        notas: 'Cierre automático — nueva jornada',
+      }),
+    });
+    if (closeRes.ok) {
+      toast('Turno anterior cerrado automáticamente', 'success');
+      loadTurnoStatus();
+    }
+  } catch(e) { /* silencioso */ }
+}
+
 function iniciarSchedulerCierreAutomatico() {
-  // Check every 60 seconds. At 21:00 auto-close any open shift.
-  let _lastClosedDate = null;
+  // On login: close stale shift from previous day immediately
+  _cerrarCorteViejo();
+
+  let _eodDoneOn = null;
   setInterval(async () => {
     if (!S.user) return;
     const now = new Date();
     const todayStr = now.toDateString();
-    if (now.getHours() !== 21 || now.getMinutes() !== 0) return;
-    if (_lastClosedDate === todayStr) return; // only once per day
-    _lastClosedDate = todayStr;
-    try {
-      const res = await api('/cortes/activo');
-      if (!res.ok) return;
-      const d = await res.json();
-      if (!d.abierto) return;
-      const closeRes = await api('/cortes/cerrar', {
-        method: 'POST',
-        body: JSON.stringify({
-          monto_cierre: d.esperado_caja || 0,
-          notas: 'Cierre automático 21:00',
-        }),
-      });
-      if (closeRes.ok) {
-        toast('Turno cerrado automáticamente a las 21:00', 'success');
-        loadTurnoStatus();
-      }
-    } catch(e) { /* silencioso */ }
+
+    // Close stale shifts from previous days (runs every tick)
+    await _cerrarCorteViejo();
+
+    // At 21:00, also close today's shift
+    if (now.getHours() === 21 && now.getMinutes() < 2 && _eodDoneOn !== todayStr) {
+      _eodDoneOn = todayStr;
+      try {
+        const res = await api('/cortes/activo');
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.abierto) return;
+        const closeRes = await api('/cortes/cerrar', {
+          method: 'POST',
+          body: JSON.stringify({
+            monto_cierre: d.esperado_caja || 0,
+            notas: 'Cierre automático 21:00',
+          }),
+        });
+        if (closeRes.ok) {
+          toast('Turno cerrado automáticamente a las 21:00', 'success');
+          loadTurnoStatus();
+        }
+      } catch(e) { /* silencioso */ }
+    }
   }, 60000);
 }
 

@@ -18,37 +18,100 @@ import app.config as cfg
 _logger = logging.getLogger("pos.scheduler")
 
 
+def _run_cierre_cortes_viejos(motivo: str = "Cierre automático") -> int:
+    """Close all open shifts from previous days. Returns count closed. Synchronous."""
+    from app.database.connection import get_db_session
+    from app.database.models import CortesCaja
+    from app.api.routes.cortes_routes import _auto_cerrar_turno
+    today = datetime.now().date()
+    db = get_db_session()
+    try:
+        cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+        cerrados = 0
+        for c in cortes:
+            if c.abierto_en and c.abierto_en.date() < today:
+                _auto_cerrar_turno(db, c, motivo)
+                _logger.info(f"Startup/scheduler: closed stale shift id={c.id} user={c.usuario_id}")
+                cerrados += 1
+        if cerrados:
+            db.commit()
+            import app.config as _cfg
+            if _cfg.TURSO_SYNC:
+                from app.database.sync_service import sync_to_turso
+                sync_to_turso()
+        return cerrados
+    except Exception as exc:
+        _logger.error(f"_run_cierre_cortes_viejos error: {exc}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
+def _run_cierre_todos_hoy(motivo: str = "Cierre automático 21:00") -> int:
+    """Close ALL open shifts (including today's) at end of day. Returns count closed."""
+    from app.database.connection import get_db_session
+    from app.database.models import CortesCaja
+    from app.api.routes.cortes_routes import _auto_cerrar_turno
+    db = get_db_session()
+    try:
+        cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+        cerrados = 0
+        for c in cortes:
+            _auto_cerrar_turno(db, c, motivo)
+            _logger.info(f"Scheduler 21:00: closed shift id={c.id} user={c.usuario_id}")
+            cerrados += 1
+        if cerrados:
+            db.commit()
+            import app.config as _cfg
+            if _cfg.TURSO_SYNC:
+                from app.database.sync_service import sync_to_turso
+                sync_to_turso()
+        return cerrados
+    except Exception as exc:
+        _logger.error(f"_run_cierre_todos_hoy error: {exc}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
 async def _scheduler_cierre_automatico():
-    """Background task: closes all open shifts every day at 21:00."""
-    _closed_on: set = set()  # set of dates already processed today
+    """
+    Background task:
+    - On every tick: close open shifts from PREVIOUS days (handles server restart after missed 9pm).
+    - At exactly 21:00 each day: close ALL open shifts for end-of-day.
+    """
+    _eod_done_on: set = set()  # dates where 21:00 close was already executed
+
+    # On startup: close any stale shifts from previous days immediately
+    await asyncio.sleep(5)  # brief delay so DB is ready
+    stale = _run_cierre_cortes_viejos("Cierre automático — servidor reiniciado")
+    if stale:
+        _logger.info(f"Startup: closed {stale} stale shift(s) from previous days")
+
+    # If server starts after 21:00 today, mark today's EOD as done so we don't re-close
+    _now = datetime.now()
+    if _now.hour >= 21:
+        _eod_done_on.add(_now.date())
+        # But still close any open shifts right now
+        _run_cierre_todos_hoy("Cierre automático — servidor iniciado después de 21:00")
+
     while True:
         await asyncio.sleep(60)
         try:
             now = datetime.now()
             today = now.date()
-            # Trigger at 21:00 sharp (minute 0), only once per day
-            if now.hour == 21 and now.minute == 0 and today not in _closed_on:
-                _closed_on.add(today)
-                from app.database.connection import get_db_session
-                from app.database.models import CortesCaja
-                from app.api.routes.cortes_routes import _auto_cerrar_turno
-                db = get_db_session()
-                try:
-                    cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
-                    for c in cortes:
-                        _auto_cerrar_turno(db, c, "Cierre automático 21:00")
-                        _logger.info(f"Scheduler: auto-closed shift id={c.id} user={c.usuario_id}")
-                    db.commit()
-                    if cortes:
-                        import app.config as _cfg
-                        if _cfg.TURSO_SYNC:
-                            from app.database.sync_service import sync_to_turso
-                            sync_to_turso()
-                except Exception as exc:
-                    _logger.error(f"Scheduler auto-close error: {exc}")
-                    db.rollback()
-                finally:
-                    db.close()
+
+            # Always close stale shifts from previous days (handles any missed nights)
+            _run_cierre_cortes_viejos("Cierre automático — jornada anterior")
+
+            # At 21:00 sharp, close today's shifts too
+            if now.hour == 21 and now.minute < 2 and today not in _eod_done_on:
+                _eod_done_on.add(today)
+                n = _run_cierre_todos_hoy("Cierre automático 21:00")
+                if n:
+                    _logger.info(f"Scheduler 21:00: closed {n} shift(s)")
         except Exception as exc:
             _logger.error(f"Scheduler tick error: {exc}")
 

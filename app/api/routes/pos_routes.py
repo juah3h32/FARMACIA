@@ -7,8 +7,24 @@ from app.database.models import Venta, ItemVenta, Producto, Lote, MovimientoStoc
 from app.api.routes.auth_routes import get_current_api_user
 import random
 import string
+from datetime import datetime as _dtnow
 
 router = APIRouter()
+
+
+def _cerrar_corte_viejo_si_existe(db, usuario_id: int) -> None:
+    """If the user has an open shift from a previous calendar day, auto-close it (commit included)."""
+    from app.database.models import CortesCaja
+    from app.api.routes.cortes_routes import _auto_cerrar_turno
+    corte = (
+        db.query(CortesCaja)
+        .filter(CortesCaja.usuario_id == usuario_id, CortesCaja.cerrado_en == None)
+        .order_by(CortesCaja.abierto_en.desc())
+        .first()
+    )
+    if corte and corte.abierto_en and corte.abierto_en.date() < _dtnow.now().date():
+        _auto_cerrar_turno(db, corte, "Cierre automático — nueva jornada")
+        db.commit()
 
 
 class ItemVentaIn(BaseModel):
@@ -60,6 +76,10 @@ def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
 def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
+        # Guard: if there is an open corte from a previous day, auto-close it NOW
+        # so today's sale is never mixed into yesterday's shift totals.
+        _cerrar_corte_viejo_si_existe(db, int(payload["sub"]))
+
         # Single query for all products at once (1 HTTP call instead of 2N)
         product_ids = [i.producto_id for i in body.items]
         products = {
