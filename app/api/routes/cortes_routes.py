@@ -772,3 +772,119 @@ def auto_cerrar_diario(bg: BackgroundTasks, payload: dict = Depends(get_current_
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+@router.post("/reconstruir-historicos")
+def reconstruir_historicos(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """
+    Admin: for each (usuario, calendar-day) that has completed ventas but no covering
+    corte, synthesises a corte (08:00 open -> 21:00 close) with correct totals.
+    Also closes open phantom cortes (0 ventas).
+    """
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from datetime import date as _date
+    from collections import defaultdict
+
+    db = get_db_session()
+    try:
+        # 1. Close open phantom cortes (0 completed ventas tied to them)
+        open_cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+        phantoms_closed = 0
+        for c in open_cortes:
+            if not c.abierto_en:
+                _auto_cerrar_turno(db, c, "Cerrado — corte sin fecha de apertura")
+                phantoms_closed += 1
+                continue
+            count = db.query(Venta).filter(
+                Venta.usuario_id == c.usuario_id,
+                Venta.creado_en >= c.abierto_en,
+                Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
+            ).count()
+            if count == 0:
+                _auto_cerrar_turno(db, c, "Cerrado — corte fantasma sin ventas")
+                phantoms_closed += 1
+        db.flush()
+
+        # 2. Gather all completed ventas grouped by (usuario_id, date)
+        all_ventas = (
+            db.query(Venta)
+            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+            .all()
+        )
+        ventas_by_user_day: dict = defaultdict(list)
+        for v in all_ventas:
+            if v.creado_en:
+                ventas_by_user_day[(v.usuario_id, v.creado_en.date())].append(v)
+
+        # 3. Gather existing cortes (including newly created/closed ones via flush)
+        all_cortes = db.query(CortesCaja).all()
+
+        def _is_covered(usuario_id: int, day: _date) -> bool:
+            for c in all_cortes:
+                if c.usuario_id != usuario_id or not c.abierto_en:
+                    continue
+                open_day  = c.abierto_en.date()
+                close_day = c.cerrado_en.date() if c.cerrado_en else datetime.now().date()
+                if open_day <= day <= close_day:
+                    return True
+            return False
+
+        # 4. Create synthetic cortes for uncovered (user, day) pairs
+        created = 0
+        for (usuario_id, day), ventas in sorted(ventas_by_user_day.items()):
+            if _is_covered(usuario_id, day):
+                continue
+            open_dt  = datetime.combine(day, _time_type(8, 0, 0))
+            close_dt = datetime.combine(day, _time_type(21, 0, 0))
+
+            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+            tv = ef + tj + tr
+            venta_ids = [v.id for v in ventas]
+            if venta_ids:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, Producto.precio_compra)
+                    .join(Producto, ItemVenta.producto_id == Producto.id)
+                    .filter(ItemVenta.venta_id.in_(venta_ids))
+                    .all()
+                )
+                total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            else:
+                total_costo = 0.0
+
+            new_c = CortesCaja(
+                usuario_id=usuario_id,
+                monto_apertura=0.0,
+                monto_cierre=ef,
+                abierto_en=open_dt,
+                cerrado_en=close_dt,
+                total_ventas=tv,
+                total_efectivo=ef,
+                total_tarjeta=tj,
+                total_transferencia=tr,
+                total_costo=total_costo,
+                num_ventas=len(ventas),
+                notas="Reconstruido automáticamente",
+            )
+            db.add(new_c)
+            all_cortes.append(new_c)
+            created += 1
+
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {
+            "ok": True,
+            "cortes_creados": created,
+            "cortes_phantom_cerrados": phantoms_closed,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

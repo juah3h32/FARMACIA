@@ -2171,6 +2171,9 @@
             <button onclick="cerrarTurnosViejos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA" title="Cerrar todos los turnos de días anteriores que quedaron abiertos">
               <i data-lucide="clock-x" style="width:13px;height:13px"></i> Cerrar turnos viejos
             </button>
+            <button onclick="reconstruirHistoricos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A" title="Crea cortes para días con ventas pero sin turno registrado">
+              <i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos
+            </button>
           </div>
         </div>
 
@@ -6662,6 +6665,24 @@ async function cerrarTurnosViejos() {
   if (d.turnos_cerrados === 0) toast('No hay turnos de días anteriores abiertos','success');
   else toast(`${d.turnos_cerrados} turno(s) cerrado(s) correctamente`,'success');
   loadCajaAdmin();
+}
+
+async function reconstruirHistoricos() {
+  if (!confirm('¿Reconstruir cortes históricos?\n\nSe crearán cortes (08:00–21:00) para cada día con ventas que no tenga turno registrado. También se cerrarán turnos fantasma sin ventas.')) return;
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = 'Procesando...';
+  try {
+    const res = await api('/cortes/reconstruir-historicos', { method: 'POST' });
+    if (!res.ok) { toast('Error al reconstruir históricos','error'); return; }
+    const d = await res.json();
+    const msg = `Reconstrucción completa: ${d.cortes_creados} corte(s) creado(s), ${d.cortes_phantom_cerrados} fantasma(s) cerrado(s)`;
+    toast(msg, 'success');
+    loadCajaAdmin();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos';
+    lucide.createIcons();
+  }
 }
 
 async function forzarSyncCaja() {
