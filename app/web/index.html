@@ -9776,6 +9776,9 @@ function chatAddToCart(pid) {
           <button onclick="cotizQty(${item.id},+1)" class="w-7 h-7 rounded-lg text-sm font-bold flex items-center justify-center" style="background:#EEF1F9;color:#1d2140">+</button>
         </div>
         <span class="text-sm font-bold w-20 text-right flex-shrink-0" style="color:#1d2140">$${subtotal.toFixed(2)}</span>
+        <button onclick="cotizAddOneToCart(${item.id})" title="Agregar al carrito" class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#DCFCE7;color:#15803D">
+          <i data-lucide="shopping-cart" style="width:12px;height:12px"></i>
+        </button>
         <button onclick="cotizRemove(${item.id})" class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEE2E2;color:#DC2626">
           <i data-lucide="x" style="width:12px;height:12px"></i>
         </button>
@@ -9806,6 +9809,19 @@ function chatAddToCart(pid) {
     finally {
       if (btn) { btn.innerHTML = '<i data-lucide="printer" style="width:15px;height:15px"></i> Imprimir [F9]'; btn.disabled = false; icons(); }
     }
+  };
+
+  window.cotizAddOneToCart = function(pid) {
+    const ci = cotizItems.find(x => x.id === pid);
+    if (!ci) return;
+    const p = (S.allProducts || []).find(x => x.id === ci.id);
+    if (!p) { toast('Producto no disponible en catálogo', 'warning'); return; }
+    const cartKey = `${p.id}`;
+    const ex = S.cart.find(i => (i._cartKey || String(i.id)) === cartKey);
+    if (ex) { ex.cantidad += ci.cantidad; }
+    else { S.cart.push({ ...p, _cartKey: cartKey, precio_venta: p.precio_venta, _esPieza: false, _label: null, cantidad: ci.cantidad }); }
+    renderCart();
+    toast(`${ci.nombre} agregado al carrito`, 'success');
   };
 
   window.cotizAgregarCarrito = function() {
