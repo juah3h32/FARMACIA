@@ -1,3 +1,8 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -9,6 +14,55 @@ from app.api.routes import historial_routes, marketing_routes, config_routes
 from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, catalogo_web_routes
 import uvicorn
 import app.config as cfg
+
+_logger = logging.getLogger("pos.scheduler")
+
+
+async def _scheduler_cierre_automatico():
+    """Background task: closes all open shifts every day at 21:00."""
+    _closed_on: set = set()  # set of dates already processed today
+    while True:
+        await asyncio.sleep(60)
+        try:
+            now = datetime.now()
+            today = now.date()
+            # Trigger at 21:00 sharp (minute 0), only once per day
+            if now.hour == 21 and now.minute == 0 and today not in _closed_on:
+                _closed_on.add(today)
+                from app.database.connection import get_db_session
+                from app.database.models import CortesCaja
+                from app.api.routes.cortes_routes import _auto_cerrar_turno
+                db = get_db_session()
+                try:
+                    cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+                    for c in cortes:
+                        _auto_cerrar_turno(db, c, "Cierre automático 21:00")
+                        _logger.info(f"Scheduler: auto-closed shift id={c.id} user={c.usuario_id}")
+                    db.commit()
+                    if cortes:
+                        import app.config as _cfg
+                        if _cfg.TURSO_SYNC:
+                            from app.database.sync_service import sync_to_turso
+                            sync_to_turso()
+                except Exception as exc:
+                    _logger.error(f"Scheduler auto-close error: {exc}")
+                    db.rollback()
+                finally:
+                    db.close()
+        except Exception as exc:
+            _logger.error(f"Scheduler tick error: {exc}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_scheduler_cierre_automatico())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
 
 # Disable interactive docs in production (frozen EXE)
 _docs    = "/docs"        if cfg.DEV_MODE else None
@@ -22,6 +76,7 @@ app = FastAPI(
     docs_url=_docs,
     redoc_url=_redoc,
     openapi_url=_openapi,
+    lifespan=lifespan,
 )
 
 _cors_origins = ["http://127.0.0.1", "http://localhost"]

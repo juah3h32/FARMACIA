@@ -2057,7 +2057,7 @@
           </div>
         </div>
 
-        <!-- Turno Auto-Apertura -->
+        <!-- Turno Auto-Apertura — info panel (comportamiento fijo) -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <div class="h-1 w-full" style="background:linear-gradient(90deg,#16A34A,#22C55E,#4ADE80)"></div>
           <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
@@ -2065,40 +2065,32 @@
               <i data-lucide="clock" style="width:20px;height:20px;color:#16A34A"></i>
             </div>
             <div>
-              <h2 class="font-bold" style="color:#0F172A">Apertura Automática de Turno</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">Si el cajero inicia sesión dentro del horario configurado, el turno se abre solo</p>
+              <h2 class="font-bold" style="color:#0F172A">Turnos de caja — comportamiento automático</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">El sistema gestiona turnos automáticamente</p>
             </div>
           </div>
-          <div class="p-6 flex flex-col gap-4" style="max-width:480px">
-            <div class="flex items-center justify-between">
+          <div class="p-6 flex flex-col gap-3" style="max-width:500px">
+            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#F0FDF4;border:1px solid #BBF7D0">
+              <i data-lucide="log-in" style="width:16px;height:16px;color:#16A34A;margin-top:2px;flex-shrink:0"></i>
               <div>
-                <p class="text-sm font-semibold" style="color:#0F172A">Activar apertura automática</p>
-                <p class="text-xs mt-0.5" style="color:#94A3B8">Solo aplica a cajeros y farmacéuticos</p>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="cfg-turno-activo" class="sr-only peer" onchange="previewTurnoConfig()">
-                <div class="w-11 h-6 rounded-full peer peer-checked:bg-green-500 peer-focus:ring-2 peer-focus:ring-green-300 transition-all" style="background:#E2E8F0"></div>
-                <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
-              </label>
-            </div>
-            <div id="cfg-turno-horario" class="grid grid-cols-2 gap-4 transition-all">
-              <div>
-                <label class="lbl">Hora inicio</label>
-                <input type="time" id="cfg-turno-inicio" class="inp" value="09:00">
-              </div>
-              <div>
-                <label class="lbl">Hora límite</label>
-                <input type="time" id="cfg-turno-fin" class="inp" value="10:00">
+                <p class="text-sm font-semibold" style="color:#15803D">Apertura automática</p>
+                <p class="text-xs mt-0.5" style="color:#166534">Al iniciar sesión entre las 8:00 y las 10:00 AM, el turno se abre automáticamente.</p>
               </div>
             </div>
-            <p id="cfg-turno-preview" class="text-xs rounded-lg px-3 py-2" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0">
-              El turno se abrirá automáticamente si el cajero inicia sesión entre las 09:00 y las 10:00
-            </p>
-            <button onclick="saveTurnoConfig()"
-                    class="h-10 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
-                    style="background:#16A34A;width:fit-content;padding:0 20px">
-              <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
-            </button>
+            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#FEF2F2;border:1px solid #FECACA">
+              <i data-lucide="clock-x" style="width:16px;height:16px;color:#DC2626;margin-top:2px;flex-shrink:0"></i>
+              <div>
+                <p class="text-sm font-semibold" style="color:#DC2626">Cierre automático</p>
+                <p class="text-xs mt-0.5" style="color:#991B1B">A las 9:00 PM todos los turnos abiertos se cierran automáticamente. Cerrar sesión NO cierra el turno.</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#EFF6FF;border:1px solid #BFDBFE">
+              <i data-lucide="calendar-days" style="width:16px;height:16px;color:#1d2140;margin-top:2px;flex-shrink:0"></i>
+              <div>
+                <p class="text-sm font-semibold" style="color:#1d2140">Un turno = un día</p>
+                <p class="text-xs mt-0.5" style="color:#1E3A5F">Si hay un turno de un día anterior sin cerrar, se cierra solo al abrir el nuevo turno del día.</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2169,12 +2161,15 @@
               <p class="text-xs" style="color:#64748B">Retiros · Historial · Cuadre</p>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap">
             <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
             </button>
             <button id="caja-sync-btn" onclick="forzarSyncCaja()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EFF6FF;color:#1d2140;border:1px solid #BFDBFE" title="Sincronizar con la nube">
               <i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync
+            </button>
+            <button onclick="cerrarTurnosViejos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA" title="Cerrar todos los turnos de días anteriores que quedaron abiertos">
+              <i data-lucide="clock-x" style="width:13px;height:13px"></i> Cerrar turnos viejos
             </button>
           </div>
         </div>
@@ -4266,6 +4261,7 @@ function launchApp() {
   if (devBtn) devBtn.style.display = S.user?.rol === 'admin' ? '' : 'none';
   loadTurnoStatus();
   autoAbrirTurnoSiCorresponde();
+  iniciarSchedulerCierreAutomatico();
   loadAlertasCaducidad();
   setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
   loadSuppliers();  // populate proveedor selects in product modal
@@ -6658,6 +6654,16 @@ async function exportVentasPDF() {
 let _cajaRetiros = [];
 let _cajaTurno   = null;
 
+async function cerrarTurnosViejos() {
+  if (!confirm('¿Cerrar automáticamente todos los turnos de días anteriores que quedaron abiertos?')) return;
+  const res = await api('/cortes/cerrar-viejos', { method: 'POST' });
+  if (!res.ok) { toast('Error al cerrar turnos viejos','error'); return; }
+  const d = await res.json();
+  if (d.turnos_cerrados === 0) toast('No hay turnos de días anteriores abiertos','success');
+  else toast(`${d.turnos_cerrados} turno(s) cerrado(s) correctamente`,'success');
+  loadCajaAdmin();
+}
+
 async function forzarSyncCaja() {
   const btn = document.getElementById('caja-sync-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; lucide.createIcons(); }
@@ -6905,21 +6911,15 @@ async function registrarRetiroCaja() {
 }
 
 // ══════════════════════════════════════════════════════════
-// TURNO AUTO-APERTURA
+// TURNO AUTO-APERTURA (08:00–10:00, fijo)
 // ══════════════════════════════════════════════════════════
 async function autoAbrirTurnoSiCorresponde() {
   if (!S.user || S.user.rol === 'admin' || S.user.rol === 'cajero_prueba') return;
   try {
-    const cfgRes = await api('/admin/config');
-    if (!cfgRes.ok) return;
-    const cfg = await cfgRes.json();
-    if (cfg.turno_auto_activo !== 'true') return;
-
-    const inicio = cfg.turno_auto_inicio || '09:00';
-    const fin    = cfg.turno_auto_fin    || '10:00';
-    const now    = new Date();
-    const hhmm   = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    if (hhmm < inicio || hhmm > fin) return;
+    const now  = new Date();
+    const hora = now.getHours();
+    // Auto-open only if login happens between 08:00 and 09:59
+    if (hora < 8 || hora >= 10) return;
 
     const turnoRes = await api('/cortes/activo');
     if (!turnoRes.ok) return;
@@ -6937,47 +6937,38 @@ async function autoAbrirTurnoSiCorresponde() {
   } catch(e) { /* silencioso — no interrumpir login */ }
 }
 
-async function initTurnoConfig() {
-  const res = await api('/admin/config');
-  if (!res.ok) return;
-  const cfg = await res.json();
-  const activo = document.getElementById('cfg-turno-activo');
-  const ini    = document.getElementById('cfg-turno-inicio');
-  const fin    = document.getElementById('cfg-turno-fin');
-  if (activo) activo.checked = cfg.turno_auto_activo === 'true';
-  if (ini)    ini.value = cfg.turno_auto_inicio || '09:00';
-  if (fin)    fin.value = cfg.turno_auto_fin    || '10:00';
-  previewTurnoConfig();
-}
 
-function previewTurnoConfig() {
-  const activo  = document.getElementById('cfg-turno-activo')?.checked;
-  const ini     = document.getElementById('cfg-turno-inicio')?.value || '09:00';
-  const fin     = document.getElementById('cfg-turno-fin')?.value    || '10:00';
-  const preview = document.getElementById('cfg-turno-preview');
-  const horario = document.getElementById('cfg-turno-horario');
-  if (horario) horario.style.opacity = activo ? '1' : '0.4';
-  if (!preview) return;
-  if (!activo) {
-    preview.textContent = 'Apertura automática desactivada — el cajero deberá abrir turno manualmente';
-    preview.style.background = '#F8FAFF'; preview.style.color = '#64748B'; preview.style.borderColor = '#E2E8F0';
-  } else {
-    preview.textContent = `El turno se abrirá automáticamente si el cajero inicia sesión entre las ${ini} y las ${fin}`;
-    preview.style.background = '#F0FDF4'; preview.style.color = '#16A34A'; preview.style.borderColor = '#BBF7D0';
-  }
-}
-
-async function saveTurnoConfig() {
-  const activo = document.getElementById('cfg-turno-activo')?.checked;
-  const ini    = document.getElementById('cfg-turno-inicio')?.value || '09:00';
-  const fin    = document.getElementById('cfg-turno-fin')?.value    || '10:00';
-  if (ini >= fin) { toast('La hora inicio debe ser menor que la hora límite','error'); return; }
-  const res = await api('/admin/config', {
-    method: 'POST',
-    body: JSON.stringify({ turno_auto_activo: activo ? 'true' : 'false', turno_auto_inicio: ini, turno_auto_fin: fin })
-  });
-  if (res.ok) toast('Configuración guardada','success');
-  else toast('Error al guardar','error');
+// ══════════════════════════════════════════════════════════
+// CIERRE AUTOMÁTICO 21:00 — CLIENTE
+// ══════════════════════════════════════════════════════════
+function iniciarSchedulerCierreAutomatico() {
+  // Check every 60 seconds. At 21:00 auto-close any open shift.
+  let _lastClosedDate = null;
+  setInterval(async () => {
+    if (!S.user) return;
+    const now = new Date();
+    const todayStr = now.toDateString();
+    if (now.getHours() !== 21 || now.getMinutes() !== 0) return;
+    if (_lastClosedDate === todayStr) return; // only once per day
+    _lastClosedDate = todayStr;
+    try {
+      const res = await api('/cortes/activo');
+      if (!res.ok) return;
+      const d = await res.json();
+      if (!d.abierto) return;
+      const closeRes = await api('/cortes/cerrar', {
+        method: 'POST',
+        body: JSON.stringify({
+          monto_cierre: d.esperado_caja || 0,
+          notas: 'Cierre automático 21:00',
+        }),
+      });
+      if (closeRes.ok) {
+        toast('Turno cerrado automáticamente a las 21:00', 'success');
+        loadTurnoStatus();
+      }
+    } catch(e) { /* silencioso */ }
+  }, 60000);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6991,11 +6982,13 @@ async function loadTurnoStatus() {
   const dot   = document.getElementById('turno-dot');
   const label = document.getElementById('turno-label');
   if (d.abierto) {
-    dot.style.background   = '#22C55E';
-    label.textContent      = 'Turno abierto';
-    btn.style.color        = '#15803D';
-    btn.style.borderColor  = '#BBF7D0';
-    btn.style.background   = '#F0FDF4';
+    const _apertura = d.abierto_en ? new Date(d.abierto_en) : null;
+    const _esViejo  = _apertura && _apertura.toDateString() !== new Date().toDateString();
+    dot.style.background   = _esViejo ? '#F59E0B' : '#22C55E';
+    label.textContent      = _esViejo ? '⚠ Turno de ayer' : 'Turno abierto';
+    btn.style.color        = _esViejo ? '#92400E' : '#15803D';
+    btn.style.borderColor  = _esViejo ? '#FDE68A' : '#BBF7D0';
+    btn.style.background   = _esViejo ? '#FFFBEB' : '#F0FDF4';
   } else {
     dot.style.background   = '#94A3B8';
     label.textContent      = 'Sin turno';
@@ -7025,6 +7018,28 @@ async function openTurnoPanel() {
     document.getElementById('tp-ef').textContent           = money(d.total_efectivo);
     document.getElementById('tp-tj').textContent           = money((d.total_tarjeta||0) + (d.total_transferencia||0));
     document.getElementById('tp-esperado').textContent     = money(d.esperado_caja);
+
+    // Warn if shift is from a previous day
+    const _turnoFechaApertura = d.abierto_en ? new Date(d.abierto_en) : null;
+    const _hoyStr = new Date().toDateString();
+    const _turnoEsViejo = _turnoFechaApertura && _turnoFechaApertura.toDateString() !== _hoyStr;
+    let _avisoViejo = document.getElementById('tp-aviso-dia-anterior');
+    if (!_avisoViejo) {
+      _avisoViejo = document.createElement('div');
+      _avisoViejo.id = 'tp-aviso-dia-anterior';
+      _avisoViejo.className = 'rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2 mb-2';
+      panelAbierto.insertBefore(_avisoViejo, panelAbierto.firstChild);
+    }
+    if (_turnoEsViejo) {
+      _avisoViejo.style.display = '';
+      _avisoViejo.style.background = '#FEF2F2';
+      _avisoViejo.style.color = '#DC2626';
+      _avisoViejo.style.border = '1px solid #FECACA';
+      const diasStr = Math.floor((new Date() - _turnoFechaApertura) / 86400000);
+      _avisoViejo.innerHTML = `⚠️ Este turno lleva ${diasStr} día${diasStr!==1?'s':''} abierto. Se cerrará automáticamente — o ciérralo ahora.`;
+    } else {
+      _avisoViejo.style.display = 'none';
+    }
 
     // Retiros de caja
     const retiros     = d.retiros || [];
@@ -7911,7 +7926,6 @@ function initSettings() {
   renderTokenHistory();
   loadEndpoints();
   if (S.user?.rol === 'admin') {
-    initTurnoConfig();
     loadAdminVentas();
   }
   loadMpStatus();

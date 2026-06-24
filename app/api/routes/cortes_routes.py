@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, date as _date_type
+from datetime import datetime, date as _date_type, time as _time_type
 from sqlalchemy import func
 from app.database.connection import get_db_session
 from app.database.models import (
@@ -90,6 +90,61 @@ def _get_corte_activo(db, usuario_id: int) -> Optional[CortesCaja]:
     )
 
 
+def _calcular_totales_corte(db, c: CortesCaja, hasta: datetime):
+    """Calculate and set totals on a CortesCaja object (does NOT commit)."""
+    ventas = (
+        db.query(Venta)
+        .filter(
+            Venta.usuario_id == c.usuario_id,
+            Venta.creado_en >= c.abierto_en,
+            Venta.creado_en <= hasta,
+            Venta.estado == EstadoVenta.completada,
+            Venta.eliminado.is_not(True),
+        )
+        .all()
+    )
+    ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+    tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+    tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+    tv = ef + tj + tr
+    venta_ids = [v.id for v in ventas]
+    if venta_ids:
+        cost_rows = (
+            db.query(ItemVenta.cantidad, Producto.precio_compra)
+            .join(Producto, ItemVenta.producto_id == Producto.id)
+            .filter(ItemVenta.venta_id.in_(venta_ids))
+            .all()
+        )
+        total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+    else:
+        total_costo = 0.0
+    c.total_ventas        = tv
+    c.total_efectivo      = ef
+    c.total_tarjeta       = tj
+    c.total_transferencia = tr
+    c.total_costo         = total_costo
+    c.num_ventas          = len(ventas)
+    return ef, tj, tr, tv, total_costo
+
+
+def _auto_cerrar_turno(db, c: CortesCaja, nota: str = "Cierre automático fin de día") -> None:
+    """Close an open shift automatically. Does NOT commit."""
+    ahora = datetime.now()
+    # Close time = 21:00 of the shift's opening day (or now if opening day is today)
+    apertura_date = c.abierto_en.date() if c.abierto_en else ahora.date()
+    if apertura_date < ahora.date():
+        cierre_dt = datetime.combine(apertura_date, _time_type(21, 0, 0))
+    else:
+        cierre_dt = ahora
+    ef, _, _, _, _ = _calcular_totales_corte(db, c, cierre_dt)
+    c.cerrado_en   = cierre_dt
+    c.monto_cierre = (c.monto_apertura or 0.0) + ef
+    if c.notas:
+        c.notas = c.notas + " | " + nota
+    else:
+        c.notas = nota
+
+
 @router.get("/activo")
 def corte_activo(payload: dict = Depends(get_current_api_user)):
     usuario_id = int(payload["sub"])
@@ -169,7 +224,12 @@ def abrir_corte(body: AbrirCorteIn, bg: BackgroundTasks, payload: dict = Depends
     try:
         existente = _get_corte_activo(db, usuario_id)
         if existente:
-            raise HTTPException(status_code=400, detail="Ya tienes un turno abierto")
+            # If the open shift is from a previous day, auto-close it before opening today's
+            if existente.abierto_en and existente.abierto_en.date() < datetime.now().date():
+                _auto_cerrar_turno(db, existente, "Cierre automático — nuevo día")
+                db.commit()
+            else:
+                raise HTTPException(status_code=400, detail="Ya tienes un turno abierto hoy")
         c = CortesCaja(
             usuario_id=usuario_id,
             monto_apertura=body.monto_apertura,
@@ -651,6 +711,62 @@ def recalcular_historicos(bg: BackgroundTasks, payload: dict = Depends(get_curre
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
         return {"ok": True, "cortes_recalculados": actualizados}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/cerrar-viejos")
+def cerrar_turnos_viejos(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Admin: auto-close all shifts that are still open from previous days."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    db = get_db_session()
+    try:
+        hoy = datetime.now().date()
+        cortes = (
+            db.query(CortesCaja)
+            .filter(CortesCaja.cerrado_en == None)
+            .all()
+        )
+        cerrados = 0
+        for c in cortes:
+            if c.abierto_en and c.abierto_en.date() < hoy:
+                _auto_cerrar_turno(db, c, "Cierre automático — turno de día anterior")
+                cerrados += 1
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, "turnos_cerrados": cerrados}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/auto-cerrar-diario")
+def auto_cerrar_diario(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Internal: close all open shifts at end of day (21:00). Called by scheduler or admin."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    db = get_db_session()
+    try:
+        cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+        cerrados = 0
+        for c in cortes:
+            _auto_cerrar_turno(db, c, "Cierre automático 21:00")
+            cerrados += 1
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, "turnos_cerrados": cerrados}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
