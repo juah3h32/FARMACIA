@@ -169,20 +169,30 @@ def reporte_inventario(payload: dict = Depends(get_current_api_user)):
 
 @router.get("/cortes")
 def cortes_caja(
-    fecha_inicio: date = Query(...),
-    fecha_fin:    date = Query(...),
+    fecha_inicio:   date = Query(...),
+    fecha_fin:      date = Query(...),
+    ocultar_vacios: bool = Query(True),   # hide 0-sale, $0 phantom shifts by default
     payload: dict = Depends(get_current_api_user),
 ):
     _require_admin(payload)
     db = get_db_session()
     try:
         fi, ff = _rango(fecha_inicio, fecha_fin)
-        cortes = (
+        q = (
             db.query(CortesCaja)
             .filter(CortesCaja.abierto_en >= fi, CortesCaja.abierto_en <= ff)
-            .order_by(CortesCaja.abierto_en.desc())
-            .all()
         )
+        if ocultar_vacios:
+            # Exclude shifts that have 0 ventas AND $0 total (phantom / test shifts)
+            from sqlalchemy import or_
+            q = q.filter(
+                or_(
+                    CortesCaja.num_ventas > 0,
+                    CortesCaja.total_ventas > 0,
+                    CortesCaja.cerrado_en == None,  # keep open shifts even if 0 so far
+                )
+            )
+        cortes = q.order_by(CortesCaja.abierto_en.desc()).all()
         result = []
         for c in cortes:
             dur_min = None
@@ -663,3 +673,36 @@ def save_pdf_to_path(
     with open(body.path, "wb") as f:
         f.write(data)
     return {"ok": True, "path": body.path}
+
+
+@router.delete("/cortes/fantasmas")
+def eliminar_cortes_fantasma(payload: dict = Depends(get_current_api_user)):
+    """Admin: permanently delete closed shifts with 0 ventas and $0 total."""
+    from fastapi import BackgroundTasks
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        fantasmas = (
+            db.query(CortesCaja)
+            .filter(
+                CortesCaja.cerrado_en != None,
+                CortesCaja.num_ventas == 0,
+                CortesCaja.total_ventas == 0,
+            )
+            .all()
+        )
+        ids = [c.id for c in fantasmas]
+        for c in fantasmas:
+            db.delete(c)
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            sync_to_turso()
+        return {"ok": True, "eliminados": len(ids), "ids": ids}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+

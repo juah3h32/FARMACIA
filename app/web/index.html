@@ -1686,10 +1686,19 @@
           </div>
           <!-- Cortes table -->
           <div class="bg-white rounded-2xl border" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
-            <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color:#E2E8F0">
+            <div class="px-5 py-4 border-b flex items-center gap-2 flex-wrap" style="border-color:#E2E8F0">
               <i data-lucide="clock" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Historial de cortes</span>
               <span class="text-xs ml-2" style="color:#94A3B8">Clic en fila para ver detalle</span>
+              <div class="ml-auto flex items-center gap-3">
+                <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none" style="color:#64748B">
+                  <input type="checkbox" id="cc-mostrar-vacios" onchange="loadCortes()" style="accent-color:#1d2140">
+                  Mostrar turno sin ventas
+                </label>
+                <button onclick="eliminarCorteFantasmas()" class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
+                  <i data-lucide="trash-2" style="width:11px;height:11px"></i> Limpiar $0
+                </button>
+              </div>
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
               <table class="w-full text-xs">
@@ -6083,11 +6092,21 @@ async function repBulkDelete() {
 }
 
 // ── Cortes de Caja ────────────────────────────────────────────────────────
+async function eliminarCorteFantasmas() {
+  if (!confirm('¿Eliminar permanentemente todos los turnos cerrados con 0 ventas y $0.00?\nEsto limpia los cortes fantasma/prueba del historial.')) return;
+  const res = await api('/reportes/cortes/fantasmas', { method: 'DELETE' });
+  if (!res.ok) { toast('Error al eliminar fantasmas','error'); return; }
+  const d = await res.json();
+  toast(`${d.eliminados} corte(s) fantasma eliminado(s)`, 'success');
+  loadCortes();
+}
+
 async function loadCortes() {
   const desde = document.getElementById('rep-desde').value;
   const hasta = document.getElementById('rep-hasta').value;
   if (!desde||!hasta) return;
-  const res = await api(`/reportes/cortes?fecha_inicio=${desde}&fecha_fin=${hasta}`);
+  const mostrarVacios = document.getElementById('cc-mostrar-vacios')?.checked ? 'false' : 'true';
+  const res = await api(`/reportes/cortes?fecha_inicio=${desde}&fecha_fin=${hasta}&ocultar_vacios=${mostrarVacios}`);
   if (!res.ok) { toast('Error cargando cortes','error'); return; }
   const cortes = await res.json();
 
