@@ -245,6 +245,30 @@ def db_sync(payload: dict = Depends(get_current_api_user)):
     return {"ok": True, "stats": stats}
 
 
+@router.get("/turso-diagnostico")
+def turso_diagnostico(payload: dict = Depends(get_current_api_user)):
+    """Compare local SQLite row counts vs Turso for key tables."""
+    _require_admin(payload)
+    from app.database.sync_service import get_db_stats, _turso_read_table
+    local_stats = get_db_stats()
+    turso_stats = {}
+    for tabla in ("ventas", "cortes_caja", "items_venta", "retiros_caja"):
+        try:
+            cols, rows = _turso_read_table(tabla)
+            turso_stats[tabla] = len(rows)
+        except Exception as e:
+            turso_stats[tabla] = f"error: {e}"
+    diff = {}
+    for t in turso_stats:
+        l = local_stats.get(t, 0)
+        r = turso_stats[t]
+        if isinstance(l, int) and isinstance(r, int):
+            diff[t] = {"local": l, "turso": r, "diferencia": r - l}
+        else:
+            diff[t] = {"local": l, "turso": r, "diferencia": "?"}
+    return {"ok": True, "tablas": diff, "turso_sync_activo": cfg.TURSO_SYNC}
+
+
 @router.get("/endpoints")
 def list_endpoints(payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)

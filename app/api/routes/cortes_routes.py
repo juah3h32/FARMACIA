@@ -780,11 +780,22 @@ def reconstruir_historicos(bg: BackgroundTasks, payload: dict = Depends(get_curr
     Admin: for each (usuario, calendar-day) that has completed ventas but no covering
     corte, synthesises a corte (08:00 open -> 21:00 close) with correct totals.
     Also closes open phantom cortes (0 ventas).
+    Pulls latest ventas from Turso first (when TURSO_SYNC=True) so that sales made
+    on other PCs or via the web app are included in the reconstruction.
     """
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     from datetime import date as _date
     from collections import defaultdict
+
+    # Pull latest data from Turso so local SQLite has ALL ventas before reconstruction
+    import app.config as _cfg
+    if _cfg.TURSO_SYNC:
+        try:
+            from app.database.sync_service import sync_from_turso
+            sync_from_turso()
+        except Exception as _e:
+            print(f"[reconstruir] sync_from_turso warning: {_e}")
 
     db = get_db_session()
     try:

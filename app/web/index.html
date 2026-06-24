@@ -2171,8 +2171,11 @@
             <button onclick="cerrarTurnosViejos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA" title="Cerrar todos los turnos de días anteriores que quedaron abiertos">
               <i data-lucide="clock-x" style="width:13px;height:13px"></i> Cerrar turnos viejos
             </button>
-            <button onclick="reconstruirHistoricos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A" title="Crea cortes para días con ventas pero sin turno registrado">
+            <button onclick="reconstruirHistoricos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A" title="Sincroniza ventas de Turso y crea cortes para días sin turno registrado">
               <i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos
+            </button>
+            <button onclick="verDiagnosticoTurso()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" title="Ver diferencias local vs Turso">
+              <i data-lucide="database" style="width:13px;height:13px"></i> Diagnóstico Turso
             </button>
           </div>
         </div>
@@ -6668,12 +6671,16 @@ async function cerrarTurnosViejos() {
 }
 
 async function reconstruirHistoricos() {
-  if (!confirm('¿Reconstruir cortes históricos?\n\nSe crearán cortes (08:00–21:00) para cada día con ventas que no tenga turno registrado. También se cerrarán turnos fantasma sin ventas.')) return;
+  if (!confirm('¿Reconstruir cortes históricos?\n\nPrimero sincroniza ventas desde Turso, luego crea cortes (08:00–21:00) para cada día con ventas que no tenga turno registrado. También cierra turnos fantasma.\n\nPuede tardar unos segundos.')) return;
   const btn = event.currentTarget;
-  btn.disabled = true; btn.textContent = 'Procesando...';
+  btn.disabled = true; btn.textContent = '⏳ Sincronizando y procesando...';
   try {
     const res = await api('/cortes/reconstruir-historicos', { method: 'POST' });
-    if (!res.ok) { toast('Error al reconstruir históricos','error'); return; }
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      toast(e.detail || 'Error al reconstruir históricos','error');
+      return;
+    }
     const d = await res.json();
     const msg = `Reconstrucción completa: ${d.cortes_creados} corte(s) creado(s), ${d.cortes_phantom_cerrados} fantasma(s) cerrado(s)`;
     toast(msg, 'success');
@@ -6683,6 +6690,45 @@ async function reconstruirHistoricos() {
     btn.innerHTML = '<i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos';
     lucide.createIcons();
   }
+}
+
+async function verDiagnosticoTurso() {
+  const res = await api('/admin/turso-diagnostico');
+  if (!res.ok) { toast('Error al consultar diagnóstico','error'); return; }
+  const d = await res.json();
+  const money = v => typeof v === 'number' ? v : v;
+  let html = `<div style="font-family:monospace;font-size:13px;line-height:1.8">`;
+  html += `<p style="font-weight:bold;margin-bottom:8px">Sync activo: ${d.turso_sync_activo ? '✅ Sí' : '❌ No (Vercel usa Turso directo)'}</p>`;
+  html += `<table style="width:100%;border-collapse:collapse">`;
+  html += `<tr style="font-weight:bold;border-bottom:2px solid #E2E8F0"><td>Tabla</td><td>Local</td><td>Turso</td><td>Diff</td></tr>`;
+  for (const [tabla, info] of Object.entries(d.tablas)) {
+    const diff = info.diferencia;
+    const color = diff === 0 ? '#16A34A' : typeof diff === 'number' && diff > 0 ? '#D97706' : '#DC2626';
+    const icon  = diff === 0 ? '✓' : diff > 0 ? '⬆' : '⬇';
+    html += `<tr style="border-bottom:1px solid #F1F5F9">
+      <td style="padding:4px 8px 4px 0;color:#374151">${tabla}</td>
+      <td style="padding:4px 8px;text-align:right">${info.local}</td>
+      <td style="padding:4px 8px;text-align:right">${info.turso}</td>
+      <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${icon} ${diff}</td>
+    </tr>`;
+  }
+  html += `</table></div>`;
+  html += `<p style="font-size:11px;color:#94A3B8;margin-top:12px">Si Turso tiene más ventas → pulsa "Reconstruir históricos" para crear los cortes faltantes y sincronizar.</p>`;
+  // Show in a modal alert
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.6);backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:20px;padding:28px;max-width:480px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-weight:700;font-size:15px;color:#0F172A">Diagnóstico Turso</span>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:#F1F5F9;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    ${html}
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="this.closest('div[style*=fixed]').remove();forzarSyncCaja()" style="flex:1;height:36px;border-radius:10px;background:#1d2140;color:#fff;font-weight:600;font-size:13px;border:none;cursor:pointer">Sincronizar ahora</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;height:36px;border-radius:10px;background:#F1F5F9;color:#374151;font-weight:600;font-size:13px;border:none;cursor:pointer">Cerrar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 async function forzarSyncCaja() {
