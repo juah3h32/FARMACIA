@@ -1695,9 +1695,6 @@
                   <input type="checkbox" id="cc-mostrar-vacios" onchange="loadCortes()" style="accent-color:#1d2140">
                   Mostrar turno sin ventas
                 </label>
-                <button onclick="eliminarCorteFantasmas()" class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
-                  <i data-lucide="trash-2" style="width:11px;height:11px"></i> Limpiar $0
-                </button>
               </div>
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
@@ -2067,43 +2064,6 @@
         </div>
 
         <!-- Turno Auto-Apertura — info panel (comportamiento fijo) -->
-        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#16A34A,#22C55E,#4ADE80)"></div>
-          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#F0FDF4">
-              <i data-lucide="clock" style="width:20px;height:20px;color:#16A34A"></i>
-            </div>
-            <div>
-              <h2 class="font-bold" style="color:#0F172A">Turnos de caja — comportamiento automático</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">El sistema gestiona turnos automáticamente</p>
-            </div>
-          </div>
-          <div class="p-6 flex flex-col gap-3" style="max-width:500px">
-            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#F0FDF4;border:1px solid #BBF7D0">
-              <i data-lucide="log-in" style="width:16px;height:16px;color:#16A34A;margin-top:2px;flex-shrink:0"></i>
-              <div>
-                <p class="text-sm font-semibold" style="color:#15803D">Apertura automática</p>
-                <p class="text-xs mt-0.5" style="color:#166534">Al iniciar sesión entre las 8:00 y las 10:00 AM, el turno se abre automáticamente.</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#FEF2F2;border:1px solid #FECACA">
-              <i data-lucide="clock-x" style="width:16px;height:16px;color:#DC2626;margin-top:2px;flex-shrink:0"></i>
-              <div>
-                <p class="text-sm font-semibold" style="color:#DC2626">Cierre automático</p>
-                <p class="text-xs mt-0.5" style="color:#991B1B">A las 9:00 PM todos los turnos abiertos se cierran automáticamente. Cerrar sesión NO cierra el turno.</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl px-4 py-3" style="background:#EFF6FF;border:1px solid #BFDBFE">
-              <i data-lucide="calendar-days" style="width:16px;height:16px;color:#1d2140;margin-top:2px;flex-shrink:0"></i>
-              <div>
-                <p class="text-sm font-semibold" style="color:#1d2140">Un turno = un día</p>
-                <p class="text-xs mt-0.5" style="color:#1E3A5F">Si hay un turno de un día anterior sin cerrar, se cierra solo al abrir el nuevo turno del día.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
         <!-- ─── Terminal Mercado Pago Point ────────────────── -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <div class="h-1 w-full" style="background:linear-gradient(90deg,#009EE3,#00BCFF,#009EE3)"></div>
@@ -3402,7 +3362,7 @@
       <div style="height:1px;background:#F1F5F9;margin:4px 0"></div>
 
       <!-- Logout -->
-      <button onclick="closeProfileModal();doLogout()"
+      <button onclick="closeProfileModal();doLogoutSafe()"
           class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80"
           style="background:#FEF2F2;color:#EF4444">
         <i data-lucide="log-out" style="width:16px;height:16px"></i>
@@ -3623,6 +3583,35 @@ function closeModal(id) {
   const m = document.getElementById(id);
   m.classList.add('hidden');
   m.classList.remove('flex');
+}
+
+function showConfirm({ title, message, confirmText='Confirmar', cancelText='Cancelar', danger=false, icon=null, onConfirm }) {
+  const iconName  = icon  || (danger ? 'alert-triangle' : 'help-circle');
+  const iconBg    = danger ? 'linear-gradient(135deg,#FEF2F2,#FECACA)' : 'linear-gradient(135deg,#FEF3C7,#FDE68A)';
+  const iconColor = danger ? '#DC2626' : '#D97706';
+  const btnBg     = danger ? 'linear-gradient(135deg,#DC2626,#B91C1C)' : 'linear-gradient(135deg,#1d2140,#2d3a6a)';
+  const msgHtml   = (message||'').replace(/\n/g,'<br>');
+  const overlay   = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="position:absolute;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(6px)" data-cfm-bg></div>
+    <div style="position:relative;background:#fff;border-radius:24px;padding:32px 28px 24px;width:420px;max-width:92vw;box-shadow:0 32px 64px rgba(0,0,0,.28);animation:modalIn .2s cubic-bezier(.16,1,.3,1) both">
+      <div style="width:52px;height:52px;border-radius:16px;background:${iconBg};display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <i data-lucide="${iconName}" style="width:26px;height:26px;color:${iconColor}"></i>
+      </div>
+      <h3 style="font-size:17px;font-weight:800;color:#0F172A;text-align:center;margin-bottom:8px">${title}</h3>
+      <p style="text-align:center;font-size:13px;color:#64748B;margin-bottom:20px;line-height:1.6">${msgHtml}</p>
+      <div style="display:flex;gap:10px">
+        <button data-cfm-cancel style="flex:1;height:46px;border-radius:14px;border:1.5px solid #E2E8F0;background:#fff;font-size:14px;font-weight:600;color:#64748B;cursor:pointer">${cancelText}</button>
+        <button data-cfm-ok style="flex:2;height:46px;border-radius:14px;border:none;background:${btnBg};font-size:14px;font-weight:700;color:#fff;cursor:pointer">${confirmText}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  const close = () => overlay.remove();
+  overlay.querySelector('[data-cfm-bg]').onclick    = close;
+  overlay.querySelector('[data-cfm-cancel]').onclick = close;
+  overlay.querySelector('[data-cfm-ok]').onclick    = () => { close(); onConfirm(); };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4254,6 +4243,42 @@ function doLogout() {
   document.getElementById('l-user').value='';
   document.getElementById('l-pass').value='';
   document.getElementById('l-err').textContent='';
+}
+
+async function doLogoutSafe() {
+  const ahora = new Date();
+  const minutos = ahora.getHours() * 60 + ahora.getMinutes();
+  const son830pm = minutos >= 20 * 60 + 30;
+
+  if (son830pm) {
+    try {
+      const r = await api('/cortes/activo');
+      if (r.ok) {
+        const t = await r.json();
+        if (t.abierto) {
+          const horaAbierto = t.abierto_en
+            ? new Date(t.abierto_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+            : '—';
+          showConfirm({
+            title: 'Turno abierto',
+            message: `Tienes un turno activo desde las ${horaAbierto}.\n\nSe cerrará automáticamente con el monto esperado en caja antes de salir.`,
+            icon: 'alarm-clock',
+            confirmText: 'Cerrar turno y salir',
+            cancelText: 'Cancelar',
+            onConfirm: async () => {
+              await api('/cortes/cerrar', {
+                method: 'POST',
+                body: JSON.stringify({ monto_cierre: t.esperado_caja ?? 0, automatico: true }),
+              }).catch(() => {});
+              doLogout();
+            }
+          });
+          return;
+        }
+      }
+    } catch {}
+  }
+  doLogout();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6093,12 +6118,19 @@ async function repBulkDelete() {
 
 // ── Cortes de Caja ────────────────────────────────────────────────────────
 async function eliminarCorteFantasmas() {
-  if (!confirm('¿Eliminar permanentemente todos los turnos cerrados con 0 ventas y $0.00?\nEsto limpia los cortes fantasma/prueba del historial.')) return;
-  const res = await api('/reportes/cortes/fantasmas', { method: 'DELETE' });
-  if (!res.ok) { toast('Error al eliminar fantasmas','error'); return; }
-  const d = await res.json();
-  toast(`${d.eliminados} corte(s) fantasma eliminado(s)`, 'success');
-  loadCortes();
+  showConfirm({
+    title: 'Limpiar cortes fantasma',
+    message: 'Elimina permanentemente todos los turnos cerrados con 0 ventas y $0.00.',
+    danger: true,
+    confirmText: 'Eliminar',
+    onConfirm: async () => {
+      const res = await api('/reportes/cortes/fantasmas', { method: 'DELETE' });
+      if (!res.ok) { toast('Error al eliminar fantasmas','error'); return; }
+      const d = await res.json();
+      toast(`${d.eliminados} corte(s) fantasma eliminado(s)`, 'success');
+      loadCortes();
+    }
+  });
 }
 
 async function loadCortes() {
@@ -6331,37 +6363,51 @@ async function openVencidosModal() {
 }
 
 async function bajaLoteVencido(loteId, cantidad, nombre) {
-  if (!confirm(`¿Dar de baja ${cantidad} unidad(es) de "${nombre}"?\nEsto registrará una merma por vencimiento.`)) return;
-  try {
-    const res = await api('/inventario/baja-lote', {
-      method: 'POST',
-      body: JSON.stringify({ lote_id: loteId, cantidad, motivo: 'vencimiento' }),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast(data.detail || 'Error al dar de baja', 'error'); return; }
-    toast(`Baja registrada — stock nuevo: ${data.stock_nuevo}`, 'success');
-    await loadAlertasCaducidad();
-    openVencidosModal(); // refresh modal
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  showConfirm({
+    title: 'Dar de baja lote',
+    message: `${cantidad} unidad(es) de "${nombre}"\n\nSe registrará una merma por vencimiento.`,
+    danger: true,
+    confirmText: 'Dar de baja',
+    onConfirm: async () => {
+      try {
+        const res = await api('/inventario/baja-lote', {
+          method: 'POST',
+          body: JSON.stringify({ lote_id: loteId, cantidad, motivo: 'vencimiento' }),
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.detail || 'Error al dar de baja', 'error'); return; }
+        toast(`Baja registrada — stock nuevo: ${data.stock_nuevo}`, 'success');
+        await loadAlertasCaducidad();
+        openVencidosModal();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    }
+  });
 }
 
 async function bajaTodasVencidas() {
   const items = (_cadData?.items || []).filter(i => i.estado === 'vencido');
   if (!items.length) return;
-  if (!confirm(`¿Dar de baja TODOS los lotes vencidos (${items.length})?\nSe registrará una merma por vencimiento para cada uno.`)) return;
-  let ok = 0, err = 0;
-  for (const l of items) {
-    try {
-      const res = await api('/inventario/baja-lote', {
-        method: 'POST',
-        body: JSON.stringify({ lote_id: l.lote_id, cantidad: l.cantidad, motivo: 'vencimiento' }),
-      });
-      if (res.ok) ok++; else err++;
-    } catch { err++; }
-  }
-  toast(`Baja masiva: ${ok} lote(s) procesados${err ? `, ${err} errores` : ''}`, ok > 0 ? 'success' : 'error');
-  await loadAlertasCaducidad();
-  openVencidosModal();
+  showConfirm({
+    title: 'Dar de baja todos los vencidos',
+    message: `${items.length} lote${items.length !== 1 ? 's' : ''} vencido${items.length !== 1 ? 's' : ''}.\n\nSe registrará una merma por vencimiento para cada uno.`,
+    danger: true,
+    confirmText: 'Dar de baja todo',
+    onConfirm: async () => {
+      let ok = 0, err = 0;
+      for (const l of items) {
+        try {
+          const res = await api('/inventario/baja-lote', {
+            method: 'POST',
+            body: JSON.stringify({ lote_id: l.lote_id, cantidad: l.cantidad, motivo: 'vencimiento' }),
+          });
+          if (res.ok) ok++; else err++;
+        } catch { err++; }
+      }
+      toast(`Baja masiva: ${ok} lote(s) procesados${err ? `, ${err} errores` : ''}`, ok > 0 ? 'success' : 'error');
+      await loadAlertasCaducidad();
+      openVencidosModal();
+    }
+  });
 }
 
 // ── Alertas de caducidad (notificación global) ─────────────────────────────
@@ -6680,35 +6726,49 @@ let _cajaRetiros = [];
 let _cajaTurno   = null;
 
 async function cerrarTurnosViejos() {
-  if (!confirm('¿Cerrar automáticamente todos los turnos de días anteriores que quedaron abiertos?')) return;
-  const res = await api('/cortes/cerrar-viejos', { method: 'POST' });
-  if (!res.ok) { toast('Error al cerrar turnos viejos','error'); return; }
-  const d = await res.json();
-  if (d.turnos_cerrados === 0) toast('No hay turnos de días anteriores abiertos','success');
-  else toast(`${d.turnos_cerrados} turno(s) cerrado(s) correctamente`,'success');
-  loadCajaAdmin();
+  showConfirm({
+    title: 'Cerrar turnos viejos',
+    message: 'Cierra automáticamente todos los turnos de días anteriores que quedaron abiertos.',
+    confirmText: 'Cerrar turnos',
+    onConfirm: async () => {
+      const res = await api('/cortes/cerrar-viejos', { method: 'POST' });
+      if (!res.ok) { toast('Error al cerrar turnos viejos','error'); return; }
+      const d = await res.json();
+      if (d.turnos_cerrados === 0) toast('No hay turnos de días anteriores abiertos','success');
+      else toast(`${d.turnos_cerrados} turno(s) cerrado(s) correctamente`,'success');
+      loadCajaAdmin();
+    }
+  });
 }
 
 async function reconstruirHistoricos() {
-  if (!confirm('¿Reconstruir cortes históricos?\n\nPrimero sincroniza ventas desde Turso, luego crea cortes (08:00–21:00) para cada día con ventas que no tenga turno registrado. También cierra turnos fantasma.\n\nPuede tardar unos segundos.')) return;
-  const btn = event.currentTarget;
-  btn.disabled = true; btn.textContent = '⏳ Sincronizando y procesando...';
-  try {
-    const res = await api('/cortes/reconstruir-historicos', { method: 'POST' });
-    if (!res.ok) {
-      const e = await res.json().catch(()=>({}));
-      toast(e.detail || 'Error al reconstruir históricos','error');
-      return;
+  const btn = event?.currentTarget;
+  showConfirm({
+    title: 'Reconstruir históricos',
+    message: 'Sincroniza ventas desde Turso y crea cortes (08:00–21:00) para cada día con ventas sin turno registrado. También cierra turnos fantasma.\n\nPuede tardar unos segundos.',
+    confirmText: 'Reconstruir',
+    onConfirm: async () => {
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando y procesando...'; }
+      try {
+        const res = await api('/cortes/reconstruir-historicos', { method: 'POST' });
+        if (!res.ok) {
+          const e = await res.json().catch(()=>({}));
+          toast(e.detail || 'Error al reconstruir históricos','error');
+          return;
+        }
+        const d = await res.json();
+        const msg = `Reconstrucción completa: ${d.cortes_creados} corte(s) creado(s), ${d.cortes_phantom_cerrados} fantasma(s) cerrado(s)`;
+        toast(msg, 'success');
+        loadCajaAdmin();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos';
+          lucide.createIcons();
+        }
+      }
     }
-    const d = await res.json();
-    const msg = `Reconstrucción completa: ${d.cortes_creados} corte(s) creado(s), ${d.cortes_phantom_cerrados} fantasma(s) cerrado(s)`;
-    toast(msg, 'success');
-    loadCajaAdmin();
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos';
-    lucide.createIcons();
-  }
+  });
 }
 
 async function verDiagnosticoTurso() {
@@ -6843,7 +6903,7 @@ async function loadCajaAdmin() {
 }
 
 function _updateCajaStats() {
-  const hoy  = new Date().toISOString().slice(0, 10);
+  const hoy  = new Date().toLocaleDateString('sv-SE');
   const desde = document.getElementById('caja-desde')?.value || '';
   const hasta  = document.getElementById('caja-hasta')?.value  || '';
   const money  = v => '$' + (v||0).toFixed(2);
@@ -6938,16 +6998,22 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
 }
 
 async function borrarRetiro(id, concepto, montoStr) {
-  const confirmado = confirm(`¿Borrar este retiro?\n\n${concepto} — ${montoStr}\n\nEsta acción restaurará el saldo disponible.`);
-  if (!confirmado) return;
-  const res = await api(`/cortes/retiro/${id}`, { method: 'DELETE' });
-  if (res.ok) {
-    toast('Retiro eliminado. Saldo restaurado ✓', 'success');
-    loadCajaAdmin();
-  } else {
-    const err = await res.json().catch(()=>({}));
-    toast(err.detail || 'Error al eliminar retiro', 'error');
-  }
+  showConfirm({
+    title: 'Borrar retiro',
+    message: `${concepto} — ${montoStr}\n\nEsta acción restaurará el saldo disponible.`,
+    danger: true,
+    confirmText: 'Borrar retiro',
+    onConfirm: async () => {
+      const res = await api(`/cortes/retiro/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast('Retiro eliminado. Saldo restaurado ✓', 'success');
+        loadCajaAdmin();
+      } else {
+        const err = await res.json().catch(()=>({}));
+        toast(err.detail || 'Error al eliminar retiro', 'error');
+      }
+    }
+  });
 }
 
 function toggleRetiroFecha() {
@@ -6958,7 +7024,7 @@ function toggleRetiroFecha() {
   if (checked && !document.getElementById('caja-retiro-fecha').value) {
     // Default to yesterday so user has to consciously pick the date
     const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
-    document.getElementById('caja-retiro-fecha').value = ayer.toISOString().slice(0, 10);
+    document.getElementById('caja-retiro-fecha').value = ayer.toLocaleDateString('sv-SE');
   }
 }
 
@@ -8150,16 +8216,23 @@ function toggleAvItems(id) {
 }
 
 async function eliminarVentaAdmin(id, folio) {
-  if (!confirm(`¿Eliminar venta ${folio}?\n\nEsto restaurará el stock de todos los productos vendidos. No se puede deshacer.`)) return;
-  const res = await api(`/ventas/${id}`, { method: 'DELETE' });
-  if (res.ok) {
-    toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
-    _avCache = _avCache.filter(v => v.id !== id);
-    renderAdminVentas();
-  } else {
-    const e = await res.json().catch(()=>({}));
-    toast(e.detail || 'Error al eliminar', 'error');
-  }
+  showConfirm({
+    title: `Eliminar venta ${folio}`,
+    message: 'Esto restaurará el stock de todos los productos vendidos.\n\nNo se puede deshacer.',
+    danger: true,
+    confirmText: 'Eliminar venta',
+    onConfirm: async () => {
+      const res = await api(`/ventas/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
+        _avCache = _avCache.filter(v => v.id !== id);
+        renderAdminVentas();
+      } else {
+        const e = await res.json().catch(()=>({}));
+        toast(e.detail || 'Error al eliminar', 'error');
+      }
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════
