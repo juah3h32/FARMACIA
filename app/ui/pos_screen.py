@@ -144,11 +144,19 @@ class PosScreen(ctk.CTkFrame):
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=WHITE).grid(row=0, column=0, padx=14, sticky="w")
 
+        from app.database.models import RolUsuario
+        if self.user.rol == RolUsuario.admin:
+            ctk.CTkButton(hdr, text="⚙", width=32, height=30,
+                          fg_color="transparent", hover_color=BLUE_D, text_color=WHITE,
+                          font=ctk.CTkFont(size=15),
+                          command=self._abrir_ajustes,
+                          ).grid(row=0, column=1, padx=(0, 2))
+
         ctk.CTkButton(hdr, text="🗑", width=36, height=30,
                       fg_color="transparent", hover_color=BLUE_D, text_color=WHITE,
                       font=ctk.CTkFont(size=14),
                       command=self._limpiar_carrito,
-                      ).grid(row=0, column=1, padx=(0, 10))
+                      ).grid(row=0, column=2, padx=(0, 10))
 
         # ── Cliente ───────────────────────────────────────────────────────────
         cli = ctk.CTkFrame(right, fg_color=SURF, height=38)
@@ -1637,6 +1645,10 @@ class PosScreen(ctk.CTkFrame):
         entry_folio.bind("<Return>", lambda e: _buscar())
         win.bind("<Escape>", lambda e: win.destroy())
         entry_folio.focus_set()
+
+    def _abrir_ajustes(self):
+        from app.ui.ajustes_pos_dialog import AjustesSistemaDialog
+        AjustesSistemaDialog(self, user=self.user)
 
     def on_show(self):
         self._verificar_corte_abierto()

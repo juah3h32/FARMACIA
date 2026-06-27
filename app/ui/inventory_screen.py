@@ -92,6 +92,7 @@ class InventoryScreen(ctk.CTkFrame):
             ("📥 Entrada",  "#16A34A", "#15803D", self._entrada_stock),
             ("🗓 Lotes",    "#7C3AED", "#6D28D9", self._ver_lotes),
             ("🗑 Eliminar", "#DC2626", "#B91C1C", self._eliminar_producto),
+            ("🔲 Códigos",  "#F59E0B", "#D97706", self._abrir_codigos),
         ]:
             ctk.CTkButton(
                 tool_inner, text=text, height=30, width=100,
@@ -347,6 +348,11 @@ class InventoryScreen(ctk.CTkFrame):
             return
         LotesDialog(self, producto_id=pid)
 
+    def _abrir_codigos(self):
+        from app.ui.codigos_screen import CodigosDialog
+        pid = self._get_selected_id()
+        CodigosDialog(self, producto_id=pid)
+
     def _on_scan_enter(self):
         barcode = self.entry_search.get().strip()
         if barcode:
@@ -424,8 +430,22 @@ class ProductoDialog(ctk.CTkToplevel):
             ctk.CTkLabel(scroll, text=label, font=ctk.CTkFont(size=12), anchor="e").grid(
                 row=i, column=0, padx=(0, 8), pady=5, sticky="e"
             )
-            e = ctk.CTkEntry(scroll, height=34)
-            e.grid(row=i, column=1, pady=5, sticky="ew")
+            if key == "codigo_barras":
+                # Barcode field with "Generate" button
+                bc_row = ctk.CTkFrame(scroll, fg_color="transparent")
+                bc_row.grid(row=i, column=1, pady=5, sticky="ew")
+                bc_row.grid_columnconfigure(0, weight=1)
+                e = ctk.CTkEntry(bc_row, height=34)
+                e.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+                ctk.CTkButton(
+                    bc_row, text="🔲 Generar", width=90, height=34,
+                    fg_color="#F59E0B", hover_color="#D97706", text_color="white",
+                    font=ctk.CTkFont(size=11),
+                    command=self._abrir_gen_codigo,
+                ).grid(row=0, column=1)
+            else:
+                e = ctk.CTkEntry(scroll, height=34)
+                e.grid(row=i, column=1, pady=5, sticky="ew")
             self.entries[key] = e
 
         # Enter key navigation
@@ -712,6 +732,14 @@ class ProductoDialog(ctk.CTkToplevel):
         finally:
             db.close()
 
+    def _abrir_gen_codigo(self):
+        from app.ui.codigos_screen import GenerarCodigoMiniDialog
+        nombre = self.entries["nombre"].get().strip() or "Producto"
+        def _on_confirm(codigo: str):
+            e = self.entries["codigo_barras"]
+            e.delete(0, "end")
+            e.insert(0, codigo)
+        GenerarCodigoMiniDialog(self, nombre_producto=nombre, on_confirm=_on_confirm)
 
     def _seleccionar_imagen(self):
         from tkinter import filedialog
