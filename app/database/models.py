@@ -150,6 +150,8 @@ class Cliente(Base):
     direccion = Column(Text)
     limite_credito = Column(Float, default=0.0)
     saldo_deuda = Column(Float, default=0.0)
+    puntos_acumulados = Column(Float, default=0.0)
+    puntos_canjeados = Column(Float, default=0.0)
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, default=_dt.now)
 
@@ -473,3 +475,146 @@ class RegistroClinico(Base):
 
     paciente = relationship("Paciente", back_populates="registros")
     usuario = relationship("Usuario")
+
+
+# ─── Cuentas por cobrar ────────────────────────────────────────────────────────
+class PagoCredito(Base):
+    __tablename__ = "pagos_credito"
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    monto = Column(Float, nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    notas = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+    cliente = relationship("Cliente")
+    usuario = relationship("Usuario")
+
+
+# ─── Recetas médicas ───────────────────────────────────────────────────────────
+class Receta(Base):
+    __tablename__ = "recetas"
+    id = Column(Integer, primary_key=True)
+    venta_id = Column(Integer, ForeignKey("ventas.id"), nullable=True)
+    medico_nombre = Column(String(200))
+    cedula = Column(String(50))
+    num_receta = Column(String(100))
+    fecha_receta = Column(Date)
+    notas = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+    venta = relationship("Venta")
+
+
+# ─── Promociones ───────────────────────────────────────────────────────────────
+class TipoPromocion(str, enum.Enum):
+    porcentaje = "porcentaje"
+    monto_fijo = "monto_fijo"
+    dos_x_uno = "dos_x_uno"
+    tres_x_dos = "tres_x_dos"
+
+
+class Promocion(Base):
+    __tablename__ = "promociones"
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(200), nullable=False)
+    tipo = Column(SAEnum(TipoPromocion), nullable=False)
+    valor = Column(Float, default=0.0)
+    aplica_a = Column(String(50), default="todos")
+    aplica_id = Column(Integer, nullable=True)
+    fecha_inicio = Column(Date, nullable=True)
+    fecha_fin = Column(Date, nullable=True)
+    activo = Column(Boolean, default=True)
+    creado_en = Column(DateTime, default=_dt.now)
+
+
+# ─── Órdenes de compra ─────────────────────────────────────────────────────────
+class EstadoOrdenCompra(str, enum.Enum):
+    borrador = "borrador"
+    enviada = "enviada"
+    recibida = "recibida"
+    cancelada = "cancelada"
+
+
+class OrdenCompra(Base):
+    __tablename__ = "ordenes_compra"
+    id = Column(Integer, primary_key=True)
+    folio = Column(String(20), unique=True)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"), nullable=True)
+    proveedor_texto = Column(String(200), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    estado = Column(SAEnum(EstadoOrdenCompra), default=EstadoOrdenCompra.borrador)
+    notas = Column(Text)
+    total_estimado = Column(Float, default=0.0)
+    creado_en = Column(DateTime, default=_dt.now)
+    enviada_en = Column(DateTime, nullable=True)
+    recibida_en = Column(DateTime, nullable=True)
+    proveedor = relationship("Proveedor")
+    usuario = relationship("Usuario")
+    items = relationship("ItemOrdenCompra", back_populates="orden", cascade="all, delete-orphan")
+
+
+class ItemOrdenCompra(Base):
+    __tablename__ = "items_orden_compra"
+    id = Column(Integer, primary_key=True)
+    orden_id = Column(Integer, ForeignKey("ordenes_compra.id"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    cantidad = Column(Integer, nullable=False)
+    precio_unitario = Column(Float, default=0.0)
+    subtotal = Column(Float, default=0.0)
+    orden = relationship("OrdenCompra", back_populates="items")
+    producto = relationship("Producto")
+
+
+# ─── Agenda de citas ───────────────────────────────────────────────────────────
+class EstadoCita(str, enum.Enum):
+    programada = "programada"
+    completada = "completada"
+    cancelada = "cancelada"
+    no_asistio = "no_asistio"
+
+
+class Cita(Base):
+    __tablename__ = "citas"
+    id = Column(Integer, primary_key=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_hora = Column(DateTime, nullable=False)
+    tipo_servicio = Column(String(100))
+    estado = Column(SAEnum(EstadoCita), default=EstadoCita.programada)
+    nombre_paciente = Column(String(200))
+    telefono = Column(String(20))
+    notas = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+    paciente = relationship("Paciente")
+    usuario = relationship("Usuario")
+
+
+# ─── Inventario cíclico ────────────────────────────────────────────────────────
+class EstadoSesionInventario(str, enum.Enum):
+    en_progreso = "en_progreso"
+    finalizada = "finalizada"
+    cancelada = "cancelada"
+
+
+class SesionInventario(Base):
+    __tablename__ = "sesiones_inventario"
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    estado = Column(SAEnum(EstadoSesionInventario), default=EstadoSesionInventario.en_progreso)
+    notas = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+    finalizada_en = Column(DateTime, nullable=True)
+    usuario = relationship("Usuario")
+    conteos = relationship("ConteoInventario", back_populates="sesion", cascade="all, delete-orphan")
+
+
+class ConteoInventario(Base):
+    __tablename__ = "conteos_inventario"
+    id = Column(Integer, primary_key=True)
+    sesion_id = Column(Integer, ForeignKey("sesiones_inventario.id"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    cantidad_sistema = Column(Integer, default=0)
+    cantidad_contada = Column(Integer, nullable=True)
+    diferencia = Column(Integer, default=0)
+    ajustado = Column(Boolean, default=False)
+    sesion = relationship("SesionInventario", back_populates="conteos")
+    producto = relationship("Producto")

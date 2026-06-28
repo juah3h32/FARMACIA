@@ -3,7 +3,7 @@ from app.database.connection import get_db_session
 from app.database.models import Venta, Producto, EstadoVenta
 from app.api.routes.auth_routes import get_current_api_user
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -59,12 +59,44 @@ def dashboard_stats(payload: dict = Depends(get_current_api_user)):
             for v in recent
         ]
 
+        # Comparativos: ayer mismo período y semana anterior
+        ayer_start = day_start - timedelta(days=1)
+        ayer_end   = now - timedelta(days=1)
+        semana_start = day_start - timedelta(days=7)
+        semana_end   = day_end - timedelta(days=7)
+        semana_actual_start = day_start - timedelta(days=now.weekday())
+
+        _base = [Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True)]
+        if not is_admin:
+            _base.append(Venta.usuario_id == user_id)
+
+        ingresos_ayer = db.query(func.sum(Venta.total)).filter(
+            *_base, Venta.creado_en >= ayer_start, Venta.creado_en <= ayer_end,
+        ).scalar() or 0.0
+
+        ingresos_semana_ant = db.query(func.sum(Venta.total)).filter(
+            *_base, Venta.creado_en >= semana_start, Venta.creado_en <= semana_end,
+        ).scalar() or 0.0
+
+        ingresos_semana_actual = db.query(func.sum(Venta.total)).filter(
+            *_base, Venta.creado_en >= semana_actual_start, Venta.creado_en <= day_end,
+        ).scalar() or 0.0
+
+        ingresos_hoy_f = round(float(ingresos_hoy), 2)
+        ingresos_ayer_f = round(float(ingresos_ayer), 2)
+
         return {
-            "ventas_hoy":     ventas_hoy,
-            "ingresos_hoy":   round(float(ingresos_hoy), 2),
-            "stock_bajo":     stock_bajo,
+            "ventas_hoy":      ventas_hoy,
+            "ingresos_hoy":    ingresos_hoy_f,
+            "stock_bajo":      stock_bajo,
             "total_productos": total_productos,
-            "recent_sales":   recent_sales,
+            "recent_sales":    recent_sales,
+            "comparativo": {
+                "ayer_mismo_periodo":  ingresos_ayer_f,
+                "semana_anterior":     round(float(ingresos_semana_ant), 2),
+                "semana_actual":       round(float(ingresos_semana_actual), 2),
+                "diferencia_dia_pct":  round((ingresos_hoy_f - ingresos_ayer_f) / max(ingresos_ayer_f, 1) * 100, 1),
+            },
         }
     finally:
         db.close()

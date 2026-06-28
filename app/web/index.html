@@ -1276,6 +1276,24 @@
                 <p class="text-xs text-center py-2" style="color:#94A3B8">Cargando...</p>
               </div>
             </div>
+            <!-- Comparativos -->
+            <div id="dash-comparativo" class="bg-white rounded-2xl border p-3 hidden" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);flex-shrink:0">
+              <p class="text-[9px] font-bold tracking-[.18em] uppercase mb-2" style="color:#94A3B8">Comparativos</p>
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs" style="color:#64748B">Hoy vs ayer</span>
+                  <span id="dash-comp-pct" class="text-sm font-bold"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs" style="color:#64748B">Esta semana</span>
+                  <span id="dash-comp-sem-actual" class="text-xs font-bold" style="color:#1d2140"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs" style="color:#64748B">Semana anterior</span>
+                  <span id="dash-comp-sem-ant" class="text-xs" style="color:#94A3B8"></span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1412,6 +1430,16 @@
             </select>
             <span id="inv-count" class="text-xs" style="color:#64748B"></span>
             <div class="ml-auto flex items-center gap-2" id="inv-add-btn-wrap">
+              <button onclick="exportarInventarioExcel()"
+                      class="h-9 px-3 rounded-xl text-white text-xs font-bold flex items-center gap-1"
+                      style="background:#059669" title="Exportar inventario a Excel">
+                <i data-lucide="table" style="width:13px;height:13px"></i> Excel
+              </button>
+              <button onclick="openInventarioCiclico()" id="btn-conteo-fisico"
+                      class="h-9 px-3 rounded-xl text-white text-xs font-bold flex items-center gap-1"
+                      style="background:#7C3AED" title="Conteo físico de inventario">
+                <i data-lucide="clipboard-check" style="width:13px;height:13px"></i> Conteo Físico
+              </button>
               <button onclick="openProductModal()"
                       class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
                       style="background:#1d2140">
@@ -2170,6 +2198,54 @@
           </div>
         </div>
 
+        <!-- ─── Alertas WhatsApp ──────────────────────────── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#25D366,#128C7E,#25D366)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#E8FFF0">
+              <i data-lucide="bell" style="width:20px;height:20px;color:#25D366"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Alertas WhatsApp</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Recibe alertas diarias de stock bajo y vencimientos vía CallMeBot</p>
+            </div>
+            <div id="wa-activas-badge" class="ml-auto px-3 py-1.5 rounded-xl text-[10px] font-bold hidden" style="background:#DCFCE7;color:#166534;border:1px solid #86EFAC">ACTIVAS</div>
+          </div>
+          <div class="p-6 flex flex-col gap-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="lbl">Número WhatsApp <span class="text-[10px] text-slate-400">(con código país, ej: 521XXXXXXXXXX)</span></label>
+                <input id="wa-numero" type="text" class="inp" placeholder="521XXXXXXXXXX">
+              </div>
+              <div>
+                <label class="lbl">API Key CallMeBot</label>
+                <input id="wa-token" type="password" class="inp" placeholder="Tu API Key de CallMeBot">
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="wa-activas" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-green-500 transition-all after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                <span class="ml-3 text-sm font-semibold" style="color:#0F172A">Activar alertas diarias (7am)</span>
+              </label>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+              <button onclick="saveConfigAlertas()" class="h-10 px-5 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#16A34A">
+                <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
+              </button>
+              <button onclick="testAlertaWA()" class="h-10 px-5 rounded-xl font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#E8FFF0;color:#15803D;border:1px solid #86EFAC">
+                <i data-lucide="send" style="width:15px;height:15px"></i> Enviar prueba
+              </button>
+            </div>
+            <div class="rounded-xl p-3 text-xs" style="background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;line-height:1.6">
+              <b>Cómo obtener tu API Key:</b><br>
+              1. Agrega <b>+34 644 52 74 17</b> a tus contactos de WhatsApp<br>
+              2. Envía el mensaje: <code class="font-mono bg-green-100 px-1 rounded">I allow callmebot to send me messages</code><br>
+              3. Recibirás tu API Key en respuesta — cópiala aquí
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- ─── CONTROL DE CAJA (ADMIN) ──────────────── -->
@@ -2696,6 +2772,82 @@
         </div>
 
       </div><!-- /marketing -->
+
+      <!-- ─── CITAS ──────────────────────────────────────── -->
+      <div data-page="citas" class="page" style="height:100%;overflow:hidden;padding:1rem 1.25rem;gap:0.75rem;display:none;flex-direction:column">
+        <div class="flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#6366F1,#8B5CF6)">
+              <i data-lucide="calendar-clock" style="width:18px;height:18px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A;line-height:1.2">Citas</h2>
+              <p class="text-xs" style="color:#64748B">Agenda · Seguimiento · Historial</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <input type="date" id="citas-fecha" class="h-9 px-3 rounded-xl text-sm border font-semibold" style="border-color:#C5CEDE;color:#1d2140" onchange="loadCitas()">
+            <button onclick="openCitaModal()" class="h-9 px-4 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition hover:opacity-90" style="background:#6366F1">
+              <i data-lucide="plus" style="width:14px;height:14px"></i> Nueva cita
+            </button>
+          </div>
+        </div>
+        <div id="citas-list" class="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+          <p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>
+        </div>
+      </div>
+
+      <!-- ─── ÓRDENES DE COMPRA ──────────────────────────── -->
+      <div data-page="ordenes-compra" class="page" style="height:100%;overflow:hidden;padding:1rem 1.25rem;gap:0.75rem;display:none;flex-direction:column">
+        <div class="flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#0EA5E9,#0284C7)">
+              <i data-lucide="shopping-cart" style="width:18px;height:18px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A;line-height:1.2">Órdenes de Compra</h2>
+              <p class="text-xs" style="color:#64748B">Pedidos a proveedores · Stock bajo</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="loadOrdenSugerida()" class="h-9 px-4 rounded-xl font-semibold text-sm flex items-center gap-2 transition hover:opacity-80" style="background:#EFF6FF;color:#0284C7;border:1px solid #BFDBFE">
+              <i data-lucide="package-search" style="width:14px;height:14px"></i> Stock bajo
+            </button>
+            <button onclick="openOrdenModal()" class="h-9 px-4 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition hover:opacity-90" style="background:#0EA5E9">
+              <i data-lucide="plus" style="width:14px;height:14px"></i> Nueva orden
+            </button>
+          </div>
+        </div>
+        <div id="ordenes-list" class="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+          <p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>
+        </div>
+      </div>
+
+      <!-- ─── PROMOCIONES ───────────────────────────────────── -->
+      <div data-page="promociones" class="page" style="height:100%;overflow:hidden;padding:1rem 1.25rem;gap:0.75rem;display:none;flex-direction:column">
+        <div class="flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
+              <i data-lucide="tag" style="width:18px;height:18px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A;line-height:1.2">Promociones</h2>
+              <p class="text-xs" style="color:#64748B">Descuentos · 2x1 · Meses activos</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="loadPromociones()" class="h-9 px-4 rounded-xl font-semibold text-sm flex items-center gap-2 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+              <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualizar
+            </button>
+            <button onclick="openPromocionModal()" class="h-9 px-4 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition hover:opacity-90" style="background:#F59E0B">
+              <i data-lucide="plus" style="width:14px;height:14px"></i> Nueva promoción
+            </button>
+          </div>
+        </div>
+        <div id="promos-list" class="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+          <p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>
+        </div>
+      </div>
 
     </main>
   </div><!-- /right panel -->
@@ -3713,6 +3865,10 @@ const NAV = [
   { type:'group', label:'SISTEMA',        admin:true },
   { key:'marketing', icon:'megaphone',        label:'Marketing',        admin:true  },
   { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
+  { type:'group', label:'SERVICIOS' },
+  { key:'citas',          icon:'calendar-clock', label:'Agenda de Citas',   admin:false },
+  { key:'ordenes-compra', icon:'clipboard-list', label:'Órdenes de Compra', admin:true  },
+  { key:'promociones',    icon:'tag',            label:'Promociones',       admin:true  },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -4662,7 +4818,8 @@ const TITLES={
   dashboard:'Dashboard', pos:'Punto de Venta', inventory:'Inventario',
   customers:'Clientes', reports:'Reportes', suppliers:'Proveedores',
   employees:'Empleados', settings:'Configuración', historial:'Historial Clínico',
-  marketing:'Marketing — PDF y Promos'
+  marketing:'Marketing — PDF y Promos',
+  citas:'Agenda de Citas', 'ordenes-compra':'Órdenes de Compra', promociones:'Promociones'
 };
 
 function navigate(page) {
@@ -4741,6 +4898,9 @@ function loadPage(page) {
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
   if (page==='marketing')  loadMarketing();
+  if (page==='citas')         { const hoy=new Date().toISOString().split('T')[0]; const fe=document.getElementById('citas-fecha'); if(fe)fe.value=hoy; loadCitas(); }
+  if (page==='ordenes-compra') loadOrdenesCompra();
+  if (page==='promociones')    loadPromociones();
   icons();
 }
 
@@ -4808,6 +4968,22 @@ async function loadDashboard() {
   _animNum('kpi-ingresos', d.ingresos_hoy, true);
   _animNum('kpi-stock',    d.stock_bajo,       false);
   _animNum('kpi-total',    d.total_productos,  false);
+
+  // Comparativos
+  if (d.comparativo) {
+    const cmp = d.comparativo;
+    const compDiv = document.getElementById('dash-comparativo');
+    if (compDiv) {
+      compDiv.classList.remove('hidden');
+      const pct = cmp.diferencia_dia_pct || 0;
+      const pctEl = document.getElementById('dash-comp-pct');
+      if (pctEl) { pctEl.textContent = (pct>=0?'+':'')+pct+'%'; pctEl.style.color = pct>=0?'#10B981':'#EF4444'; }
+      const saEl = document.getElementById('dash-comp-sem-actual');
+      if (saEl) saEl.textContent = fmt(cmp.semana_actual||0);
+      const santEl = document.getElementById('dash-comp-sem-ant');
+      if (santEl) santEl.textContent = fmt(cmp.semana_anterior||0);
+    }
+  }
 
   // Carousel: go to slide 0 on every load, init auto only for admin
   kpiGoTo(0);
@@ -5480,6 +5656,9 @@ function renderInvTable(prods) {
           </button>
           <button onclick="deleteProduct(${p.id})" title="Eliminar" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#FEF2F2;color:#EF4444">
             <i data-lucide="trash-2" style="width:12px;height:12px"></i>
+          </button>
+          <button onclick="openHistorialPrecio(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" title="Historial precio" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F1F5F9;color:#64748B">
+            <i data-lucide="trending-up" style="width:12px;height:12px"></i>
           </button>` : ''}
         </div>
       </td>
@@ -6003,15 +6182,18 @@ function renderCustTable(cs) {
       <td class="px-5 py-3 text-sm" style="color:#64748B">${c.email||'—'}</td>
       <td class="px-5 py-3 text-sm font-mono" style="color:#64748B">${c.rfc||'—'}</td>
       <td class="px-5 py-3">
-        ${S.user?.rol==='admin' ? `
         <div class="flex gap-1.5">
+          <button onclick="openCreditoCliente(${c.id},'${c.nombre.replace(/'/g,"\\'")}')" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#D1FAE5;color:#10B981" title="Ver crédito">
+            <i data-lucide="credit-card" style="width:11px;height:11px"></i>
+          </button>
+          ${S.user?.rol==='admin' ? `
           <button onclick="openCustModal(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#EEF1F9;color:#1d2140">
             <i data-lucide="pencil" style="width:11px;height:11px"></i> Editar
           </button>
           <button onclick="deleteCust(${c.id})" class="h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1" style="background:#FEF2F2;color:#EF4444">
             <i data-lucide="trash-2" style="width:11px;height:11px"></i>
-          </button>
-        </div>` : '<span class="text-xs" style="color:#94A3B8">—</span>'}
+          </button>` : ''}
+        </div>
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="text-center py-8 text-xs" style="color:#94A3B8">Sin clientes</td></tr>';
   icons();
@@ -8315,6 +8497,7 @@ function initSettings() {
     loadProductosSinCodigo();
   }
   loadMpStatus();
+  if (S.user?.rol === 'admin') loadConfigAlertas();
   icons();
 }
 
@@ -11248,8 +11431,680 @@ async function loadProductosSinCodigo() {
   icons();
 }
 
+// ── apiFetch helper ───────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  const res = await api(path, opts);
+  if (!res.ok) {
+    let detail = 'Error';
+    try { const e = await res.json(); detail = e.detail || detail; } catch(_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// ── WhatsApp Alertas ──────────────────────────────────────────────────────────
+async function loadConfigAlertas() {
+  try {
+    const d = await apiFetch('/config/alertas');
+    document.getElementById('wa-numero').value = d.numero || '';
+    document.getElementById('wa-token').value  = d.token  || '';
+    document.getElementById('wa-activas').checked = !!d.activas;
+    const badge = document.getElementById('wa-activas-badge');
+    if (d.activas) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+  } catch(e) {}
+}
+
+async function saveConfigAlertas() {
+  const numero  = document.getElementById('wa-numero').value.trim();
+  const token   = document.getElementById('wa-token').value.trim();
+  const activas = document.getElementById('wa-activas').checked;
+  if (!numero || !token) { toast('Ingresa número y API Key', 'warning'); return; }
+  try {
+    await apiFetch('/config/alertas', { method:'POST', body: JSON.stringify({ numero, token, activas }) });
+    toast('Configuración guardada', 'success');
+    const badge = document.getElementById('wa-activas-badge');
+    if (activas) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function testAlertaWA() {
+  try {
+    await apiFetch('/config/alertas/test', { method:'POST' });
+    toast('Mensaje de prueba enviado', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Historial Precio ──────────────────────────────────────────────────────────
+async function openHistorialPrecio(pid, nombre) {
+  document.getElementById('hp-titulo').textContent = nombre;
+  document.getElementById('hp-body').innerHTML = '<tr><td colspan="3" class="text-center py-4 text-xs" style="color:#94A3B8">Cargando...</td></tr>';
+  openModal('modal-historial-precio');
+  try {
+    const data = await apiFetch(`/productos/${pid}/historial-precio`);
+    if (!data.length) {
+      document.getElementById('hp-body').innerHTML = '<tr><td colspan="3" class="text-center py-4 text-xs" style="color:#94A3B8">Sin cambios de precio registrados</td></tr>';
+      return;
+    }
+    document.getElementById('hp-body').innerHTML = data.map(r => `
+      <tr class="border-b hover:bg-slate-50" style="border-color:#F1F5F9">
+        <td class="py-2 px-3 text-xs" style="color:#64748B">${r.fecha ? new Date(r.fecha).toLocaleDateString('es-MX') : '—'}</td>
+        <td class="py-2 px-3 text-xs text-right font-mono" style="color:#EF4444">$${parseFloat(r.precio_anterior||0).toFixed(2)}</td>
+        <td class="py-2 px-3 text-xs text-right font-mono font-bold" style="color:#16A34A">$${parseFloat(r.precio_nuevo||0).toFixed(2)}</td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message, 'error'); closeModal('modal-historial-precio'); }
+}
+
+// ── Receta Médica ─────────────────────────────────────────────────────────────
+let _recetaVentaId = null;
+function openRecetaModal(ventaId) {
+  _recetaVentaId = ventaId;
+  document.getElementById('rec-medico').value = '';
+  document.getElementById('rec-cedula').value = '';
+  document.getElementById('rec-diagnostico').value = '';
+  document.getElementById('rec-notas').value = '';
+  openModal('modal-receta');
+}
+
+async function saveReceta() {
+  const body = {
+    venta_id:    _recetaVentaId,
+    medico:      document.getElementById('rec-medico').value.trim(),
+    cedula:      document.getElementById('rec-cedula').value.trim(),
+    diagnostico: document.getElementById('rec-diagnostico').value.trim(),
+    notas:       document.getElementById('rec-notas').value.trim(),
+  };
+  if (!body.medico) { toast('Ingresa el nombre del médico', 'warning'); return; }
+  try {
+    await apiFetch('/recetas', { method:'POST', body: JSON.stringify(body) });
+    toast('Receta guardada', 'success');
+    closeModal('modal-receta');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Inventario Cíclico ────────────────────────────────────────────────────────
+let _sesionInventarioId = null;
+
+async function openInventarioCiclico() {
+  openModal('modal-inventario-ciclico');
+  document.getElementById('inv-cicl-sesion').classList.add('hidden');
+  document.getElementById('inv-cicl-crear').classList.remove('hidden');
+  document.getElementById('inv-cicl-conteos').innerHTML = '';
+  const res = await api('/inventario-ciclico');
+  if (res.ok) {
+    const data = await res.json();
+    const enCurso = data.find(s => s.estado === 'en_curso');
+    if (enCurso) {
+      _sesionInventarioId = enCurso.id;
+      loadSesionConteo(enCurso.id);
+    }
+  }
+}
+
+async function crearSesionInventario() {
+  try {
+    const d = await apiFetch('/inventario-ciclico', { method:'POST' });
+    _sesionInventarioId = d.id;
+    toast('Sesión de conteo creada', 'success');
+    loadSesionConteo(d.id);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function loadSesionConteo(sid) {
+  document.getElementById('inv-cicl-crear').classList.add('hidden');
+  document.getElementById('inv-cicl-sesion').classList.remove('hidden');
+  try {
+    const d = await apiFetch(`/inventario-ciclico/${sid}`);
+    document.getElementById('inv-cicl-sesion-titulo').textContent = `Sesión #${sid} — ${new Date(d.creado_en||'').toLocaleDateString('es-MX')}`;
+    document.getElementById('inv-cicl-conteos').innerHTML = d.conteos.map(c => `
+      <div class="flex items-center gap-3 py-2 border-b" style="border-color:#F1F5F9">
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-semibold truncate" style="color:#0F172A">${c.producto_nombre}</p>
+          <p class="text-[10px]" style="color:#94A3B8">Sistema: ${c.cantidad_sistema} uds</p>
+        </div>
+        <input type="number" min="0" step="0.001" id="cnt-${c.id}" value="${c.cantidad_contada ?? ''}"
+               class="w-20 h-8 px-2 rounded-lg border text-xs text-right font-mono" style="border-color:#C5CEDE"
+               placeholder="0">
+      </div>`).join('');
+    icons();
+    if (d.estado !== 'en_curso') {
+      document.getElementById('inv-cicl-guardar').classList.add('hidden');
+      document.getElementById('inv-cicl-aplicar').classList.add('hidden');
+    }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function guardarConteos() {
+  const inputs = document.querySelectorAll('[id^="cnt-"]');
+  const conteos = [];
+  inputs.forEach(inp => {
+    const conteo_id = parseInt(inp.id.replace('cnt-',''));
+    const val = inp.value.trim();
+    if (val !== '') conteos.push({ conteo_id, cantidad_contada: parseFloat(val) });
+  });
+  if (!conteos.length) { toast('Ingresa al menos un conteo', 'warning'); return; }
+  try {
+    await apiFetch(`/inventario-ciclico/${_sesionInventarioId}/conteos`, { method:'POST', body: JSON.stringify(conteos) });
+    toast('Conteos guardados', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function aplicarAjustesInventario() {
+  if (!confirm('¿Aplicar ajustes al stock real? Esta acción no se puede deshacer.')) return;
+  try {
+    const d = await apiFetch(`/inventario-ciclico/${_sesionInventarioId}/aplicar`, { method:'POST' });
+    toast(`Ajustes aplicados: ${d.ajustes_aplicados} productos`, 'success');
+    closeModal('modal-inventario-ciclico');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Crédito Cliente ───────────────────────────────────────────────────────────
+let _creditoClienteId = null;
+
+async function openCreditoCliente(cid, nombre) {
+  _creditoClienteId = cid;
+  document.getElementById('cred-nombre').textContent = nombre;
+  document.getElementById('cred-info').innerHTML = '<p class="text-xs text-center py-4" style="color:#94A3B8">Cargando...</p>';
+  document.getElementById('cred-pago-monto').value = '';
+  openModal('modal-credito-cliente');
+  refreshCreditoCliente();
+}
+
+async function refreshCreditoCliente() {
+  try {
+    const d = await apiFetch(`/clientes/${_creditoClienteId}/credito`);
+    document.getElementById('cred-info').innerHTML = `
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div class="rounded-xl p-3" style="background:#F0F9FF;border:1px solid #BAE6FD">
+          <p class="text-[10px]" style="color:#64748B">Límite</p>
+          <p class="text-lg font-black" style="color:#0284C7">$${parseFloat(d.limite||0).toFixed(2)}</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#FFF7ED;border:1px solid #FDE68A">
+          <p class="text-[10px]" style="color:#64748B">Adeudo</p>
+          <p class="text-lg font-black" style="color:#D97706">$${parseFloat(d.deuda||0).toFixed(2)}</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#F0FDF4;border:1px solid #BBF7D0">
+          <p class="text-[10px]" style="color:#64748B">Disponible</p>
+          <p class="text-lg font-black" style="color:#16A34A">$${parseFloat(d.disponible||0).toFixed(2)}</p>
+        </div>
+      </div>
+      <div class="mt-3 space-y-1 max-h-40 overflow-y-auto">
+        ${(d.pagos||[]).map(p=>`<div class="flex justify-between text-xs py-1 border-b" style="border-color:#F1F5F9"><span style="color:#64748B">${new Date(p.fecha).toLocaleDateString('es-MX')}</span><span class="font-bold" style="color:#16A34A">+$${parseFloat(p.monto).toFixed(2)}</span></div>`).join('')||'<p class="text-xs text-center py-2" style="color:#94A3B8">Sin pagos registrados</p>'}
+      </div>`;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function registrarPagoCredito() {
+  const monto = parseFloat(document.getElementById('cred-pago-monto').value);
+  const notas = document.getElementById('cred-pago-notas').value.trim();
+  if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'warning'); return; }
+  try {
+    await apiFetch(`/clientes/${_creditoClienteId}/credito/pago`, { method:'POST', body: JSON.stringify({ monto, notas }) });
+    toast('Pago registrado', 'success');
+    document.getElementById('cred-pago-monto').value = '';
+    document.getElementById('cred-pago-notas').value = '';
+    refreshCreditoCliente();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Citas ─────────────────────────────────────────────────────────────────────
+async function loadCitas() {
+  const fecha = document.getElementById('citas-fecha').value;
+  const list  = document.getElementById('citas-list');
+  list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>';
+  try {
+    const data = await apiFetch(`/citas${fecha ? '?fecha='+fecha : ''}`);
+    if (!data.length) {
+      list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Sin citas para esta fecha</p>';
+      return;
+    }
+    list.innerHTML = data.map(c => {
+      const color = { pendiente:'#F59E0B', confirmada:'#3B82F6', completada:'#16A34A', cancelada:'#EF4444' }[c.estado] || '#94A3B8';
+      const hora = c.fecha_hora ? new Date(c.fecha_hora).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="bg-white rounded-2xl border p-4 flex items-center gap-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+        <div class="w-1.5 self-stretch rounded-full flex-shrink-0" style="background:${color}"></div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-sm" style="color:#0F172A">${c.paciente_nombre||c.nombre_paciente||'—'}</p>
+          <p class="text-xs mt-0.5" style="color:#64748B">${c.tipo_servicio||''} ${hora ? '· '+hora : ''}</p>
+        </div>
+        <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold" style="background:${color}22;color:${color}">${c.estado}</span>
+        <div class="flex gap-1">
+          <button onclick="cambiarEstadoCita(${c.id},'completada')" class="h-8 w-8 rounded-xl flex items-center justify-center hover:bg-green-50" title="Completada" style="color:#16A34A">
+            <i data-lucide="check-circle-2" style="width:15px;height:15px"></i>
+          </button>
+          <button onclick="cambiarEstadoCita(${c.id},'cancelada')" class="h-8 w-8 rounded-xl flex items-center justify-center hover:bg-red-50" title="Cancelar" style="color:#EF4444">
+            <i data-lucide="x-circle" style="width:15px;height:15px"></i>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+    icons();
+  } catch(e) { toast(e.message, 'error'); list.innerHTML = ''; }
+}
+
+function openCitaModal() {
+  document.getElementById('cita-nombre').value = '';
+  document.getElementById('cita-telefono').value = '';
+  document.getElementById('cita-fecha').value = document.getElementById('citas-fecha').value || '';
+  document.getElementById('cita-hora').value = '';
+  document.getElementById('cita-motivo').value = '';
+  openModal('modal-cita');
+}
+
+async function saveCita() {
+  const nombre  = document.getElementById('cita-nombre').value.trim();
+  const telefono= document.getElementById('cita-telefono').value.trim();
+  const fecha   = document.getElementById('cita-fecha').value;
+  const hora    = document.getElementById('cita-hora').value || '00:00';
+  const motivo  = document.getElementById('cita-motivo').value.trim();
+  if (!nombre || !fecha) { toast('Nombre y fecha son requeridos', 'warning'); return; }
+  const fecha_hora = `${fecha}T${hora}:00`;
+  const body = { nombre_paciente: nombre, telefono, fecha_hora, tipo_servicio: motivo };
+  try {
+    await apiFetch('/citas', { method:'POST', body: JSON.stringify(body) });
+    toast('Cita creada', 'success');
+    closeModal('modal-cita');
+    loadCitas();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function cambiarEstadoCita(cid, estado) {
+  try {
+    await apiFetch(`/citas/${cid}/estado?estado=${encodeURIComponent(estado)}`, { method:'PATCH' });
+    loadCitas();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Órdenes de Compra ─────────────────────────────────────────────────────────
+let _ordenItems = [];
+
+async function loadOrdenesCompra() {
+  const list = document.getElementById('ordenes-list');
+  list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>';
+  try {
+    const data = await apiFetch('/ordenes-compra');
+    if (!data.length) {
+      list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Sin órdenes de compra</p>';
+      return;
+    }
+    list.innerHTML = data.map(o => {
+      const color = { borrador:'#94A3B8', enviada:'#3B82F6', recibida:'#16A34A', cancelada:'#EF4444' }[o.estado] || '#94A3B8';
+      return `<div class="bg-white rounded-2xl border p-4 flex items-center gap-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <p class="font-bold text-sm" style="color:#0F172A">OC-${o.id} · ${o.proveedor_nombre||o.proveedor||'—'}</p>
+            <span class="px-2 py-0.5 rounded-xl text-[10px] font-bold" style="background:${color}22;color:${color}">${o.estado}</span>
+          </div>
+          <p class="text-xs mt-0.5" style="color:#64748B">${o.items?.length||0} artículos · $${parseFloat(o.total_estimado||0).toFixed(2)} · ${o.creado_en ? new Date(o.creado_en).toLocaleDateString('es-MX') : ''}</p>
+        </div>
+        ${S.user?.rol==='admin' ? `<div class="flex gap-1">
+          ${o.estado==='borrador' ? `<button onclick="cambiarEstadoOrden(${o.id},'enviada')" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5" style="background:#EFF6FF;color:#0284C7;border:1px solid #BFDBFE"><i data-lucide="send" style="width:12px;height:12px"></i> Enviar</button>` : ''}
+          ${o.estado==='enviada' ? `<button onclick="cambiarEstadoOrden(${o.id},'recibida')" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0"><i data-lucide="package-check" style="width:12px;height:12px"></i> Recibida</button>` : ''}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+    icons();
+  } catch(e) { toast(e.message, 'error'); list.innerHTML = ''; }
+}
+
+async function loadOrdenSugerida() {
+  try {
+    const data = await apiFetch('/ordenes-compra/sugerida/stock-bajo');
+    if (!data.length) { toast('No hay productos con stock bajo', 'info'); return; }
+    _ordenItems = data.map(p => ({ producto_id: p.producto_id || p.id, nombre: p.nombre, cantidad: p.cantidad_sugerida || 1, precio_unitario: p.precio_compra || 0 }));
+    openOrdenModal();
+    renderOrdenItems();
+    toast(`${data.length} productos con stock bajo cargados`, 'info');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function openOrdenModal() {
+  _ordenItems = _ordenItems.length ? _ordenItems : [];
+  document.getElementById('orden-proveedor').value = '';
+  document.getElementById('orden-notas').value = '';
+  renderOrdenItems();
+  openModal('modal-orden-compra');
+}
+
+function renderOrdenItems() {
+  const tbody = document.getElementById('orden-items');
+  if (!_ordenItems.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-xs" style="color:#94A3B8">Sin artículos — agrega productos</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _ordenItems.map((it, i) => `
+    <tr class="border-b" style="border-color:#F1F5F9">
+      <td class="py-2 px-3 text-xs font-medium" style="color:#0F172A">${it.nombre}</td>
+      <td class="py-2 px-2"><input type="number" min="1" value="${it.cantidad}" oninput="_ordenItems[${i}].cantidad=+this.value;_calcOrden()"
+           class="w-16 h-7 px-2 rounded-lg border text-xs text-right font-mono" style="border-color:#C5CEDE"></td>
+      <td class="py-2 px-2"><input type="number" min="0" step="0.01" value="${it.precio_unitario}" oninput="_ordenItems[${i}].precio_unitario=+this.value;_calcOrden()"
+           class="w-24 h-7 px-2 rounded-lg border text-xs text-right font-mono" style="border-color:#C5CEDE"></td>
+      <td class="py-2 px-2"><button onclick="_ordenItems.splice(${i},1);renderOrdenItems()" class="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-red-50" style="color:#EF4444"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></td>
+    </tr>`).join('');
+  _calcOrden();
+  icons();
+}
+
+function _calcOrden() {
+  const total = _ordenItems.reduce((s,it) => s + (it.cantidad||0)*(it.precio_unitario||0), 0);
+  const el = document.getElementById('orden-total');
+  if (el) el.textContent = `$${total.toFixed(2)}`;
+}
+
+async function saveOrdenCompra() {
+  const proveedor = document.getElementById('orden-proveedor').value.trim();
+  const notas     = document.getElementById('orden-notas').value.trim();
+  if (!proveedor) { toast('Ingresa el proveedor', 'warning'); return; }
+  if (!_ordenItems.length) { toast('Agrega al menos un artículo', 'warning'); return; }
+  try {
+    await apiFetch('/ordenes-compra', { method:'POST', body: JSON.stringify({ proveedor, notas, items: _ordenItems }) });
+    toast('Orden de compra creada', 'success');
+    closeModal('modal-orden-compra');
+    _ordenItems = [];
+    loadOrdenesCompra();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function cambiarEstadoOrden(oid, estado) {
+  try {
+    await apiFetch(`/ordenes-compra/${oid}/estado?estado=${encodeURIComponent(estado)}`, { method:'PATCH' });
+    toast('Estado actualizado', 'success');
+    loadOrdenesCompra();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Promociones ───────────────────────────────────────────────────────────────
+async function loadPromociones() {
+  const list = document.getElementById('promos-list');
+  list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Cargando...</p>';
+  try {
+    const data = await apiFetch('/promociones');
+    if (!data.length) {
+      list.innerHTML = '<p class="text-center text-sm py-12" style="color:#94A3B8">Sin promociones creadas</p>';
+      return;
+    }
+    list.innerHTML = data.map(p => {
+      const activa = p.activa;
+      return `<div class="bg-white rounded-2xl border p-4 flex items-center gap-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${activa?'#FFF7ED':'#F8FAFF'};border:1px solid ${activa?'#FDE68A':'#E2E8F0'}">
+          <i data-lucide="tag" style="width:16px;height:16px;color:${activa?'#D97706':'#CBD5E1'}"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-sm truncate" style="color:#0F172A">${p.nombre}</p>
+          <p class="text-xs mt-0.5" style="color:#64748B">${tipoPromoLabel(p.tipo)} · ${p.fecha_inicio||''} → ${p.fecha_fin||'sin fecha fin'}</p>
+        </div>
+        <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold" style="background:${activa?'#DCFCE7':'#F1F5F9'};color:${activa?'#166534':'#64748B'}">${activa?'ACTIVA':'INACTIVA'}</span>
+        ${S.user?.rol==='admin' ? `<div class="flex gap-1">
+          <button onclick="togglePromocion(${p.id},${!activa})" class="h-8 w-8 rounded-xl flex items-center justify-center hover:bg-slate-100" title="${activa?'Desactivar':'Activar'}" style="color:${activa?'#94A3B8':'#16A34A'}">
+            <i data-lucide="${activa?'toggle-right':'toggle-left'}" style="width:15px;height:15px"></i>
+          </button>
+          <button onclick="deletePromocion(${p.id})" class="h-8 w-8 rounded-xl flex items-center justify-center hover:bg-red-50" style="color:#EF4444">
+            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+          </button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+    icons();
+  } catch(e) { toast(e.message, 'error'); list.innerHTML = ''; }
+}
+
+function tipoPromoLabel(tipo) {
+  return { porcentaje:'Descuento %', monto_fijo:'Descuento fijo', dos_por_uno:'2x1', tres_por_dos:'3x2' }[tipo] || tipo;
+}
+
+async function togglePromocion(pid, activa) {
+  try {
+    await apiFetch(`/promociones/${pid}/toggle?activa=${activa}`, { method:'PATCH' });
+    loadPromociones();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deletePromocion(pid) {
+  if (!confirm('¿Eliminar esta promoción?')) return;
+  try {
+    await apiFetch(`/promociones/${pid}`, { method:'DELETE' });
+    toast('Promoción eliminada', 'success');
+    loadPromociones();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function openPromocionModal() {
+  document.getElementById('promo-nombre').value = '';
+  document.getElementById('promo-tipo').value = 'porcentaje';
+  document.getElementById('promo-valor').value = '';
+  document.getElementById('promo-fecha-ini').value = '';
+  document.getElementById('promo-fecha-fin').value = '';
+  openModal('modal-promocion');
+}
+
+async function savePromocion() {
+  const body = {
+    nombre:       document.getElementById('promo-nombre').value.trim(),
+    tipo:         document.getElementById('promo-tipo').value,
+    valor:        parseFloat(document.getElementById('promo-valor').value||0),
+    fecha_inicio: document.getElementById('promo-fecha-ini').value || null,
+    fecha_fin:    document.getElementById('promo-fecha-fin').value || null,
+    activo:       true,
+  };
+  if (!body.nombre) { toast('Ingresa el nombre', 'warning'); return; }
+  try {
+    await apiFetch('/promociones', { method:'POST', body: JSON.stringify(body) });
+    toast('Promoción creada', 'success');
+    closeModal('modal-promocion');
+    loadPromociones();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Exportar Inventario Excel ─────────────────────────────────────────────────
+async function exportarInventarioExcel() {
+  try {
+    const res = await api('/reportes/inventario-excel');
+    if (!res.ok) { toast('Error al generar Excel', 'error'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `inventario_${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { toast(e.message, 'error'); }
+}
 
 </script>
+
+<!-- ─── modal-historial-precio ──────────────────────────────── -->
+<div id="modal-historial-precio" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-historial-precio')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl" style="width:480px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column">
+    <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <div>
+        <p class="font-bold text-sm" style="color:#0F172A">Historial de precios</p>
+        <p id="hp-titulo" class="text-xs mt-0.5" style="color:#64748B">—</p>
+      </div>
+      <button onclick="closeModal('modal-historial-precio')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4">
+      <table class="w-full">
+        <thead><tr class="border-b" style="border-color:#E2E8F0">
+          <th class="text-left py-2 px-3 text-[10px] font-bold uppercase" style="color:#94A3B8">Fecha</th>
+          <th class="text-right py-2 px-3 text-[10px] font-bold uppercase" style="color:#94A3B8">Anterior</th>
+          <th class="text-right py-2 px-3 text-[10px] font-bold uppercase" style="color:#94A3B8">Nuevo</th>
+        </tr></thead>
+        <tbody id="hp-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-receta ────────────────────────────────────────── -->
+<div id="modal-receta" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-receta')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl" style="width:480px;max-width:95vw">
+    <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color:#E2E8F0">
+      <p class="font-bold text-sm" style="color:#0F172A">Registrar Receta Médica</p>
+      <button onclick="closeModal('modal-receta')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="p-5 flex flex-col gap-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Médico</label><input id="rec-medico" type="text" class="inp" placeholder="Dr. Nombre"></div>
+        <div><label class="lbl">Cédula profesional</label><input id="rec-cedula" type="text" class="inp" placeholder="12345678"></div>
+      </div>
+      <div><label class="lbl">Diagnóstico</label><input id="rec-diagnostico" type="text" class="inp" placeholder="Diagnóstico"></div>
+      <div><label class="lbl">Notas</label><textarea id="rec-notas" class="inp" rows="2" placeholder="Instrucciones, dosis..."></textarea></div>
+    </div>
+    <div class="flex gap-3 px-5 pb-5">
+      <button onclick="saveReceta()" class="flex-1 h-10 rounded-xl font-bold text-sm text-white" style="background:#1d2140">Guardar receta</button>
+      <button onclick="closeModal('modal-receta')" class="h-10 px-4 rounded-xl text-sm border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-inventario-ciclico ────────────────────────────── -->
+<div id="modal-inventario-ciclico" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-inventario-ciclico')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:560px;max-width:95vw;max-height:85vh">
+    <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <p class="font-bold text-sm" style="color:#0F172A">Conteo Físico de Inventario</p>
+      <button onclick="closeModal('modal-inventario-ciclico')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+      <!-- Crear nueva sesión -->
+      <div id="inv-cicl-crear" class="rounded-xl p-5 text-center" style="background:#F0F9FF;border:1px solid #BAE6FD">
+        <i data-lucide="clipboard-list" style="width:32px;height:32px;color:#0284C7;margin:0 auto 8px"></i>
+        <p class="font-bold text-sm" style="color:#0C4A6E">Iniciar conteo físico</p>
+        <p class="text-xs mt-1 mb-4" style="color:#64748B">Genera una sesión con todos los productos para registrar cantidades físicas y ajustar el stock.</p>
+        <button onclick="crearSesionInventario()" class="h-10 px-6 rounded-xl font-bold text-sm text-white" style="background:#0284C7">Crear sesión de conteo</button>
+      </div>
+      <!-- Sesión activa -->
+      <div id="inv-cicl-sesion" class="hidden flex flex-col gap-3">
+        <p id="inv-cicl-sesion-titulo" class="text-xs font-bold" style="color:#64748B"></p>
+        <div id="inv-cicl-conteos" class="flex flex-col"></div>
+      </div>
+    </div>
+    <div class="flex gap-3 px-5 pb-5 flex-shrink-0 border-t pt-4" style="border-color:#F1F5F9">
+      <button id="inv-cicl-guardar" onclick="guardarConteos()" class="flex-1 h-10 rounded-xl font-bold text-sm text-white" style="background:#1d2140">Guardar conteos</button>
+      <button id="inv-cicl-aplicar" onclick="aplicarAjustesInventario()" class="h-10 px-4 rounded-xl font-bold text-sm flex items-center gap-2" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A"><i data-lucide="check-circle-2" style="width:14px;height:14px"></i> Aplicar ajustes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-credito-cliente ────────────────────────────────── -->
+<div id="modal-credito-cliente" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-credito-cliente')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl" style="width:480px;max-width:95vw">
+    <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color:#E2E8F0">
+      <div>
+        <p class="font-bold text-sm" style="color:#0F172A">Crédito del Cliente</p>
+        <p id="cred-nombre" class="text-xs mt-0.5 font-semibold" style="color:#6366F1">—</p>
+      </div>
+      <button onclick="closeModal('modal-credito-cliente')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="p-5 flex flex-col gap-4">
+      <div id="cred-info"></div>
+      <div class="border-t pt-4" style="border-color:#F1F5F9">
+        <p class="text-xs font-bold mb-3" style="color:#0F172A">Registrar pago</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Monto $</label><input id="cred-pago-monto" type="number" min="0.01" step="0.01" class="inp" placeholder="0.00"></div>
+          <div><label class="lbl">Notas</label><input id="cred-pago-notas" type="text" class="inp" placeholder="Opcional"></div>
+        </div>
+        <button onclick="registrarPagoCredito()" class="mt-3 h-10 px-5 rounded-xl font-bold text-sm text-white w-full" style="background:#16A34A">Registrar pago</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-cita ───────────────────────────────────────────── -->
+<div id="modal-cita" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-cita')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl" style="width:440px;max-width:95vw">
+    <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color:#E2E8F0">
+      <p class="font-bold text-sm" style="color:#0F172A">Nueva Cita</p>
+      <button onclick="closeModal('modal-cita')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="p-5 flex flex-col gap-3">
+      <div><label class="lbl">Nombre del paciente</label><input id="cita-nombre" type="text" class="inp" placeholder="Nombre completo"></div>
+      <div><label class="lbl">Teléfono</label><input id="cita-telefono" type="text" class="inp" placeholder="Opcional"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Fecha</label><input id="cita-fecha" type="date" class="inp"></div>
+        <div><label class="lbl">Hora</label><input id="cita-hora" type="time" class="inp"></div>
+      </div>
+      <div><label class="lbl">Motivo</label><input id="cita-motivo" type="text" class="inp" placeholder="Motivo de la cita"></div>
+    </div>
+    <div class="flex gap-3 px-5 pb-5">
+      <button onclick="saveCita()" class="flex-1 h-10 rounded-xl font-bold text-sm text-white" style="background:#6366F1">Agendar cita</button>
+      <button onclick="closeModal('modal-cita')" class="h-10 px-4 rounded-xl text-sm border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-orden-compra ──────────────────────────────────── -->
+<div id="modal-orden-compra" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-orden-compra')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:620px;max-width:95vw;max-height:85vh">
+    <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <p class="font-bold text-sm" style="color:#0F172A">Nueva Orden de Compra</p>
+      <button onclick="closeModal('modal-orden-compra')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Proveedor</label><input id="orden-proveedor" type="text" class="inp" placeholder="Nombre del proveedor"></div>
+        <div><label class="lbl">Notas</label><input id="orden-notas" type="text" class="inp" placeholder="Opcional"></div>
+      </div>
+      <table class="w-full">
+        <thead><tr class="border-b" style="border-color:#E2E8F0">
+          <th class="text-left py-1.5 px-3 text-[10px] font-bold uppercase" style="color:#94A3B8">Producto</th>
+          <th class="text-right py-1.5 px-2 text-[10px] font-bold uppercase" style="color:#94A3B8">Cant.</th>
+          <th class="text-right py-1.5 px-2 text-[10px] font-bold uppercase" style="color:#94A3B8">P.Unitario</th>
+          <th class="py-1.5 px-2"></th>
+        </tr></thead>
+        <tbody id="orden-items"></tbody>
+      </table>
+      <div class="flex items-center justify-between">
+        <p class="text-xs" style="color:#94A3B8">Total estimado</p>
+        <p id="orden-total" class="font-black text-lg" style="color:#0F172A">$0.00</p>
+      </div>
+    </div>
+    <div class="flex gap-3 px-5 pb-5 flex-shrink-0 border-t pt-4" style="border-color:#F1F5F9">
+      <button onclick="saveOrdenCompra()" class="flex-1 h-10 rounded-xl font-bold text-sm text-white" style="background:#0EA5E9">Crear orden</button>
+      <button onclick="closeModal('modal-orden-compra')" class="h-10 px-4 rounded-xl text-sm border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── modal-promocion ─────────────────────────────────────── -->
+<div id="modal-promocion" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-promocion')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl" style="width:440px;max-width:95vw">
+    <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color:#E2E8F0">
+      <p class="font-bold text-sm" style="color:#0F172A">Nueva Promoción</p>
+      <button onclick="closeModal('modal-promocion')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+    </div>
+    <div class="p-5 flex flex-col gap-3">
+      <div><label class="lbl">Nombre de la promoción</label><input id="promo-nombre" type="text" class="inp" placeholder="Ej: 20% en vitaminas"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="lbl">Tipo</label>
+          <select id="promo-tipo" class="inp">
+            <option value="porcentaje">Descuento %</option>
+            <option value="monto_fijo">Monto fijo $</option>
+            <option value="dos_por_uno">2x1</option>
+            <option value="tres_por_dos">3x2</option>
+          </select>
+        </div>
+        <div><label class="lbl">Valor (% o $)</label><input id="promo-valor" type="number" min="0" step="0.01" class="inp" placeholder="0"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Fecha inicio</label><input id="promo-fecha-ini" type="date" class="inp"></div>
+        <div><label class="lbl">Fecha fin</label><input id="promo-fecha-fin" type="date" class="inp"></div>
+      </div>
+    </div>
+    <div class="flex gap-3 px-5 pb-5">
+      <button onclick="savePromocion()" class="flex-1 h-10 rounded-xl font-bold text-sm text-white" style="background:#F59E0B">Crear promoción</button>
+      <button onclick="closeModal('modal-promocion')" class="h-10 px-4 rounded-xl text-sm border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

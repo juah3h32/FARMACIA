@@ -260,6 +260,26 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
 
         db.commit()
 
+        # Acumular puntos si hay cliente vinculado
+        if body.cliente_id:
+            try:
+                from app.database.models import Configuracion, Cliente as _Cliente
+                cfg_row = db.query(Configuracion).filter(Configuracion.clave == "pesos_por_punto").first()
+                pesos_por_punto = float(cfg_row.valor) if cfg_row and cfg_row.valor else 10.0
+                cliente_obj = db.query(_Cliente).filter(_Cliente.id == body.cliente_id).first()
+                if cliente_obj:
+                    puntos_ganados = total / pesos_por_punto
+                    cliente_obj.puntos_acumulados = (cliente_obj.puntos_acumulados or 0) + puntos_ganados
+                    db.commit()
+            except Exception:
+                pass  # puntos no son críticos, nunca bloquear la venta
+
+        # Verificar si algún producto requiere receta (para que frontend muestre aviso)
+        requiere_receta = any(
+            products.get(item.producto_id) and products[item.producto_id].requiere_receta
+            for item in body.items
+        )
+
         # Imprimir ticket
         from app.services.printer_service import printer_service
         from app.database.models import Usuario
@@ -297,7 +317,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
-        return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio, "ticket_texto": ticket_texto}
+        return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio, "ticket_texto": ticket_texto, "requiere_receta": requiere_receta}
     except HTTPException:
         raise
     except Exception as e:

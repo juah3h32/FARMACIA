@@ -12,6 +12,8 @@ from app.api.routes import dashboard_routes, pos_routes, customers_routes, emplo
 from app.api.routes import admin_routes, reports_routes, cortes_routes, ai_routes, suppliers_routes
 from app.api.routes import historial_routes, marketing_routes, config_routes
 from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, catalogo_web_routes
+from app.api.routes import credito_routes, recetas_routes, promociones_routes
+from app.api.routes import ordenes_compra_routes, citas_routes, inventario_ciclico_routes
 import uvicorn
 import app.config as cfg
 
@@ -112,6 +114,13 @@ async def _scheduler_cierre_automatico():
                 n = _run_cierre_todos_hoy("Cierre automático 21:00")
                 if n:
                     _logger.info(f"Scheduler 21:00: closed {n} shift(s)")
+            # At 7:00 send daily WhatsApp alerts if configured
+            if now.hour == 7 and now.minute < 2:
+                try:
+                    from app.services.alertas_service import enviar_alertas_diarias
+                    enviar_alertas_diarias()
+                except Exception as exc:
+                    _logger.error(f"Alertas 7am error: {exc}")
         except Exception as exc:
             _logger.error(f"Scheduler tick error: {exc}")
 
@@ -176,6 +185,13 @@ app.include_router(public_routes.router,       prefix="/api/public",      tags=[
 app.include_router(app_auth_routes.router,     prefix="/api/app/auth",    tags=["App Auth"])
 app.include_router(pedidos_web_routes.router,   prefix="/api/app/pedidos",  tags=["App Pedidos"])
 app.include_router(catalogo_web_routes.router,  prefix="/api/app/catalogo", tags=["App Catálogo Admin"])
+# Nuevas funciones v2.3.48+
+app.include_router(credito_routes.router,            prefix="/api/clientes",           tags=["Crédito"])
+app.include_router(recetas_routes.router,            prefix="/api/recetas",            tags=["Recetas"])
+app.include_router(promociones_routes.router,        prefix="/api/promociones",        tags=["Promociones"])
+app.include_router(ordenes_compra_routes.router,     prefix="/api/ordenes-compra",     tags=["Órdenes Compra"])
+app.include_router(citas_routes.router,              prefix="/api/citas",              tags=["Citas"])
+app.include_router(inventario_ciclico_routes.router, prefix="/api/inventario-ciclico", tags=["Inventario Cíclico"])
 
 
 @app.get("/api/health")

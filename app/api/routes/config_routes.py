@@ -174,3 +174,80 @@ def mp_cancel_intent(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
     mp_point.cancel_current_intent()
     return {"ok": True}
+
+
+# ── WhatsApp Alertas (CallMeBot) ─────────────────────────────────────────────
+
+_WA_KEYS = ["whatsapp_numero", "whatsapp_token", "alertas_activas"]
+
+
+@router.get("/alertas")
+def get_alertas(payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        rows = db.query(Configuracion).filter(Configuracion.clave.in_(_WA_KEYS)).all()
+        d = {r.clave: r.valor for r in rows}
+        return {
+            "numero":   d.get("whatsapp_numero", ""),
+            "token":    d.get("whatsapp_token", ""),
+            "activas":  d.get("alertas_activas", "0") == "1",
+        }
+    finally:
+        db.close()
+
+
+class AlertasIn(BaseModel):
+    numero: str
+    token: str
+    activas: bool = False
+
+
+@router.post("/alertas")
+def set_alertas(body: AlertasIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        updates = {
+            "whatsapp_numero": body.numero.strip(),
+            "whatsapp_token":  body.token.strip(),
+            "alertas_activas": "1" if body.activas else "0",
+        }
+        for clave, valor in updates.items():
+            row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+            if row:
+                row.valor = valor
+            else:
+                db.add(Configuracion(clave=clave, valor=valor))
+        db.commit()
+        return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/alertas/test")
+def test_alerta(payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.services.alertas_service import _send_whatsapp, _get_config
+    from app.database.connection import get_db_session
+    db = get_db_session()
+    try:
+        cfg_data = _get_config(db)
+        numero = cfg_data.get("whatsapp_numero", "")
+        token  = cfg_data.get("whatsapp_token", "")
+        if not numero or not token:
+            raise HTTPException(status_code=400, detail="Configura número y token primero")
+        _send_whatsapp(numero, token, "FarmaciaPOS: Prueba de alertas WhatsApp OK")
+        return {"ok": True}
+    finally:
+        db.close()

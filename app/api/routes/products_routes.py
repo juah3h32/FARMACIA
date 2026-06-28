@@ -437,6 +437,7 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
             ).update({"codigo_barras": None})
         from datetime import datetime as _dt_now
         was_fraccionada = p.venta_fraccionada
+        precio_anterior = p.precio_venta
         for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
             setattr(p, k, v)
         p.actualizado_en = _dt_now.now()  # guarantee bump so sync CASE WHEN keeps local
@@ -444,6 +445,16 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
             p.piezas_sueltas = p.unidades_por_caja or 1
             p.stock = max(0, p.stock - 1)
         db.commit()
+        if precio_anterior != p.precio_venta:
+            from app.database.models import AuditoriaLog
+            db.add(AuditoriaLog(
+                usuario_id=int(payload["sub"]),
+                accion="cambio_precio",
+                tabla="productos",
+                registro_id=p.id,
+                detalles=f"precio_anterior={precio_anterior:.2f} precio_nuevo={p.precio_venta:.2f}",
+            ))
+            db.commit()
         db.refresh(p)
         _sync_bg(bg)
         return p
@@ -551,6 +562,43 @@ async def subir_imagen_producto(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/{prod_id}/historial-precio")
+def historial_precio(prod_id: int, payload: dict = Depends(get_current_api_user)):
+    db = get_db_session()
+    try:
+        from app.database.models import AuditoriaLog
+        logs = (
+            db.query(AuditoriaLog)
+            .filter(
+                AuditoriaLog.tabla == "productos",
+                AuditoriaLog.registro_id == prod_id,
+                AuditoriaLog.accion == "cambio_precio",
+            )
+            .order_by(AuditoriaLog.creado_en.desc())
+            .limit(50)
+            .all()
+        )
+        result = []
+        for log in logs:
+            detalles = {}
+            if log.detalles:
+                for part in log.detalles.split():
+                    if "=" in part:
+                        k, v = part.split("=", 1)
+                        detalles[k] = v
+            result.append({
+                "id": log.id,
+                "precio_anterior": float(detalles.get("precio_anterior", 0)),
+                "precio_nuevo": float(detalles.get("precio_nuevo", 0)),
+                "usuario_id": log.usuario_id,
+                "usuario_nombre": log.usuario.nombre if log.usuario else None,
+                "fecha": log.creado_en.isoformat() if log.creado_en else None,
+            })
+        return result
     finally:
         db.close()
 

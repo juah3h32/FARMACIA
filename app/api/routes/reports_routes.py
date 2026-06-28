@@ -706,3 +706,51 @@ def eliminar_cortes_fantasma(payload: dict = Depends(get_current_api_user)):
     finally:
         db.close()
 
+
+@router.get("/inventario-excel")
+def exportar_inventario_excel(payload: dict = Depends(get_current_api_user)):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from fastapi.responses import Response
+    db = get_db_session()
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Inventario"
+        headers = ["ID", "Código", "Nombre", "Categoría", "Proveedor", "Stock",
+                   "Stock Mín.", "Precio Compra", "Precio Venta", "Valor Inventario",
+                   "Presentación", "Activo"]
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(fill_type="solid", fgColor="1d2140")
+        productos = (db.query(Producto).filter(Producto.activo == True)
+                     .order_by(Producto.nombre).all())
+        for row, p in enumerate(productos, 2):
+            ws.cell(row=row, column=1, value=p.id)
+            ws.cell(row=row, column=2, value=p.codigo_barras or "")
+            ws.cell(row=row, column=3, value=p.nombre)
+            ws.cell(row=row, column=4, value=p.categoria.nombre if p.categoria else "")
+            ws.cell(row=row, column=5, value=p.proveedor.nombre if p.proveedor else "")
+            ws.cell(row=row, column=6, value=p.stock)
+            ws.cell(row=row, column=7, value=p.stock_minimo)
+            ws.cell(row=row, column=8, value=p.precio_compra)
+            ws.cell(row=row, column=9, value=p.precio_venta)
+            ws.cell(row=row, column=10, value=round(p.stock * p.precio_compra, 2))
+            ws.cell(row=row, column=11, value=p.presentacion or "")
+            ws.cell(row=row, column=12, value="Sí" if p.activo else "No")
+        for col in ws.columns:
+            max_len = max((len(str(cell.value or "")) for cell in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        import io as _io
+        buf = _io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return Response(
+            content=buf.read(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=inventario.xlsx"},
+        )
+    finally:
+        db.close()
+

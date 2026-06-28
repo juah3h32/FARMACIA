@@ -90,3 +90,32 @@ def eliminar_cliente(cid: int, payload: dict = Depends(get_current_api_user)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+@router.get("/{cid}/puntos")
+def puntos_cliente(cid: int, payload: dict = Depends(get_current_api_user)):
+    db = get_db_session()
+    try:
+        c = db.query(Cliente).filter(Cliente.id == cid).first()
+        if not c:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        from app.database.models import Configuracion
+        cfg = {
+            r.clave: r.valor
+            for r in db.query(Configuracion).filter(
+                Configuracion.clave.in_(["pesos_por_punto", "valor_punto_en_pesos"])
+            ).all()
+        }
+        pesos_por_punto = float(cfg.get("pesos_por_punto", "10"))
+        valor_punto = float(cfg.get("valor_punto_en_pesos", "0.1"))
+        disponibles = (c.puntos_acumulados or 0) - (c.puntos_canjeados or 0)
+        return {
+            "puntos_acumulados": c.puntos_acumulados or 0,
+            "puntos_canjeados": c.puntos_canjeados or 0,
+            "puntos_disponibles": disponibles,
+            "valor_descuento": round(disponibles * valor_punto, 2),
+            "pesos_por_punto": pesos_por_punto,
+            "valor_punto_en_pesos": valor_punto,
+        }
+    finally:
+        db.close()
