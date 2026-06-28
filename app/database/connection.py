@@ -145,12 +145,8 @@ def _migrate():
 
 
 def init_db():
-    # Fast path: skip create_all if schema already exists (saves ~400ms on every run)
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT id FROM usuarios LIMIT 1"))
-    except Exception:
-        Base.metadata.create_all(bind=engine)
+    # Always run create_all — it's idempotent (creates only missing tables)
+    Base.metadata.create_all(bind=engine)
     _migrate()
     _seed_initial_data()
     _normalizar_nombres_productos()
