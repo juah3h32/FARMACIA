@@ -1030,8 +1030,19 @@
       <img src="/logo_sistema.webp" style="max-width:100%; height:auto; max-height:60px; object-fit:contain; display:block">
     </div>
 
+    <!-- Menú rápido -->
+    <div class="px-2 pt-2 pb-1">
+      <button onclick="openQuickMenu()" title="Menú rápido (Ctrl+K)"
+        class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:opacity-90"
+        style="background:rgba(255,255,255,.07);color:#94A3B8;border:1px solid rgba(255,255,255,.1);cursor:pointer">
+        <i data-lucide="layout-grid" style="width:13px;height:13px;flex-shrink:0"></i>
+        <span>Todos los módulos</span>
+        <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(255,255,255,.1);color:#64748B">Ctrl K</span>
+      </button>
+    </div>
+
     <!-- Nav -->
-    <div class="flex-1 overflow-y-auto py-2 px-2">
+    <div class="flex-1 overflow-y-auto py-1 px-2 scroll-light">
       <nav id="sidebar-nav" class="flex flex-col gap-0.5"></nav>
     </div>
 
@@ -2854,6 +2865,25 @@
 </div><!-- /app -->
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: MENÚ RÁPIDO / COMMAND PALETTE
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-quick-menu" class="fixed inset-0 z-[90] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(10,15,30,.75);backdrop-filter:blur(6px)" onclick="closeQuickMenu()"></div>
+  <div class="relative flex flex-col" style="width:100%;max-width:780px;max-height:85vh;background:#fff;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.4);overflow:hidden">
+    <!-- Search bar -->
+    <div class="flex items-center gap-3 px-4 py-3 flex-shrink-0" style="border-bottom:1px solid #E2E8F0;background:#F8FAFC">
+      <i data-lucide="search" style="width:16px;height:16px;color:#94A3B8;flex-shrink:0"></i>
+      <input id="qm-search" type="text" placeholder="Buscar módulo…" oninput="filterQuickMenu(this.value)"
+        class="flex-1 bg-transparent outline-none text-sm font-medium" style="color:#1d2140;border:none"
+        autocomplete="off">
+      <span class="text-[10px] px-2 py-0.5 rounded font-bold" style="background:#E2E8F0;color:#94A3B8">ESC</span>
+    </div>
+    <!-- Cards grid -->
+    <div id="qm-grid" class="overflow-y-auto p-4 flex flex-col gap-4 scroll-light"></div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: GENERADOR DE CÓDIGO DE BARRAS / QR
@@ -11895,6 +11925,103 @@ async function savePromocion() {
     loadPromociones();
   } catch(e) { toast(e.message, 'error'); }
 }
+
+// ── Menú Rápido / Command Palette ────────────────────────────────────────────
+const QM_GROUPS = [
+  {
+    label: 'Principal', color: '#1d2140', bg: '#EEF2FF',
+    items: [
+      { key:'dashboard',  icon:'layout-dashboard', label:'Dashboard',         desc:'Estadísticas del día en tiempo real' },
+      { key:'pos',        icon:'shopping-cart',     label:'Nueva Venta',       desc:'Punto de venta — escanea y cobra' },
+      { key:'inventory',  icon:'package',           label:'Inventario',        desc:'Productos, stock, lotes y vencimientos' },
+    ]
+  },
+  {
+    label: 'Pacientes', color: '#0891B2', bg: '#E0F7FA',
+    items: [
+      { key:'customers',  icon:'users',             label:'Clientes',          desc:'Directorio de clientes y crédito' },
+      { key:'historial',  icon:'heart-pulse',       label:'Historial Clínico', desc:'Signos vitales y expedientes' },
+      { key:'citas',      icon:'calendar-clock',    label:'Agenda de Citas',   desc:'Inyecciones, toma de presión, glucosa' },
+    ]
+  },
+  {
+    label: 'Administración', color: '#7C3AED', bg: '#F3E8FF', admin: true,
+    items: [
+      { key:'reports',        icon:'bar-chart-3',    label:'Reportes',          desc:'Ventas, top productos, cortes, CSV/PDF', admin:true },
+      { key:'caja',           icon:'landmark',       label:'Control de Caja',   desc:'Apertura, cierre y retiros de turno', admin:true },
+      { key:'ordenes-compra', icon:'clipboard-list', label:'Órdenes de Compra', desc:'Pedidos a proveedores — stock bajo', admin:true },
+      { key:'promociones',    icon:'tag',            label:'Promociones',       desc:'2x1, descuentos %, fechas automáticas', admin:true },
+    ]
+  },
+  {
+    label: 'Sistema', color: '#D97706', bg: '#FEF3C7', admin: true,
+    items: [
+      { key:'suppliers',  icon:'truck',             label:'Proveedores',       desc:'Directorio y datos de contacto', admin:true },
+      { key:'employees',  icon:'user-cog',          label:'Empleados',         desc:'Usuarios, roles y accesos', admin:true },
+      { key:'marketing',  icon:'megaphone',         label:'Marketing',         desc:'Catálogo PDF, imagen promo', admin:true },
+      { key:'settings',   icon:'settings',          label:'Configuración',     desc:'Sistema, alertas WhatsApp, pagos', admin:true },
+    ]
+  },
+];
+
+function openQuickMenu() {
+  const el = document.getElementById('modal-quick-menu');
+  el.style.display = 'flex';
+  document.getElementById('qm-search').value = '';
+  renderQuickMenu('');
+  setTimeout(() => { document.getElementById('qm-search').focus(); }, 80);
+  icons();
+}
+function closeQuickMenu() {
+  document.getElementById('modal-quick-menu').style.display = 'none';
+}
+function filterQuickMenu(q) { renderQuickMenu(q.toLowerCase()); }
+
+function renderQuickMenu(q) {
+  const isAdmin = S.user?.rol === 'admin';
+  const grid = document.getElementById('qm-grid');
+  let html = '';
+  for (const group of QM_GROUPS) {
+    if (group.admin && !isAdmin) continue;
+    const visibleItems = group.items.filter(it => {
+      if (it.admin && !isAdmin) return false;
+      if (!q) return true;
+      return it.label.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q);
+    });
+    if (!visibleItems.length) continue;
+    html += `<div>
+      <p class="text-[10px] font-bold uppercase tracking-wider mb-2 px-1" style="color:${group.color}">${group.label}</p>
+      <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
+        ${visibleItems.map(it => `
+          <button onclick="navigate('${it.key}');closeQuickMenu()"
+            class="flex items-start gap-3 p-3 rounded-xl text-left transition-all hover:shadow-md active:scale-95"
+            style="background:${group.bg};border:1px solid transparent;cursor:pointer">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${group.color}">
+              <i data-lucide="${it.icon}" style="width:16px;height:16px;color:#fff"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold leading-tight" style="color:#1d2140">${it.label}</p>
+              <p class="text-[10px] mt-0.5 leading-snug" style="color:#64748B">${it.desc}</p>
+            </div>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html || '<p class="text-sm text-center p-8" style="color:#94A3B8">Sin resultados</p>';
+  icons();
+}
+
+// Ctrl+K abre el menú rápido, ESC lo cierra
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    const qm = document.getElementById('modal-quick-menu');
+    if (qm.style.display === 'flex') closeQuickMenu();
+    else if (S.user) openQuickMenu();
+  }
+  if (e.key === 'Escape') closeQuickMenu();
+});
 
 // ── Exportar Inventario Excel ─────────────────────────────────────────────────
 async function exportarInventarioExcel() {
