@@ -1158,38 +1158,62 @@
             <div id="kpi-track" style="display:flex;transition:transform .45s cubic-bezier(.4,0,.2,1)">
 
               <!-- ── Slide 0: HOY ──────────────────────── -->
-              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#2e4a8a,#1d2140)">
-                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-                    <i data-lucide="shopping-cart" style="width:20px;height:20px;color:#fff"></i>
+              <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <!-- Ventas hoy -->
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#EEF2FF">
+                      <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#4F46E5"></i>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#EEF2FF;color:#4F46E5">HOY</span>
                   </div>
-                  <p id="kpi-ventas" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ventas hoy</p>
+                  <div>
+                    <p id="kpi-ventas" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Ventas hoy</p>
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#4F46E510"></div>
                 </div>
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#22C55E,#16A34A)">
-                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-                    <i data-lucide="dollar-sign" style="width:20px;height:20px;color:#fff"></i>
+                <!-- Ingresos hoy -->
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#DCFCE7">
+                      <i data-lucide="trending-up" style="width:16px;height:16px;color:#16A34A"></i>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#DCFCE7;color:#16A34A">INGRESOS</span>
                   </div>
-                  <p id="kpi-ingresos" class="text-3xl font-black text-white leading-none tabular-nums">—</p>
-                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Ingresos hoy</p>
+                  <div>
+                    <p id="kpi-ingresos" class="text-2xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Ingresos hoy</p>
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#16A34A10"></div>
                 </div>
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
-                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-                    <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#fff"></i>
+                <!-- Stock bajo -->
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#FEF3C7">
+                      <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#D97706"></i>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#FEF3C7;color:#D97706">ALERTA</span>
                   </div>
-                  <p id="kpi-stock" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Stock bajo</p>
+                  <div>
+                    <p id="kpi-stock" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Stock bajo</p>
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#D9770610"></div>
                 </div>
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED)">
-                  <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full" style="background:rgba(255,255,255,.08)"></div>
-                  <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(255,255,255,.2)">
-                    <i data-lucide="package-2" style="width:20px;height:20px;color:#fff"></i>
+                <!-- Productos -->
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#F3E8FF">
+                      <i data-lucide="package-2" style="width:16px;height:16px;color:#7C3AED"></i>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#F3E8FF;color:#7C3AED">TOTAL</span>
                   </div>
-                  <p id="kpi-total" class="text-4xl font-black text-white leading-none tabular-nums">—</p>
-                  <p class="text-xs font-medium mt-2" style="color:rgba(255,255,255,.75)">Productos</p>
+                  <div>
+                    <p id="kpi-total" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Productos</p>
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#7C3AED10"></div>
                 </div>
               </div>
 
@@ -2869,19 +2893,28 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: MENÚ RÁPIDO / COMMAND PALETTE
 ══════════════════════════════════════════════════════════════════════════════ -->
-<div id="modal-quick-menu" class="fixed inset-0 z-[90] hidden items-center justify-center" style="padding:20px">
-  <div class="absolute inset-0" style="background:rgba(10,15,30,.75);backdrop-filter:blur(6px)" onclick="closeQuickMenu()"></div>
-  <div class="relative flex flex-col" style="width:100%;max-width:780px;max-height:85vh;background:#fff;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.4);overflow:hidden">
-    <!-- Search bar -->
-    <div class="flex items-center gap-3 px-4 py-3 flex-shrink-0" style="border-bottom:1px solid #E2E8F0;background:#F8FAFC">
-      <i data-lucide="search" style="width:16px;height:16px;color:#94A3B8;flex-shrink:0"></i>
+<div id="modal-quick-menu" class="fixed inset-0 z-[90] hidden items-center justify-center" style="padding:16px">
+  <div class="absolute inset-0" style="background:rgba(8,12,24,.8);backdrop-filter:blur(8px)" onclick="closeQuickMenu()"></div>
+  <div class="relative flex flex-col" style="width:100%;max-width:680px;max-height:88vh;border-radius:22px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6)">
+    <!-- Header search -->
+    <div class="flex items-center gap-3 px-5 py-4 flex-shrink-0" style="background:#1d2140">
+      <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.12)">
+        <i data-lucide="layout-grid" style="width:15px;height:15px;color:#fff"></i>
+      </div>
       <input id="qm-search" type="text" placeholder="Buscar módulo…" oninput="filterQuickMenu(this.value)"
-        class="flex-1 bg-transparent outline-none text-sm font-medium" style="color:#1d2140;border:none"
+        class="flex-1 bg-transparent outline-none font-medium text-white text-sm placeholder-white/40" style="border:none"
         autocomplete="off">
-      <span class="text-[10px] px-2 py-0.5 rounded font-bold" style="background:#E2E8F0;color:#94A3B8">ESC</span>
+      <button onclick="closeQuickMenu()" class="text-white/50 hover:text-white/90 transition-colors">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
     </div>
-    <!-- Cards grid -->
-    <div id="qm-grid" class="overflow-y-auto p-4 flex flex-col gap-4 scroll-light"></div>
+    <!-- App grid -->
+    <div id="qm-grid" class="overflow-y-auto scroll-light" style="background:#0F172A;padding:20px 20px 24px"></div>
+    <!-- Footer -->
+    <div class="flex items-center justify-between px-5 py-2.5 flex-shrink-0" style="background:#0F172A;border-top:1px solid rgba(255,255,255,.06)">
+      <span class="text-[10px] font-medium" style="color:rgba(255,255,255,.3)">Ctrl+K para abrir · ESC para cerrar</span>
+      <span class="text-[10px] font-medium" style="color:rgba(255,255,255,.3)">FarmaciaPOS</span>
+    </div>
   </div>
 </div>
 
@@ -11981,6 +12014,7 @@ function renderQuickMenu(q) {
   const isAdmin = S.user?.rol === 'admin';
   const grid = document.getElementById('qm-grid');
   let html = '';
+  let totalVisible = 0;
   for (const group of QM_GROUPS) {
     if (group.admin && !isAdmin) continue;
     const visibleItems = group.items.filter(it => {
@@ -11989,26 +12023,40 @@ function renderQuickMenu(q) {
       return it.label.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q);
     });
     if (!visibleItems.length) continue;
-    html += `<div>
-      <p class="text-[10px] font-bold uppercase tracking-wider mb-2 px-1" style="color:${group.color}">${group.label}</p>
-      <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
+    totalVisible += visibleItems.length;
+    html += `
+    <div style="margin-bottom:20px">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-[9px] font-bold uppercase tracking-[.16em]" style="color:${group.color}80">${group.label}</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.07)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">
         ${visibleItems.map(it => `
           <button onclick="navigate('${it.key}');closeQuickMenu()"
-            class="flex items-start gap-3 p-3 rounded-xl text-left transition-all hover:shadow-md active:scale-95"
-            style="background:${group.bg};border:1px solid transparent;cursor:pointer">
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${group.color}">
-              <i data-lucide="${it.icon}" style="width:16px;height:16px;color:#fff"></i>
+            class="qm-tile group flex flex-col items-center gap-2 p-3 rounded-2xl transition-all"
+            style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);cursor:pointer;text-align:center"
+            onmouseover="this.style.background='rgba(255,255,255,.1)';this.style.borderColor='${group.color}50';this.style.transform='translateY(-2px)'"
+            onmouseout="this.style.background='rgba(255,255,255,.04)';this.style.borderColor='rgba(255,255,255,.06)';this.style.transform=''"
+            onmousedown="this.style.transform='scale(.96)'" onmouseup="this.style.transform='translateY(-2px)'">
+            <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all"
+              style="background:linear-gradient(135deg,${group.color},${group.color}cc)">
+              <i data-lucide="${it.icon}" style="width:19px;height:19px;color:#fff"></i>
             </div>
-            <div class="min-w-0">
-              <p class="text-xs font-bold leading-tight" style="color:#1d2140">${it.label}</p>
-              <p class="text-[10px] mt-0.5 leading-snug" style="color:#64748B">${it.desc}</p>
-            </div>
+            <span class="text-[11px] font-semibold leading-tight" style="color:rgba(255,255,255,.85)">${it.label}</span>
           </button>
         `).join('')}
       </div>
     </div>`;
   }
-  grid.innerHTML = html || '<p class="text-sm text-center p-8" style="color:#94A3B8">Sin resultados</p>';
+  if (!totalVisible) {
+    html = `<div class="flex flex-col items-center justify-center py-12 gap-3">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:rgba(255,255,255,.05)">
+        <i data-lucide="search-x" style="width:24px;height:24px;color:rgba(255,255,255,.3)"></i>
+      </div>
+      <p class="text-sm font-medium" style="color:rgba(255,255,255,.4)">Sin resultados para "${q}"</p>
+    </div>`;
+  }
+  grid.innerHTML = html;
   icons();
 }
 
