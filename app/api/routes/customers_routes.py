@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 from app.database.connection import get_db_session
@@ -22,13 +22,30 @@ class ClienteIn(BaseModel):
 
 
 @router.get("/")
-def listar_clientes(payload: dict = Depends(get_current_api_user)):
+def listar_clientes(
+    q: Optional[str] = Query(None),
+    payload: dict = Depends(get_current_api_user),
+):
     db = get_db_session()
     try:
-        rows = db.query(Cliente).filter(Cliente.activo == True).order_by(Cliente.nombre).all()
+        query = db.query(Cliente).filter(Cliente.activo == True)
+        if q:
+            term = f"%{q.strip()}%"
+            query = query.filter(
+                Cliente.nombre.ilike(term) | Cliente.telefono.ilike(term)
+            )
+        rows = query.order_by(Cliente.nombre).all()
         return [
-            {"id": c.id, "nombre": c.nombre, "telefono": c.telefono,
-             "email": c.email, "rfc": c.rfc, "direccion": c.direccion}
+            {
+                "id": c.id,
+                "nombre": c.nombre,
+                "telefono": c.telefono,
+                "email": c.email,
+                "rfc": c.rfc,
+                "direccion": c.direccion,
+                "puntos_acumulados": c.puntos_acumulados or 0,
+                "puntos_canjeados": c.puntos_canjeados or 0,
+            }
             for c in rows
         ]
     finally:

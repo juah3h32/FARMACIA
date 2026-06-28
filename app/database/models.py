@@ -618,3 +618,43 @@ class ConteoInventario(Base):
     ajustado = Column(Boolean, default=False)
     sesion = relationship("SesionInventario", back_populates="conteos")
     producto = relationship("Producto")
+
+
+# ─── Gastos / Egresos ──────────────────────────────────────────────────────────
+class CategoriaGasto(str, enum.Enum):
+    renta = "renta"
+    servicios = "servicios"
+    personal = "personal"
+    compras = "compras"
+    mantenimiento = "mantenimiento"
+    otros = "otros"
+
+
+class Gasto(Base):
+    __tablename__ = "gastos"
+    id = Column(Integer, primary_key=True)
+    concepto = Column(String(200), nullable=False)
+    monto = Column(Float, nullable=False)
+    categoria = Column(SAEnum(CategoriaGasto), default=CategoriaGasto.otros)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    fecha = Column(Date, nullable=False)
+    notas = Column(Text)
+    comprobante_url = Column(String(500))
+    creado_en = Column(DateTime, default=_dt.now)
+    usuario = relationship("Usuario")
+
+
+# ─── Historial de precios ──────────────────────────────────────────────────────
+class HistorialPrecio(Base):
+    __tablename__ = "historial_precios"
+    id = Column(Integer, primary_key=True)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    precio_compra_anterior = Column(Float, nullable=True)
+    precio_compra_nuevo = Column(Float, nullable=True)
+    precio_venta_anterior = Column(Float, nullable=True)
+    precio_venta_nuevo = Column(Float, nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    notas = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+    producto = relationship("Producto")
+    usuario = relationship("Usuario")

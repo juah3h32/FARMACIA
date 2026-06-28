@@ -887,7 +887,7 @@
   .nav-item { transition:background .15s,color .15s,box-shadow .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
   .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
-  .nav-group-label { font-size:9px; font-weight:700; letter-spacing:.16em; color:rgba(148,163,184,.45); padding:0.6rem 0.5rem 0.25rem; }
+  .nav-group-label { font-size:9px; font-weight:700; letter-spacing:.16em; color:rgba(148,163,184,.45); padding:0.55rem 0.5rem 0.2rem; }
 
   /* ── KPI cards v2 (carousel) ─────────────────────────── */
   .kpi-card2 { background:#fff;border-radius:16px;border:1px solid #E2E8F0;padding:14px 16px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.04); }
@@ -1026,24 +1026,28 @@
   <!-- ── Sidebar ───────────────────────────────────── -->
   <aside class="w-52 flex flex-col flex-shrink-0" style="background:#1d2140">
     <!-- Brand -->
-    <div class="px-4 py-5 flex items-center justify-center" style="border-bottom:1px solid rgba(255,255,255,.08)">
-      <img src="/logo_sistema.webp" style="max-width:100%; height:auto; max-height:60px; object-fit:contain; display:block">
+    <div class="px-4 py-3 flex items-center justify-center" style="border-bottom:1px solid rgba(255,255,255,.08)">
+      <img src="/logo_sistema.webp" style="max-width:100%; height:auto; max-height:50px; object-fit:contain; display:block">
     </div>
 
     <!-- Menú rápido -->
     <div class="px-2 pt-2 pb-1">
       <button onclick="openQuickMenu()" title="Menú rápido (Ctrl+K)"
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:opacity-90"
-        style="background:rgba(255,255,255,.07);color:#94A3B8;border:1px solid rgba(255,255,255,.1);cursor:pointer">
-        <i data-lucide="layout-grid" style="width:13px;height:13px;flex-shrink:0"></i>
-        <span>Todos los módulos</span>
-        <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(255,255,255,.1);color:#64748B">Ctrl K</span>
+        class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap"
+        style="background:linear-gradient(135deg,rgba(99,102,241,.35),rgba(139,92,246,.25));color:#C4B5FD;border:1px solid rgba(139,92,246,.3);cursor:pointer"
+        onmouseover="this.style.background='linear-gradient(135deg,rgba(99,102,241,.5),rgba(139,92,246,.4))'"
+        onmouseout="this.style.background='linear-gradient(135deg,rgba(99,102,241,.35),rgba(139,92,246,.25))'">
+        <div style="width:22px;height:22px;border-radius:7px;background:rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="layout-grid" style="width:12px;height:12px;color:#C4B5FD"></i>
+        </div>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis">Módulos</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded-md font-bold flex-shrink-0" style="background:rgba(139,92,246,.3);color:#C4B5FD">Ctrl K</span>
       </button>
     </div>
 
     <!-- Nav -->
-    <div class="flex-1 overflow-y-auto py-1 px-2 scroll-light">
-      <nav id="sidebar-nav" class="flex flex-col gap-0.5"></nav>
+    <div class="flex-1 overflow-hidden pt-1 pb-4 px-2">
+      <nav id="sidebar-nav" class="flex flex-col gap-px"></nav>
     </div>
 
     <!-- Farmacito IA (cajeros only) -->
@@ -1160,60 +1164,60 @@
               <!-- ── Slide 0: HOY ──────────────────────── -->
               <div class="kpi-slide" style="min-width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
                 <!-- Ventas hoy -->
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:linear-gradient(135deg,#4F46E5,#3730A3);min-height:100px;box-shadow:0 8px 24px rgba(79,70,229,.35)">
+                  <div class="absolute -top-5 -right-5 w-24 h-24 rounded-full" style="background:rgba(255,255,255,.1)"></div>
                   <div class="flex items-center justify-between mb-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#EEF2FF">
-                      <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#4F46E5"></i>
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,.2)">
+                      <i data-lucide="shopping-cart" style="width:16px;height:16px;color:#fff"></i>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#EEF2FF;color:#4F46E5">HOY</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,.2);color:#fff">HOY</span>
                   </div>
                   <div>
-                    <p id="kpi-ventas" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Ventas hoy</p>
+                    <p id="kpi-ventas" class="text-3xl font-black tabular-nums leading-none" style="color:#fff">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:rgba(255,255,255,.75)">Ventas hoy</p>
                   </div>
-                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#4F46E510"></div>
                 </div>
                 <!-- Ingresos hoy -->
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:linear-gradient(135deg,#059669,#047857);min-height:100px;box-shadow:0 8px 24px rgba(5,150,105,.35)">
+                  <div class="absolute -top-5 -right-5 w-24 h-24 rounded-full" style="background:rgba(255,255,255,.1)"></div>
                   <div class="flex items-center justify-between mb-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#DCFCE7">
-                      <i data-lucide="trending-up" style="width:16px;height:16px;color:#16A34A"></i>
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,.2)">
+                      <i data-lucide="trending-up" style="width:16px;height:16px;color:#fff"></i>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#DCFCE7;color:#16A34A">INGRESOS</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,.2);color:#fff">INGRESOS</span>
                   </div>
                   <div>
-                    <p id="kpi-ingresos" class="text-2xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Ingresos hoy</p>
+                    <p id="kpi-ingresos" class="text-2xl font-black tabular-nums leading-none" style="color:#fff">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:rgba(255,255,255,.75)">Ingresos hoy</p>
                   </div>
-                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#16A34A10"></div>
                 </div>
                 <!-- Stock bajo -->
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:linear-gradient(135deg,#D97706,#B45309);min-height:100px;box-shadow:0 8px 24px rgba(217,119,6,.35)">
+                  <div class="absolute -top-5 -right-5 w-24 h-24 rounded-full" style="background:rgba(255,255,255,.1)"></div>
                   <div class="flex items-center justify-between mb-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#FEF3C7">
-                      <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#D97706"></i>
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,.2)">
+                      <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#fff"></i>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#FEF3C7;color:#D97706">ALERTA</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,.2);color:#fff">ALERTA</span>
                   </div>
                   <div>
-                    <p id="kpi-stock" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Stock bajo</p>
+                    <p id="kpi-stock" class="text-3xl font-black tabular-nums leading-none" style="color:#fff">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:rgba(255,255,255,.75)">Stock bajo</p>
                   </div>
-                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#D9770610"></div>
                 </div>
                 <!-- Productos -->
-                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:#fff;border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(0,0,0,.04);min-height:100px">
+                <div class="kpi-card rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between" style="background:linear-gradient(135deg,#7C3AED,#6D28D9);min-height:100px;box-shadow:0 8px 24px rgba(124,58,237,.35)">
+                  <div class="absolute -top-5 -right-5 w-24 h-24 rounded-full" style="background:rgba(255,255,255,.1)"></div>
                   <div class="flex items-center justify-between mb-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#F3E8FF">
-                      <i data-lucide="package-2" style="width:16px;height:16px;color:#7C3AED"></i>
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,.2)">
+                      <i data-lucide="package-2" style="width:16px;height:16px;color:#fff"></i>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#F3E8FF;color:#7C3AED">TOTAL</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,.2);color:#fff">TOTAL</span>
                   </div>
                   <div>
-                    <p id="kpi-total" class="text-3xl font-black tabular-nums leading-none" style="color:#0F172A">—</p>
-                    <p class="text-xs font-medium mt-1" style="color:#94A3B8">Productos</p>
+                    <p id="kpi-total" class="text-3xl font-black tabular-nums leading-none" style="color:#fff">—</p>
+                    <p class="text-xs font-medium mt-1" style="color:rgba(255,255,255,.75)">Productos</p>
                   </div>
-                  <div class="absolute bottom-0 right-0 w-20 h-20 rounded-full -mb-8 -mr-8" style="background:#7C3AED10"></div>
                 </div>
               </div>
 
@@ -2884,6 +2888,208 @@
         </div>
       </div>
 
+      <!-- ─── GASTOS / EGRESOS ──────────────────────────────── -->
+      <div data-page="gastos" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#EF4444,#DC2626)">
+              <i data-lucide="receipt" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A">Gastos / Egresos</h2>
+              <p class="text-xs" style="color:#64748B">Gastos operativos — renta, servicios, personal</p>
+            </div>
+          </div>
+          <button onclick="openModal('modal-gasto')" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#EF4444;border:none;cursor:pointer">
+            <i data-lucide="plus" style="width:15px;height:15px"></i> Registrar gasto
+          </button>
+        </div>
+        <!-- Filtros -->
+        <div class="flex gap-3 mb-4 flex-shrink-0">
+          <input type="date" id="gastos-fi" class="px-3 py-2 rounded-xl text-sm border" style="border-color:#E2E8F0;color:#0F172A">
+          <input type="date" id="gastos-ff" class="px-3 py-2 rounded-xl text-sm border" style="border-color:#E2E8F0;color:#0F172A">
+          <button onclick="loadGastos()" class="px-4 py-2 rounded-xl text-sm font-semibold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Filtrar</button>
+        </div>
+        <!-- KPI resumen -->
+        <div id="gastos-kpi" class="grid grid-cols-3 gap-3 mb-4 flex-shrink-0"></div>
+        <!-- Tabla -->
+        <div class="flex-1 overflow-auto rounded-2xl border" style="border-color:#E2E8F0">
+          <table class="w-full text-sm">
+            <thead style="background:#F8FAFC;position:sticky;top:0">
+              <tr>
+                <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Fecha</th>
+                <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Concepto</th>
+                <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Categoría</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Monto</th>
+                <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Cajero</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="gastos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── ALERTAS ────────────────────────────────────────── -->
+      <div data-page="alertas" class="page" style="display:none;flex-direction:column;height:100%;overflow-y:auto;padding:1.25rem">
+        <div class="flex items-center gap-3 mb-5 flex-shrink-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
+            <i data-lucide="bell-ring" style="width:20px;height:20px;color:#fff"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-black" style="color:#0F172A">Centro de Alertas</h2>
+            <p class="text-xs" style="color:#64748B">Stock bajo · Vencimientos próximos · Citas del día</p>
+          </div>
+          <button onclick="loadAlertas()" class="ml-auto px-4 py-2 rounded-xl text-sm font-semibold" style="background:#F59E0B;color:#fff;border:none;cursor:pointer">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px;display:inline"></i> Actualizar
+          </button>
+        </div>
+        <div id="alertas-content" class="space-y-5"></div>
+      </div>
+
+      <!-- ─── RENTABILIDAD POR CAJERO ───────────────────────── -->
+      <div data-page="rentabilidad" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#059669,#047857)">
+              <i data-lucide="trending-up" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A">Rentabilidad por Cajero</h2>
+              <p class="text-xs" style="color:#64748B">Ventas, ganancia y ticket promedio por empleado</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <input type="date" id="rent-fi" class="px-3 py-2 rounded-xl text-sm border" style="border-color:#E2E8F0">
+            <input type="date" id="rent-ff" class="px-3 py-2 rounded-xl text-sm border" style="border-color:#E2E8F0">
+            <button onclick="loadRentabilidad()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#059669;border:none;cursor:pointer">Ver</button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-auto rounded-2xl border" style="border-color:#E2E8F0">
+          <table class="w-full text-sm">
+            <thead style="background:#F8FAFC;position:sticky;top:0">
+              <tr>
+                <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Cajero</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Ventas</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Total</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Costo</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Ganancia</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Margen</th>
+                <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Ticket Prom.</th>
+              </tr>
+            </thead>
+            <tbody id="rent-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── DEVOLUCIONES ───────────────────────────────────── -->
+      <div data-page="devoluciones" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center gap-3 mb-4 flex-shrink-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">
+            <i data-lucide="undo-2" style="width:20px;height:20px;color:#fff"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-black" style="color:#0F172A">Devoluciones</h2>
+            <p class="text-xs" style="color:#64748B">Busca el folio de venta y selecciona los artículos a devolver</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mb-4 flex-shrink-0">
+          <input id="devp-folio" type="text" placeholder="Folio de venta (ej. F12345678)" class="flex-1 px-4 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0" onkeydown="if(event.key==='Enter')buscarVentaDevolucion()">
+          <button onclick="buscarVentaDevolucion()" class="px-4 py-2.5 rounded-xl text-sm font-bold" style="background:#4F46E5;color:#fff;border:none;cursor:pointer">
+            <i data-lucide="search" style="width:14px;height:14px;display:inline"></i> Buscar
+          </button>
+        </div>
+        <div id="devp-result" class="flex-1 overflow-auto"></div>
+      </div>
+
+      <!-- ─── PUNTOS DE LEALTAD ──────────────────────────────── -->
+      <div data-page="lealtad" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center gap-3 mb-4 flex-shrink-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#D97706)">
+            <i data-lucide="star" style="width:20px;height:20px;color:#fff"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-black" style="color:#0F172A">Programa de Puntos</h2>
+            <p class="text-xs" style="color:#64748B">Consulta y canjea puntos de lealtad por cliente</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mb-4 flex-shrink-0">
+          <input id="lealtad-buscar" type="text" placeholder="Buscar cliente por nombre o teléfono…" class="flex-1 px-4 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0" oninput="buscarClienteLealtad(this.value)">
+        </div>
+        <div id="lealtad-lista" class="flex-1 overflow-auto space-y-3"></div>
+      </div>
+
+      <!-- ─── REORDEN AUTOMÁTICO ─────────────────────────────── -->
+      <div data-page="reorden" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#0891B2,#0E7490)">
+              <i data-lucide="package-plus" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A">Reorden Automático</h2>
+              <p class="text-xs" style="color:#64748B">Productos bajo mínimo — genera orden de compra con un clic</p>
+            </div>
+          </div>
+          <button onclick="crearOrdenReorden()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#0891B2;border:none;cursor:pointer">
+            <i data-lucide="clipboard-plus" style="width:14px;height:14px;display:inline"></i> Crear orden de compra
+          </button>
+        </div>
+        <div id="reorden-lista" class="flex-1 overflow-auto"></div>
+      </div>
+
+      <!-- ─── HISTORIAL DE PRECIOS ───────────────────────────── -->
+      <div data-page="historial-precios" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center gap-3 mb-4 flex-shrink-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#7C3AED,#6D28D9)">
+            <i data-lucide="chart-line" style="width:20px;height:20px;color:#fff"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-black" style="color:#0F172A">Historial de Precios</h2>
+            <p class="text-xs" style="color:#64748B">Evolución de precios por producto</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mb-4 flex-shrink-0">
+          <input id="hp-buscar" type="text" placeholder="Buscar producto…" class="flex-1 px-4 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0" oninput="buscarProductoHistorialPrecios(this.value)">
+        </div>
+        <div id="hp-result" class="flex-1 overflow-auto"></div>
+      </div>
+
+      <!-- ─── FACTURACIÓN SIMPLIFICADA ──────────────────────── -->
+      <div data-page="facturacion" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center gap-3 mb-4 flex-shrink-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#1d2140,#312E81)">
+            <i data-lucide="file-text" style="width:20px;height:20px;color:#fff"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-black" style="color:#0F172A">Facturación Simplificada</h2>
+            <p class="text-xs" style="color:#64748B">Genera factura PDF con RFC del cliente (sin CFDI)</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 flex-shrink-0 mb-4">
+          <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
+            <p class="text-xs font-bold mb-3" style="color:#64748B">DATOS DEL CLIENTE</p>
+            <input id="fact-nombre" type="text" placeholder="Nombre o razón social" class="w-full px-3 py-2 rounded-xl border text-sm mb-2" style="border-color:#E2E8F0">
+            <input id="fact-rfc" type="text" placeholder="RFC" class="w-full px-3 py-2 rounded-xl border text-sm mb-2" style="border-color:#E2E8F0">
+            <input id="fact-direccion" type="text" placeholder="Dirección" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+          </div>
+          <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
+            <p class="text-xs font-bold mb-3" style="color:#64748B">FOLIO DE VENTA</p>
+            <div class="flex gap-2">
+              <input id="fact-folio" type="text" placeholder="Folio de venta (ej. F12345678)" class="flex-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+              <button onclick="cargarVentaFactura()" class="px-3 py-2 rounded-xl text-sm font-bold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Cargar</button>
+            </div>
+            <div id="fact-items" class="mt-3 text-sm" style="color:#64748B">Ingresa un folio de venta para cargar los artículos.</div>
+          </div>
+        </div>
+        <div class="flex justify-end flex-shrink-0">
+          <button onclick="generarFacturaPDF()" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#1d2140,#312E81);border:none;cursor:pointer">
+            <i data-lucide="download" style="width:15px;height:15px"></i> Generar PDF
+          </button>
+        </div>
+      </div>
+
     </main>
   </div><!-- /right panel -->
 </div><!-- /app -->
@@ -2893,28 +3099,42 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: MENÚ RÁPIDO / COMMAND PALETTE
 ══════════════════════════════════════════════════════════════════════════════ -->
-<div id="modal-quick-menu" class="fixed inset-0 z-[90] hidden items-center justify-center" style="padding:16px">
-  <div class="absolute inset-0" style="background:rgba(8,12,24,.8);backdrop-filter:blur(8px)" onclick="closeQuickMenu()"></div>
-  <div class="relative flex flex-col" style="width:100%;max-width:680px;max-height:88vh;border-radius:22px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6)">
-    <!-- Header search -->
-    <div class="flex items-center gap-3 px-5 py-4 flex-shrink-0" style="background:#1d2140">
-      <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.12)">
-        <i data-lucide="layout-grid" style="width:15px;height:15px;color:#fff"></i>
+<div id="modal-quick-menu" class="fixed inset-0 z-[90] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeQuickMenu()"></div>
+  <div class="relative flex flex-col" style="width:100%;max-width:620px;max-height:85vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">Módulos del sistema</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Selecciona una sección para navegar</p>
       </div>
-      <input id="qm-search" type="text" placeholder="Buscar módulo…" oninput="filterQuickMenu(this.value)"
-        class="flex-1 bg-transparent outline-none font-medium text-white text-sm placeholder-white/40" style="border:none"
-        autocomplete="off">
-      <button onclick="closeQuickMenu()" class="text-white/50 hover:text-white/90 transition-colors">
+      <button onclick="closeQuickMenu()" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#64748B;border:none">
         <i data-lucide="x" style="width:16px;height:16px"></i>
       </button>
     </div>
-    <!-- App grid -->
-    <div id="qm-grid" class="overflow-y-auto scroll-light" style="background:#0F172A;padding:20px 20px 24px"></div>
-    <!-- Footer -->
-    <div class="flex items-center justify-between px-5 py-2.5 flex-shrink-0" style="background:#0F172A;border-top:1px solid rgba(255,255,255,.06)">
-      <span class="text-[10px] font-medium" style="color:rgba(255,255,255,.3)">Ctrl+K para abrir · ESC para cerrar</span>
-      <span class="text-[10px] font-medium" style="color:rgba(255,255,255,.3)">FarmaciaPOS</span>
+
+    <!-- Group tabs -->
+    <div class="px-5 flex gap-1 flex-shrink-0" id="qm-tabs" style="border-bottom:1px solid #F1F5F9;padding-bottom:0;overflow-x:auto"></div>
+
+    <!-- Slides container -->
+    <div style="overflow:hidden;flex:1;min-height:0">
+      <div id="qm-track" style="display:flex;transition:transform .35s cubic-bezier(.4,0,.2,1);height:100%">
+        <!-- slides rendered by JS -->
+      </div>
     </div>
+
+    <!-- Footer nav -->
+    <div class="flex items-center justify-between px-5 py-3 flex-shrink-0" style="border-top:1px solid #F1F5F9">
+      <button onclick="qmSlide(-1)" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 transition hover:bg-slate-100" style="color:#64748B;border:1px solid #E2E8F0">
+        <i data-lucide="chevron-left" style="width:14px;height:14px"></i> Anterior
+      </button>
+      <div id="qm-dots" class="flex gap-1.5 items-center"></div>
+      <button onclick="qmSlide(1)" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 transition hover:bg-slate-100" style="color:#64748B;border:1px solid #E2E8F0">
+        Siguiente <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -3708,7 +3928,7 @@
 <div id="modal-profile" class="fixed inset-0 z-[80] hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)"
        onclick="closeProfileModal()"></div>
-  <div class="modal-pane relative bg-white rounded-3xl shadow-2xl w-[320px] overflow-hidden">
+  <div class="modal-pane relative bg-white rounded-3xl shadow-2xl overflow-hidden" style="width:340px">
 
     <!-- Gradient header with avatar -->
     <div class="relative flex flex-col items-center pt-8 pb-6 px-6"
@@ -3748,31 +3968,134 @@
     </div>
 
     <!-- Actions -->
-    <div class="p-4 space-y-2">
-      <!-- Change photo -->
-      <button onclick="document.getElementById('photo-input').click()"
-          class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80"
-          style="background:#EEF1F9;color:#1d2140">
-        <i data-lucide="image" style="width:16px;height:16px"></i>
-        Cambiar foto de perfil
-      </button>
+    <div class="p-4">
 
-      <!-- Remove photo -->
-      <button onclick="removeProfilePhoto()" id="remove-photo-btn"
-          class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80 hidden"
-          style="background:#FEF9C3;color:#CA8A04">
-        <i data-lucide="image-off" style="width:16px;height:16px"></i>
-        Quitar foto
-      </button>
+      <!-- ── Perfil ─────────────────────────────────────── -->
+      <p class="text-[9px] font-black uppercase tracking-[.16em] px-1 mb-2" style="color:#94A3B8">Perfil</p>
+      <div class="space-y-1 mb-3">
+        <button onclick="document.getElementById('photo-input').click()"
+            class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+            style="color:#1d2140;background:none;border:none;cursor:pointer"
+            onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EEF1F9">
+            <i data-lucide="image" style="width:14px;height:14px;color:#1d2140"></i>
+          </div>
+          Cambiar foto de perfil
+        </button>
+        <button onclick="removeProfilePhoto()" id="remove-photo-btn"
+            class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all hidden"
+            style="color:#B45309;background:none;border:none;cursor:pointer"
+            onmouseover="this.style.background='#FEF9C3'" onmouseout="this.style.background='none'">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEF9C3">
+            <i data-lucide="image-off" style="width:14px;height:14px;color:#B45309"></i>
+          </div>
+          Quitar foto
+        </button>
+      </div>
 
-      <div style="height:1px;background:#F1F5F9;margin:4px 0"></div>
+      <!-- ── Sistema (admin only) ───────────────────────── -->
+      <div id="profile-admin-section" class="hidden">
+        <div style="height:1px;background:#F1F5F9;margin:8px 0 10px"></div>
+        <p class="text-[9px] font-black uppercase tracking-[.16em] px-1 mb-2" style="color:#94A3B8">Sistema</p>
+        <div class="space-y-1 mb-3">
+          <button onclick="closeProfileModal();navigate('settings')"
+              class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+              style="color:#1d2140;background:none;border:none;cursor:pointer"
+              onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EDE9FE">
+              <i data-lucide="settings" style="width:14px;height:14px;color:#7C3AED"></i>
+            </div>
+            Configuración del sistema
+          </button>
+          <button onclick="closeProfileModal();openAjustesSub('impresora')"
+              class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+              style="color:#1d2140;background:none;border:none;cursor:pointer"
+              onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EFF6FF">
+              <i data-lucide="printer" style="width:14px;height:14px;color:#2563EB"></i>
+            </div>
+            Configurar impresora
+          </button>
+          <button onclick="closeProfileModal();openQuickMenu()"
+              class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+              style="color:#1d2140;background:none;border:none;cursor:pointer"
+              onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0FDF4">
+              <i data-lucide="layout-grid" style="width:14px;height:14px;color:#16A34A"></i>
+            </div>
+            Todos los módulos
+            <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-md" style="background:#F1F5F9;color:#64748B">Ctrl K</span>
+          </button>
+        </div>
+      </div>
 
-      <!-- Logout -->
+      <!-- ── Sesión ──────────────────────────────────────── -->
+      <div style="height:1px;background:#F1F5F9;margin:8px 0 10px"></div>
+      <p class="text-[9px] font-black uppercase tracking-[.16em] px-1 mb-2" style="color:#94A3B8">Sesión</p>
       <button onclick="closeProfileModal();doLogoutSafe()"
-          class="w-full h-11 rounded-xl flex items-center gap-3 px-4 text-sm font-semibold transition-all hover:opacity-80"
-          style="background:#FEF2F2;color:#EF4444">
-        <i data-lucide="log-out" style="width:16px;height:16px"></i>
+          class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+          style="color:#EF4444;background:none;border:none;cursor:pointer"
+          onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#FEF2F2">
+          <i data-lucide="log-out" style="width:14px;height:14px;color:#EF4444"></i>
+        </div>
         Cerrar sesión
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Nuevo Gasto ───────────────────────────────────────────────── -->
+<div id="modal-gasto" class="fixed inset-0 z-[85] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)" onclick="closeModal('modal-gasto')"></div>
+  <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:420px">
+    <div class="h-1.5" style="background:linear-gradient(90deg,#EF4444,#F59E0B)"></div>
+    <div class="p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:#FEF2F2">
+          <i data-lucide="receipt" style="width:20px;height:20px;color:#EF4444"></i>
+        </div>
+        <div>
+          <p class="font-black text-base" style="color:#0F172A">Registrar Gasto</p>
+          <p class="text-xs" style="color:#64748B">Egreso operativo</p>
+        </div>
+        <button onclick="closeModal('modal-gasto')" class="ml-auto w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="border:none;cursor:pointer;color:#64748B">
+          <i data-lucide="x" style="width:15px;height:15px"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-bold mb-1 block" style="color:#64748B">CONCEPTO</label>
+          <input id="gasto-concepto" type="text" placeholder="Ej. Pago de renta, luz, nómina…" class="w-full px-3 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0;color:#0F172A">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold mb-1 block" style="color:#64748B">MONTO</label>
+            <input id="gasto-monto" type="number" min="0" step="0.01" placeholder="$0.00" class="w-full px-3 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs font-bold mb-1 block" style="color:#64748B">FECHA</label>
+            <input id="gasto-fecha" type="date" class="w-full px-3 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-bold mb-1 block" style="color:#64748B">CATEGORÍA</label>
+          <select id="gasto-categoria" class="w-full px-3 py-2.5 rounded-xl border text-sm" style="border-color:#E2E8F0;color:#0F172A">
+            <option value="renta">Renta</option>
+            <option value="servicios">Servicios (luz, agua, internet)</option>
+            <option value="personal">Personal / Nómina</option>
+            <option value="compras">Compras / Materiales</option>
+            <option value="mantenimiento">Mantenimiento</option>
+            <option value="otros" selected>Otros</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-bold mb-1 block" style="color:#64748B">NOTAS (opcional)</label>
+          <textarea id="gasto-notas" rows="2" placeholder="Referencia, número de factura…" class="w-full px-3 py-2.5 rounded-xl border text-sm resize-none" style="border-color:#E2E8F0"></textarea>
+        </div>
+      </div>
+      <button onclick="guardarGasto()" class="w-full h-11 mt-5 rounded-2xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#EF4444,#DC2626);border:none;cursor:pointer">
+        Guardar gasto
       </button>
     </div>
   </div>
@@ -3925,13 +4248,7 @@ const NAV = [
   { key:'caja',      icon:'landmark',         label:'Control de Caja',  admin:true  },
   { key:'suppliers', icon:'truck',            label:'Proveedores',      admin:true  },
   { key:'employees', icon:'user-cog',         label:'Empleados',        admin:true  },
-  { type:'group', label:'SISTEMA',        admin:true },
   { key:'marketing', icon:'megaphone',        label:'Marketing',        admin:true  },
-  { key:'settings',  icon:'settings',         label:'Configuración',    admin:true  },
-  { type:'group', label:'SERVICIOS' },
-  { key:'citas',          icon:'calendar-clock', label:'Agenda de Citas',   admin:false },
-  { key:'ordenes-compra', icon:'clipboard-list', label:'Órdenes de Compra', admin:true  },
-  { key:'promociones',    icon:'tag',            label:'Promociones',       admin:true  },
 ];
 
 // ══════════════════════════════════════════════════════════
@@ -4656,39 +4973,91 @@ function doLogout() {
 }
 
 async function doLogoutSafe() {
-  const ahora = new Date();
-  const minutos = ahora.getHours() * 60 + ahora.getMinutes();
-  const son830pm = minutos >= 20 * 60 + 30;
+  // Always check for an open shift before logging out
+  try {
+    const r = await api('/cortes/activo');
+    if (r.ok) {
+      const t = await r.json();
+      if (t.abierto) {
+        const horaAbierto = t.abierto_en
+          ? new Date(t.abierto_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+          : '—';
+        const ahora = new Date();
+        const minutos = ahora.getHours() * 60 + ahora.getMinutes();
+        const esHoraCierre = minutos >= 20 * 60; // 8pm+
 
-  if (son830pm) {
-    try {
-      const r = await api('/cortes/activo');
-      if (r.ok) {
-        const t = await r.json();
-        if (t.abierto) {
-          const horaAbierto = t.abierto_en
-            ? new Date(t.abierto_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-            : '—';
-          showConfirm({
-            title: 'Turno abierto',
-            message: `Tienes un turno activo desde las ${horaAbierto}.\n\nSe cerrará automáticamente con el monto esperado en caja antes de salir.`,
-            icon: 'alarm-clock',
-            confirmText: 'Cerrar turno y salir',
-            cancelText: 'Cancelar',
-            onConfirm: async () => {
-              await api('/cortes/cerrar', {
-                method: 'POST',
-                body: JSON.stringify({ monto_cierre: t.esperado_caja ?? 0, automatico: true }),
-              }).catch(() => {});
-              doLogout();
-            }
-          });
-          return;
-        }
+        _showCierreLogoutModal({
+          horaAbierto,
+          esperado: t.esperado_caja ?? 0,
+          esHoraCierre,
+          onCerrarYSalir: async () => {
+            await api('/cortes/cerrar', {
+              method: 'POST',
+              body: JSON.stringify({ monto_cierre: t.esperado_caja ?? 0, automatico: true }),
+            }).catch(() => {});
+            doLogout();
+          },
+          onSoloSalir: () => doLogout(),
+        });
+        return;
       }
-    } catch {}
-  }
+    }
+  } catch {}
   doLogout();
+}
+
+function _showCierreLogoutModal({ horaAbierto, esperado, esHoraCierre, onCerrarYSalir, onSoloSalir }) {
+  // Remove any existing instance
+  document.getElementById('_modal-cierre-logout')?.remove();
+
+  const fmt$ = n => '$' + parseFloat(n||0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const aviso = esHoraCierre
+    ? `<div class="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A">
+        <i data-lucide="clock-alert" style="width:14px;height:14px;flex-shrink:0"></i>
+        Es hora de cierre — se recomienda cerrar el turno antes de salir.
+      </div>`
+    : '';
+
+  const overlay = document.createElement('div');
+  overlay.id = '_modal-cierre-logout';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="height:4px;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div>
+      <div style="padding:28px 28px 0">
+        <div style="width:56px;height:56px;border-radius:18px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+          <i data-lucide="landmark" style="width:26px;height:26px;color:#D97706"></i>
+        </div>
+        <p style="font-size:18px;font-weight:900;color:#0F172A;margin:0 0 6px">Tienes un turno abierto</p>
+        <p style="font-size:13px;color:#64748B;margin:0 0 16px;line-height:1.5">
+          Tu turno lleva abierto desde las <b style="color:#0F172A">${horaAbierto}</b>.<br>
+          Efectivo esperado en caja: <b style="color:#16A34A">${fmt$(esperado)}</b>
+        </p>
+        ${aviso}
+      </div>
+      <div style="padding:20px 28px 28px;display:flex;flex-direction:column;gap:10px;margin-top:${aviso?'14px':'0'}">
+        <button id="_btn-cierre-y-salir"
+          style="width:100%;height:44px;border-radius:14px;background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px">
+          <i data-lucide="log-out" style="width:16px;height:16px"></i>
+          Cerrar turno y salir
+        </button>
+        <button id="_btn-solo-salir"
+          style="width:100%;height:40px;border-radius:14px;background:#FEF2F2;color:#EF4444;border:1px solid #FECACA;cursor:pointer;font-size:13px;font-weight:600">
+          Salir sin cerrar turno
+        </button>
+        <button id="_btn-cierre-cancelar"
+          style="width:100%;height:40px;border-radius:14px;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;cursor:pointer;font-size:13px;font-weight:600">
+          Cancelar — seguir trabajando
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  document.getElementById('_btn-cierre-y-salir').onclick = () => { overlay.remove(); onCerrarYSalir(); };
+  document.getElementById('_btn-solo-salir').onclick    = () => { overlay.remove(); onSoloSalir(); };
+  document.getElementById('_btn-cierre-cancelar').onclick = () => overlay.remove();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4797,6 +5166,11 @@ function openProfileModal() {
     document.getElementById('remove-photo-btn').classList.add('hidden');
   }
 
+  // Show admin section only for admins
+  const adminSec = document.getElementById('profile-admin-section');
+  if (u.rol === 'admin') adminSec.classList.remove('hidden');
+  else adminSec.classList.add('hidden');
+
   const m = document.getElementById('modal-profile');
   m.classList.remove('hidden');
   m.classList.add('flex');
@@ -4882,7 +5256,11 @@ const TITLES={
   customers:'Clientes', reports:'Reportes', suppliers:'Proveedores',
   employees:'Empleados', settings:'Configuración', historial:'Historial Clínico',
   marketing:'Marketing — PDF y Promos',
-  citas:'Agenda de Citas', 'ordenes-compra':'Órdenes de Compra', promociones:'Promociones'
+  citas:'Agenda de Citas', 'ordenes-compra':'Órdenes de Compra', promociones:'Promociones',
+  gastos:'Gastos / Egresos', alertas:'Centro de Alertas', rentabilidad:'Rentabilidad por Cajero',
+  devoluciones:'Devoluciones', lealtad:'Programa de Puntos', reorden:'Reorden Automático',
+  'historial-precios':'Historial de Precios', facturacion:'Facturación Simplificada',
+  'inventario-ciclico':'Conteo Físico de Inventario',
 };
 
 function navigate(page) {
@@ -4964,6 +5342,22 @@ function loadPage(page) {
   if (page==='citas')         { const hoy=new Date().toISOString().split('T')[0]; const fe=document.getElementById('citas-fecha'); if(fe)fe.value=hoy; loadCitas(); }
   if (page==='ordenes-compra') loadOrdenesCompra();
   if (page==='promociones')    loadPromociones();
+  // Nuevas páginas
+  if (page==='gastos') {
+    const hoy=new Date().toISOString().split('T')[0];
+    const fi=document.getElementById('gastos-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
+    const ff=document.getElementById('gastos-ff'); if(ff&&!ff.value)ff.value=hoy;
+    loadGastos();
+  }
+  if (page==='alertas')       loadAlertas();
+  if (page==='rentabilidad') {
+    const hoy=new Date().toISOString().split('T')[0];
+    const fi=document.getElementById('rent-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
+    const ff=document.getElementById('rent-ff'); if(ff&&!ff.value)ff.value=hoy;
+    loadRentabilidad();
+  }
+  if (page==='reorden')       loadReorden();
+  if (page==='inventario-ciclico') loadInventarioCiclico?.();
   icons();
 }
 
@@ -11964,100 +12358,514 @@ const QM_GROUPS = [
   {
     label: 'Principal', color: '#1d2140', bg: '#EEF2FF',
     items: [
-      { key:'dashboard',  icon:'layout-dashboard', label:'Dashboard',         desc:'Estadísticas del día en tiempo real' },
-      { key:'pos',        icon:'shopping-cart',     label:'Nueva Venta',       desc:'Punto de venta — escanea y cobra' },
-      { key:'inventory',  icon:'package',           label:'Inventario',        desc:'Productos, stock, lotes y vencimientos' },
+      { key:'dashboard',    icon:'layout-dashboard', label:'Dashboard',          desc:'Estadísticas del día en tiempo real' },
+      { key:'pos',          icon:'shopping-cart',    label:'Nueva Venta',        desc:'Punto de venta — escanea y cobra' },
+      { key:'inventory',    icon:'package',          label:'Inventario',         desc:'Productos, stock, lotes y vencimientos' },
+      { key:'devoluciones', icon:'undo-2',           label:'Devoluciones',       desc:'Registrar devolución de productos vendidos' },
+      { key:'alertas',      icon:'bell-ring',        label:'Centro de Alertas',  desc:'Stock bajo, vencimientos, citas del día' },
     ]
   },
   {
     label: 'Pacientes', color: '#0891B2', bg: '#E0F7FA',
     items: [
-      { key:'customers',  icon:'users',             label:'Clientes',          desc:'Directorio de clientes y crédito' },
-      { key:'historial',  icon:'heart-pulse',       label:'Historial Clínico', desc:'Signos vitales y expedientes' },
-      { key:'citas',      icon:'calendar-clock',    label:'Agenda de Citas',   desc:'Inyecciones, toma de presión, glucosa' },
+      { key:'customers',    icon:'users',            label:'Clientes',           desc:'Directorio de clientes y crédito' },
+      { key:'historial',    icon:'heart-pulse',      label:'Historial Clínico',  desc:'Signos vitales y expedientes' },
+      { key:'citas',        icon:'calendar-clock',   label:'Agenda de Citas',    desc:'Inyecciones, toma de presión, glucosa' },
+      { key:'lealtad',      icon:'star',             label:'Puntos de Lealtad',  desc:'Ver y canjear puntos acumulados por cliente' },
     ]
   },
   {
     label: 'Administración', color: '#7C3AED', bg: '#F3E8FF', admin: true,
     items: [
-      { key:'reports',        icon:'bar-chart-3',    label:'Reportes',          desc:'Ventas, top productos, cortes, CSV/PDF', admin:true },
-      { key:'caja',           icon:'landmark',       label:'Control de Caja',   desc:'Apertura, cierre y retiros de turno', admin:true },
-      { key:'ordenes-compra', icon:'clipboard-list', label:'Órdenes de Compra', desc:'Pedidos a proveedores — stock bajo', admin:true },
-      { key:'promociones',    icon:'tag',            label:'Promociones',       desc:'2x1, descuentos %, fechas automáticas', admin:true },
+      { key:'reports',         icon:'bar-chart-3',    label:'Reportes',           desc:'Ventas, top productos, cortes, CSV/PDF', admin:true },
+      { key:'caja',            icon:'landmark',       label:'Control de Caja',    desc:'Apertura, cierre y retiros de turno', admin:true },
+      { key:'gastos',          icon:'receipt',        label:'Gastos / Egresos',   desc:'Registrar gastos operativos y calcular utilidad neta', admin:true },
+      { key:'rentabilidad',    icon:'trending-up',    label:'Rentabilidad Cajero',desc:'Ventas, ganancia y ticket promedio por empleado', admin:true },
+      { key:'ordenes-compra',  icon:'clipboard-list', label:'Órdenes de Compra',  desc:'Pedidos a proveedores — stock bajo', admin:true },
+      { key:'promociones',     icon:'tag',            label:'Promociones',        desc:'2x1, descuentos %, fechas automáticas', admin:true },
+      { key:'reorden',         icon:'package-plus',   label:'Reorden Auto',       desc:'Productos bajo mínimo — genera orden de compra', admin:true },
+      { key:'facturacion',     icon:'file-text',      label:'Facturación',        desc:'Generar factura simplificada con RFC del cliente', admin:true },
     ]
   },
   {
     label: 'Sistema', color: '#D97706', bg: '#FEF3C7', admin: true,
     items: [
-      { key:'suppliers',  icon:'truck',             label:'Proveedores',       desc:'Directorio y datos de contacto', admin:true },
-      { key:'employees',  icon:'user-cog',          label:'Empleados',         desc:'Usuarios, roles y accesos', admin:true },
-      { key:'marketing',  icon:'megaphone',         label:'Marketing',         desc:'Catálogo PDF, imagen promo', admin:true },
-      { key:'settings',   icon:'settings',          label:'Configuración',     desc:'Sistema, alertas WhatsApp, pagos', admin:true },
+      { key:'suppliers',       icon:'truck',          label:'Proveedores',        desc:'Directorio y datos de contacto', admin:true },
+      { key:'employees',       icon:'user-cog',       label:'Empleados',          desc:'Usuarios, roles y accesos', admin:true },
+      { key:'marketing',       icon:'megaphone',      label:'Marketing',          desc:'Catálogo PDF, imagen promo', admin:true },
+      { key:'settings',        icon:'settings',       label:'Configuración',      desc:'Sistema, alertas WhatsApp, pagos', admin:true },
+      { key:'historial-precios', icon:'chart-line',   label:'Historial Precios',  desc:'Evolución de precios de compra y venta por producto', admin:true },
+    ]
+  },
+  {
+    label: 'Servicios', color: '#16A34A', bg: '#DCFCE7',
+    items: [
+      { key:'citas',           icon:'calendar-clock', label:'Agenda de Citas',   desc:'Programar y gestionar citas del día' },
+      { key:'ordenes-compra',  icon:'clipboard-list', label:'Órdenes de Compra', desc:'Pedidos a proveedores', admin:true },
+      { key:'promociones',     icon:'tag',            label:'Promociones',       desc:'Descuentos y ofertas activas', admin:true },
+      { key:'inventario-ciclico', icon:'scan-barcode',label:'Conteo Físico',     desc:'Sesión de inventario cíclico con scanner', admin:true },
     ]
   },
 ];
 
+let _qmSlide = 0;
+let _qmGroups = [];
+
 function openQuickMenu() {
-  const el = document.getElementById('modal-quick-menu');
-  el.style.display = 'flex';
-  document.getElementById('qm-search').value = '';
-  renderQuickMenu('');
-  setTimeout(() => { document.getElementById('qm-search').focus(); }, 80);
+  document.getElementById('modal-quick-menu').style.display = 'flex';
+  _qmSlide = 0;
+  buildQuickMenu();
   icons();
 }
 function closeQuickMenu() {
   document.getElementById('modal-quick-menu').style.display = 'none';
 }
-function filterQuickMenu(q) { renderQuickMenu(q.toLowerCase()); }
+function filterQuickMenu(q) { buildQuickMenu(q.toLowerCase()); }
 
-function renderQuickMenu(q) {
+function buildQuickMenu(q='') {
   const isAdmin = S.user?.rol === 'admin';
-  const grid = document.getElementById('qm-grid');
-  let html = '';
-  let totalVisible = 0;
-  for (const group of QM_GROUPS) {
-    if (group.admin && !isAdmin) continue;
-    const visibleItems = group.items.filter(it => {
+  _qmGroups = QM_GROUPS.filter(g => {
+    if (g.admin && !isAdmin) return false;
+    const vis = g.items.filter(it => {
       if (it.admin && !isAdmin) return false;
       if (!q) return true;
       return it.label.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q);
     });
-    if (!visibleItems.length) continue;
-    totalVisible += visibleItems.length;
-    html += `
-    <div style="margin-bottom:20px">
-      <div class="flex items-center gap-2 mb-3">
-        <span class="text-[9px] font-bold uppercase tracking-[.16em]" style="color:${group.color}80">${group.label}</span>
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.07)"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">
-        ${visibleItems.map(it => `
+    g._vis = vis;
+    return vis.length > 0;
+  });
+  if (_qmSlide >= _qmGroups.length) _qmSlide = 0;
+
+  // Tabs
+  const tabsEl = document.getElementById('qm-tabs');
+  tabsEl.innerHTML = _qmGroups.map((g, i) => `
+    <button onclick="_qmSlide=${i};qmGoTo(${i})"
+      class="px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap"
+      id="qm-tab-${i}"
+      style="border-color:${i===_qmSlide?g.color:'transparent'};color:${i===_qmSlide?g.color:'#94A3B8'};background:none;cursor:pointer">
+      ${g.label}
+    </button>`).join('');
+
+  // Slides
+  const track = document.getElementById('qm-track');
+  track.innerHTML = _qmGroups.map(g => `
+    <div style="min-width:100%;width:100%;padding:16px 20px 16px;overflow-y:auto;max-height:calc(85vh - 170px)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px">
+        ${g._vis.map(it => `
           <button onclick="navigate('${it.key}');closeQuickMenu()"
-            class="qm-tile group flex flex-col items-center gap-2 p-3 rounded-2xl transition-all"
-            style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);cursor:pointer;text-align:center"
-            onmouseover="this.style.background='rgba(255,255,255,.1)';this.style.borderColor='${group.color}50';this.style.transform='translateY(-2px)'"
-            onmouseout="this.style.background='rgba(255,255,255,.04)';this.style.borderColor='rgba(255,255,255,.06)';this.style.transform=''"
-            onmousedown="this.style.transform='scale(.96)'" onmouseup="this.style.transform='translateY(-2px)'">
-            <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all"
-              style="background:linear-gradient(135deg,${group.color},${group.color}cc)">
-              <i data-lucide="${it.icon}" style="width:19px;height:19px;color:#fff"></i>
+            style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 8px 14px;border-radius:18px;background:#fff;border:1.5px solid #E8EDF5;cursor:pointer;text-align:center;transition:all .18s"
+            onmouseover="this.style.background='${g.color}10';this.style.borderColor='${g.color}';this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px ${g.color}22'"
+            onmouseout="this.style.background='#fff';this.style.borderColor='#E8EDF5';this.style.transform='';this.style.boxShadow=''"
+            onmousedown="this.style.transform='scale(.94)'" onmouseup="this.style.transform='translateY(-3px)'">
+            <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,${g.color},${g.color}bb);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px ${g.color}40">
+              <i data-lucide="${it.icon}" style="width:22px;height:22px;color:#fff"></i>
             </div>
-            <span class="text-[11px] font-semibold leading-tight" style="color:rgba(255,255,255,.85)">${it.label}</span>
+            <span style="font-size:11px;font-weight:700;color:#1d2140;line-height:1.3">${it.label}</span>
           </button>
         `).join('')}
       </div>
-    </div>`;
-  }
-  if (!totalVisible) {
-    html = `<div class="flex flex-col items-center justify-center py-12 gap-3">
-      <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:rgba(255,255,255,.05)">
-        <i data-lucide="search-x" style="width:24px;height:24px;color:rgba(255,255,255,.3)"></i>
-      </div>
-      <p class="text-sm font-medium" style="color:rgba(255,255,255,.4)">Sin resultados para "${q}"</p>
-    </div>`;
-  }
-  grid.innerHTML = html;
+    </div>
+  `).join('');
+
+  // Dots
+  const dotsEl = document.getElementById('qm-dots');
+  dotsEl.innerHTML = _qmGroups.map((g, i) => `
+    <button onclick="qmGoTo(${i})"
+      style="width:${i===_qmSlide?20:6}px;height:6px;border-radius:3px;background:${i===_qmSlide?g.color:'#E2E8F0'};border:none;cursor:pointer;transition:all .25s"></button>
+  `).join('');
+
+  qmGoTo(_qmSlide, false);
   icons();
+}
+
+function qmGoTo(idx, animate=true) {
+  if (!_qmGroups.length) return;
+  idx = Math.max(0, Math.min(_qmGroups.length - 1, idx));
+  _qmSlide = idx;
+  const track = document.getElementById('qm-track');
+  track.style.transition = animate ? 'transform .35s cubic-bezier(.4,0,.2,1)' : 'none';
+  track.style.transform = `translateX(-${idx * 100}%)`;
+  // Update tabs
+  _qmGroups.forEach((g, i) => {
+    const t = document.getElementById(`qm-tab-${i}`);
+    if (t) {
+      t.style.borderColor = i === idx ? g.color : 'transparent';
+      t.style.color = i === idx ? g.color : '#94A3B8';
+    }
+  });
+  // Update dots
+  const dotsEl = document.getElementById('qm-dots');
+  if (dotsEl) dotsEl.innerHTML = _qmGroups.map((g, i) => `
+    <button onclick="qmGoTo(${i})"
+      style="width:${i===idx?20:6}px;height:6px;border-radius:3px;background:${i===idx?g.color:'#E2E8F0'};border:none;cursor:pointer;transition:all .25s"></button>
+  `).join('');
+}
+
+function qmSlide(dir) {
+  qmGoTo(_qmSlide + dir);
+}
+
+// ══════════════════════════════════════════════════════════
+// GASTOS / EGRESOS
+// ══════════════════════════════════════════════════════════
+async function loadGastos() {
+  const fi = document.getElementById('gastos-fi')?.value;
+  const ff = document.getElementById('gastos-ff')?.value;
+  let url = '/gastos';
+  const p = [];
+  if (fi) p.push('fecha_inicio=' + fi);
+  if (ff) p.push('fecha_fin=' + ff);
+  if (p.length) url += '?' + p.join('&');
+  try {
+    const [gastos, resumen] = await Promise.all([
+      apiFetch(url),
+      fi && ff ? apiFetch(`/gastos/resumen?fecha_inicio=${fi}&fecha_fin=${ff}`) : Promise.resolve(null),
+    ]);
+    const tbody = document.getElementById('gastos-tbody');
+    const catColors = {renta:'#EF4444',servicios:'#0891B2',personal:'#7C3AED',compras:'#16A34A',mantenimiento:'#D97706',otros:'#64748B'};
+    tbody.innerHTML = gastos.map(g => `
+      <tr class="hovrow border-b" style="border-color:#F1F5F9">
+        <td class="px-4 py-3 text-xs" style="color:#64748B">${g.fecha || ''}</td>
+        <td class="px-4 py-3 text-sm font-semibold" style="color:#0F172A">${g.concepto}</td>
+        <td class="px-4 py-3">
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${catColors[g.categoria]||'#64748B'}18;color:${catColors[g.categoria]||'#64748B'}">${g.categoria}</span>
+        </td>
+        <td class="px-4 py-3 text-sm font-black text-right" style="color:#EF4444">${fmt(g.monto)}</td>
+        <td class="px-4 py-3 text-xs" style="color:#64748B">${g.cajero}</td>
+        <td class="px-4 py-3">
+          <button onclick="eliminarGasto(${g.id})" class="text-xs px-2 py-1 rounded-lg hover:bg-red-50" style="color:#EF4444;border:none;cursor:pointer">
+            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+          </button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-sm" style="color:#94A3B8">Sin gastos registrados</td></tr>';
+    if (resumen) {
+      const kpi = document.getElementById('gastos-kpi');
+      kpi.innerHTML = `
+        <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
+          <p class="text-xs font-bold" style="color:#64748B">TOTAL GASTOS</p>
+          <p class="text-2xl font-black mt-1" style="color:#EF4444">${fmt(resumen.total)}</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
+          <p class="text-xs font-bold" style="color:#64748B">REGISTROS</p>
+          <p class="text-2xl font-black mt-1" style="color:#0F172A">${resumen.num_gastos}</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-4 overflow-auto" style="border-color:#E2E8F0">
+          <p class="text-xs font-bold mb-2" style="color:#64748B">POR CATEGORÍA</p>
+          ${(resumen.por_categoria||[]).map(c=>`<div class="flex justify-between text-xs"><span style="color:#64748B">${c.categoria}</span><span class="font-bold" style="color:#EF4444">${fmt(c.total)}</span></div>`).join('')}
+        </div>`;
+    }
+    icons();
+  } catch(e) { toast('Error cargando gastos','error'); }
+}
+
+async function guardarGasto() {
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const monto = parseFloat(document.getElementById('gasto-monto').value);
+  const fecha = document.getElementById('gasto-fecha').value;
+  const categoria = document.getElementById('gasto-categoria').value;
+  const notas = document.getElementById('gasto-notas').value.trim();
+  if (!concepto || !monto || !fecha) { toast('Concepto, monto y fecha son requeridos','error'); return; }
+  try {
+    await apiFetch('/gastos', { method:'POST', body: JSON.stringify({ concepto, monto, fecha, categoria, notas }) });
+    toast('Gasto registrado','success');
+    closeModal('modal-gasto');
+    document.getElementById('gasto-concepto').value = '';
+    document.getElementById('gasto-monto').value = '';
+    document.getElementById('gasto-notas').value = '';
+    loadGastos();
+  } catch(e) { toast('Error al guardar gasto','error'); }
+}
+
+async function eliminarGasto(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  try {
+    await apiFetch('/gastos/' + id, { method:'DELETE' });
+    toast('Gasto eliminado','success');
+    loadGastos();
+  } catch(e) { toast('Error','error'); }
+}
+
+// ══════════════════════════════════════════════════════════
+// ALERTAS
+// ══════════════════════════════════════════════════════════
+async function loadAlertas() {
+  const cont = document.getElementById('alertas-content');
+  if (!cont) return;
+  cont.innerHTML = '<p class="text-sm text-center py-8" style="color:#94A3B8">Cargando alertas…</p>';
+  try {
+    const data = await apiFetch('/alertas/pendientes');
+    let html = '';
+    // Citas hoy
+    if (data.citas_hoy?.length) {
+      html += `<div class="bg-white rounded-2xl border p-4" style="border-color:#BAE8FF">
+        <p class="text-xs font-black uppercase tracking-wider mb-3" style="color:#0891B2">Citas de hoy (${data.citas_hoy.length})</p>
+        <div class="space-y-2">
+          ${data.citas_hoy.map(c=>`<div class="flex items-center gap-3 px-3 py-2 rounded-xl" style="background:#F0F9FF">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#0891B2">
+              <i data-lucide="calendar-clock" style="width:15px;height:15px;color:#fff"></i>
+            </div>
+            <div><p class="text-sm font-semibold" style="color:#0F172A">${c.paciente}</p>
+            <p class="text-xs" style="color:#64748B">${c.hora} · ${c.tipo||'Sin tipo'}</p></div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    // Stock bajo
+    if (data.stock_bajo?.length) {
+      html += `<div class="bg-white rounded-2xl border p-4" style="border-color:#FCA5A5">
+        <p class="text-xs font-black uppercase tracking-wider mb-3" style="color:#EF4444">Stock bajo (${data.stock_bajo.length} productos)</p>
+        <div class="space-y-2">
+          ${data.stock_bajo.map(p=>`<div class="flex items-center justify-between px-3 py-2 rounded-xl" style="background:#FEF2F2">
+            <div><p class="text-sm font-semibold" style="color:#0F172A">${p.nombre}</p>
+            <p class="text-xs" style="color:#64748B">Stock: ${p.stock} · Mín: ${p.stock_minimo}</p></div>
+            <button onclick="navigate('inventory');closeQuickMenu()" class="text-xs px-2 py-1 rounded-lg font-semibold" style="background:#EF4444;color:#fff;border:none;cursor:pointer">Ver</button>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    // Vencimientos
+    if (data.vencimientos?.length) {
+      html += `<div class="bg-white rounded-2xl border p-4" style="border-color:#FDE68A">
+        <p class="text-xs font-black uppercase tracking-wider mb-3" style="color:#D97706">Vencimientos próximos (${data.vencimientos.length})</p>
+        <div class="space-y-2">
+          ${data.vencimientos.map(v=>`<div class="flex items-center justify-between px-3 py-2 rounded-xl" style="background:${v.vencido?'#FEF2F2':'#FFFBEB'}">
+            <div><p class="text-sm font-semibold" style="color:#0F172A">${v.producto}</p>
+            <p class="text-xs" style="color:#64748B">Lote: ${v.numero_lote||'—'} · ${v.vencido?'VENCIDO':'Vence: '+v.fecha_vencimiento} (${v.dias_restantes}d)</p></div>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${v.vencido?'#EF4444':'#D97706'};color:#fff">${v.cantidad} uds</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    if (!html) html = `<div class="text-center py-12"><i data-lucide="check-circle-2" style="width:40px;height:40px;color:#16A34A;margin:auto"></i><p class="mt-3 font-semibold" style="color:#16A34A">Sin alertas pendientes</p></div>`;
+    cont.innerHTML = html;
+    icons();
+  } catch(e) { cont.innerHTML = '<p class="text-sm text-center py-8" style="color:#EF4444">Error cargando alertas</p>'; }
+}
+
+// ══════════════════════════════════════════════════════════
+// RENTABILIDAD POR CAJERO
+// ══════════════════════════════════════════════════════════
+async function loadRentabilidad() {
+  const fi = document.getElementById('rent-fi')?.value;
+  const ff = document.getElementById('rent-ff')?.value;
+  if (!fi || !ff) { toast('Selecciona rango de fechas','error'); return; }
+  try {
+    const data = await apiFetch(`/reportes/rentabilidad-cajero?fecha_inicio=${fi}&fecha_fin=${ff}`);
+    const tbody = document.getElementById('rent-tbody');
+    const colores = ['#F59E0B','#94A3B8','#B45309'];
+    tbody.innerHTML = data.map((r,i) => `
+      <tr class="hovrow border-b" style="border-color:#F1F5F9">
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white" style="background:${colores[i]||'#64748B'}">${i+1}</div>
+            <div><p class="text-sm font-bold" style="color:#0F172A">${r.cajero}</p><p class="text-[10px]" style="color:#94A3B8">${r.rol}</p></div>
+          </div>
+        </td>
+        <td class="px-4 py-3 text-sm text-right font-bold" style="color:#0F172A">${fmtN(r.num_ventas)}</td>
+        <td class="px-4 py-3 text-sm text-right font-bold" style="color:#0F172A">${fmt(r.total_ventas)}</td>
+        <td class="px-4 py-3 text-sm text-right" style="color:#64748B">${fmt(r.total_costo)}</td>
+        <td class="px-4 py-3 text-sm text-right font-black" style="color:#16A34A">${fmt(r.ganancia)}</td>
+        <td class="px-4 py-3 text-sm text-right">
+          <span class="px-2 py-0.5 rounded-full text-xs font-bold" style="background:#DCFCE7;color:#16A34A">${r.margen_pct}%</span>
+        </td>
+        <td class="px-4 py-3 text-sm text-right" style="color:#64748B">${fmt(r.ticket_promedio)}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-sm" style="color:#94A3B8">Sin ventas en el período</td></tr>';
+  } catch(e) { toast('Error cargando rentabilidad','error'); }
+}
+
+// ══════════════════════════════════════════════════════════
+// DEVOLUCIONES
+// ══════════════════════════════════════════════════════════
+async function buscarVentaDevolucion() {
+  const folio = document.getElementById('devp-folio')?.value.trim();
+  if (!folio) return;
+  const cont = document.getElementById('devp-result');
+  cont.innerHTML = '<p class="text-sm py-4" style="color:#94A3B8">Buscando…</p>';
+  try {
+    const ventas = await apiFetch(`/ventas?folio=${encodeURIComponent(folio)}`);
+    const v = Array.isArray(ventas) ? ventas[0] : null;
+    if (!v) { cont.innerHTML = '<p class="text-sm py-4 text-red-500">Venta no encontrada</p>'; return; }
+    cont.innerHTML = `
+      <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
+        <div class="flex items-center justify-between mb-3">
+          <p class="font-black text-sm" style="color:#0F172A">Folio: ${v.folio}</p>
+          <span class="text-xs px-2 py-0.5 rounded-full font-bold" style="background:#DCFCE7;color:#16A34A">${v.estado}</span>
+        </div>
+        <p class="text-xs mb-3" style="color:#64748B">Total: <b class="text-slate-800">${fmt(v.total)}</b> · Cajero: ${v.cajero||'—'} · ${v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-MX') : '—'}</p>
+        <p class="text-xs font-bold mb-2" style="color:#64748B">ARTÍCULOS A DEVOLVER</p>
+        <div class="space-y-2" id="devp-items-list">
+          ${(v.items||[]).map(it => `
+            <div class="devp-item flex items-center gap-3 p-2 rounded-xl" style="background:#F8FAFC" data-id="${it.producto_id}" data-max="${it.cantidad}" data-precio="${it.precio_unitario}">
+              <input type="checkbox" class="devp-chk">
+              <div class="flex-1">
+                <p class="text-sm font-semibold" style="color:#0F172A">${it.nombre}</p>
+                <p class="text-xs" style="color:#64748B">${it.cantidad} × ${fmt(it.precio_unitario)}</p>
+              </div>
+              <input type="number" min="1" max="${it.cantidad}" value="${it.cantidad}" class="devp-qty w-16 px-2 py-1 rounded-lg border text-sm text-center" style="border-color:#E2E8F0">
+            </div>`).join('')}
+        </div>
+        <textarea id="devp-motivo" placeholder="Motivo de devolución (opcional)" class="mt-3 w-full px-3 py-2 rounded-xl border text-sm resize-none" style="border-color:#E2E8F0;height:60px"></textarea>
+        <button onclick="procesarDevolucion(${v.id})" class="mt-3 w-full h-10 rounded-xl text-sm font-bold text-white" style="background:#4F46E5;border:none;cursor:pointer">
+          Procesar devolución seleccionada
+        </button>
+      </div>`;
+  } catch(e) { cont.innerHTML = '<p class="text-sm py-4 text-red-500">Error al buscar venta</p>'; }
+}
+
+async function procesarDevolucion(ventaId) {
+  const chks = document.querySelectorAll('.devp-chk:checked');
+  if (!chks.length) { toast('Selecciona al menos un artículo','error'); return; }
+  const motivo = document.getElementById('devp-motivo')?.value.trim() || '';
+  const items = [];
+  chks.forEach(c => {
+    const row = c.closest('.devp-item');
+    const qty = parseInt(row.querySelector('.devp-qty').value) || 1;
+    items.push({ producto_id: parseInt(row.dataset.id), cantidad: Math.min(qty, parseInt(row.dataset.max)) });
+  });
+  try {
+    const res = await apiFetch(`/ventas/${ventaId}/devolucion`, { method:'POST', body: JSON.stringify({ items, motivo }) });
+    toast(`Devolución procesada — ${fmt(res.total_devuelto)} devueltos al stock`, 'success');
+    document.getElementById('devp-result').innerHTML = '';
+    document.getElementById('devp-folio').value = '';
+  } catch(e) { toast(e.message || 'Error al procesar devolución','error'); }
+}
+
+// ══════════════════════════════════════════════════════════
+// LEALTAD / PUNTOS
+// ══════════════════════════════════════════════════════════
+async function buscarClienteLealtad(q) {
+  if (q.length < 2) { document.getElementById('lealtad-lista').innerHTML = ''; return; }
+  try {
+    const data = await apiFetch(`/clientes/?q=${encodeURIComponent(q)}`);
+    const lista = document.getElementById('lealtad-lista');
+    lista.innerHTML = (Array.isArray(data) ? data : []).map(c => `
+      <div class="bg-white rounded-2xl border p-4 flex items-center justify-between" style="border-color:#E2E8F0">
+        <div>
+          <p class="font-bold text-sm" style="color:#0F172A">${c.nombre}</p>
+          <p class="text-xs mt-0.5" style="color:#64748B">${c.telefono||'—'}</p>
+          <p class="text-xs mt-1 font-bold" style="color:#D97706">
+            <i data-lucide="star" style="width:12px;height:12px;display:inline;vertical-align:middle"></i>
+            ${parseFloat(c.puntos_acumulados||0).toFixed(0)} pts acumulados · ${parseFloat(c.puntos_canjeados||0).toFixed(0)} canjeados
+          </p>
+        </div>
+        <div class="text-right">
+          <p class="text-lg font-black" style="color:#F59E0B">${(parseFloat(c.puntos_acumulados||0)-parseFloat(c.puntos_canjeados||0)).toFixed(0)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">pts disponibles</p>
+        </div>
+      </div>`).join('') || '<p class="text-sm py-4 text-center" style="color:#94A3B8">Sin resultados</p>';
+    icons();
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════
+// REORDEN AUTOMÁTICO
+// ══════════════════════════════════════════════════════════
+async function loadReorden() {
+  const cont = document.getElementById('reorden-lista');
+  if (!cont) return;
+  cont.innerHTML = '<p class="text-sm py-4" style="color:#94A3B8">Cargando…</p>';
+  try {
+    const data = await apiFetch('/ordenes-compra/sugerida/stock-bajo');
+    if (!data?.length) {
+      cont.innerHTML = '<div class="text-center py-12"><i data-lucide="package-check" style="width:40px;height:40px;color:#16A34A;margin:auto"></i><p class="mt-3 font-semibold" style="color:#16A34A">Sin productos bajo mínimo</p></div>';
+      icons(); return;
+    }
+    cont.innerHTML = `<div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0">
+      <table class="w-full text-sm">
+        <thead style="background:#F8FAFC">
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-bold" style="color:#64748B">Producto</th>
+            <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Stock actual</th>
+            <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Stock mín.</th>
+            <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Proveedor</th>
+            <th class="text-right px-4 py-3 text-xs font-bold" style="color:#64748B">Sugerido pedir</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(it=>`<tr class="border-b hovrow" style="border-color:#F1F5F9">
+            <td class="px-4 py-3 font-semibold" style="color:#0F172A">${it.nombre}</td>
+            <td class="px-4 py-3 text-right font-black" style="color:#EF4444">${it.stock_actual}</td>
+            <td class="px-4 py-3 text-right" style="color:#64748B">${it.stock_minimo}</td>
+            <td class="px-4 py-3 text-right text-xs" style="color:#64748B">${it.proveedor_nombre||'—'}</td>
+            <td class="px-4 py-3 text-right font-bold" style="color:#059669">${it.cantidad_sugerida}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } catch(e) { cont.innerHTML = '<p class="text-sm py-4 text-red-500">Error cargando datos</p>'; }
+}
+
+async function crearOrdenReorden() {
+  try {
+    const data = await apiFetch('/ordenes-compra/sugerida/stock-bajo');
+    if (!data?.length) { toast('Sin productos bajo mínimo','info'); return; }
+    await apiFetch('/ordenes-compra', {
+      method:'POST',
+      body: JSON.stringify({
+        proveedor: 'Por definir',
+        notas: 'Generada automáticamente por reorden',
+        items: data.map(it => ({ producto_id: it.producto_id, cantidad: it.cantidad_sugerida, precio_unitario: it.precio_compra || 0 })),
+      }),
+    });
+    toast('Orden de compra creada','success');
+    navigate('ordenes-compra');
+  } catch(e) { toast('Error al crear orden','error'); }
+}
+
+// ══════════════════════════════════════════════════════════
+// HISTORIAL DE PRECIOS
+// ══════════════════════════════════════════════════════════
+async function buscarProductoHistorialPrecios(q) {
+  if (q.length < 2) { document.getElementById('hp-result').innerHTML = ''; return; }
+  try {
+    const productos = await apiFetch(`/productos/?busqueda=${encodeURIComponent(q)}`);
+    const lista = Array.isArray(productos) ? productos : (productos.items || []);
+    document.getElementById('hp-result').innerHTML = lista.map(p => `
+      <div class="bg-white rounded-2xl border p-4 mb-3" style="border-color:#E2E8F0">
+        <div class="flex items-center justify-between mb-2">
+          <p class="font-bold text-sm" style="color:#0F172A">${p.nombre}</p>
+          <div class="text-right">
+            <p class="text-xs" style="color:#64748B">Compra: <b style="color:#1d2140">${fmt(p.precio_compra)}</b></p>
+            <p class="text-xs" style="color:#64748B">Venta: <b style="color:#16A34A">${fmt(p.precio_venta)}</b></p>
+          </div>
+        </div>
+        <p class="text-xs" style="color:#94A3B8">Historial de cambios próximamente disponible</p>
+      </div>`).join('') || '<p class="text-sm py-4 text-center" style="color:#94A3B8">Sin resultados</p>';
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════
+// FACTURACIÓN SIMPLIFICADA
+// ══════════════════════════════════════════════════════════
+async function cargarVentaFactura() {
+  const folio = document.getElementById('fact-folio')?.value.trim();
+  if (!folio) return;
+  try {
+    const ventas = await apiFetch(`/ventas?folio=${encodeURIComponent(folio)}`);
+    const v = Array.isArray(ventas) ? ventas[0] : null;
+    if (!v) { toast('Venta no encontrada','error'); return; }
+    document.getElementById('fact-items').innerHTML = `
+      <div class="space-y-1 mt-2">
+        ${(v.items||[]).map(it=>`<div class="flex justify-between text-xs py-1 border-b" style="border-color:#F1F5F9">
+          <span style="color:#0F172A">${it.nombre||it.producto_id} ×${it.cantidad}</span>
+          <span class="font-bold" style="color:#0F172A">${fmt(it.subtotal)}</span>
+        </div>`).join('')}
+        <div class="flex justify-between text-sm font-black pt-1">
+          <span>TOTAL</span><span style="color:#16A34A">${fmt(v.total)}</span>
+        </div>
+      </div>`;
+    document.getElementById('fact-items')._venta = v;
+  } catch(e) { toast('Error al cargar venta','error'); }
+}
+
+function generarFacturaPDF() {
+  const nombre = document.getElementById('fact-nombre')?.value.trim();
+  const rfc = document.getElementById('fact-rfc')?.value.trim();
+  if (!nombre || !rfc) { toast('Nombre y RFC son requeridos','error'); return; }
+  const ventaEl = document.getElementById('fact-items');
+  const v = ventaEl?._venta;
+  if (!v) { toast('Carga una venta primero','error'); return; }
+  toast('Función de PDF en desarrollo — exportar desde Reportes por ahora','info');
 }
 
 // Ctrl+K abre el menú rápido, ESC lo cierra

@@ -707,6 +707,58 @@ def eliminar_cortes_fantasma(payload: dict = Depends(get_current_api_user)):
         db.close()
 
 
+@router.get("/rentabilidad-cajero")
+def rentabilidad_cajero(
+    fecha_inicio: date = Query(...),
+    fecha_fin: date = Query(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        fi, ff = _rango(fecha_inicio, fecha_fin)
+        from app.database.models import Usuario
+        usuarios = db.query(Usuario).filter(Usuario.activo == True).all()
+        result = []
+        for u in usuarios:
+            ventas = (
+                db.query(Venta)
+                .filter(
+                    Venta.usuario_id == u.id,
+                    Venta.creado_en >= fi,
+                    Venta.creado_en <= ff,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                )
+                .all()
+            )
+            if not ventas:
+                continue
+            total_v = sum(v.total for v in ventas)
+            vids = [v.id for v in ventas]
+            cost_rows = (
+                db.query(ItemVenta.cantidad, Producto.precio_compra)
+                .join(Producto, ItemVenta.producto_id == Producto.id)
+                .filter(ItemVenta.venta_id.in_(vids))
+                .all()
+            )
+            total_c = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            result.append({
+                "cajero": u.nombre or u.username,
+                "rol": u.rol.value if u.rol else "",
+                "num_ventas": len(ventas),
+                "total_ventas": round(total_v, 2),
+                "total_costo": round(total_c, 2),
+                "ganancia": round(total_v - total_c, 2),
+                "ticket_promedio": round(total_v / len(ventas), 2) if ventas else 0.0,
+                "margen_pct": round((total_v - total_c) / total_v * 100, 1) if total_v else 0.0,
+            })
+        result.sort(key=lambda x: -x["total_ventas"])
+        return result
+    finally:
+        db.close()
+
+
 @router.get("/inventario-excel")
 def exportar_inventario_excel(payload: dict = Depends(get_current_api_user)):
     from openpyxl import Workbook
