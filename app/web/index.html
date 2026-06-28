@@ -20,6 +20,8 @@
 </style>
 <script src="/static/tailwind.js"></script>
 <script src="/static/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
 <!-- ═══════════ MODAL TERMINAL MP ═══════════ -->
 <div id="modal-mp-terminal" class="fixed inset-0 z-[999] hidden items-center justify-center">
@@ -39,8 +41,8 @@
       <div class="w-2 h-2 rounded-full animate-pulse" style="background:#009EE3"></div>
       <span class="text-xs" style="color:#64748B">Esperando que el cliente pague...</span>
     </div>
-    <button onclick="cancelMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5">
-      ✕ Cancelar operación
+    <button onclick="cancelMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5">
+      <i data-lucide="x-circle" style="width:15px;height:15px"></i> Cancelar operación
     </button>
   </div>
 </div>
@@ -90,7 +92,7 @@
         <span id="cotiz-total" class="text-xl font-black" style="color:#1d2140">$0.00</span>
       </div>
       <div class="flex gap-2 px-4 py-3">
-        <button onclick="cotizLimpiar()" class="h-10 px-4 rounded-xl text-sm font-semibold flex-shrink-0" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA">✕ Limpiar</button>
+        <button onclick="cotizLimpiar()" class="h-10 px-4 rounded-xl text-sm font-semibold flex-shrink-0 flex items-center gap-1.5" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA"><i data-lucide="trash-2" style="width:14px;height:14px"></i> Limpiar</button>
         <button onclick="cotizAgregarCarrito()" class="h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 flex-shrink-0" style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0">
           <i data-lucide="shopping-cart" style="width:14px;height:14px"></i> Agregar al carrito
         </button>
@@ -168,8 +170,8 @@
                style="border-color:#E2E8F0;color:#374151">
         <div class="flex gap-2">
           <button onclick="closeDevolucion()" class="h-10 px-4 rounded-xl text-sm font-semibold" style="background:#F1F5F9;color:#475569">Cancelar</button>
-          <button onclick="devConfirmar()" id="dev-confirm-btn" class="flex-1 h-10 rounded-xl text-sm font-bold text-white" style="background:#16A34A">
-            ✓ Registrar Devolución
+          <button onclick="devConfirmar()" id="dev-confirm-btn" class="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style="background:#16A34A">
+            <i data-lucide="rotate-ccw" style="width:15px;height:15px"></i> Registrar Devolución
           </button>
         </div>
       </div>
@@ -818,7 +820,7 @@
     </div>
     <div class="flex gap-3 px-6 pb-6">
       <button onclick="closeModal('modal-entrada')" class="flex-1 h-10 rounded-xl border text-sm font-medium transition-colors hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
-      <button onclick="saveEntrada()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background:#16A34A">✅ Registrar Entrada</button>
+      <button onclick="saveEntrada()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90 flex items-center justify-center gap-2" style="background:#16A34A"><i data-lucide="package-plus" style="width:15px;height:15px"></i> Registrar Entrada</button>
     </div>
   </div>
 </div>
@@ -1385,8 +1387,8 @@
           <div class="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="relative">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
-              <input id="inv-search" type="text" placeholder="Nombre, genérico, código, marca..."
-                     class="h-9 pl-9 pr-3 rounded-xl text-sm border w-72" style="border-color:#E2E8F0;background:#F8FAFF"
+              <input id="inv-search" type="text" placeholder="Nombre, código, marca..."
+                     class="h-9 pl-9 pr-3 rounded-xl text-sm border w-56" style="border-color:#E2E8F0;background:#F8FAFF"
                      oninput="invFilter(this.value)">
             </div>
             <!-- Sort -->
@@ -1417,17 +1419,17 @@
               </button>
             </div>
           </div>
-          <div class="overflow-x-auto lg:overflow-x-visible flex-1 overflow-y-auto scroll-light">
-            <table class="w-full text-sm table-auto">
+          <div class="overflow-x-auto flex-1 overflow-y-auto scroll-light">
+            <table class="w-full text-sm" style="min-width:680px">
               <thead>
                 <tr style="background:#F8FAFF">
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Nombre</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Código</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Stock</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Mín.</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Proveedor</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Precio venta</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Próx. vencimiento</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Prov.</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Precio</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Venc.</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Estado</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold" style="color:#64748B">Acciones</th>
                 </tr>
@@ -1850,6 +1852,60 @@
           </div>
         </div>
 
+        <!-- ── Ajustes Rápidos del POS ─────────────────────────── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#7C3AED,#16A34A)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+              <i data-lucide="sliders-horizontal" style="width:20px;height:20px;color:#1d2140"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Ajustes del POS</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Impresora · Ticket · Báscula · Códigos</p>
+            </div>
+          </div>
+          <div class="p-6 grid grid-cols-3 gap-3">
+            <button onclick="openAjustesSub('impresora')" class="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 hover:scale-105 transition-all cursor-pointer" style="border-color:#2563EB;background:#EFF6FF">
+              <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#2563EB">
+                <i data-lucide="printer" style="width:24px;height:24px;color:#fff"></i>
+              </div>
+              <span class="text-xs font-bold text-center" style="color:#2563EB">Configurar<br>Impresora</span>
+            </button>
+            <button onclick="openAjustesSub('ticket')" class="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 hover:scale-105 transition-all cursor-pointer" style="border-color:#7C3AED;background:#F5F3FF">
+              <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#7C3AED">
+                <i data-lucide="receipt-text" style="width:24px;height:24px;color:#fff"></i>
+              </div>
+              <span class="text-xs font-bold text-center" style="color:#7C3AED">Editor de<br>Ticket</span>
+            </button>
+            <button onclick="openCodeGen(null,'','')" class="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 hover:scale-105 transition-all cursor-pointer" style="border-color:#D97706;background:#FFFBEB">
+              <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#D97706">
+                <i data-lucide="barcode" style="width:24px;height:24px;color:#fff"></i>
+              </div>
+              <span class="text-xs font-bold text-center" style="color:#D97706">Generador<br>QR / Códigos</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Generador de Códigos para Productos sin Código ─── -->
+        <div id="codegen-sin-codigo-card" class="bg-white rounded-2xl border overflow-hidden hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#F59E0B,#D97706)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#FFFBEB">
+              <i data-lucide="barcode" style="width:20px;height:20px;color:#D97706"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-bold" style="color:#0F172A">Productos sin código de barras</h2>
+              <p id="codegen-sin-count" class="text-xs mt-0.5" style="color:#94A3B8">Cargando...</p>
+            </div>
+            <button onclick="loadProductosSinCodigo()" class="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+              <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar
+            </button>
+          </div>
+          <div id="codegen-sin-lista" class="p-4 grid gap-2" style="max-height:320px;overflow-y:auto">
+            <p class="text-xs text-center py-6" style="color:#94A3B8">Cargando productos...</p>
+          </div>
+        </div>
+
         <!-- API Token Generator -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <!-- Gradient header strip -->
@@ -2106,9 +2162,9 @@
             <div class="rounded-xl p-3 text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
               <b>Pasos para la primera configuración:</b><br>
               1. En tu celular: abre la app <b>Mercado Pago → Tu negocio → Cobrar con Point</b> y activa tu ME30S<br>
-              2. Regresa aquí → click <b>🔍 Detectar</b> → el Device ID aparece automático<br>
-              3. Click <b>💾 Guardar</b><br>
-              4. Click <b>📡 Activar modo PDV</b> (solo una vez — pone la terminal en modo integración)<br>
+              2. Regresa aquí → click <b>Detectar</b> → el Device ID aparece automático<br>
+              3. Click <b>Guardar</b><br>
+              4. Click <b>Activar modo PDV</b> (solo una vez — pone la terminal en modo integración)<br>
               5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal
             </div>
           </div>
@@ -2238,7 +2294,7 @@
                   </label>
                   <div id="caja-retiro-fecha-wrap" class="hidden mt-1.5">
                     <input id="caja-retiro-fecha" type="date" class="inp text-xs">
-                    <p class="text-xs mt-1" style="color:#F59E0B">⚠ Solo para retiros ya realizados que no se registraron ese día.</p>
+                    <p class="text-xs mt-1" style="color:#F59E0B">Aviso: Solo para retiros ya realizados que no se registraron ese día.</p>
                   </div>
                 </div>
                 <div id="caja-retiro-tipo-hint" class="rounded-xl px-3 py-2 text-xs" style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;display:none">
@@ -2647,6 +2703,138 @@
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
 
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: GENERADOR DE CÓDIGO DE BARRAS / QR
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-codegen" class="fixed inset-0 z-[70] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(5px)" onclick="closeModal('modal-codegen')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:680px;max-width:96vw;max-height:90vh">
+
+    <!-- Header -->
+    <div id="cg-header" class="flex items-center justify-between px-5 py-4 flex-shrink-0 rounded-t-2xl" style="background:linear-gradient(135deg,#1d2140,#2d3561)">
+      <div class="flex items-center gap-2 min-w-0">
+        <i id="cg-header-icon" data-lucide="barcode" style="width:18px;height:18px;color:#fff;flex-shrink:0"></i>
+        <span id="cg-header-titulo" class="font-bold text-white text-sm whitespace-nowrap">Generador de Código</span>
+        <span id="cg-producto-badge" class="text-xs px-2 py-0.5 rounded-full font-medium truncate" style="background:rgba(255,255,255,.15);color:#CBD5E1;max-width:220px"></span>
+        <span id="cg-badge-readonly" class="hidden text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap flex items-center gap-1" style="background:#FEF3C7;color:#92400E"><i data-lucide="lock" style="width:9px;height:9px"></i> Código oficial</span>
+      </div>
+      <button onclick="closeModal('modal-codegen')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors flex-shrink-0 ml-2" style="color:#fff">
+        <i data-lucide="x" style="width:15px;height:15px"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="flex flex-1 overflow-hidden" style="min-height:0">
+
+      <!-- Left: controls -->
+      <div class="w-64 flex-shrink-0 border-r flex flex-col gap-4 p-5 overflow-y-auto" style="border-color:#E2E8F0">
+
+        <!-- Tipo de código -->
+        <div id="cg-seccion-tipo">
+          <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Tipo de código</p>
+          <div class="flex flex-col gap-1.5">
+            <label class="flex items-center gap-2 text-xs cursor-pointer p-2 rounded-lg hover:bg-slate-50">
+              <input type="radio" name="cg-tipo" value="code128" checked onchange="cgPreview()" style="accent-color:#1d2140">
+              <span class="font-medium" style="color:#374151">Code-128</span>
+              <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded" style="background:#EEF1F9;color:#1d2140">Universal</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer p-2 rounded-lg hover:bg-slate-50">
+              <input type="radio" name="cg-tipo" value="ean13" onchange="cgPreview()" style="accent-color:#1d2140">
+              <span class="font-medium" style="color:#374151">EAN-13</span>
+              <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded" style="background:#F0FDF4;color:#16A34A">13 dígitos</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer p-2 rounded-lg hover:bg-slate-50">
+              <input type="radio" name="cg-tipo" value="qr" onchange="cgPreview()" style="accent-color:#1d2140">
+              <span class="font-medium" style="color:#374151">QR Code</span>
+              <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded" style="background:#F5F3FF;color:#7C3AED">Escaneble</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Código -->
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Valor del código</p>
+          <input id="cg-codigo" class="inp text-xs font-mono" placeholder="Escribe o genera automático" oninput="cgPreview()">
+          <button id="cg-btn-autogenerar" onclick="cgAutoGenerate()" class="mt-2 w-full h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all hover:opacity-90" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+            <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Auto-generar
+          </button>
+          <div id="cg-aviso-readonly" class="hidden mt-2 p-2.5 rounded-lg text-xs" style="background:#FEF3C7;color:#92400E;border:1px solid #F59E0B">
+            <div class="flex items-center gap-1.5 font-bold mb-1">
+              <i data-lucide="lock" style="width:11px;height:11px"></i> Código de registro oficial
+            </div>
+            <span style="color:#B45309">Identificador único del medicamento · no modificable</span>
+          </div>
+        </div>
+
+        <!-- Tamaño -->
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Tamaño de etiqueta</p>
+          <select id="cg-tamano" class="inp text-xs" onchange="cgPreview()">
+            <option value="sm">Pequeño (40×20mm)</option>
+            <option value="md" selected>Mediano (60×30mm)</option>
+            <option value="lg">Grande (90×40mm)</option>
+          </select>
+        </div>
+
+        <!-- Nombre en etiqueta -->
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Texto en etiqueta</p>
+          <input id="cg-texto-etiqueta" class="inp text-xs" placeholder="Nombre del producto" oninput="cgPreview()">
+          <label class="flex items-center gap-2 mt-2 text-xs cursor-pointer">
+            <input type="checkbox" id="cg-mostrar-precio" onchange="cgPreview()" style="accent-color:#1d2140">
+            <span style="color:#374151">Incluir precio</span>
+          </label>
+          <input id="cg-precio-etiqueta" class="inp text-xs mt-1.5 hidden" placeholder="$0.00" oninput="cgPreview()">
+        </div>
+
+        <!-- Copias -->
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Copias a imprimir</p>
+          <div class="flex items-center gap-2">
+            <button onclick="cgAdjustCopies(-1)" class="w-8 h-8 rounded-lg border flex items-center justify-center text-sm font-bold" style="border-color:#E2E8F0;color:#374151">−</button>
+            <input id="cg-copias" type="number" value="1" min="1" max="50" class="inp text-center text-sm font-bold" style="width:60px">
+            <button onclick="cgAdjustCopies(1)" class="w-8 h-8 rounded-lg border flex items-center justify-center text-sm font-bold" style="border-color:#E2E8F0;color:#374151">+</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right: preview + export -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- Canvas area -->
+        <div class="flex-1 flex flex-col items-center justify-center gap-3 p-6" style="background:#F8FAFF">
+          <p class="text-[10px] font-bold uppercase tracking-wider" style="color:#94A3B8">Vista previa</p>
+          <div id="cg-preview-area" class="bg-white rounded-xl shadow-sm border flex items-center justify-center p-4" style="border-color:#E2E8F0;min-height:180px;min-width:300px">
+            <canvas id="cg-canvas-1d" class="hidden" style="max-width:100%"></canvas>
+            <canvas id="cg-canvas-qr" class="hidden"></canvas>
+            <p id="cg-empty-hint" class="text-xs" style="color:#94A3B8">Escribe un código para ver la vista previa</p>
+          </div>
+          <div id="cg-label-preview" class="hidden bg-white rounded-xl border p-3 text-center" style="border-color:#E2E8F0;min-width:220px">
+            <p id="cg-lp-nombre" class="text-xs font-bold truncate" style="color:#0F172A"></p>
+            <p id="cg-lp-precio" class="hidden text-sm font-black mt-0.5" style="color:#16A34A"></p>
+            <p id="cg-lp-codigo" class="text-[10px] font-mono mt-1" style="color:#64748B"></p>
+          </div>
+        </div>
+
+        <!-- Export actions -->
+        <div class="flex-shrink-0 border-t px-4 py-3 flex gap-2" style="border-color:#E2E8F0">
+          <button onclick="cgExportPNG()" class="flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:opacity-90 whitespace-nowrap" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE">
+            <i data-lucide="image" style="width:14px;height:14px"></i> PNG
+          </button>
+          <button onclick="cgExportPDF()" class="flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:opacity-90 whitespace-nowrap" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A">
+            <i data-lucide="file-text" style="width:14px;height:14px"></i> Imprimir / PDF
+          </button>
+          <button id="cg-btn-guardar" onclick="cgSave()" class="flex-1 h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all hover:opacity-90 hidden whitespace-nowrap" style="background:linear-gradient(135deg,#16A34A,#15803D)">
+            <i data-lucide="save" style="width:14px;height:14px"></i> Guardar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL VENCIDOS ═══════════ -->
 <div id="modal-vencidos" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(4px)" onclick="closeModal('modal-vencidos')"></div>
@@ -2703,13 +2891,13 @@
     </div>
     <div class="p-6 flex flex-col gap-4">
       <div class="rounded-xl p-4" style="background:#FFF5F5;border:1px solid #FEE2E2">
-        <p class="text-sm font-semibold mb-1" style="color:#7F1D1D">⚠️ Se eliminarán permanentemente:</p>
+        <p class="text-sm font-semibold mb-1" style="color:#7F1D1D">Se eliminarán permanentemente:</p>
         <ul class="text-xs space-y-1 pl-4 list-disc" style="color:#B91C1C">
           <li>Todas las ventas y sus ítems</li>
           <li>Todos los cortes de caja</li>
           <li>Movimientos de stock e historial de auditoría</li>
         </ul>
-        <p class="text-xs mt-2 font-medium" style="color:#64748B">✓ Se conservan: productos, clientes, empleados, categorías.</p>
+        <p class="text-xs mt-2 font-medium" style="color:#64748B">Se conservan: productos, clientes, empleados, categorías.</p>
       </div>
       <div>
         <label class="lbl">Clave de seguridad</label>
@@ -2935,8 +3123,11 @@
             <div>
               <label class="lbl flex items-center gap-1">Código de barras
                 <span id="pm-barcode-edit-hint" class="hidden text-[9px] font-normal px-1 rounded" style="color:#16A34A;background:#F0FDF4">editable</span>
+                <button type="button" onclick="pmOpenCodeGen()" id="pm-btn-codegen" class="ml-auto flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded transition-all hover:opacity-80" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A">
+                  <i data-lucide="barcode" style="width:10px;height:10px"></i> Generar
+                </button>
               </label>
-              <input id="pm-barcode" class="inp" placeholder="EAN-13">
+              <input id="pm-barcode" class="inp font-mono" placeholder="EAN-13 o escanear">
             </div>
             <div><label class="lbl">Marca</label><input id="pm-marca" class="inp" placeholder="Marca"></div>
           </div>
@@ -3033,7 +3224,7 @@
                 </div>
               </div>
               <div class="rounded-lg p-2 flex items-start gap-2" style="background:#FEF9C3;border:1px solid #FDE68A">
-                <span style="font-size:13px">💡</span>
+                <i data-lucide="lightbulb" style="width:13px;height:13px;color:#F59E0B"></i>
                 <p class="text-[10px]" style="color:#92400E">
                   <strong>Cómo funciona:</strong> El stock se guarda en <em>cajas</em> (lo que compras al proveedor).<br>
                   Ejemplo: compras 2 cajas de 28 tabletas → ingresa <strong>2</strong> al stock.<br>
@@ -3043,7 +3234,7 @@
               </div>
             </div>
             <p id="pm-fraccionada-nota" class="hidden text-[10px] mt-1.5" style="color:#92400E">
-              ⚠️ Stock en <strong>cajas</strong>. Al vender sueltas, el sistema abre cajas automáticamente y registra las piezas sobrantes.
+              Stock en <strong>cajas</strong>. Al vender sueltas, el sistema abre cajas automáticamente y registra las piezas sobrantes.
             </p>
           </div>
         </div>
@@ -3069,7 +3260,7 @@
             </div>
             <div class="flex items-center justify-between mt-1">
               <p id="pm-img-status" class="text-xs flex-1" style="color:#94A3B8;min-height:14px"></p>
-              <button type="button" id="pm-btn-quitar-img" onclick="pmClearImage()" class="hidden text-xs font-semibold" style="color:#EF4444">✕ quitar</button>
+              <button type="button" id="pm-btn-quitar-img" onclick="pmClearImage()" class="hidden text-xs font-semibold flex items-center gap-1" style="color:#EF4444"><i data-lucide="x" style="width:11px;height:11px"></i> quitar</button>
             </div>
             <input id="pm-img-input" type="file" accept="image/*" class="hidden" onchange="pmHandleImageSelect(event)">
           </div>
@@ -3637,10 +3828,10 @@ async function loadMpStatus() {
     if (d.device_id && deviceEl && validDevice) deviceEl.value = d.device_id;
     if (badge) {
       if (d.token_set && validDevice) {
-        badge.textContent = '✓ LISTO';
+        badge.textContent = 'LISTO';
         badge.style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
       } else if (d.token_set) {
-        badge.textContent = '⚠ FALTA DEVICE ID';
+        badge.textContent = 'FALTA DEVICE ID';
         badge.style.cssText = 'background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
       } else {
         badge.textContent = 'SIN CONFIGURAR';
@@ -3655,7 +3846,7 @@ async function saveMpConfig() {
   const device = document.getElementById('mp-device')?.value.trim();
   if (!token) { toast('Ingresa el Access Token', 'warning'); return; }
   const res = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device||'' }) });
-  if (res.ok) { toast('Terminal MP configurada ✓', 'success'); loadMpStatus(); }
+  if (res.ok) { toast('Terminal MP configurada', 'success'); loadMpStatus(); }
   else { const e=await res.json(); toast(e.detail||'Error al guardar', 'error'); }
 }
 
@@ -3677,7 +3868,7 @@ async function detectMpDevices() {
   if (!d.devices?.length) {
     // No terminales vinculadas — mostrar instrucciones
     const msg = [
-      '⚠ No se encontraron terminales en tu cuenta.',
+      'No se encontraron terminales en tu cuenta.',
       '',
       'Pasos para vincular tu ME30S:',
       '1. Abre la app "Mercado Pago" en tu celular',
@@ -3694,7 +3885,7 @@ async function detectMpDevices() {
   if (d.devices.length === 1) {
     const did = d.devices[0].id;
     document.getElementById('mp-device').value = did;
-    toast(`Terminal detectada ✓ Haz click en Guardar`, 'success');
+    toast(`Terminal detectada — haz click en Guardar`, 'success');
   } else {
     const list = d.devices.map(dv => `${dv.id}  (${dv.operating_mode||''})`).join('\n');
     alert(`Terminales encontradas — copia el ID al campo Device ID:\n\n${list}`);
@@ -3712,7 +3903,7 @@ async function activateMpPdv() {
     body: JSON.stringify({ token, device_id: device }),
   });
   if (res.ok) {
-    toast('Modo PDV activado ✓ La terminal ya recibe pagos desde el POS', 'success');
+    toast('Modo PDV activado — la terminal ya recibe pagos desde el POS', 'success');
     loadMpStatus();
   } else {
     const e = await res.json();
@@ -3758,7 +3949,7 @@ async function pollMpIntent() {
       clearInterval(_mpPollTimer); _mpPollTimer = null;
       const pState = d.payment?.state;
       if (pState === 'APPROVED') {
-        document.getElementById('mp-modal-status').textContent = '✓ Pago aprobado — registrando venta...';
+        document.getElementById('mp-modal-status').textContent = 'Pago aprobado — registrando venta...';
         document.getElementById('mp-modal-status').style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:12px;padding:12px 16px;font-size:14px;text-align:center;width:100%';
         await completeMpSale();
       } else {
@@ -3781,7 +3972,7 @@ async function completeMpSale() {
 
   // Cajero de prueba: body es null → no registrar en BD, solo mostrar éxito
   if (!_mpSaleBody) {
-    document.getElementById('pay-folio').textContent  = 'Folio: PRUEBA-MP ✓';
+    document.getElementById('pay-folio').textContent  = 'Folio: PRUEBA-MP';
     document.getElementById('pay-total').textContent  = document.getElementById('mp-modal-amount')?.textContent || '';
     document.getElementById('pay-cambio').textContent = '$0.00';
     const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
@@ -3860,7 +4051,7 @@ async function _refreshAuditoria() {
   const badge = document.getElementById('audit-badge');
   if (badge) badge.textContent = data.con_discrepancia > 0
     ? `${data.con_discrepancia} discrepancias`
-    : '✓ Sin discrepancias';
+    : 'Sin discrepancias';
   const lastEl = document.getElementById('audit-last-update');
   if (lastEl) lastEl.textContent = `· ${new Date().toLocaleTimeString('es-MX',{timeStyle:'short'})}`;
   const fixBtn = document.getElementById('audit-fix-btn');
@@ -3880,7 +4071,7 @@ async function _refreshAuditoria() {
     const bg  = r.ok ? '' : 'style="background:#FEF2F2"';
     const dif = r.diferencia !== 0
       ? `<span style="color:#DC2626;font-weight:700">+${r.diferencia}</span>`
-      : '<span style="color:#16A34A">✓</span>';
+      : '<span style="color:#16A34A">OK</span>';
     return `<tr class="border-b" style="border-color:#F1F5F9" ${bg}>
       <td class="px-3 py-2 text-xs" style="color:#0F172A">${r.nombre}</td>
       <td class="px-3 py-2 text-xs text-center" style="color:#374151">${r.vendido}</td>
@@ -3945,10 +4136,10 @@ async function recalcularStock() {
     if (res.ok) {
       const d = await res.json();
       if (d.corregidos > 0) {
-        toast(`Stock corregido en ${d.corregidos} producto(s) ✓`, 'success');
+        toast(`Stock corregido en ${d.corregidos} producto(s)`, 'success');
         await _reloadInvProducts();
       } else {
-        toast('Stock ya está correcto según historial ✓', 'success');
+        toast('Stock ya está correcto según historial', 'success');
       }
     } else {
       const err = await res.json().catch(() => ({}));
@@ -3968,7 +4159,7 @@ async function _ejecutarCorreccionAudit() {
   const res = await api('/inventario/corregir-audit', { method: 'POST' });
   if (res.ok) {
     const d = await res.json();
-    toast(`Stock corregido: ${d.corregidos} producto(s) ✓`, 'success');
+    toast(`Stock corregido: ${d.corregidos} producto(s)`, 'success');
     await _refreshAuditoria();
     _reloadInvProducts();
   } else {
@@ -4147,7 +4338,7 @@ async function _pollProgress() {
       bar.style.width = '100%';
       pct.textContent = '100%';
       pct.style.color = '#16A34A';
-      lbl.textContent = '✓ Descargado — instalando...';
+      lbl.textContent = 'Descargado — instalando...';
       lbl.style.color = '#16A34A';
       // Hide cancel button, show success state
       if (card) {
@@ -4173,7 +4364,7 @@ async function _pollProgress() {
     // Server died (app closed itself) — expected after done
     if (_updDoneSeenAt && (Date.now() - _updDoneSeenAt) > 1500) {
       clearInterval(_updPollTimer);
-      document.getElementById('dl-label').textContent = '✓ Cerrando — espera un momento...';
+      document.getElementById('dl-label').textContent = 'Cerrando — espera un momento...';
     }
   }
 }
@@ -4576,7 +4767,7 @@ async function loadDashboard() {
   const now=new Date();
   const gEl=document.getElementById('dash-greeting');
   const dEl=document.getElementById('dash-date');
-  if (gEl) gEl.textContent=`${greet}, ${S.user?.nombre||'usuario'} 👋`;
+  if (gEl) gEl.textContent=`${greet}, ${S.user?.nombre||'usuario'} `;
   if (dEl) dEl.textContent=`${days[now.getDay()]} ${now.getDate()} de ${months[now.getMonth()]} de ${now.getFullYear()}`;
 
   const res=await api('/dashboard/stats');
@@ -4848,7 +5039,7 @@ function addToCart(pid, esPieza=false) {
       const vLotes = _cadData.items.filter(l=>l.producto_id===pid && l.estado==='vencido');
       const cantVencida = vLotes.reduce((s,l)=>s+l.cantidad,0);
       if (cantVencida>0 && cantVencida>=p.stock) {
-        toast('⛔ PRODUCTO VENCIDO — no se puede vender','error');
+        toast('PRODUCTO VENCIDO — no se puede vender','error');
         return;
       }
     }
@@ -5230,9 +5421,9 @@ function renderInvTable(prods) {
       ? `<span style="font-size:10px;background:#EEF1F9;color:#1d2140;padding:1px 5px;border-radius:10px;margin-left:4px">${info.count} lotes</span>`
       : '';
     const fechaFmt = fmtDate(info.fecha);
-    if (info.estado==='vencido')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEF2F2;color:#EF4444;padding:2px 5px;border-radius:10px;font-weight:700">⛔ Vencido ${diasLabel}</span>${lotesBadge}</div>`;
-    if (info.estado==='critico')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FFF7ED;color:#EA580C;padding:2px 5px;border-radius:10px;font-weight:700">⚠️ ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
-    return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEFCE8;color:#CA8A04;padding:2px 5px;border-radius:10px;font-weight:600">🕐 ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
+    if (info.estado==='vencido')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEF2F2;color:#EF4444;padding:2px 5px;border-radius:10px;font-weight:700">Vencido ${diasLabel}</span>${lotesBadge}</div>`;
+    if (info.estado==='critico')  return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FFF7ED;color:#EA580C;padding:2px 5px;border-radius:10px;font-weight:700">Alerta ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
+    return `<div style="font-size:11px;white-space:nowrap"><span style="background:#FEFCE8;color:#CA8A04;padding:2px 5px;border-radius:10px;font-weight:600">Prox. ${fechaFmt} (${diasLabel})</span>${lotesBadge}</div>`;
   };
 
   const tbody=document.getElementById('inv-tbody');
@@ -5245,7 +5436,16 @@ function renderInvTable(prods) {
         ${p.nombre_generico?`<p class="text-[10px] leading-tight" style="color:#94A3B8">${p.nombre_generico}</p>`:''}
         ${(p.presentacion||p.concentracion||p.contenido)?`<p class="text-[10px] mt-0.5 leading-tight" style="color:#CBD5E1">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')}</p>`:''}
       </td>
-      <td class="px-3 py-2.5 font-mono text-[10px] whitespace-nowrap" style="color:#64748B">${p.codigo_barras||'—'}</td>
+      <td class="px-2 py-2" style="max-width:120px">
+        <div class="font-mono text-[9px] truncate" style="color:#64748B" title="${p.codigo_barras||''}">
+          ${p.codigo_barras || `<span class="italic" style="color:#CBD5E1">Sin código</span>`}
+        </div>
+        ${S.user?.rol==='admin' && !p.codigo_barras
+          ? `<button onclick="openCodeGen(${p.id},'${p.nombre.replace(/'/g,"\\'")}','')" class="mt-0.5 text-[8px] px-1.5 py-0.5 rounded font-bold hover:opacity-80" style="background:#D97706;color:#fff;border:none">+ Código</button>`
+          : (S.user?.rol==='admin' && p.codigo_barras
+            ? `<button onclick="openCodeGen(${p.id},'${p.nombre.replace(/'/g,"\\'")}','${p.codigo_barras.replace(/'/g,"\\'")}')\" class="mt-0.5 text-[8px] px-1.5 py-0.5 rounded font-bold hover:opacity-80" style="background:#1d2140;color:#fff;border:none" title="Imprimir etiqueta">Etiqueta</button>`
+            : '')}
+      </td>
       <td class="px-3 py-2.5">
         <span class="font-bold text-sm ${p.stock<=0?'text-red-500':p.stock<=p.stock_minimo?'text-amber-500':'text-green-600'}">${p.stock}</span>
       </td>
@@ -5263,23 +5463,23 @@ function renderInvTable(prods) {
           ${p.activo?'Activo':'Inactivo'}
         </span>
       </td>
-      <td class="px-3 py-2.5">
-        <div class="flex gap-1 flex-wrap lg:flex-nowrap">
-          <button onclick="openLotesModal(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" class="h-7 px-2 rounded-lg text-[10px] font-medium flex items-center gap-1 shrink-0" style="background:#F5F3FF;color:#8B5CF6">
-            <i data-lucide="layers" style="width:11px;height:11px"></i> Lotes
+      <td class="px-2 py-2">
+        <div class="flex gap-1 flex-nowrap">
+          <button onclick="openLotesModal(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" title="Lotes" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F5F3FF;color:#8B5CF6">
+            <i data-lucide="layers" style="width:12px;height:12px"></i>
           </button>
           ${S.user?.rol==='admin' ? `
-          <button onclick="openEntradaModal(S.allInv.find(x=>x.id===${p.id}))" class="h-7 px-2 rounded-lg text-[10px] font-medium flex items-center gap-1 shrink-0" style="background:#F0FDF4;color:#16A34A">
-            <i data-lucide="package-plus" style="width:11px;height:11px"></i> Entrada
+          <button onclick="openEntradaModal(S.allInv.find(x=>x.id===${p.id}))" title="Entrada de stock" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F0FDF4;color:#16A34A">
+            <i data-lucide="package-plus" style="width:12px;height:12px"></i>
           </button>
-          <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico de inventario" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F5F3FF;color:#7C3AED">
-            <i data-lucide="clipboard-check" style="width:13px;height:13px"></i>
+          <button onclick="openAjusteFisico(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.stock})" title="Ajuste físico" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#F5F3FF;color:#7C3AED">
+            <i data-lucide="clipboard-check" style="width:12px;height:12px"></i>
           </button>
-          <button onclick="openProductModal(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#EEF1F9;color:#1d2140">
-            <i data-lucide="pencil" style="width:13px;height:13px"></i>
+          <button onclick="openProductModal(${p.id})" title="Editar producto" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#EEF1F9;color:#1d2140">
+            <i data-lucide="pencil" style="width:12px;height:12px"></i>
           </button>
-          <button onclick="deleteProduct(${p.id})" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#FEF2F2;color:#EF4444">
-            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+          <button onclick="deleteProduct(${p.id})" title="Eliminar" class="h-7 w-7 rounded-lg text-[10px] font-medium flex items-center justify-center shrink-0" style="background:#FEF2F2;color:#EF4444">
+            <i data-lucide="trash-2" style="width:12px;height:12px"></i>
           </button>` : ''}
         </div>
       </td>
@@ -5451,13 +5651,13 @@ async function _loadProdLotesInModal(prodId) {
     if (!res.ok) { listEl.innerHTML='<p style="color:#EF4444">Error al cargar lotes</p>'; return; }
     const lotes = await res.json();
     if (!lotes.length) {
-      listEl.innerHTML = '<p style="color:#F97316;font-weight:600">⚠️ Sin lotes registrados — usa "Agregar entrada" para registrar fecha de vencimiento</p>';
+      listEl.innerHTML = '<p style="color:#F97316;font-weight:600">Sin lotes registrados — usa "Agregar entrada" para registrar fecha de vencimiento</p>';
       return;
     }
     const badge = e => {
-      if (e==='vencido')  return '<span style="background:#FEF2F2;color:#EF4444;padding:1px 6px;border-radius:20px;font-weight:700">⛔ Vencido</span>';
-      if (e==='por_vencer') return '<span style="background:#FFFBEB;color:#D97706;padding:1px 6px;border-radius:20px;font-weight:700">⚠ Por vencer</span>';
-      return '<span style="background:#F0FDF4;color:#16A34A;padding:1px 6px;border-radius:20px;font-weight:700">✓ Vigente</span>';
+      if (e==='vencido')  return '<span style="background:#FEF2F2;color:#EF4444;padding:1px 6px;border-radius:20px;font-weight:700">Vencido</span>';
+      if (e==='por_vencer') return '<span style="background:#FFFBEB;color:#D97706;padding:1px 6px;border-radius:20px;font-weight:700">Por vencer</span>';
+      return '<span style="background:#F0FDF4;color:#16A34A;padding:1px 6px;border-radius:20px;font-weight:700">Vigente</span>';
     };
     listEl.innerHTML = lotes.map(l =>
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#fff;border-radius:8px;border:1px solid #E2E8F0">
@@ -5491,11 +5691,11 @@ function pmPreviewDias(val) {
   const fv = new Date(y, m-1, lastDay);
   const dias = Math.round((fv - hoy) / 86400000);
   const label = String(m).padStart(2,'0') + '/' + y;
-  if (dias < 0)      { el.textContent=`⛔ Ya vencido (${label})`;                    el.style.color='#EF4444'; }
-  else if (dias===0) { el.textContent=`⚠️ Vence hoy (${label})`;                     el.style.color='#EA580C'; }
-  else if (dias<=30) { el.textContent=`⚠️ Vence en ${dias} días — ${label}`;         el.style.color='#EA580C'; }
-  else if (dias<=90) { el.textContent=`🕐 ${dias} días restantes — ${label}`;        el.style.color='#CA8A04'; }
-  else               { el.textContent=`✓ Vigente — ${label}`;                        el.style.color='#16A34A'; }
+  if (dias < 0)      { el.textContent=`Ya vencido (${label})`;                    el.style.color='#EF4444'; }
+  else if (dias===0) { el.textContent=`Vence hoy (${label})`;                     el.style.color='#EA580C'; }
+  else if (dias<=30) { el.textContent=`Vence en ${dias} días — ${label}`;         el.style.color='#EA580C'; }
+  else if (dias<=90) { el.textContent=`${dias} días restantes — ${label}`;        el.style.color='#CA8A04'; }
+  else               { el.textContent=`Vigente — ${label}`;                        el.style.color='#16A34A'; }
 }
 
 async function pmImprimirTicketPrueba() {
@@ -5697,7 +5897,7 @@ function pmLoadImagePreview(url) {
   document.getElementById('pm-img-placeholder').classList.add('hidden');
   document.getElementById('pm-btn-quitar-img').classList.remove('hidden');
   const st = document.getElementById('pm-img-status');
-  st.textContent = '✓ Imagen actual desde Cloudinary';
+  st.textContent = 'Imagen actual desde Cloudinary';
   st.style.color = '#16A34A';
 }
 
@@ -5753,14 +5953,14 @@ async function pmUploadImage(productId) {
       const data = await res.json();
       _pmImageUrl = data.imagen_url;
       _pmImageFile = null;
-      st.textContent = '✓ Imagen subida correctamente';
+      st.textContent = 'Imagen subida correctamente';
       st.style.color = '#16A34A';
     } else {
-      st.textContent = '⚠ Producto guardado — imagen no subida';
+      st.textContent = 'Producto guardado — imagen no subida';
       st.style.color = '#EA580C';
     }
   } catch(e) {
-    st.textContent = '⚠ Error al subir imagen';
+    st.textContent = 'Error al subir imagen';
     st.style.color = '#EA580C';
   }
 }
@@ -5963,7 +6163,7 @@ async function loadReports() {
     document.getElementById('rep-count-badge').textContent = `${ventas.length} ventas`;
 
     const COLS = isAdmin ? 10 : 8;
-    const pagoIcon = { efectivo:'💵', tarjeta:'💳', transferencia:'🏦', mixto:'🔀' };
+    const pagoIcon = { efectivo:'Efect.', tarjeta:'Tarjeta', transferencia:'Transfer.', mixto:'Mixto' };
 
     if (!ventas.length) {
       document.getElementById('rep-tbody').innerHTML =
@@ -6165,10 +6365,10 @@ async function loadCortes() {
         const difColor= dif==null?'#64748B':Math.abs(dif)<0.01?'#16A34A':'#EF4444';
         const bg = c.abierto ? '#FFFBEB' : (dif!=null&&Math.abs(dif)>0.01?'#FEF2F2':'#fff');
         const estado = c.abierto
-          ? '<span style="color:#D97706;font-weight:600">🟡 Abierto</span>'
+          ? '<span style="color:#D97706;font-weight:600">Abierto</span>'
           : (dif!=null&&Math.abs(dif)>0.01
-            ? '<span style="color:#EF4444;font-weight:600">⛔ Descuadre</span>'
-            : '<span style="color:#16A34A;font-weight:600">✓ Cuadrado</span>');
+            ? '<span style="color:#EF4444;font-weight:600">Descuadre</span>'
+            : '<span style="color:#16A34A;font-weight:600">Cuadrado</span>');
         return `<tr class="hovrow border-b cursor-pointer" style="border-color:#F1F5F9;background:${bg}" onclick='showCorteDetalle(${JSON.stringify(c)})'>
           <td class="px-4 py-2 font-medium" style="color:#0F172A">${c.cajero}</td>
           <td class="px-4 py-2" style="color:#374151">${fmtDT(c.abierto_en)}</td>
@@ -6193,8 +6393,8 @@ function showCorteDetalle(c) {
   const fmtDur= m => m==null?'—':`${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
   const dif = c.diferencia;
   const difColor = dif==null?'#64748B':Math.abs(dif)<0.01?'#16A34A':'#EF4444';
-  const estado = c.abierto ? '🟡 Turno abierto'
-    : (dif!=null&&Math.abs(dif)>0.01 ? '⛔ Descuadre de caja' : '✓ Caja cuadrada');
+  const estado = c.abierto ? 'Turno abierto'
+    : (dif!=null&&Math.abs(dif)>0.01 ? 'Descuadre de caja' : 'Caja cuadrada');
   const estadoColor = c.abierto?'#D97706':(dif!=null&&Math.abs(dif)>0.01?'#EF4444':'#16A34A');
 
   document.getElementById('corte-detalle-body').innerHTML = `
@@ -6274,9 +6474,9 @@ async function loadVencimientos(filtro) {
   document.getElementById('venc-count').textContent = `${lotes.length} lotes`;
 
   const estadoBadge = e => {
-    if (e==='vencido')    return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#FEF2F2;color:#EF4444">⛔ Vencido</span>';
-    if (e==='por_vencer') return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#FFFBEB;color:#D97706">⚠ Por vencer</span>';
-    if (e==='vigente')    return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#F0FDF4;color:#16A34A">✓ Vigente</span>';
+    if (e==='vencido')    return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#FEF2F2;color:#EF4444">Vencido</span>';
+    if (e==='por_vencer') return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#FFFBEB;color:#D97706">Por vencer</span>';
+    if (e==='vigente')    return '<span class="px-2 py-0.5 rounded-full font-semibold" style="background:#F0FDF4;color:#16A34A">Vigente</span>';
     return '<span style="color:#94A3B8">Sin fecha</span>';
   };
 
@@ -6341,7 +6541,7 @@ async function openVencidosModal() {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-xs font-semibold" style="color:#0F172A">Lote: ${l.numero_lote || 'S/N'}</span>
-              <span class="text-[11px] px-2 py-0.5 rounded-full font-bold" style="background:#FEE2E2;color:#EF4444">⛔ Venció ${Math.abs(l.dias_restantes)}d atrás</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full font-bold" style="background:#FEE2E2;color:#EF4444">Venció ${Math.abs(l.dias_restantes)}d atrás</span>
             </div>
             <div class="flex items-center gap-3 mt-1">
               <span class="text-xs" style="color:#64748B">Fecha: <strong>${fmtDate(l.fecha_vencimiento)}</strong></span>
@@ -6455,11 +6655,11 @@ async function loadAlertasCaducidad() {
     if (!_cadToastShown) {
       _cadToastShown = true;
       if (_cadData.vencidos > 0)
-        toast(`⛔ ${_cadData.vencidos} lote(s) VENCIDO(S) — requieren atención inmediata`, 'error');
+        toast(`Alerta: ${_cadData.vencidos} lote(s) VENCIDOS — requieren atención inmediata`, 'error');
       else if (urgent > 0)
-        toast(`⚠️ ${urgent} lote(s) por vencer en ≤30 días`, 'warning');
+        toast(`Aviso: ${urgent} lote(s) por vencer en 30 días o menos`, 'warning');
       else if (_cadData.proximos > 0)
-        toast(`🕐 ${_cadData.proximos} lote(s) por vencer en 90 días`, 'info');
+        toast(`Info: ${_cadData.proximos} lote(s) por vencer en 90 días`, 'info');
     }
   } catch(e) {}
 }
@@ -6500,9 +6700,9 @@ function renderCadModal() {
     : _cadData.items.filter(i => i.estado === _cadFiltro);
 
   const badge = e => {
-    if (e === 'vencido') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FEF2F2;color:#EF4444">⛔ Vencido</span>';
-    if (e === 'critico') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FFF7ED;color:#EA580C">⚠️ Crítico</span>';
-    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FEFCE8;color:#CA8A04">🕐 Próximo</span>';
+    if (e === 'vencido') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FEF2F2;color:#EF4444">Vencido</span>';
+    if (e === 'critico') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FFF7ED;color:#EA580C">Crítico</span>';
+    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#FEFCE8;color:#CA8A04">Próximo</span>';
   };
 
   document.getElementById('cad-tbody').innerHTML = items.length
@@ -6544,9 +6744,9 @@ async function _refreshLotesTable(id) {
   const lotes = await res.json();
   const isAdmin = S.user?.rol === 'admin';
   const estadoBadge = e => {
-    if (e==='vencido')    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#FEF2F2;color:#EF4444">⛔ Vencido</span>';
-    if (e==='por_vencer') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#FFFBEB;color:#D97706">⚠ Por vencer</span>';
-    if (e==='vigente')    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#F0FDF4;color:#16A34A">✓ Vigente</span>';
+    if (e==='vencido')    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#FEF2F2;color:#EF4444">Vencido</span>';
+    if (e==='por_vencer') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#FFFBEB;color:#D97706">Por vencer</span>';
+    if (e==='vigente')    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:#F0FDF4;color:#16A34A">Vigente</span>';
     return '<span class="text-xs" style="color:#94A3B8">Sin fecha</span>';
   };
   document.getElementById('lotes-tbody').innerHTML = lotes.length
@@ -6694,7 +6894,7 @@ async function exportVentasPDF() {
         body: JSON.stringify({ path: savePath }),
       });
       if (!res.ok) { toast('Error al guardar PDF', 'error'); return; }
-      toast(`PDF guardado: ${savePath.split(/[\\/]/).pop()} ✓`, 'success');
+      toast(`PDF guardado: ${savePath.split(/[\\/]/).pop()}`, 'success');
     } catch(e) {
       toast('Error de conexión', 'error');
     }
@@ -6713,7 +6913,7 @@ async function exportVentasPDF() {
     a.download = defaultName;
     a.click();
     URL.revokeObjectURL(url);
-    toast('PDF descargado ✓', 'success');
+    toast('PDF descargado', 'success');
   } catch(e) {
     toast('Error de conexión', 'error');
   }
@@ -6777,7 +6977,7 @@ async function verDiagnosticoTurso() {
   const d = await res.json();
   const money = v => typeof v === 'number' ? v : v;
   let html = `<div style="font-family:monospace;font-size:13px;line-height:1.8">`;
-  html += `<p style="font-weight:bold;margin-bottom:8px">Sync activo: ${d.turso_sync_activo ? '✅ Sí' : '❌ No (Vercel usa Turso directo)'}</p>`;
+  html += `<p style="font-weight:bold;margin-bottom:8px">Sync activo: ${d.turso_sync_activo ? 'Sí' : 'No (Vercel usa Turso directo)'}</p>`;
   html += `<table style="width:100%;border-collapse:collapse">`;
   html += `<tr style="font-weight:bold;border-bottom:2px solid #E2E8F0"><td>Tabla</td><td>Local</td><td>Turso</td><td>Diff</td></tr>`;
   for (const [tabla, info] of Object.entries(d.tablas)) {
@@ -6799,7 +6999,7 @@ async function verDiagnosticoTurso() {
   overlay.innerHTML = `<div style="background:#fff;border-radius:20px;padding:28px;max-width:480px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,.25)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <span style="font-weight:700;font-size:15px;color:#0F172A">Diagnóstico Turso</span>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:#F1F5F9;cursor:pointer;font-size:16px">✕</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:#F1F5F9;cursor:pointer;font-size:16px"><i data-lucide="x" style="width:14px;height:14px"></i></button>
     </div>
     ${html}
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -6822,7 +7022,7 @@ async function forzarSyncCaja() {
       const hastaEl = document.getElementById('caja-hasta');
       if (desdeEl) desdeEl.value = '';
       if (hastaEl) hastaEl.value = '';
-      toast('Sincronización completada ✓', 'success');
+      toast('Sincronización completada', 'success');
       await loadCajaAdmin();
     } else {
       const msg = data.error || data.detail || 'Error al sincronizar';
@@ -6888,7 +7088,7 @@ async function loadCajaAdmin() {
         <div class="flex justify-between"><span style="color:#94A3B8">Costo productos</span><span class="font-semibold" style="color:#64748B">−${money(t.total_costo||0)}</span></div>
         <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Ganancia bruta</span><span class="font-bold" style="color:#16A34A">${money(t.ganancia||0)}</span></div>
         <div class="flex justify-between"><span style="color:#94A3B8">Ya retirado</span><span class="font-semibold" style="color:#DC2626">−${money(t.total_retiros||0)}</span></div>
-        <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">💰 Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(t.disponible||0)}</span></div>
+        <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color:#BBF7D0"><span style="color:#166534;font-weight:700">Puedo retirar</span><span class="font-black" style="color:#15803D;font-size:1.05rem">${money(t.disponible||0)}</span></div>
         <div class="flex justify-between border-t pt-1.5 mt-1" style="border-color:#E2E8F0"><span style="color:#374151;font-weight:600">Efectivo en caja</span><span class="font-bold" style="color:#1d2140">${money(t.esperado_caja)}</span></div>`;
     } else if (card) {
       card.classList.add('hidden');
@@ -6951,8 +7151,8 @@ function renderRetirosCaja() {
 
   const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
   const tipoBtn = r => r.tipo === 'inversion'
-    ? `<button onclick="cambiarTipoRetiro(${r.id},'personal')" title="Cambiar a Personal" style="background:#DBEAFE;color:#1E40AF;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">🏪 Inversión ⇄</button>`
-    : `<button onclick="cambiarTipoRetiro(${r.id},'inversion')" title="Cambiar a Inversión" style="background:#DCFCE7;color:#166534;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">💰 Personal ⇄</button>`;
+    ? `<button onclick="cambiarTipoRetiro(${r.id},'personal')" title="Cambiar a Personal" style="background:#DBEAFE;color:#1E40AF;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Inversión ⇄</button>`
+    : `<button onclick="cambiarTipoRetiro(${r.id},'inversion')" title="Cambiar a Inversión" style="background:#DCFCE7;color:#166534;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Personal ⇄</button>`;
   tbody.innerHTML = lista.map(r => `
     <tr class="border-b hovrow" style="border-color:#F8FAFF">
       <td class="px-4 py-2.5" style="color:#374151;white-space:nowrap">${fmtDT(r.creado_en)}</td>
@@ -6963,8 +7163,8 @@ function renderRetirosCaja() {
       <td class="px-4 py-2.5 text-center">
         <button onclick="borrarRetiro(${r.id},'${(r.concepto||'Sin concepto').replace(/'/g,'\\\'')}',$${(r.monto||0).toFixed(2)})"
           title="Eliminar retiro"
-          style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">
-          🗑 Borrar
+          style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg> Borrar
         </button>
       </td>
     </tr>`).join('');
@@ -6992,7 +7192,7 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
     body: JSON.stringify({ tipo: nuevoTipo }),
   });
   if (!res.ok) { toast('Error al cambiar tipo','error'); return; }
-  const label = nuevoTipo === 'inversion' ? '🏪 Inversión' : '💰 Personal';
+  const label = nuevoTipo === 'inversion' ? 'Inversión' : 'Personal';
   toast(`Retiro cambiado a ${label}`,'success');
   loadCajaAdmin();
 }
@@ -7006,7 +7206,7 @@ async function borrarRetiro(id, concepto, montoStr) {
     onConfirm: async () => {
       const res = await api(`/cortes/retiro/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast('Retiro eliminado. Saldo restaurado ✓', 'success');
+        toast('Retiro eliminado. Saldo restaurado', 'success');
         loadCajaAdmin();
       } else {
         const err = await res.json().catch(()=>({}));
@@ -7170,7 +7370,7 @@ async function loadTurnoStatus() {
     const _apertura = d.abierto_en ? new Date(d.abierto_en) : null;
     const _esViejo  = _apertura && _apertura.toDateString() !== new Date().toDateString();
     dot.style.background   = _esViejo ? '#F59E0B' : '#22C55E';
-    label.textContent      = _esViejo ? '⚠ Turno de ayer' : 'Turno abierto';
+    label.textContent      = _esViejo ? 'Turno de ayer' : 'Turno abierto';
     btn.style.color        = _esViejo ? '#92400E' : '#15803D';
     btn.style.borderColor  = _esViejo ? '#FDE68A' : '#BBF7D0';
     btn.style.background   = _esViejo ? '#FFFBEB' : '#F0FDF4';
@@ -7221,7 +7421,7 @@ async function openTurnoPanel() {
       _avisoViejo.style.color = '#DC2626';
       _avisoViejo.style.border = '1px solid #FECACA';
       const diasStr = Math.floor((new Date() - _turnoFechaApertura) / 86400000);
-      _avisoViejo.innerHTML = `⚠️ Este turno lleva ${diasStr} día${diasStr!==1?'s':''} abierto. Se cerrará automáticamente — o ciérralo ahora.`;
+      _avisoViejo.innerHTML = `Este turno lleva ${diasStr} día${diasStr!==1?'s':''} abierto. Se cerrará automáticamente — o ciérralo ahora.`;
     } else {
       _avisoViejo.style.display = 'none';
     }
@@ -7371,7 +7571,7 @@ async function _procesarCierreRespuesta(res) {
   const money = v => '$' + (v||0).toFixed(2);
   const dif = d.diferencia || 0;
   const difColor = Math.abs(dif) < 0.01 ? '#16A34A' : dif > 0 ? '#D97706' : '#DC2626';
-  const cuadreLabel = Math.abs(dif) < 0.01 ? 'Cuadre exacto ✓' : dif > 0 ? 'Sobrante' : 'Faltante';
+  const cuadreLabel = Math.abs(dif) < 0.01 ? 'Cuadre exacto' : dif > 0 ? 'Sobrante' : 'Faltante';
   document.getElementById('cierre-estado').textContent = cuadreLabel;
   document.getElementById('cierre-estado').style.color = difColor;
   document.getElementById('cierre-icon').style.background = Math.abs(dif) < 0.01 ? '#DCFCE7' : dif > 0 ? '#FFFBEB' : '#FEF2F2';
@@ -8112,6 +8312,7 @@ function initSettings() {
   loadEndpoints();
   if (S.user?.rol === 'admin') {
     loadAdminVentas();
+    loadProductosSinCodigo();
   }
   loadMpStatus();
   icons();
@@ -8356,7 +8557,7 @@ async function posSearchKeydown(e) {
           S.allProducts.push(exact);
       } else if (r.status === 409) {
         const err = await r.json().catch(()=>({}));
-        toast('⛔ ' + (err.detail || 'Producto VENCIDO'), 'error');
+        toast((err.detail || 'Producto VENCIDO'), 'error');
         return;
       }
     } catch (_) {}
@@ -8408,7 +8609,7 @@ async function scanBarcode(barcode) {
         }
       } else if (r.status === 409) {
         const err = await r.json().catch(()=>({}));
-        toast('⛔ ' + (err.detail || 'Producto VENCIDO — no se puede vender'), 'error');
+        toast((err.detail || 'Producto VENCIDO — no se puede vender'), 'error');
         return;
       }
     } catch (_) {}
@@ -8578,7 +8779,7 @@ async function executePurgeHistorial() {
     });
     if (res.ok) {
       closeModal('modal-purge-historial');
-      toast('✅ Historial eliminado correctamente', 'success');
+      toast('Historial eliminado correctamente', 'success');
       // Refresh dashboard + reports data
       if (typeof loadDashboard === 'function') loadDashboard();
     } else {
@@ -8592,7 +8793,7 @@ async function executePurgeHistorial() {
 
 function showPurgeError(msg) {
   const el = document.getElementById('purge-error');
-  el.textContent = '⛔ ' + msg;
+  el.textContent = msg;
   el.classList.remove('hidden');
 }
 
@@ -8727,7 +8928,7 @@ function renderHistPacientes(list) {
   el.innerHTML = list.map(p => {
     const age = calcAge(p.fecha_nacimiento);
     const ageStr = age !== null ? `${age} años` : '';
-    const sexIcon = p.sexo === 'femenino' ? '♀' : p.sexo === 'masculino' ? '♂' : '';
+    const sexIcon = p.sexo === 'femenino' ? 'F' : p.sexo === 'masculino' ? 'M' : '';
     const isActive = S.histPid === p.id;
     const avatarBg = p.sexo === 'femenino' ? '#EC4899' : p.sexo === 'masculino' ? '#0EA5E9' : '#8B5CF6';
     return `<div class="px-3 py-2.5 cursor-pointer transition-colors flex items-center gap-2.5"
@@ -8992,7 +9193,7 @@ async function histSearchCliente(q) {
 function histSelectCliente(id, nombre) {
   document.getElementById('hist-pac-cliente-id').value    = id;
   document.getElementById('hist-pac-cliente-search').value = nombre;
-  document.getElementById('hist-pac-cliente-sel').textContent = `✓ Vinculado: ${nombre}`;
+  document.getElementById('hist-pac-cliente-sel').textContent = `Vinculado: ${nombre}`;
   document.getElementById('hist-pac-cliente-results').classList.add('hidden');
 }
 
@@ -9053,7 +9254,11 @@ async function saveHistPaciente() {
   const method = editId ? 'PUT' : 'POST';
   const url    = editId ? `/historial/pacientes/${editId}` : '/historial/pacientes';
   const res = await api(url, { method, body: JSON.stringify(body) });
-  if (!res.ok) { toast('Error al guardar paciente', 'error'); return; }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    toast(err.detail || `Error ${res.status} al guardar paciente`, 'error');
+    return;
+  }
   const saved = await res.json();
   closeModal('modal-hist-paciente');
   toast(editId ? 'Paciente actualizado' : 'Paciente registrado', 'success');
@@ -9135,7 +9340,7 @@ function _mktUpdateDescStatus() {
   const el = document.getElementById('mkt-desc-status');
   if (!el) return;
   if (_mktDescripcionPromo) {
-    el.textContent = `✓ ${_mktDescripcionPromo.length} caracteres`;
+    el.textContent = `${_mktDescripcionPromo.length} caracteres`;
     el.style.color = '#16A34A';
   } else {
     el.textContent = '— sin descripción';
@@ -9176,7 +9381,7 @@ async function mktDescargarManual() {
     await _saveFile(blob, `Manual_FarmaciaPos_${date}.pdf`, [
       { description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }
     ]);
-    toast('Manual descargado ✓', 'success');
+    toast('Manual descargado', 'success');
   } catch(e) {
     toast('Error descargando manual', 'error');
   } finally {
@@ -9274,7 +9479,7 @@ async function mktGenerarPDF(tipo = 'todos') {
     const date  = new Date().toISOString().slice(0,10);
     const fname = `Catalogo_${labels[tipo]}_${date}.pdf`;
     const saved = await _saveFile(blob, fname, [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]);
-    if (saved) toast('PDF guardado ✓', 'success');
+    if (saved) toast('PDF guardado', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -9290,7 +9495,7 @@ function mktFiltrarPromo(term) {
     <div onclick="mktSeleccionarProd(${p.id})"
          class="px-3 py-2 text-xs cursor-pointer hover:bg-blue-50 flex justify-between items-center"
          style="border-bottom:1px solid #F1F5F9">
-      <span class="font-medium">${p.nombre}${p.imagen_url?' 🖼':''}</span>
+      <span class="font-medium">${p.nombre}${p.imagen_url?' [img]':''}</span>
       <span class="font-semibold" style="color:#16A34A">${fmt(p.precio_venta)}</span>
     </div>`).join('');
   res.style.display = 'block';
@@ -9304,7 +9509,7 @@ function mktSeleccionarProd(id) {
   document.getElementById('mkt-promo-search').value = '';
   document.getElementById('mkt-promo-results').style.display = 'none';
   const sel = document.getElementById('mkt-promo-selected');
-  sel.textContent = `✓ ${prod.nombre}`;
+  sel.textContent = prod.nombre;
   sel.style.display = 'block';
 
   document.getElementById('mkt-precio-actual').textContent = fmt(prod.precio_venta);
@@ -9407,7 +9612,7 @@ async function mktPreviewPromo() {
   img.src          = url;
   img.style.display = 'block';
   empty.style.display = 'none';
-  toast('Vista previa lista ✓', 'success');
+  toast('Vista previa lista', 'success');
 }
 
 async function mktDescargarPromo() {
@@ -9417,7 +9622,7 @@ async function mktDescargarPromo() {
   const name  = (_mktSelectedProd?.nombre||'promo').slice(0,20).replace(/\s+/g,'_');
   const fname = `Promo_${name}_${new Date().toISOString().slice(0,10)}.png`;
   const saved = await _saveFile(blob, fname, [{ description: 'Imagen PNG', accept: { 'image/png': ['.png'] } }]);
-  if (saved) toast('Imagen guardada ✓', 'success');
+  if (saved) toast('Imagen guardada', 'success');
 }
 
 // ── Asistente Farmacéutico ─────────────────────────────────────────────────
@@ -9538,7 +9743,7 @@ async function sendChat() {
 function chatAddToCart(pid) {
   if (S.currentPage !== 'pos') navigate('pos');
   addToCart(pid);
-  toast('Producto agregado al carrito ✓', 'success');
+  toast('Producto agregado al carrito', 'success');
 }
 </script>
 
@@ -9567,7 +9772,7 @@ function chatAddToCart(pid) {
         <i data-lucide="bot" style="width:13px;height:13px;color:#fff"></i>
       </div>
       <div class="rounded-2xl rounded-tl-sm px-3 py-2 text-xs" style="background:#fff;border:1px solid #E2E8F0;color:#374151;max-width:268px">
-        ¡Hola! Soy Farmacito 💊 Consúltame sobre medicamentos o dime síntomas y te digo qué tienes disponible.
+        ¡Hola! Soy Farmacito Consúltame sobre medicamentos o dime síntomas y te digo qué tienes disponible.
         <br><span style="color:#94A3B8;font-size:10px">Ej: "¿Tienes naproxeno?" · "Qué dar para dolor de cabeza"</span>
       </div>
     </div>
@@ -9681,7 +9886,7 @@ function chatAddToCart(pid) {
         const estadoBadge = v.estado === 'devolucion'
           ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style="background:#FEF3C7;color:#B45309">Dev.</span>'
           : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style="background:#DCFCE7;color:#15803D">OK</span>';
-        const metodoIcon = v.metodo_pago === 'efectivo' ? '💵' : v.metodo_pago === 'tarjeta' ? '💳' : '🏦';
+        const metodoIcon = v.metodo_pago === 'efectivo' ? 'Efect.' : v.metodo_pago === 'tarjeta' ? 'Tarj.' : 'Trans.';
         return `<div onclick="devSeleccionarVenta(${v.id})" class="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 cursor-pointer transition-all" style="background:${bg}" onmouseenter="this.style.background='#EEF1F9'" onmouseleave="this.style.background='${bg}'">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
@@ -9763,7 +9968,7 @@ function chatAddToCart(pid) {
             <p class="text-sm font-semibold truncate" style="color:#94A3B8;text-decoration:line-through">${item.nombre}</p>
             <p class="text-xs" style="color:#CBD5E1">$${Number(item.precio).toFixed(2)} c/u</p>
           </div>
-          <span class="text-xs px-2 py-1 rounded-full font-bold" style="background:#DCFCE7;color:#15803D;white-space:nowrap">✓ Devuelto ×${item.qty_orig}</span>
+          <span class="text-xs px-2 py-1 rounded-full font-bold" style="background:#DCFCE7;color:#15803D;white-space:nowrap">Devuelto ×${item.qty_orig}</span>
         </div>`;
       }
       const partial = item.ya_devuelto > 0;
@@ -9815,13 +10020,13 @@ function chatAddToCart(pid) {
         });
         const data = await r.json();
         if (r.ok && data.ok) {
-          toast(`✓ Devolución — Folio: ${data.folio}  ·  Devuelto: $${Number(data.total_devuelto).toFixed(2)}`, 'success');
+          toast(`Devolución — Folio: ${data.folio}  ·  Devuelto: $${Number(data.total_devuelto).toFixed(2)}`, 'success');
           closeDevolucion();
         } else {
           toast(data.detail || 'Error al registrar devolución', 'error');
         }
       } catch (_) { toast('Error de conexión', 'error'); }
-      finally { if (btn) { btn.textContent = '✓ Registrar Devolución'; btn.disabled = false; } }
+      finally { if (btn) { btn.textContent = 'Registrar Devolución'; btn.disabled = false; } }
     });
   };
 })();
@@ -10052,6 +10257,998 @@ function chatAddToCart(pid) {
     toast(`${added} producto${added > 1 ? 's' : ''} agregado${added > 1 ? 's' : ''} al carrito`, 'success');
   };
 })();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: GENERADOR DE CÓDIGOS QR / BARRAS
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-codigos" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-codigos')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:900px;max-width:96vw;height:82vh;max-height:700px">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0;background:linear-gradient(135deg,#1d2140,#2d3461);border-radius:1rem 1rem 0 0">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,.15)">
+          <i data-lucide="qr-code" style="width:18px;height:18px;color:#fff"></i>
+        </div>
+        <div>
+          <p class="font-bold text-sm text-white">Generador de Códigos QR y Barras</p>
+          <p class="text-[10px]" style="color:rgba(255,255,255,.6)">Genera, asigna y exporta etiquetas para productos</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modal-codigos')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors" style="color:#fff"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Left: product list -->
+      <div class="w-64 flex-shrink-0 border-r flex flex-col" style="border-color:#E2E8F0">
+        <div class="p-3 border-b" style="border-color:#E2E8F0">
+          <input id="cod-search" type="text" placeholder="Buscar producto..."
+                 class="w-full h-8 px-3 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF"
+                 oninput="codSearch(this.value)">
+          <label class="flex items-center gap-2 mt-2 cursor-pointer">
+            <input type="checkbox" id="cod-filter-sin" onchange="codSearch(document.getElementById('cod-search').value)" class="rounded">
+            <span class="text-xs" style="color:#64748B">Solo sin código</span>
+          </label>
+        </div>
+        <div id="cod-list" class="flex-1 overflow-y-auto scroll-light text-xs"></div>
+      </div>
+
+      <!-- Right: preview + controls -->
+      <div class="flex-1 flex flex-col p-5 gap-4 overflow-y-auto scroll-light">
+        <!-- Type selector -->
+        <div class="flex items-center gap-4">
+          <span class="text-xs font-semibold" style="color:#374151">Tipo:</span>
+          <label class="flex items-center gap-1.5 cursor-pointer text-xs">
+            <input type="radio" name="cod-tipo" value="code128" checked onchange="codRefreshPreview()"> Code128
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer text-xs">
+            <input type="radio" name="cod-tipo" value="qr" onchange="codRefreshPreview()"> QR
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer text-xs">
+            <input type="radio" name="cod-tipo" value="ean13" onchange="codRefreshPreview()"> EAN-13
+          </label>
+        </div>
+
+        <!-- Preview -->
+        <div id="cod-preview-wrap" class="rounded-xl border flex items-center justify-center" style="border-color:#E2E8F0;background:#F8FAFF;min-height:180px">
+          <p class="text-xs" style="color:#94A3B8">← Selecciona un producto</p>
+        </div>
+
+        <!-- Product info -->
+        <div id="cod-info" class="hidden rounded-xl p-3 text-xs" style="background:#F8FAFF;color:#374151;border:1px solid #E2E8F0"></div>
+
+        <!-- Code input -->
+        <div>
+          <label class="text-xs font-medium block mb-1" style="color:#374151">Texto del código</label>
+          <div class="flex gap-2">
+            <input id="cod-codigo" type="text" placeholder="Código del producto"
+                   class="flex-1 h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0"
+                   oninput="codSchedulePreview()">
+            <button onclick="codAutoGen()" class="h-9 px-3 rounded-lg text-xs font-semibold text-white flex items-center gap-1 hover:opacity-90"
+                    style="background:#7C3AED">
+              <i data-lucide="zap" style="width:12px;height:12px"></i> Auto
+            </button>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex flex-wrap gap-2">
+          <button onclick="codAsignar()" class="h-9 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 hover:opacity-90"
+                  style="background:#16A34A">
+            <i data-lucide="save" style="width:13px;height:13px"></i> Asignar al producto
+          </button>
+          <button onclick="codExportPng()" class="h-9 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 hover:opacity-90"
+                  style="background:#2563EB">
+            <i data-lucide="image" style="width:13px;height:13px"></i> PNG
+          </button>
+          <button onclick="codExportPdf(false)" class="h-9 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 hover:opacity-90"
+                  style="background:#DC2626">
+            <i data-lucide="file-text" style="width:13px;height:13px"></i> PDF etiqueta
+          </button>
+          <button onclick="codExportPdf(true)" class="h-9 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 hover:opacity-90"
+                  style="background:#F59E0B">
+            <i data-lucide="layers" style="width:13px;height:13px"></i> PDF masivo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL MINI: GENERAR CÓDIGO (desde formulario de producto)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-gen-codigo" class="fixed inset-0 z-[60] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-gen-codigo')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl p-5 flex flex-col gap-4" style="width:440px;max-width:95vw">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="barcode" style="width:16px;height:16px;color:#7C3AED"></i>
+        <p class="font-bold text-sm" style="color:#0F172A">Generar Código de Barras / QR</p>
+      </div>
+      <button onclick="closeModal('modal-gen-codigo')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+        <input type="radio" name="mini-tipo" value="code128" checked onchange="miniRefresh()"> Code128
+      </label>
+      <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+        <input type="radio" name="mini-tipo" value="qr" onchange="miniRefresh()"> QR
+      </label>
+    </div>
+
+    <div class="flex gap-2">
+      <input id="mini-codigo" type="text" placeholder="Código a generar"
+             class="flex-1 h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0"
+             oninput="miniRefresh()">
+      <button onclick="miniAuto()" class="h-9 px-3 rounded-lg text-xs font-semibold text-white hover:opacity-90 flex items-center gap-1" style="background:#7C3AED"><i data-lucide="zap" style="width:12px;height:12px"></i> Auto</button>
+    </div>
+
+    <div id="mini-preview" class="rounded-xl border flex items-center justify-center" style="border-color:#E2E8F0;background:#F8FAFF;min-height:120px">
+      <p class="text-xs" style="color:#94A3B8">Escribe o genera un código</p>
+    </div>
+
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal('modal-gen-codigo')" class="h-9 px-4 rounded-lg text-xs border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="miniConfirmar()" class="h-9 px-4 rounded-lg text-xs font-semibold text-white hover:opacity-90 flex items-center gap-1.5" style="background:#16A34A"><i data-lucide="check" style="width:13px;height:13px"></i> Usar este código</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: AJUSTES DEL SISTEMA (desde POS)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-ajustes" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-ajustes')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl p-6" style="width:540px;max-width:95vw">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="settings" style="width:16px;height:16px;color:#64748B"></i>
+          <p class="font-bold text-base" style="color:#0F172A">Ajustes del Sistema</p>
+        </div>
+        <p class="text-xs mt-0.5" style="color:#64748B">Selecciona una opción para configurar</p>
+      </div>
+      <button onclick="closeModal('modal-ajustes')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors" style="color:#94A3B8"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="openAjustesSub('impresora')" class="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 hover:scale-105 transition-all cursor-pointer" style="border-color:#2563EB;background:#EFF6FF">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#2563EB">
+          <i data-lucide="printer" style="width:24px;height:24px;color:#fff"></i>
+        </div>
+        <span class="text-xs font-bold" style="color:#2563EB">Configurar<br>Impresora</span>
+      </button>
+      <button onclick="openAjustesSub('ticket')" class="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 hover:scale-105 transition-all cursor-pointer" style="border-color:#7C3AED;background:#F5F3FF">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#7C3AED">
+          <i data-lucide="receipt-text" style="width:24px;height:24px;color:#fff"></i>
+        </div>
+        <span class="text-xs font-bold" style="color:#7C3AED">Editor de<br>Ticket</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: CONFIGURAR IMPRESORA (sub-ajuste)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfg-impresora" class="fixed inset-0 z-[60] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-cfg-impresora')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4" style="width:480px;max-width:95vw">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="printer" style="width:15px;height:15px;color:#2563EB"></i>
+        <p class="font-bold text-sm" style="color:#0F172A">Configurar Impresora</p>
+      </div>
+      <button onclick="closeModal('modal-cfg-impresora')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+    </div>
+    <div class="grid gap-3">
+      <div><label class="text-xs font-medium block mb-1" style="color:#374151">Nombre de impresora (Windows)</label>
+        <input id="cfg-imp-nombre" type="text" placeholder="Ej: XP-58, POS-80" class="w-full h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0"></div>
+      <div><label class="text-xs font-medium block mb-1" style="color:#374151">Ancho de papel</label>
+        <select id="cfg-imp-ancho" class="w-full h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0">
+          <option value="26">50mm (26 col)</option>
+          <option value="32" selected>58mm (32 col)</option>
+          <option value="48">80mm (48 col)</option>
+        </select></div>
+    </div>
+    <div id="cfg-imp-status" class="text-xs px-3 py-2 rounded-lg hidden"></div>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal('modal-cfg-impresora')" class="h-9 px-4 rounded-lg text-xs border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="guardarCfgImpresora()" class="h-9 px-4 rounded-lg text-xs font-semibold text-white hover:opacity-90 flex items-center gap-1.5" style="background:#4CAF50"><i data-lucide="save" style="width:13px;height:13px"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: CONFIGURAR BÁSCULA (sub-ajuste)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfg-bascula" class="fixed inset-0 z-[60] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-cfg-bascula')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4" style="width:460px;max-width:95vw">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="scale" style="width:15px;height:15px;color:#64748B"></i>
+        <p class="font-bold text-sm" style="color:#0F172A">Configurar Báscula / Balanza</p>
+      </div>
+      <button onclick="closeModal('modal-cfg-bascula')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+    </div>
+    <p class="text-xs" style="color:#64748B">La báscula envía el peso vía puerto COM (RS-232 o USB-CDC).</p>
+    <div class="grid gap-3">
+      <div><label class="text-xs font-medium block mb-1" style="color:#374151">Puerto COM</label>
+        <input id="cfg-bas-puerto" type="text" placeholder="COM1" class="w-full h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0"></div>
+      <div><label class="text-xs font-medium block mb-1" style="color:#374151">Baudrate</label>
+        <select id="cfg-bas-baud" class="w-full h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0">
+          <option value="9600" selected>9600</option><option value="19200">19200</option>
+          <option value="38400">38400</option><option value="115200">115200</option>
+        </select></div>
+      <div><label class="text-xs font-medium block mb-1" style="color:#374151">Protocolo</label>
+        <select id="cfg-bas-proto" class="w-full h-9 px-3 rounded-lg text-sm border" style="border-color:#E2E8F0">
+          <option value="toledo">Toledo / Mettler</option>
+          <option value="cas">CAS</option>
+          <option value="generic">Genérico</option>
+        </select></div>
+    </div>
+    <div id="cfg-bas-status" class="text-xs px-3 py-2 rounded-lg hidden"></div>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeModal('modal-cfg-bascula')" class="h-9 px-4 rounded-lg text-xs border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="guardarCfgBascula()" class="h-9 px-4 rounded-lg text-xs font-semibold text-white hover:opacity-90 flex items-center gap-1.5" style="background:#4CAF50"><i data-lucide="save" style="width:13px;height:13px"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: EDITOR DE TICKET (sub-ajuste)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-editor-ticket" class="fixed inset-0 z-[60] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.5);backdrop-filter:blur(4px)" onclick="closeModal('modal-editor-ticket')"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex" style="width:960px;max-width:96vw;height:84vh;max-height:680px">
+
+    <!-- Left: preview -->
+    <div class="w-64 flex-shrink-0 border-r flex flex-col" style="border-color:#E2E8F0;background:#E5E7EB;border-radius:1rem 0 0 1rem">
+      <p class="text-xs font-bold text-center py-3" style="color:#4B5563">Vista previa del ticket</p>
+      <div class="flex-1 overflow-y-auto scroll-light px-4 pb-4">
+        <div id="ticket-preview" class="bg-white rounded-lg shadow-sm p-3 text-[10px]" style="font-family:'Courier New',monospace;line-height:1.5;color:#111827;min-height:300px"></div>
+      </div>
+    </div>
+
+    <!-- Right: settings -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+        <div class="flex items-center gap-2">
+          <i data-lucide="receipt-text" style="width:15px;height:15px;color:#7C3AED"></i>
+          <p class="font-bold text-sm" style="color:#0F172A">Editor de Diseño del Ticket</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="ticketTestPrint()" class="h-8 px-3 rounded-lg text-xs font-medium hover:opacity-90 text-white flex items-center gap-1.5" style="background:#2196F3"><i data-lucide="printer" style="width:12px;height:12px"></i> Testear</button>
+          <button onclick="guardarTicket()" class="h-8 px-3 rounded-lg text-xs font-semibold text-white hover:opacity-90 flex items-center gap-1.5" style="background:#4CAF50"><i data-lucide="save" style="width:12px;height:12px"></i> Guardar</button>
+          <button onclick="closeModal('modal-editor-ticket')" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto scroll-light p-5 space-y-4">
+
+        <!-- Fuentes -->
+        <div>
+          <p class="text-xs font-bold mb-2" style="color:#374151">Fuente y tamaño</p>
+          <div class="rounded-xl border p-3 grid grid-cols-2 gap-3" style="border-color:#E2E8F0;background:#F8FAFF">
+            <div><label class="text-[10px] font-medium block mb-1" style="color:#64748B">Fuente títulos</label>
+              <select id="tk-f-titulo" class="w-full h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0" onchange="ticketRefreshPreview()">
+                <option value="HELVETICA_BOLD">HELVETICA_BOLD</option><option value="HELVETICA">HELVETICA</option>
+                <option value="COURIER_BOLD">COURIER_BOLD</option><option value="COURIER">COURIER</option>
+              </select></div>
+            <div><label class="text-[10px] font-medium block mb-1" style="color:#64748B">Fuente contenido</label>
+              <select id="tk-f-cont" class="w-full h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0" onchange="ticketRefreshPreview()">
+                <option value="HELVETICA">HELVETICA</option><option value="HELVETICA_BOLD">HELVETICA_BOLD</option>
+                <option value="COURIER">COURIER</option><option value="COURIER_BOLD">COURIER_BOLD</option>
+              </select></div>
+          </div>
+        </div>
+
+        <!-- Logo -->
+        <div>
+          <p class="text-xs font-bold mb-2" style="color:#374151">Logo en el ticket</p>
+          <div class="rounded-xl border p-3 space-y-2" style="border-color:#E2E8F0;background:#F8FAFF">
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" id="tk-logo-activo" onchange="ticketRefreshPreview()"> Imprimir logo
+            </label>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input type="radio" name="tk-logo-tipo" value="empresa" checked onchange="ticketRefreshPreview()"> Logo de empresa
+              </label>
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input type="radio" name="tk-logo-tipo" value="custom" onchange="ticketRefreshPreview()"> Otra imagen
+              </label>
+            </div>
+            <div class="flex gap-2">
+              <input id="tk-logo-path" type="text" placeholder="Ruta de imagen personalizada..."
+                     class="flex-1 h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0" onchange="ticketRefreshPreview()">
+              <button onclick="tkSelectLogo()" class="h-8 px-2 rounded-lg text-xs border hover:bg-slate-50 flex items-center justify-center" style="border-color:#E2E8F0;color:#64748B"><i data-lucide="folder-open" style="width:14px;height:14px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Apartado personalizado -->
+        <div>
+          <p class="text-xs font-bold mb-2" style="color:#374151">Apartado personalizado</p>
+          <div class="rounded-xl border p-3 space-y-2" style="border-color:#E2E8F0;background:#F8FAFF">
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" id="tk-custom-activo" onchange="ticketRefreshPreview()"> Incluir apartado personalizado
+            </label>
+            <textarea id="tk-custom-texto" rows="3" placeholder="Texto personalizado (leyenda, dirección, etc.)"
+                      class="w-full px-3 py-2 rounded-lg text-xs border resize-none" style="border-color:#E2E8F0;font-family:'Courier New',monospace"
+                      oninput="ticketRefreshPreview()"></textarea>
+          </div>
+        </div>
+
+        <!-- Datos de negocio -->
+        <div>
+          <p class="text-xs font-bold mb-2" style="color:#374151">Datos de negocio en el ticket</p>
+          <div class="rounded-xl border p-3 space-y-1.5" style="border-color:#E2E8F0;background:#F8FAFF">
+            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="tk-d-nombre" checked onchange="ticketRefreshPreview()"> Nombre de empresa</label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="tk-d-fiscal" checked onchange="ticketRefreshPreview()"> Identificación fiscal (RFC/NIT)</label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="tk-d-dir" checked onchange="ticketRefreshPreview()"> Dirección</label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="tk-d-email" checked onchange="ticketRefreshPreview()"> Email</label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="tk-d-tel" checked onchange="ticketRefreshPreview()"> Teléfono</label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ Códigos QR / Barras ══════════════════════════════════════════════════════
+
+let _codProductos = [];
+let _codSelPid = null;
+let _codPreviewTimer = null;
+
+function openCodigosModal(pid = null) {
+  _codSelPid = pid;
+  openModal('modal-codigos');
+  lucide.createIcons();
+  codLoadProducts();
+}
+
+async function codLoadProducts() {
+  const search = document.getElementById('cod-search').value.trim();
+  const sinCod = document.getElementById('cod-filter-sin').checked;
+  try {
+    let prods = await api('/productos?solo_activos=true' + (search ? '&busqueda=' + encodeURIComponent(search) : ''));
+    if (sinCod) prods = prods.filter(p => !p.codigo_barras);
+    _codProductos = prods;
+    const list = document.getElementById('cod-list');
+    if (!prods.length) {
+      list.innerHTML = '<p class="p-4 text-center text-xs" style="color:#94A3B8">Sin productos</p>';
+      return;
+    }
+    list.innerHTML = prods.map(p => `
+      <div onclick="codSelect(${p.id})" id="cod-item-${p.id}"
+           class="px-3 py-2.5 border-b cursor-pointer hover:bg-blue-50 transition-colors"
+           style="border-color:#F1F5F9">
+        <p class="font-medium text-[11px] truncate" style="color:#0F172A">${p.nombre}</p>
+        <p class="text-[10px] mt-0.5" style="color:${p.codigo_barras ? '#16A34A' : '#F59E0B'}">${p.codigo_barras || '(sin código)'}</p>
+      </div>`).join('');
+    if (_codSelPid) setTimeout(() => codSelect(_codSelPid), 50);
+  } catch(e) { console.error(e); }
+}
+
+function codSearch(val) {
+  clearTimeout(_codPreviewTimer);
+  _codPreviewTimer = setTimeout(codLoadProducts, 300);
+}
+
+function codSelect(pid) {
+  _codSelPid = pid;
+  document.querySelectorAll('[id^="cod-item-"]').forEach(el => el.style.background = '');
+  const el = document.getElementById('cod-item-' + pid);
+  if (el) el.style.background = '#EFF6FF';
+  const p = _codProductos.find(x => x.id === pid);
+  if (!p) return;
+  const inp = document.getElementById('cod-codigo');
+  inp.value = p.codigo_barras || '';
+  const info = document.getElementById('cod-info');
+  info.classList.remove('hidden');
+  info.innerHTML = `<b>${p.nombre}</b> &nbsp;|&nbsp; Precio: $${p.precio_venta.toFixed(2)} &nbsp;|&nbsp; Stock: ${p.stock} &nbsp;|&nbsp; Código: <span style="color:${p.codigo_barras?'#16A34A':'#F59E0B'}">${p.codigo_barras||'(sin código)'}</span>`;
+  codRefreshPreview();
+}
+
+function codGetTipo() {
+  return document.querySelector('input[name="cod-tipo"]:checked')?.value || 'code128';
+}
+
+let _codPrevTimer = null;
+function codSchedulePreview() {
+  clearTimeout(_codPrevTimer);
+  _codPrevTimer = setTimeout(codRefreshPreview, 400);
+}
+
+function codRefreshPreview() {
+  const codigo = document.getElementById('cod-codigo').value.trim();
+  const wrap = document.getElementById('cod-preview-wrap');
+  if (!codigo) {
+    wrap.innerHTML = '<p class="text-xs" style="color:#94A3B8">← Selecciona un producto</p>';
+    return;
+  }
+  const tipo = codGetTipo();
+  const url = `/api/productos/barcode-preview?texto=${encodeURIComponent(codigo)}&tipo=${tipo}`;
+  wrap.innerHTML = `<img src="${url}" style="max-width:380px;max-height:160px;object-fit:contain" onerror="this.parentElement.innerHTML='<p class=\\'text-xs\\' style=\\'color:#DC2626\\'>Error generando código</p>'">`;
+}
+
+function codAutoGen() {
+  if (!_codSelPid) { toast('Selecciona un producto primero', 'warning'); return; }
+  const tipo = codGetTipo();
+  let code;
+  if (tipo === 'ean13') {
+    const digits = Array.from({length:12}, () => Math.floor(Math.random()*10)).join('');
+    const s = digits.split('').reduce((acc,d,i) => acc + parseInt(d) * (i%2===0?1:3), 0);
+    code = digits + String((10 - s%10) % 10);
+  } else {
+    code = 'FAR' + String(_codSelPid).padStart(6, '0');
+  }
+  document.getElementById('cod-codigo').value = code;
+  codRefreshPreview();
+}
+
+async function codAsignar() {
+  const codigo = document.getElementById('cod-codigo').value.trim();
+  if (!_codSelPid || !codigo) { toast('Selecciona producto y escribe el código', 'warning'); return; }
+  try {
+    await api(`/productos/${_codSelPid}/barcode`, { method:'PATCH', body:{ codigo_barras: codigo } });
+    toast('Código asignado correctamente', 'success');
+    codLoadProducts();
+    const info = document.getElementById('cod-info');
+    if (info) info.querySelector('span').textContent = codigo;
+  } catch(e) { toast(e.message || 'Error al asignar', 'error'); }
+}
+
+function codExportPng() {
+  const codigo = document.getElementById('cod-codigo').value.trim();
+  if (!_codSelPid || !codigo) { toast('Selecciona producto con código', 'warning'); return; }
+  const a = document.createElement('a');
+  a.href = `/api/productos/${_codSelPid}/label?tipo=${codGetTipo()}`;
+  a.download = `etiqueta_${_codSelPid}.png`;
+  a.click();
+}
+
+async function codExportPdf(masivo) {
+  let ids;
+  if (masivo) {
+    ids = _codProductos.filter(p => p.codigo_barras).map(p => p.id);
+    if (!ids.length) { toast('Ningún producto visible tiene código', 'warning'); return; }
+  } else {
+    if (!_codSelPid) { toast('Selecciona un producto', 'warning'); return; }
+    const codigo = document.getElementById('cod-codigo').value.trim();
+    if (!codigo) { toast('Asigna el código primero', 'warning'); return; }
+    ids = [_codSelPid];
+  }
+  try {
+    toast(masivo ? `Generando PDF con ${ids.length} etiquetas...` : 'Generando PDF...', 'info');
+    const res = await fetch('/api/productos/etiquetas-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('pos_token') || '') },
+      body: JSON.stringify({ ids, tipo: codGetTipo() })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = masivo ? 'etiquetas_productos.pdf' : `etiqueta_${_codSelPid}.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('PDF generado y descargado', 'success');
+  } catch(e) { toast(e.message || 'Error generando PDF', 'error'); }
+}
+
+// ══ Mini-modal generar código (desde producto form) ══════════════════════════
+
+function openGenCodigoMini() {
+  const nombre = document.getElementById('pm-nombre')?.value || 'Producto';
+  document.getElementById('mini-codigo').value = '';
+  document.getElementById('mini-preview').innerHTML = '<p class="text-xs" style="color:#94A3B8">Escribe o genera un código</p>';
+  openModal('modal-gen-codigo');
+}
+
+function miniAuto() {
+  const tipo = document.querySelector('input[name="mini-tipo"]:checked')?.value || 'code128';
+  const code = 'FAR' + String(Math.floor(Math.random()*900000)+100000);
+  document.getElementById('mini-codigo').value = code;
+  miniRefresh();
+}
+
+function miniRefresh() {
+  const codigo = document.getElementById('mini-codigo').value.trim();
+  const tipo = document.querySelector('input[name="mini-tipo"]:checked')?.value || 'code128';
+  const pv = document.getElementById('mini-preview');
+  if (!codigo) return;
+  const url = `/api/productos/barcode-preview?texto=${encodeURIComponent(codigo)}&tipo=${tipo}`;
+  pv.innerHTML = `<img src="${url}" style="max-width:360px;max-height:110px;object-fit:contain" onerror="this.parentElement.innerHTML='<p style=\\'color:#DC2626;font-size:11px\\'>Error</p>'">`;
+}
+
+function miniConfirmar() {
+  const codigo = document.getElementById('mini-codigo').value.trim();
+  if (!codigo) { toast('Escribe o genera un código primero', 'warning'); return; }
+  const bc = document.getElementById('pm-barcode');
+  if (bc) bc.value = codigo;
+  closeModal('modal-gen-codigo');
+}
+
+// ══ Ajustes del Sistema (POS) ════════════════════════════════════════════════
+
+function openAjustesSistema() {
+  openModal('modal-ajustes');
+}
+
+function openAjustesSub(tipo) {
+  closeModal('modal-ajustes');
+  if (tipo === 'impresora') openCfgImpresora();
+  else if (tipo === 'ticket') openEditorTicket();
+  else if (tipo === 'bascula') openCfgBascula();
+}
+
+// ── Impresora ────────────────────────────────────────────────────────────────
+
+async function openCfgImpresora() {
+  openModal('modal-cfg-impresora');
+  try {
+    const cfg = await api('/config/impresora');
+    document.getElementById('cfg-imp-nombre').value = cfg.impresora_nombre || '';
+    const a = cfg.impresora_ancho || '32';
+    document.getElementById('cfg-imp-ancho').value = a;
+  } catch(e) {}
+}
+
+async function guardarCfgImpresora() {
+  const nombre = document.getElementById('cfg-imp-nombre').value.trim();
+  const ancho  = document.getElementById('cfg-imp-ancho').value;
+  const st = document.getElementById('cfg-imp-status');
+  try {
+    await api('/config/impresora', { method:'PUT', body:{ impresora_nombre: nombre, impresora_ancho: ancho, impresora_tipo:'windows', impresora_puerto: nombre } });
+    st.className = 'text-xs px-3 py-2 rounded-lg'; st.style.background='#DCFCE7'; st.style.color='#16A34A';
+    st.textContent = 'Guardado correctamente'; st.classList.remove('hidden');
+  } catch(e) {
+    st.className = 'text-xs px-3 py-2 rounded-lg'; st.style.background='#FEE2E2'; st.style.color='#DC2626';
+    st.textContent = e.message || 'Error'; st.classList.remove('hidden');
+  }
+}
+
+// ── Báscula ──────────────────────────────────────────────────────────────────
+
+async function openCfgBascula() {
+  openModal('modal-cfg-bascula');
+  try {
+    const cfg = await api('/config/bascula');
+    document.getElementById('cfg-bas-puerto').value = cfg.bascula_puerto || '';
+    document.getElementById('cfg-bas-baud').value   = cfg.bascula_baud || '9600';
+    document.getElementById('cfg-bas-proto').value  = cfg.bascula_protocolo || 'toledo';
+  } catch(e) {}
+}
+
+async function guardarCfgBascula() {
+  const st = document.getElementById('cfg-bas-status');
+  try {
+    await api('/config/bascula', { method:'PUT', body:{
+      bascula_puerto:    document.getElementById('cfg-bas-puerto').value.trim(),
+      bascula_baud:      document.getElementById('cfg-bas-baud').value,
+      bascula_protocolo: document.getElementById('cfg-bas-proto').value,
+    }});
+    st.className='text-xs px-3 py-2 rounded-lg'; st.style.background='#DCFCE7'; st.style.color='#16A34A';
+    st.textContent='Guardado'; st.classList.remove('hidden');
+  } catch(e) {
+    st.className='text-xs px-3 py-2 rounded-lg'; st.style.background='#FEE2E2'; st.style.color='#DC2626';
+    st.textContent=e.message||'Error'; st.classList.remove('hidden');
+  }
+}
+
+// ── Editor de Ticket ─────────────────────────────────────────────────────────
+
+async function openEditorTicket() {
+  openModal('modal-editor-ticket');
+  try {
+    const cfg = await api('/config/ticket');
+    document.getElementById('tk-f-titulo').value        = cfg.ticket_fuente_titulo || 'HELVETICA_BOLD';
+    document.getElementById('tk-f-cont').value          = cfg.ticket_fuente_contenido || 'HELVETICA';
+    document.getElementById('tk-logo-activo').checked   = cfg.ticket_logo_activo !== 'false';
+    const lt = cfg.ticket_logo_tipo || 'empresa';
+    document.querySelector(`input[name="tk-logo-tipo"][value="${lt}"]`).checked = true;
+    document.getElementById('tk-logo-path').value       = cfg.ticket_logo_custom || '';
+    document.getElementById('tk-custom-activo').checked = cfg.ticket_custom_activo === 'true';
+    document.getElementById('tk-custom-texto').value    = cfg.ticket_custom_texto || '';
+    document.getElementById('tk-d-nombre').checked      = cfg.ticket_dato_nombre !== 'false';
+    document.getElementById('tk-d-fiscal').checked      = cfg.ticket_dato_fiscal !== 'false';
+    document.getElementById('tk-d-dir').checked         = cfg.ticket_dato_direccion !== 'false';
+    document.getElementById('tk-d-email').checked       = cfg.ticket_dato_email !== 'false';
+    document.getElementById('tk-d-tel').checked         = cfg.ticket_dato_telefono !== 'false';
+    ticketRefreshPreview();
+  } catch(e) { ticketRefreshPreview(); }
+}
+
+function ticketRefreshPreview() {
+  const logoActivo  = document.getElementById('tk-logo-activo')?.checked;
+  const logoTipo    = document.querySelector('input[name="tk-logo-tipo"]:checked')?.value || 'empresa';
+  const customActivo= document.getElementById('tk-custom-activo')?.checked;
+  const customTexto = document.getElementById('tk-custom-texto')?.value || '';
+  const fTitulo     = document.getElementById('tk-f-titulo')?.value || 'HELVETICA_BOLD';
+  const bold        = fTitulo.includes('BOLD');
+  const dNombre     = document.getElementById('tk-d-nombre')?.checked;
+  const dFiscal     = document.getElementById('tk-d-fiscal')?.checked;
+  const dDir        = document.getElementById('tk-d-dir')?.checked;
+  const dEmail      = document.getElementById('tk-d-email')?.checked;
+  const dTel        = document.getElementById('tk-d-tel')?.checked;
+
+  const line = (t, b=false, c=true) =>
+    `<div style="text-align:${c?'center':'left'};${b?'font-weight:bold':''};">${t}</div>`;
+  const sep = () => '<div style="border-top:1px dashed #aaa;margin:4px 0"></div>';
+
+  let html = '<div style="padding:8px 4px">';
+  if (logoActivo) html += `<div style="text-align:center;padding:6px 0;background:#EFF6FF;border-radius:4px;margin-bottom:4px;font-size:9px;color:#2563EB">[ ${logoTipo==='empresa'?'Logo de empresa':'Imagen personalizada'} ]</div>`;
+  if (dNombre) html += line('MI FARMACIA', bold);
+  if (dDir)    html += line('Calle Principal #1');
+  if (dFiscal) html += line('RFC: FAR-000000');
+  if (dEmail)  html += line('info@farmacia.com');
+  if (dTel)    html += line('Tel: 555-0000');
+  html += sep();
+  html += line('Ticket: T000-0001') + line('26/06/2026  12:00:00') + line('Cajero: Admin');
+  html += sep();
+  html += '<table style="width:100%;font-size:9px"><tr><td style="color:#64748B">Cant</td><td style="color:#64748B">Producto</td><td style="color:#64748B;text-align:right">Total</td></tr>';
+  html += '<tr><td>1</td><td>Paracetamol 500mg</td><td style="text-align:right">$15.00</td></tr>';
+  html += '<tr><td>2</td><td>Amoxicilina 250ml</td><td style="text-align:right">$45.00</td></tr></table>';
+  html += sep();
+  html += line('Subtotal: $60.00',false,false) + line('IVA: $0.00',false,false) + line('TOTAL: $60.00', bold, false);
+  html += line('Efectivo: $70.00',false,false) + line('Cambio: $10.00',false,false);
+  if (customActivo && customTexto) { html += sep(); html += line(customTexto.replace(/\n/g,'<br>')); }
+  html += sep();
+  html += line('¡Gracias por su compra!', bold);
+  html += '</div>';
+  const pv = document.getElementById('ticket-preview');
+  if (pv) pv.innerHTML = html;
+}
+
+function tkSelectLogo() {
+  toast('Selección de archivo disponible en la versión de escritorio', 'info');
+}
+
+async function guardarTicket() {
+  try {
+    await api('/config/ticket', { method:'PUT', body:{
+      ticket_fuente_titulo:    document.getElementById('tk-f-titulo').value,
+      ticket_fuente_contenido: document.getElementById('tk-f-cont').value,
+      ticket_logo_activo:      document.getElementById('tk-logo-activo').checked ? 'true' : 'false',
+      ticket_logo_tipo:        document.querySelector('input[name="tk-logo-tipo"]:checked')?.value || 'empresa',
+      ticket_logo_custom:      document.getElementById('tk-logo-path').value,
+      ticket_custom_activo:    document.getElementById('tk-custom-activo').checked ? 'true' : 'false',
+      ticket_custom_texto:     document.getElementById('tk-custom-texto').value,
+      ticket_dato_nombre:      document.getElementById('tk-d-nombre').checked ? 'true' : 'false',
+      ticket_dato_fiscal:      document.getElementById('tk-d-fiscal').checked ? 'true' : 'false',
+      ticket_dato_direccion:   document.getElementById('tk-d-dir').checked ? 'true' : 'false',
+      ticket_dato_email:       document.getElementById('tk-d-email').checked ? 'true' : 'false',
+      ticket_dato_telefono:    document.getElementById('tk-d-tel').checked ? 'true' : 'false',
+    }});
+    toast('Formato de ticket guardado', 'success');
+  } catch(e) { toast(e.message || 'Error', 'error'); }
+}
+
+async function ticketTestPrint() {
+  try {
+    await api('/config/ticket/test-print', { method:'POST' });
+    toast('Ticket de prueba enviado a la impresora', 'success');
+  } catch(e) { toast(e.message || 'La impresora no está conectada', 'warning'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GENERADOR DE CÓDIGO DE BARRAS / QR
+// ══════════════════════════════════════════════════════════════════
+
+let _cg = { prodId: null, nombre: '' };
+
+function openCodeGen(prodId, nombre, codigoActual) {
+  _cg = { prodId, nombre };
+  const tieneCodigoExistente = !!(codigoActual && codigoActual.trim());
+
+  // Header
+  document.getElementById('cg-producto-badge').textContent = nombre || (tieneCodigoExistente ? '' : 'Nuevo código');
+  document.getElementById('cg-header-titulo').textContent = tieneCodigoExistente ? 'Etiqueta del Producto' : 'Generador de Código';
+  document.getElementById('cg-badge-readonly').classList.toggle('hidden', !tieneCodigoExistente);
+
+  // Código input — lock if existing
+  const cgCodigo = document.getElementById('cg-codigo');
+  cgCodigo.value = codigoActual || '';
+  cgCodigo.readOnly = tieneCodigoExistente;
+  cgCodigo.style.background = tieneCodigoExistente ? '#F1F5F9' : '';
+  cgCodigo.style.color = tieneCodigoExistente ? '#64748B' : '';
+  cgCodigo.style.cursor = tieneCodigoExistente ? 'not-allowed' : '';
+
+  // Tipo selector + auto-generate: hide when code is locked
+  document.getElementById('cg-seccion-tipo').classList.toggle('hidden', tieneCodigoExistente);
+  document.getElementById('cg-btn-autogenerar').classList.toggle('hidden', tieneCodigoExistente);
+  document.getElementById('cg-aviso-readonly').classList.toggle('hidden', !tieneCodigoExistente);
+
+  // Etiqueta fields
+  document.getElementById('cg-texto-etiqueta').value = nombre || '';
+  document.getElementById('cg-precio-etiqueta').value = '';
+  document.getElementById('cg-mostrar-precio').checked = false;
+  document.getElementById('cg-precio-etiqueta').classList.add('hidden');
+  document.getElementById('cg-copias').value = 1;
+
+  // Save button: only when product linked AND no existing code (would be overwrite)
+  const saveBtn = document.getElementById('cg-btn-guardar');
+  if (prodId && !tieneCodigoExistente) saveBtn.classList.remove('hidden');
+  else saveBtn.classList.add('hidden');
+
+  cgPreview();
+  openModal('modal-codegen');
+  icons();
+}
+
+function pmOpenCodeGen() {
+  const prodId = S.prodEditId || null;
+  const nombre = document.getElementById('pm-nombre')?.value || '';
+  const codigoActual = document.getElementById('pm-barcode')?.value || '';
+  openCodeGen(prodId, nombre, codigoActual);
+  // On save, write back to pm-barcode
+  _cg._fromPM = true;
+}
+
+function cgAdjustCopies(delta) {
+  const el = document.getElementById('cg-copias');
+  el.value = Math.max(1, Math.min(50, parseInt(el.value || 1) + delta));
+}
+
+function cgAutoGenerate() {
+  const tipo = document.querySelector('input[name="cg-tipo"]:checked').value;
+  let codigo;
+  if (tipo === 'ean13') {
+    codigo = _cgGenEAN13();
+  } else {
+    // Code-128 / QR: internal prefix + timestamp
+    const ts = Date.now().toString().slice(-9);
+    codigo = 'INT' + ts;
+  }
+  document.getElementById('cg-codigo').value = codigo;
+  cgPreview();
+}
+
+function _cgGenEAN13() {
+  // Prefix 200 = internal/variable weight (GS1 internal use)
+  let digits = '200';
+  for (let i = 0; i < 9; i++) digits += Math.floor(Math.random() * 10);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(digits[i]) * (i % 2 === 0 ? 1 : 3);
+  const check = (10 - (sum % 10)) % 10;
+  return digits + check;
+}
+
+function cgPreview() {
+  const codigo = (document.getElementById('cg-codigo').value || '').trim();
+  const tipo   = document.querySelector('input[name="cg-tipo"]:checked')?.value || 'code128';
+  const hint   = document.getElementById('cg-empty-hint');
+  const canvas1d = document.getElementById('cg-canvas-1d');
+  const canvasQR = document.getElementById('cg-canvas-qr');
+
+  canvas1d.classList.add('hidden');
+  canvasQR.classList.add('hidden');
+  hint.classList.toggle('hidden', !!codigo);
+
+  if (!codigo) {
+    _cgUpdateLabelPreview(codigo);
+    return;
+  }
+
+  if (tipo === 'qr') {
+    canvas1d.classList.add('hidden');
+    canvasQR.classList.remove('hidden');
+    try {
+      QRCode.toCanvas(canvasQR, codigo, {
+        width: 180, margin: 1,
+        color: { dark:'#0F172A', light:'#FFFFFF' }
+      }, err => { if(err) console.warn('QR error', err); });
+    } catch(e) { console.warn('QR not loaded', e); }
+  } else {
+    canvasQR.classList.add('hidden');
+    canvas1d.classList.remove('hidden');
+    try {
+      const fmt = tipo === 'ean13' ? 'EAN13' : 'CODE128';
+      JsBarcode(canvas1d, codigo, {
+        format: fmt,
+        lineColor: '#0F172A',
+        background: '#FFFFFF',
+        width: 2, height: 60,
+        displayValue: true,
+        fontSize: 11,
+        margin: 8,
+        valid: v => { if (!v) { canvas1d.classList.add('hidden'); hint.textContent = 'Código inválido para ' + fmt; hint.classList.remove('hidden'); } }
+      });
+    } catch(e) {
+      canvas1d.classList.add('hidden');
+      hint.textContent = e.message || 'Error al generar';
+      hint.classList.remove('hidden');
+    }
+  }
+
+  _cgUpdateLabelPreview(codigo);
+}
+
+function _cgUpdateLabelPreview(codigo) {
+  const nombre = (document.getElementById('cg-texto-etiqueta').value || '').trim();
+  const mostrarPrecio = document.getElementById('cg-mostrar-precio').checked;
+  const precio = document.getElementById('cg-precio-etiqueta').value.trim();
+  const lp = document.getElementById('cg-label-preview');
+  const lpNombre = document.getElementById('cg-lp-nombre');
+  const lpPrecio = document.getElementById('cg-lp-precio');
+  const lpCodigo = document.getElementById('cg-lp-codigo');
+
+  if (!codigo && !nombre) { lp.classList.add('hidden'); return; }
+  lp.classList.remove('hidden');
+  lpNombre.textContent = nombre || '—';
+  lpCodigo.textContent = codigo || '';
+  if (mostrarPrecio && precio) {
+    lpPrecio.textContent = precio;
+    lpPrecio.classList.remove('hidden');
+  } else {
+    lpPrecio.classList.add('hidden');
+  }
+}
+
+document.addEventListener('change', e => {
+  if (e.target?.id === 'cg-mostrar-precio') {
+    document.getElementById('cg-precio-etiqueta').classList.toggle('hidden', !e.target.checked);
+    cgPreview();
+  }
+});
+
+async function cgSave() {
+  const codigo = (document.getElementById('cg-codigo').value || '').trim();
+  if (!codigo) { toast('Escribe o genera un código primero', 'warning'); return; }
+  if (!_cg.prodId) { toast('No hay producto vinculado', 'error'); return; }
+
+  const res = await api(`/productos/${_cg.prodId}/barcode`, {
+    method: 'PATCH',
+    body: JSON.stringify({ codigo_barras: codigo })
+  });
+  if (res.ok) {
+    toast('Código guardado en el producto', 'success');
+    closeModal('modal-codegen');
+    const pmBarcode = document.getElementById('pm-barcode');
+    if (pmBarcode) pmBarcode.value = codigo;
+    loadInventory();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    toast(err.detail || 'Error al guardar el código', 'error');
+  }
+}
+
+function cgExportPNG() {
+  const tipo = document.querySelector('input[name="cg-tipo"]:checked')?.value || 'code128';
+  const canvas = tipo === 'qr'
+    ? document.getElementById('cg-canvas-qr')
+    : document.getElementById('cg-canvas-1d');
+  const codigo = (document.getElementById('cg-codigo').value || 'codigo').trim();
+
+  if (canvas.classList.contains('hidden') || !canvas.width) {
+    toast('Genera un código válido primero', 'warning');
+    return;
+  }
+  const link = document.createElement('a');
+  link.download = `${codigo}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  toast('PNG descargado', 'success');
+}
+
+function cgExportPDF() {
+  const tipo = document.querySelector('input[name="cg-tipo"]:checked')?.value || 'code128';
+  const canvas = tipo === 'qr'
+    ? document.getElementById('cg-canvas-qr')
+    : document.getElementById('cg-canvas-1d');
+  const codigo = (document.getElementById('cg-codigo').value || '').trim();
+  const nombre = (document.getElementById('cg-texto-etiqueta').value || '').trim();
+  const mostrarPrecio = document.getElementById('cg-mostrar-precio').checked;
+  const precio = document.getElementById('cg-precio-etiqueta').value.trim();
+  const copias = parseInt(document.getElementById('cg-copias').value || 1);
+
+  if (canvas.classList.contains('hidden') || !canvas.width || !codigo) {
+    toast('Genera un código válido primero', 'warning');
+    return;
+  }
+
+  const imgData = canvas.toDataURL('image/png');
+  const tamano = document.getElementById('cg-tamano').value;
+  const [wMm, hMm] = tamano === 'sm' ? [40,20] : tamano === 'lg' ? [90,40] : [60,30];
+
+  let etiquetas = '';
+  for (let i = 0; i < copias; i++) {
+    etiquetas += `
+      <div class="etiqueta">
+        <img src="${imgData}" alt="${codigo}">
+        ${nombre ? `<p class="nombre">${nombre}</p>` : ''}
+        ${mostrarPrecio && precio ? `<p class="precio">${precio}</p>` : ''}
+        <p class="codigo">${codigo}</p>
+      </div>`;
+  }
+
+  const pw = window.open('', '_blank', 'width=600,height=800');
+  if (!pw) { toast('Permitir ventanas emergentes para imprimir', 'warning'); return; }
+  pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Etiquetas — ${codigo}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; background:#fff; }
+  @media print {
+    body { margin:0; }
+    @page { margin:5mm; }
+  }
+  .grid { display:flex; flex-wrap:wrap; gap:3mm; padding:5mm; }
+  .etiqueta {
+    width:${wMm}mm; min-height:${hMm}mm;
+    border:0.5px solid #ccc; border-radius:2mm;
+    padding:2mm; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1mm;
+    page-break-inside:avoid;
+  }
+  .etiqueta img { max-width:100%; max-height:${hMm*0.55}mm; object-fit:contain; }
+  .nombre { font-size:6pt; font-weight:bold; text-align:center; color:#111; line-height:1.2; word-break:break-word; }
+  .precio { font-size:9pt; font-weight:900; color:#15803D; }
+  .codigo { font-size:5pt; font-family:monospace; color:#666; }
+</style>
+</head>
+<body>
+<div class="grid">${etiquetas}</div>
+<script>
+  window.addEventListener('load', () => {
+    setTimeout(() => { window.print(); }, 400);
+  });
+<\/script>
+</body>
+</html>`);
+  pw.document.close();
+}
+
+// ── Productos sin código en la sección admin ──────────────────
+async function loadProductosSinCodigo() {
+  const card = document.getElementById('codegen-sin-codigo-card');
+  const lista = document.getElementById('codegen-sin-lista');
+  const count = document.getElementById('codegen-sin-count');
+  card.classList.remove('hidden');
+  lista.innerHTML = '<p class="text-xs text-center py-6" style="color:#94A3B8">Cargando...</p>';
+
+  let prods = S.allInv?.length ? S.allInv : null;
+  if (!prods) {
+    const res = await api('/productos/');
+    if (!res.ok) { lista.innerHTML = '<p class="text-xs text-center py-4 text-red-500">Error al cargar</p>'; return; }
+    prods = await res.json();
+  }
+  const sinCod = prods.filter(p => !p.codigo_barras && p.activo !== false);
+
+  count.textContent = `${sinCod.length} producto(s) sin código`;
+
+  if (!sinCod.length) {
+    lista.innerHTML = '<p class="text-xs text-center py-6 text-green-600 font-semibold">Todos los productos tienen código</p>';
+    return;
+  }
+
+  lista.innerHTML = sinCod.map(p => `
+    <div class="flex items-center gap-3 px-3 py-2 rounded-xl border" style="border-color:#E2E8F0;background:#FAFBFF">
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold truncate" style="color:#0F172A">${p.nombre}</p>
+        ${p.presentacion||p.concentracion ? `<p class="text-[10px]" style="color:#94A3B8">${[p.presentacion,p.concentracion].filter(Boolean).join(' · ')}</p>` : ''}
+      </div>
+      <button onclick="openCodeGen(${p.id},'${p.nombre.replace(/'/g,"\\'")}','')"
+              class="flex-shrink-0 h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:opacity-90 transition-all"
+              style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A">
+        <i data-lucide="barcode" style="width:12px;height:12px"></i> Generar código
+      </button>
+    </div>`).join('');
+  icons();
+}
+
+
 </script>
 
 </body>

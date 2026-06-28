@@ -92,6 +92,236 @@ def _prod_dict(p: Producto) -> dict:
     return d
 
 
+# ─── Barcode / QR helpers ─────────────────────────────────────────────────────
+
+def _gen_barcode_img(texto: str, fmt: str):
+    """Return PIL Image of barcode or QR."""
+    import io
+    from PIL import Image
+    if fmt == "qr":
+        import qrcode
+        qr = qrcode.QRCode(box_size=7, border=2)
+        qr.add_data(texto)
+        qr.make(fit=True)
+        return qr.make_image(fill_color="black", back_color="white").get_image()
+    else:
+        import barcode as _bc
+        from barcode.writer import ImageWriter
+        writer = ImageWriter()
+        writer.set_options({"module_height": 12, "quiet_zone": 3,
+                            "font_size": 9, "text_distance": 3, "write_text": True})
+        buf = io.BytesIO()
+        bc_class = _bc.get_barcode_class(fmt)
+        bc_obj = bc_class(texto, writer=writer)
+        bc_obj.write(buf)
+        buf.seek(0)
+        img = Image.open(buf)
+        img.load()
+        return img.copy()
+
+
+def _gen_label_img(nombre: str, precio: float, codigo: str, fmt: str):
+    """Return PIL Image: barcode/QR + product name + price label."""
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+    bc = _gen_barcode_img(codigo, fmt)
+    lw = 420
+    ratio = (lw - 20) / bc.width
+    bh = max(int(bc.height * ratio), 10)
+    bc = bc.resize((lw - 20, bh), Image.LANCZOS)
+    label = Image.new("RGB", (lw, bh + 70), "white")
+    label.paste(bc, (10, 5))
+    draw = ImageDraw.Draw(label)
+    try:
+        f_big = ImageFont.truetype("arial.ttf", 13)
+        f_sm  = ImageFont.truetype("arial.ttf", 11)
+    except Exception:
+        f_big = f_sm = ImageFont.load_default()
+    cx = lw // 2
+    y0 = bh + 10
+    nm = (nombre[:44] + "…") if len(nombre) > 44 else nombre
+    draw.text((cx, y0), nm, fill="black", font=f_big, anchor="mt")
+    draw.text((cx, y0 + 22), f"$ {precio:.2f}", fill="#555", font=f_sm, anchor="mt")
+    return label
+
+
+def _img_to_stream(img) -> "io.BytesIO":
+    import io
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+
+@router.get("/barcode-preview")
+def barcode_preview(
+    texto: str = Query(...),
+    tipo: str = Query("code128"),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Return PNG of barcode/QR for given text (for live preview)."""
+    import io
+    from fastapi.responses import StreamingResponse
+    if not texto:
+        raise HTTPException(status_code=400, detail="Texto vacío")
+    try:
+        img = _gen_barcode_img(texto.strip(), tipo)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return StreamingResponse(
+        _img_to_stream(img), media_type="image/png",
+        headers={"Cache-Control": "no-store"})
+
+
+@router.post("/etiquetas-pdf")
+def etiquetas_pdf(
+    body: dict,
+    bg: BackgroundTasks,
+    payload: dict = Depends(get_current_api_user),
+):
+    """Generate PDF label sheet for given product IDs. Body: {ids:[..], tipo:'code128'}."""
+    import io, os, tempfile
+    from fastapi.responses import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib.utils import ImageReader
+
+    ids = body.get("ids", [])
+    tipo = body.get("tipo", "code128")
+    if not ids:
+        raise HTTPException(status_code=400, detail="Sin IDs")
+
+    db = get_db_session()
+    try:
+        productos = db.query(Producto).filter(
+            Producto.id.in_(ids), Producto.codigo_barras != None,
+            Producto.activo == True).all()
+    finally:
+        db.close()
+
+    if not productos:
+        raise HTTPException(status_code=400, detail="Sin productos con código")
+
+    page_w, page_h = letter
+    margin = 10 * mm
+    cols, rows = 3, 8
+    lw = (page_w - 2 * margin) / cols
+    lh = (page_h - 2 * margin) / rows
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp.close()
+
+    c = rl_canvas.Canvas(tmp.name, pagesize=letter)
+    ci, ri, first = 0, 0, True
+    for p in productos:
+        try:
+            img = _gen_label_img(p.nombre, p.precio_venta, p.codigo_barras, tipo)
+        except Exception:
+            continue
+        if not first and ci == 0 and ri == 0:
+            c.showPage()
+        first = False
+        x = margin + ci * lw
+        y = page_h - margin - (ri + 1) * lh
+        buf = io.BytesIO(); img.save(buf, "PNG"); buf.seek(0)
+        ir = ImageReader(buf)
+        iw, ih = ir.getSize()
+        pad = 3 * mm
+        scale = min((lw - 2*pad)/iw, (lh - 2*pad)/ih)
+        dw, dh = iw * scale, ih * scale
+        c.drawImage(ir, x+pad+(lw-2*pad-dw)/2, y+pad+(lh-2*pad-dh)/2, width=dw, height=dh)
+        c.setStrokeColorRGB(0.85, 0.85, 0.85); c.setLineWidth(0.5)
+        c.rect(x+1, y+1, lw-2, lh-2)
+        ci += 1
+        if ci >= cols:
+            ci = 0; ri += 1
+            if ri >= rows:
+                ci, ri = 0, 0
+    c.save()
+
+    def _cleanup():
+        try: os.unlink(tmp.name)
+        except Exception: pass
+    bg.add_task(_cleanup)
+
+    return FileResponse(tmp.name, media_type="application/pdf", filename="etiquetas.pdf")
+
+
+@router.get("/{producto_id}/label")
+def get_product_label(
+    producto_id: int,
+    tipo: str = Query("code128"),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Return PNG label (barcode + name + price) for a product."""
+    from fastapi.responses import StreamingResponse
+    db = get_db_session()
+    try:
+        p = db.query(Producto).filter(Producto.id == producto_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        if not p.codigo_barras:
+            raise HTTPException(status_code=400, detail="Sin código de barras")
+        nombre, precio, codigo = p.nombre, p.precio_venta, p.codigo_barras
+    finally:
+        db.close()
+    try:
+        img = _gen_label_img(nombre, precio, codigo, tipo)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return StreamingResponse(
+        _img_to_stream(img), media_type="image/png",
+        headers={"Content-Disposition": f"attachment; filename=etiqueta_{producto_id}.png"})
+
+
+# ─── Assign barcode ───────────────────────────────────────────────────────────
+
+class AsignarCodigoIn(BaseModel):
+    codigo_barras: str
+
+
+@router.patch("/{producto_id}/barcode")
+def asignar_barcode(
+    producto_id: int,
+    body: AsignarCodigoIn,
+    bg: BackgroundTasks,
+    payload: dict = Depends(get_current_api_user),
+):
+    """Assign barcode to a product (admin only)."""
+    _require_admin(payload)
+    codigo = body.codigo_barras.strip()
+    if not codigo:
+        raise HTTPException(status_code=400, detail="Código vacío")
+    db = get_db_session()
+    try:
+        dup = db.query(Producto).filter(
+            Producto.codigo_barras == codigo,
+            Producto.id != producto_id,
+            Producto.activo == True,
+        ).first()
+        if dup:
+            raise HTTPException(status_code=400,
+                                detail=f"Código ya asignado a '{dup.nombre}'")
+        p = db.query(Producto).filter(Producto.id == producto_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        p.codigo_barras = codigo
+        db.commit()
+        db.refresh(p)
+        _sync_bg(bg)
+        return _prod_dict(p)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        db.close()
+
+
+# ─── List ─────────────────────────────────────────────────────────────────────
+
 @router.get("/", response_model=list[ProductoResponse])
 def listar_productos(
     busqueda: Optional[str] = Query(None),

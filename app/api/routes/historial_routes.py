@@ -98,7 +98,6 @@ def listar_pacientes(q: Optional[str] = None, payload: dict = Depends(get_curren
 
 @router.post("/pacientes")
 def crear_paciente(body: PacienteIn, payload: dict = Depends(get_current_api_user)):
-    _require_admin(payload)
     db = get_db_session()
     try:
         p = Paciente(**body.model_dump())
