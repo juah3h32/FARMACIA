@@ -3229,11 +3229,11 @@
 ══════════════════════════════════════════════════════════════════════════════ -->
 <div id="modal-cfdi-confirmar" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-confirmar')"></div>
-  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:560px;max-height:88vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:680px;max-height:90vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
     <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
       <div>
-        <p class="text-base font-black" style="color:#0F172A">Confirmar datos del CFDI</p>
-        <p class="text-xs mt-0.5" style="color:#94A3B8">Revisa TODO antes de timbrar — es fiscalmente irreversible</p>
+        <p class="text-base font-black" style="color:#0F172A">Vista previa del documento oficial</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Así se generará el CFDI — revisa todo antes de timbrar, es fiscalmente irreversible</p>
       </div>
       <button onclick="closeModal('modal-cfdi-confirmar')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
         <i data-lucide="x" style="width:16px;height:16px"></i>
@@ -12211,7 +12211,6 @@ async function abrirConfirmacionTimbrado() {
   openModal('modal-cfdi-confirmar');
   try {
     const d = await apiFetch(`/cfdi/preview?mes=${mes}&anio=${anio}`);
-    const fila = (k,v) => `<div class="flex justify-between py-1"><span style="color:#94A3B8">${k}</span><span style="color:#0F172A;font-weight:600;text-align:right">${v}</span></div>`;
 
     if (d.ya_facturado) {
       body.innerHTML = `<p class="text-sm font-bold" style="color:#F59E0B">Este periodo ya tiene una factura global timbrada. Cancélala primero si necesitas corregirla.</p>`;
@@ -12229,22 +12228,72 @@ async function abrirConfirmacionTimbrado() {
     if (d.sandbox) {
       html += `<div class="mb-3 p-2 rounded-xl text-xs font-bold text-center" style="background:#FEF3C7;color:#92400E">MODO PRUEBA (SANDBOX) — este timbrado no es fiscalmente válido</div>`;
     }
-    html += `<p class="text-xs font-bold mb-1" style="color:#64748B">EMISOR</p>`;
-    html += fila('Razón social', d.emisor.razon_social || '—');
-    html += fila('RFC', d.emisor.rfc || '—');
-    html += fila('Régimen fiscal', d.emisor.regimen_fiscal || '—');
-    html += fila('C.P. expedición', d.emisor.cp || '—');
-    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">RECEPTOR</p>`;
-    html += fila('RFC', d.receptor.rfc);
-    html += fila('Nombre', d.receptor.nombre);
-    html += fila('Uso CFDI', d.receptor.uso_cfdi);
-    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">CONCEPTO (GLOBAL, 1 PARTIDA)</p>`;
-    html += fila('Clave prod/serv', d.concepto.clave_prod_serv);
-    html += fila('Descripción', d.concepto.descripcion);
-    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">IMPORTES (${d.num_ventas} venta(s) agregadas)</p>`;
-    html += fila('Subtotal', `$${d.subtotal.toFixed(2)}`);
-    html += fila('IVA', `$${d.iva.toFixed(2)}`);
-    html += `<div class="flex justify-between py-2 mt-1 border-t" style="border-color:#F1F5F9"><span style="color:#0F172A;font-weight:700">TOTAL</span><span style="color:#16A34A;font-weight:900;font-size:1.05rem">$${d.total.toFixed(2)}</span></div>`;
+
+    const hoy = new Date().toLocaleDateString('es-MX');
+    html += `
+    <div style="border:1px solid #CBD5E1;border-radius:12px;padding:16px;background:#FAFBFF">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1d2140;padding-bottom:10px;margin-bottom:10px;gap:12px">
+        <div>
+          <p style="font-weight:900;font-size:13px;color:#0F172A">${d.emisor.razon_social || '—'}</p>
+          <p style="font-size:11px;color:#64748B">RFC: ${d.emisor.rfc || '—'}</p>
+          <p style="font-size:11px;color:#64748B">Régimen fiscal: ${d.emisor.regimen_fiscal} — Simplificado de Confianza (RESICO)</p>
+          <p style="font-size:11px;color:#64748B">C.P. expedición: ${d.emisor.cp || '—'}</p>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <p style="font-weight:900;font-size:12px;color:#1d2140">FACTURA GLOBAL · CFDI 4.0</p>
+          <p style="font-size:10px;color:#94A3B8">Folio fiscal (UUID): se genera al timbrar</p>
+          <p style="font-size:10px;color:#94A3B8">Fecha de emisión: ${hoy}</p>
+          <p style="font-size:10px;color:#94A3B8">Periodo: ${CFDI_MESES[mes-1]} ${anio} (mensual)</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;font-size:11px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <p style="font-weight:700;color:#64748B;margin-bottom:2px">RECEPTOR</p>
+          <p style="color:#0F172A">${d.receptor.nombre} — RFC ${d.receptor.rfc}</p>
+          <p style="color:#64748B">Uso CFDI: ${d.receptor.uso_cfdi} · Régimen receptor: ${d.receptor.regimen_fiscal}</p>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <p style="font-weight:700;color:#64748B;margin-bottom:2px">FORMA / MÉTODO DE PAGO</p>
+          <p style="color:#0F172A">99 — Por definir (venta agregada)</p>
+          <p style="color:#0F172A">PUE — Pago en una sola exhibición</p>
+        </div>
+      </div>
+
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead>
+          <tr style="background:#EEF2FF;text-align:left">
+            <th style="padding:6px;border-radius:6px 0 0 6px">Cant.</th>
+            <th style="padding:6px">Clave prod/serv</th>
+            <th style="padding:6px">Descripción</th>
+            <th style="padding:6px;text-align:right">P. Unitario</th>
+            <th style="padding:6px;text-align:right;border-radius:0 6px 6px 0">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:6px">1</td>
+            <td style="padding:6px">${d.concepto.clave_prod_serv}</td>
+            <td style="padding:6px">${d.concepto.descripcion}</td>
+            <td style="padding:6px;text-align:right">$${d.subtotal.toFixed(2)}</td>
+            <td style="padding:6px;text-align:right">$${d.subtotal.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:10px;color:#94A3B8;margin-top:4px">Concentra ${d.num_ventas} venta(s) completada(s) del periodo en una sola partida (factura global).</p>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <div style="width:220px;font-size:11px">
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#64748B">Subtotal</span><span style="color:#0F172A;font-weight:600">$${d.subtotal.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#64748B">IVA (16%)</span><span style="color:#0F172A;font-weight:600">$${d.iva.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding-top:4px;margin-top:4px;border-top:1px solid #CBD5E1"><span style="color:#0F172A;font-weight:800">TOTAL</span><span style="color:#16A34A;font-weight:900;font-size:1.1rem">$${d.total.toFixed(2)}</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;padding-top:8px;border-top:1px dashed #CBD5E1;font-size:9px;color:#94A3B8;text-align:center">
+        El sello digital del SAT y el código QR se agregan automáticamente al timbrar con Facturama.<br>Esta es una vista previa del contenido — no es el documento fiscal final.
+      </div>
+    </div>`;
     body.innerHTML = html;
 
     _cfdiPendiente = { mes, anio };

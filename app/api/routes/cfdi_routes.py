@@ -38,7 +38,7 @@ def _leer_config_facturacion(db) -> dict:
         "facturama_sandbox":    d.get("facturama_sandbox", "1") == "1",
         "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_NAME,
         "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
-        "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal", ""),
+        "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal") or "626",
         "emisor_cp":            d.get("emisor_cp", ""),
     }
 
