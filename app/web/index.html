@@ -3199,12 +3199,8 @@
               <label class="text-xs" style="color:#64748B">Año</label>
               <input id="cfdi-anio" type="number" class="px-3 py-2 rounded-xl border text-sm block" style="border-color:#E2E8F0;width:100px">
             </div>
-            <button onclick="previewFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Vista previa</button>
-            <button onclick="abrirConfirmacionTimbrado()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
-              <i data-lucide="stamp" style="width:14px;height:14px;display:inline"></i> Timbrar factura
-            </button>
+            <button onclick="abrirConfirmacionTimbrado()" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Vista previa</button>
           </div>
-          <div id="cfdi-preview" class="mt-3 text-sm" style="color:#64748B"></div>
         </div>
 
         <!-- Historial -->
@@ -12203,21 +12199,6 @@ async function guardarConfigCfdi() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-async function previewFacturaGlobal() {
-  const mes = document.getElementById('cfdi-mes').value;
-  const anio = document.getElementById('cfdi-anio').value;
-  const box = document.getElementById('cfdi-preview');
-  box.textContent = 'Consultando ventas del periodo...';
-  try {
-    const d = await apiFetch(`/cfdi/preview?mes=${mes}&anio=${anio}`);
-    if (d.ya_facturado) {
-      box.innerHTML = `<span style="color:#F59E0B;font-weight:700">Este periodo ya tiene una factura global timbrada.</span>`;
-      return;
-    }
-    box.innerHTML = `${d.num_ventas} venta(s) pendientes · Subtotal $${d.subtotal.toFixed(2)} · IVA $${d.iva.toFixed(2)} · <b>Total $${d.total.toFixed(2)}</b>`;
-  } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
-}
-
 let _cfdiPendiente = null; // { mes, anio } de la última vista previa confirmada en el modal
 
 async function abrirConfirmacionTimbrado() {
@@ -12283,7 +12264,6 @@ async function confirmarYTimbrarFacturaGlobal() {
     const d = await apiFetch('/cfdi/timbrar-global', { method:'POST', body: JSON.stringify({ mes, anio }) });
     toast(`Factura global timbrada — UUID ${d.uuid}`, 'success');
     closeModal('modal-cfdi-confirmar');
-    document.getElementById('cfdi-preview').textContent = '';
     _cfdiPendiente = null;
     loadHistorialCfdi();
   } catch(e) {
