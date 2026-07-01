@@ -3166,6 +3166,15 @@
           </div>
         </div>
 
+        <!-- Resumen para Declaración Mensual (ingresos + compras + IVA neto + ISR) -->
+        <div class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-bold" style="color:#64748B">RESUMEN — DECLARACIÓN MENSUAL (día 17)</p>
+            <button onclick="loadDeclaracionMensual()" class="px-3 py-1.5 rounded-xl text-xs font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Actualizar</button>
+          </div>
+          <div id="decl-mensual-body" class="text-xs" style="color:#94A3B8">Selecciona mes/año abajo y presiona Actualizar.</div>
+        </div>
+
         <!-- Config Facturama -->
         <div class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
           <p class="text-xs font-bold mb-3" style="color:#64748B">CONEXIÓN FACTURAMA Y DATOS FISCALES DEL EMISOR</p>
@@ -12293,6 +12302,44 @@ async function loadCfdiGlobal() {
   } catch(e) {}
 
   loadHistorialCfdi();
+  loadDeclaracionMensual();
+}
+
+async function loadDeclaracionMensual() {
+  const mes = document.getElementById('cfdi-mes')?.value;
+  const anio = document.getElementById('cfdi-anio')?.value;
+  const box = document.getElementById('decl-mensual-body');
+  if (!mes || !anio || !box) return;
+  box.innerHTML = 'Calculando...';
+  try {
+    const d = await apiFetch(`/cfdi/declaracion-mensual?mes=${mes}&anio=${anio}`);
+    const ivaColor = d.iva_a_pagar >= 0 ? '#EF4444' : '#16A34A';
+    const ivaLabel = d.iva_a_pagar >= 0 ? 'IVA a pagar' : 'Saldo a favor de IVA';
+    box.innerHTML = `
+      <div class="grid grid-cols-4 gap-3 mb-3">
+        <div class="rounded-xl p-3 text-center" style="background:#F0FDF4;border:1px solid #BBF7D0">
+          <p class="text-[10px]" style="color:#64748B">Ingresos (${d.ingresos.num_ventas} ventas)</p>
+          <p class="text-sm font-black" style="color:#16A34A">$${d.ingresos.subtotal.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">IVA cobrado $${d.ingresos.iva.toFixed(2)}</p>
+        </div>
+        <div class="rounded-xl p-3 text-center" style="background:#FFF7ED;border:1px solid #FDE68A">
+          <p class="text-[10px]" style="color:#64748B">Compras (${d.compras.num_facturas} facturas)</p>
+          <p class="text-sm font-black" style="color:#D97706">$${d.compras.subtotal.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">IVA acreditable $${d.compras.iva.toFixed(2)}</p>
+        </div>
+        <div class="rounded-xl p-3 text-center" style="background:#FEF2F2;border:1px solid #FECACA">
+          <p class="text-[10px]" style="color:#64748B">${ivaLabel}</p>
+          <p class="text-sm font-black" style="color:${ivaColor}">$${Math.abs(d.iva_a_pagar).toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">cobrado − acreditable</p>
+        </div>
+        <div class="rounded-xl p-3 text-center" style="background:#F0F9FF;border:1px solid #BAE6FD">
+          <p class="text-[10px]" style="color:#64748B">ISR estimado (tasa ${(d.isr.tasa_aplicable*100).toFixed(2)}%)</p>
+          <p class="text-sm font-black" style="color:#0284C7">$${d.isr.isr_acumulado_estimado.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">sobre acumulado del año</p>
+        </div>
+      </div>
+      <div class="p-2 rounded-xl" style="background:#F8FAFC;color:#64748B">${d.isr.nota}</div>`;
+  } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
 }
 
 async function guardarConfigCfdi() {

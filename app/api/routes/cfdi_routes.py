@@ -5,7 +5,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, Configuracion
+from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, Configuracion, FacturaCompra
 from app.api.routes.auth_routes import get_current_api_user
 from app.services import facturama_service
 import app.config as cfg
@@ -27,6 +27,24 @@ def _rango(mes: int, anio: int):
     fi = datetime(anio, mes, 1)
     ff = datetime(anio + 1, 1, 1) if mes == 12 else datetime(anio, mes + 1, 1)
     return fi, ff
+
+
+# Tabla ISR RESICO personas físicas (Art. 113-E LISR) — tasa sobre ingreso ACUMULADO
+# desde enero (no marginal: se aplica una sola tasa a todo el acumulado según el rango).
+_ISR_BRACKETS = [
+    (25_000.00, 0.010),
+    (50_000.00, 0.011),
+    (83_333.33, 0.015),
+    (208_333.33, 0.020),
+    (291_666.67, 0.025),
+]
+
+
+def _tasa_isr(acumulado: float) -> float:
+    for limite, tasa in _ISR_BRACKETS:
+        if acumulado <= limite:
+            return tasa
+    return _ISR_BRACKETS[-1][1]  # arriba del tope RESICO — igual se usa la tasa máxima como referencia
 
 
 def _leer_config_facturacion(db) -> dict:
@@ -65,6 +83,85 @@ def _agregar_ventas_pendientes(db, mes: int, anio: int):
     iva = sum(v.iva or 0.0 for v in ventas)
     total = sum(v.total or 0.0 for v in ventas)
     return ventas, subtotal, iva, total
+
+
+@router.get("/declaracion-mensual")
+def declaracion_mensual(
+    mes: int = Query(..., ge=1, le=12),
+    anio: int = Query(..., ge=2020, le=2100),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Junta ingresos (ventas), compras (facturas de proveedor), IVA neto e ISR
+    estimado del mes — para tener en un solo lugar lo que se declara ante el SAT."""
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        fi, ff = _rango(mes, anio)
+
+        # Ingresos del mes: TODAS las ventas completadas (facturadas o no) — el ISR/IVA
+        # se causan al cobrar, no al timbrar el CFDI global.
+        ventas_mes = (
+            db.query(Venta)
+            .filter(Venta.creado_en >= fi, Venta.creado_en < ff,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True))
+            .all()
+        )
+        ing_subtotal = sum(v.subtotal or 0.0 for v in ventas_mes)
+        ing_iva = sum(v.iva or 0.0 for v in ventas_mes)
+        ing_total = sum(v.total or 0.0 for v in ventas_mes)
+
+        # Compras del mes (facturas de proveedor registradas)
+        compras_mes = (
+            db.query(FacturaCompra)
+            .filter(FacturaCompra.fecha_factura >= fi.date(), FacturaCompra.fecha_factura < ff.date())
+            .all()
+        )
+        com_subtotal = sum(c.subtotal or 0.0 for c in compras_mes)
+        com_iva = sum(c.iva or 0.0 for c in compras_mes)
+        com_total = sum(c.total or 0.0 for c in compras_mes)
+
+        # Ingreso ACUMULADO desde el 1-enero del año hasta fin del mes seleccionado —
+        # la tasa ISR de RESICO se determina por el acumulado, no por el mes aislado.
+        fi_anio = datetime(anio, 1, 1)
+        ventas_acumuladas = (
+            db.query(Venta)
+            .filter(Venta.creado_en >= fi_anio, Venta.creado_en < ff,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True))
+            .all()
+        )
+        ingreso_acumulado = sum(v.subtotal or 0.0 for v in ventas_acumuladas)
+        tasa = _tasa_isr(ingreso_acumulado)
+        isr_acumulado_anio = round(ingreso_acumulado * tasa, 2)
+
+        return {
+            "mes": mes, "anio": anio,
+            "ingresos": {
+                "num_ventas": len(ventas_mes),
+                "subtotal": round(ing_subtotal, 2),
+                "iva": round(ing_iva, 2),
+                "total": round(ing_total, 2),
+            },
+            "compras": {
+                "num_facturas": len(compras_mes),
+                "subtotal": round(com_subtotal, 2),
+                "iva": round(com_iva, 2),
+                "total": round(com_total, 2),
+            },
+            "iva_a_pagar": round(ing_iva - com_iva, 2),
+            "isr": {
+                "ingreso_acumulado_anio": round(ingreso_acumulado, 2),
+                "tasa_aplicable": tasa,
+                "isr_acumulado_estimado": isr_acumulado_anio,
+                "nota": "Este acumulado es SOLO de lo registrado en este sistema. El ISR real "
+                        "de este mes = ISR acumulado − lo ya pagado en meses previos del año, "
+                        "dato que este sistema no tiene. Verifica el importe exacto en tu Buzón "
+                        "Tributario o con tu contador antes de declarar.",
+            },
+        }
+    finally:
+        db.close()
 
 
 @router.get("/preview")
