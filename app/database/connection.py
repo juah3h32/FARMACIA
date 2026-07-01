@@ -119,6 +119,10 @@ def _migrate():
         ("clientes",     "notas_internas",    "TEXT"),
         ("ventas",       "facturada",         "INTEGER NOT NULL DEFAULT 0"),
         ("ventas",       "cfdi_global_id",    "INTEGER"),
+        ("cfdi_facturas_globales", "xml_url", "VARCHAR(500)"),
+        ("cfdi_facturas_globales", "pdf_url", "VARCHAR(500)"),
+        ("facturas_compra",        "xml_url", "VARCHAR(500)"),
+        ("facturas_compra",        "pdf_url", "VARCHAR(500)"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
@@ -131,6 +135,28 @@ def _migrate():
             except Exception:
                 pass  # column already exists — skip
 
+    # Tables added after the initial schema — must exist in Turso too, not just local.
+    # sync_service.py syncs rows assuming the table is already there; CREATE TABLE IF NOT
+    # EXISTS here is what actually creates it in the cloud (desktop app never runs
+    # Base.metadata.create_all against Turso — that only happens on Vercel).
+    new_tables_ddl = [
+        "CREATE TABLE IF NOT EXISTS cfdi_facturas_globales ("
+        "id INTEGER PRIMARY KEY, mes INTEGER NOT NULL, anio INTEGER NOT NULL, "
+        "subtotal REAL DEFAULT 0.0, iva REAL DEFAULT 0.0, total REAL DEFAULT 0.0, "
+        "num_ventas INTEGER DEFAULT 0, estado VARCHAR(20) DEFAULT 'timbrada', "
+        "facturama_id VARCHAR(50), uuid_fiscal VARCHAR(50), serie VARCHAR(10), folio VARCHAR(20), "
+        "xml_path VARCHAR(300), pdf_path VARCHAR(300), xml_url VARCHAR(500), pdf_url VARCHAR(500), "
+        "error_mensaje TEXT, usuario_id INTEGER REFERENCES usuarios(id), "
+        "creado_en DATETIME, cancelado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS facturas_compra ("
+        "id INTEGER PRIMARY KEY, proveedor_id INTEGER REFERENCES proveedores(id), "
+        "proveedor_nombre VARCHAR(150) NOT NULL, proveedor_rfc VARCHAR(20), "
+        "folio_fiscal VARCHAR(50), fecha_factura DATE NOT NULL, "
+        "subtotal REAL DEFAULT 0.0, iva REAL DEFAULT 0.0, total REAL NOT NULL, concepto TEXT, "
+        "xml_path VARCHAR(300), pdf_path VARCHAR(300), xml_url VARCHAR(500), pdf_url VARCHAR(500), "
+        "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME)",
+    ]
+
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).
     # We cannot rely on `added` here because columns added manually to local DB won't be
     # in `added`, yet Turso may still be missing them.
@@ -141,6 +167,9 @@ def _migrate():
         try:
             payload = {
                 "requests": [
+                    {"type": "execute", "stmt": {"sql": ddl, "args": []}}
+                    for ddl in new_tables_ddl
+                ] + [
                     {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
                     for t, c, ct in new_cols
                 ] + [{"type": "close"}]

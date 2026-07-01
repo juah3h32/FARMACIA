@@ -22,10 +22,12 @@ BACKUP_KEEP    = 7  # days of local backups to retain
 _WATERMARK_FILE = cfg.DATA_DIR / "watermarks.json"
 
 # FK-dependency order (import & sync must respect this)
+# cfdi_facturas_globales va antes de ventas porque ventas.cfdi_global_id la referencia
 _TABLE_ORDER = [
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
-    "productos", "lotes", "ventas", "items_venta",
-    "compras", "items_compra", "cortes_caja", "retiros_caja", "movimientos_stock", "auditoria_log",
+    "productos", "lotes", "cfdi_facturas_globales", "ventas", "items_venta",
+    "compras", "items_compra", "facturas_compra", "cortes_caja", "retiros_caja",
+    "movimientos_stock", "auditoria_log",
 ]
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
@@ -34,12 +36,14 @@ _TABLE_ORDER = [
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
+    "cfdi_facturas_globales", "facturas_compra",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
 # (each PC may have a subset; deletions happen via soft-delete / purge only)
 _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
-                               "compras", "items_compra", "cortes_caja", "retiros_caja"})
+                               "compras", "items_compra", "cortes_caja", "retiros_caja",
+                               "cfdi_facturas_globales", "facturas_compra"})
 
 # Watermark per table: last id synced to Turso (append-only tables only)
 # Persisted to disk so restarts don't re-send the entire history.
@@ -175,8 +179,8 @@ def _turso_read_table(table: str) -> tuple[list[str], list[tuple]]:
 # Reverse FK order for safe deletion (children before parents)
 _PURGE_ORDER = [
     "auditoria_log", "movimientos_stock", "cortes_caja",
-    "items_compra", "compras",
-    "items_venta", "ventas",
+    "items_compra", "compras", "facturas_compra",
+    "items_venta", "ventas", "cfdi_facturas_globales",
     "lotes", "productos",
     "clientes", "proveedores", "categorias",
 ]

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 from typing import Optional
 from datetime import date, datetime
 from pathlib import Path
@@ -52,8 +52,8 @@ def listar_facturas_compra(
                 "iva": r.iva or 0.0,
                 "total": r.total or 0.0,
                 "concepto": r.concepto or "",
-                "tiene_xml": bool(r.xml_path),
-                "tiene_pdf": bool(r.pdf_path),
+                "tiene_xml": bool(r.xml_path or r.xml_url),
+                "tiene_pdf": bool(r.pdf_path or r.pdf_url),
                 "creado_en": r.creado_en.isoformat() if r.creado_en else None,
             }
             for r in rows
@@ -124,6 +124,16 @@ async def crear_factura_compra(
             p = d / f"{r.id}.pdf"
             p.write_bytes(await pdf.read())
             r.pdf_path = str(p)
+
+        # Respaldo en la nube (Cloudinary) — falla en silencio, no bloquea el registro
+        try:
+            from app.services.cloudinary_service import upload_documento
+            if r.xml_path:
+                r.xml_url = upload_documento(r.xml_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.xml")
+            if r.pdf_path:
+                r.pdf_url = upload_documento(r.pdf_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.pdf")
+        except Exception:
+            pass
         db.commit()
         return {"ok": True, "id": r.id}
     except Exception as e:
@@ -139,14 +149,16 @@ def descargar_xml(fid: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(FacturaCompra).filter(FacturaCompra.id == fid).first()
-        if not r or not r.xml_path:
+        if not r or (not r.xml_path and not r.xml_url):
             raise HTTPException(status_code=404, detail="No encontrado")
-        p = Path(r.xml_path)
-        if not p.exists():
-            raise HTTPException(status_code=404, detail="Archivo no encontrado en disco")
-        return Response(content=p.read_bytes(), media_type="application/xml", headers={
-            "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.xml"'
-        })
+        p = Path(r.xml_path) if r.xml_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/xml", headers={
+                "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.xml"'
+            })
+        if r.xml_url:
+            return RedirectResponse(r.xml_url)
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en disco ni en la nube")
     finally:
         db.close()
 
@@ -157,14 +169,16 @@ def descargar_pdf(fid: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(FacturaCompra).filter(FacturaCompra.id == fid).first()
-        if not r or not r.pdf_path:
+        if not r or (not r.pdf_path and not r.pdf_url):
             raise HTTPException(status_code=404, detail="No encontrado")
-        p = Path(r.pdf_path)
-        if not p.exists():
-            raise HTTPException(status_code=404, detail="Archivo no encontrado en disco")
-        return Response(content=p.read_bytes(), media_type="application/pdf", headers={
-            "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.pdf"'
-        })
+        p = Path(r.pdf_path) if r.pdf_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/pdf", headers={
+                "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.pdf"'
+            })
+        if r.pdf_url:
+            return RedirectResponse(r.pdf_url)
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en disco ni en la nube")
     finally:
         db.close()
 
@@ -182,6 +196,14 @@ def eliminar_factura_compra(fid: int, payload: dict = Depends(get_current_api_us
                 p = Path(path_str)
                 if p.exists():
                     p.unlink()
+        try:
+            from app.services.cloudinary_service import delete_documento
+            if r.xml_url:
+                delete_documento("FARMACIA/FACTURAS_COMPRA", f"{r.id}.xml")
+            if r.pdf_url:
+                delete_documento("FARMACIA/FACTURAS_COMPRA", f"{r.id}.pdf")
+        except Exception:
+            pass
         db.delete(r)
         db.commit()
         return {"ok": True}

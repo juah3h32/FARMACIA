@@ -227,6 +227,8 @@ class CfdiFacturaGlobal(Base):
     folio = Column(String(20))
     xml_path = Column(String(300))
     pdf_path = Column(String(300))
+    xml_url = Column(String(500))  # respaldo en Cloudinary
+    pdf_url = Column(String(500))  # respaldo en Cloudinary
     error_mensaje = Column(Text)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     creado_en = Column(DateTime, default=_dt.now)
@@ -256,6 +258,8 @@ class FacturaCompra(Base):
     concepto = Column(Text)
     xml_path = Column(String(300))
     pdf_path = Column(String(300))
+    xml_url = Column(String(500))  # respaldo en Cloudinary
+    pdf_url = Column(String(500))  # respaldo en Cloudinary
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     creado_en = Column(DateTime, default=_dt.now)
 

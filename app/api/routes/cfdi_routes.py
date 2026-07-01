@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from datetime import datetime, date
 from pathlib import Path
@@ -172,12 +172,24 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         pdf_path.write_bytes(resultado["pdf_bytes"])
         xml_path.write_bytes(resultado["xml_bytes"])
 
+        # Respaldo en la nube (Cloudinary) — no debe tumbar el timbrado si falla,
+        # el CFDI ya quedó fiscalmente válido en este punto.
+        pdf_url = xml_url = None
+        try:
+            from app.services.cloudinary_service import upload_documento
+            public_id = f"{body.anio}-{body.mes:02d}"
+            pdf_url = upload_documento(str(pdf_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.pdf")
+            xml_url = upload_documento(str(xml_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.xml")
+        except Exception:
+            pass
+
         registro = CfdiFacturaGlobal(
             mes=body.mes, anio=body.anio, subtotal=subtotal, iva=iva, total=total,
             num_ventas=len(ventas), estado="timbrada",
             facturama_id=resultado["facturama_id"], uuid_fiscal=resultado["uuid"],
             serie=resultado["serie"], folio=resultado["folio"],
             pdf_path=str(pdf_path), xml_path=str(xml_path),
+            pdf_url=pdf_url, xml_url=xml_url,
             usuario_id=int(payload["sub"]) if payload.get("sub") else None,
         )
         db.add(registro)
@@ -231,14 +243,16 @@ def descargar_pdf(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
-        if not r or not r.pdf_path:
+        if not r or (not r.pdf_path and not r.pdf_url):
             raise HTTPException(status_code=404, detail="No encontrado")
-        p = Path(r.pdf_path)
-        if not p.exists():
-            raise HTTPException(status_code=404, detail="Archivo PDF no encontrado en disco")
-        return Response(content=p.read_bytes(), media_type="application/pdf", headers={
-            "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.pdf"'
-        })
+        p = Path(r.pdf_path) if r.pdf_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/pdf", headers={
+                "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.pdf"'
+            })
+        if r.pdf_url:
+            return RedirectResponse(r.pdf_url)
+        raise HTTPException(status_code=404, detail="Archivo PDF no encontrado en disco ni en la nube")
     finally:
         db.close()
 
@@ -249,14 +263,16 @@ def descargar_xml(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
-        if not r or not r.xml_path:
+        if not r or (not r.xml_path and not r.xml_url):
             raise HTTPException(status_code=404, detail="No encontrado")
-        p = Path(r.xml_path)
-        if not p.exists():
-            raise HTTPException(status_code=404, detail="Archivo XML no encontrado en disco")
-        return Response(content=p.read_bytes(), media_type="application/xml", headers={
-            "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.xml"'
-        })
+        p = Path(r.xml_path) if r.xml_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/xml", headers={
+                "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.xml"'
+            })
+        if r.xml_url:
+            return RedirectResponse(r.xml_url)
+        raise HTTPException(status_code=404, detail="Archivo XML no encontrado en disco ni en la nube")
     finally:
         db.close()
 

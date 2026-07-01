@@ -43,3 +43,24 @@ def delete_product_image(product_id: int) -> None:
         cloudinary.uploader.destroy(f"FARMACIA/PRODUCTOS/producto_{product_id}")
     except Exception:
         pass
+
+
+def upload_documento(file_path: str, folder: str, public_id: str) -> str:
+    """Sube un archivo (XML/PDF) como raw a Cloudinary para respaldo en la nube."""
+    _configure()
+    result = cloudinary.uploader.upload(
+        file_path,
+        folder=folder,
+        public_id=public_id,
+        overwrite=True,
+        resource_type="raw",
+    )
+    return result["secure_url"]
+
+
+def delete_documento(folder: str, public_id: str) -> None:
+    _configure()
+    try:
+        cloudinary.uploader.destroy(f"{folder}/{public_id}", resource_type="raw")
+    except Exception:
+        pass
