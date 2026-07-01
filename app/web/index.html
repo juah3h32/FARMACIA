@@ -3200,7 +3200,7 @@
               <input id="cfdi-anio" type="number" class="px-3 py-2 rounded-xl border text-sm block" style="border-color:#E2E8F0;width:100px">
             </div>
             <button onclick="previewFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Vista previa</button>
-            <button onclick="timbrarFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
+            <button onclick="abrirConfirmacionTimbrado()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
               <i data-lucide="stamp" style="width:14px;height:14px;display:inline"></i> Timbrar factura
             </button>
           </div>
@@ -3227,6 +3227,31 @@
 </div><!-- /app -->
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: CONFIRMAR FACTURA GLOBAL CFDI ANTES DE TIMBRAR
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-confirmar" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-confirmar')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:560px;max-height:88vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">Confirmar datos del CFDI</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Revisa TODO antes de timbrar — es fiscalmente irreversible</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-confirmar')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="cfdi-confirmar-body" class="px-5 pb-3 overflow-auto text-sm" style="flex:1"></div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end" style="border-top:1px solid #F1F5F9">
+      <button onclick="closeModal('modal-cfdi-confirmar')" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Cancelar</button>
+      <button id="cfdi-confirmar-btn" onclick="confirmarYTimbrarFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
+        <i data-lucide="stamp" style="width:14px;height:14px;display:inline"></i> Todo correcto, timbrar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: MENÚ RÁPIDO / COMMAND PALETTE
@@ -12193,16 +12218,78 @@ async function previewFacturaGlobal() {
   } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
 }
 
-async function timbrarFacturaGlobal() {
+let _cfdiPendiente = null; // { mes, anio } de la última vista previa confirmada en el modal
+
+async function abrirConfirmacionTimbrado() {
   const mes = parseInt(document.getElementById('cfdi-mes').value);
   const anio = parseInt(document.getElementById('cfdi-anio').value);
-  if (!confirm(`¿Timbrar la factura global de ${CFDI_MESES[mes-1]} ${anio}? Esta acción es fiscalmente irreversible y consume un timbre de tu plan Facturama.`)) return;
+  const body = document.getElementById('cfdi-confirmar-body');
+  const btn = document.getElementById('cfdi-confirmar-btn');
+  body.innerHTML = '<p class="text-xs py-6 text-center" style="color:#94A3B8">Consultando datos del periodo...</p>';
+  btn.disabled = true; btn.style.opacity = .5;
+  openModal('modal-cfdi-confirmar');
+  try {
+    const d = await apiFetch(`/cfdi/preview?mes=${mes}&anio=${anio}`);
+    const fila = (k,v) => `<div class="flex justify-between py-1"><span style="color:#94A3B8">${k}</span><span style="color:#0F172A;font-weight:600;text-align:right">${v}</span></div>`;
+
+    if (d.ya_facturado) {
+      body.innerHTML = `<p class="text-sm font-bold" style="color:#F59E0B">Este periodo ya tiene una factura global timbrada. Cancélala primero si necesitas corregirla.</p>`;
+      return;
+    }
+    if (!d.num_ventas) {
+      body.innerHTML = `<p class="text-sm font-bold" style="color:#F59E0B">No hay ventas pendientes de facturar en ${CFDI_MESES[mes-1]} ${anio}.</p>`;
+      return;
+    }
+
+    let html = '';
+    if (d.datos_incompletos && d.datos_incompletos.length) {
+      html += `<div class="mb-3 p-3 rounded-xl text-xs font-bold" style="background:#FEF2F2;color:#EF4444">Faltan datos: ${d.datos_incompletos.join(', ')}. Complétalos en la sección de configuración antes de timbrar.</div>`;
+    }
+    if (d.sandbox) {
+      html += `<div class="mb-3 p-2 rounded-xl text-xs font-bold text-center" style="background:#FEF3C7;color:#92400E">MODO PRUEBA (SANDBOX) — este timbrado no es fiscalmente válido</div>`;
+    }
+    html += `<p class="text-xs font-bold mb-1" style="color:#64748B">EMISOR</p>`;
+    html += fila('Razón social', d.emisor.razon_social || '—');
+    html += fila('RFC', d.emisor.rfc || '—');
+    html += fila('Régimen fiscal', d.emisor.regimen_fiscal || '—');
+    html += fila('C.P. expedición', d.emisor.cp || '—');
+    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">RECEPTOR</p>`;
+    html += fila('RFC', d.receptor.rfc);
+    html += fila('Nombre', d.receptor.nombre);
+    html += fila('Uso CFDI', d.receptor.uso_cfdi);
+    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">CONCEPTO (GLOBAL, 1 PARTIDA)</p>`;
+    html += fila('Clave prod/serv', d.concepto.clave_prod_serv);
+    html += fila('Descripción', d.concepto.descripcion);
+    html += `<p class="text-xs font-bold mt-3 mb-1" style="color:#64748B">IMPORTES (${d.num_ventas} venta(s) agregadas)</p>`;
+    html += fila('Subtotal', `$${d.subtotal.toFixed(2)}`);
+    html += fila('IVA', `$${d.iva.toFixed(2)}`);
+    html += `<div class="flex justify-between py-2 mt-1 border-t" style="border-color:#F1F5F9"><span style="color:#0F172A;font-weight:700">TOTAL</span><span style="color:#16A34A;font-weight:900;font-size:1.05rem">$${d.total.toFixed(2)}</span></div>`;
+    body.innerHTML = html;
+
+    _cfdiPendiente = { mes, anio };
+    const bloqueado = (d.datos_incompletos && d.datos_incompletos.length);
+    btn.disabled = !!bloqueado; btn.style.opacity = bloqueado ? .5 : 1;
+  } catch(e) {
+    body.innerHTML = `<p class="text-sm font-bold" style="color:#EF4444">${e.message}</p>`;
+  }
+}
+
+async function confirmarYTimbrarFacturaGlobal() {
+  if (!_cfdiPendiente) return;
+  const { mes, anio } = _cfdiPendiente;
+  const btn = document.getElementById('cfdi-confirmar-btn');
+  btn.disabled = true; btn.style.opacity = .5;
   try {
     const d = await apiFetch('/cfdi/timbrar-global', { method:'POST', body: JSON.stringify({ mes, anio }) });
     toast(`Factura global timbrada — UUID ${d.uuid}`, 'success');
+    closeModal('modal-cfdi-confirmar');
     document.getElementById('cfdi-preview').textContent = '';
+    _cfdiPendiente = null;
     loadHistorialCfdi();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    toast(e.message, 'error');
+    btn.disabled = false; btn.style.opacity = 1;
+  }
 }
 
 async function loadHistorialCfdi() {

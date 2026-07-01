@@ -83,6 +83,14 @@ def preview_factura_global(
             .first()
         )
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, mes, anio)
+        fconf = _leer_config_facturacion(db)
+        faltantes = [
+            campo for campo, label in [
+                ("facturama_user", "usuario Facturama"), ("facturama_password", "contraseña Facturama"),
+                ("emisor_rfc", "RFC emisor"), ("emisor_regimen_fiscal", "régimen fiscal emisor"),
+                ("emisor_cp", "código postal emisor"),
+            ] if not fconf.get(campo)
+        ]
         return {
             "mes": mes, "anio": anio,
             "num_ventas": len(ventas),
@@ -90,6 +98,25 @@ def preview_factura_global(
             "iva": round(iva, 2),
             "total": round(total, 2),
             "ya_facturado": bool(ya_existe),
+            "emisor": {
+                "razon_social": fconf["emisor_razon_social"],
+                "rfc": fconf["emisor_rfc"],
+                "regimen_fiscal": fconf["emisor_regimen_fiscal"],
+                "cp": fconf["emisor_cp"],
+            },
+            "receptor": {
+                "rfc": facturama_service.RFC_PUBLICO_GENERAL,
+                "nombre": "PUBLICO EN GENERAL",
+                "uso_cfdi": "S01",
+                "regimen_fiscal": "616",
+            },
+            "concepto": {
+                "clave_prod_serv": "01010101",
+                "descripcion": f"Venta de mercancías periodo {mes:02d}/{anio} (factura global)",
+                "clave_unidad": "ACT",
+            },
+            "sandbox": fconf["facturama_sandbox"],
+            "datos_incompletos": faltantes,
         }
     finally:
         db.close()
