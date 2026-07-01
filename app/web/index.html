@@ -23,6 +23,65 @@
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
+<!-- ═══════════ MODAL CIERRE MENSUAL RESICO ═══════════ -->
+<div id="modal-cierre-resico" class="fixed inset-0 z-[980] hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.7);backdrop-filter:blur(6px)" onclick="closeCierreResico()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:420px">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 rounded-t-2xl" style="background:linear-gradient(135deg,#0891B2,#0e7490)">
+      <div class="flex items-center gap-2">
+        <i data-lucide="file-badge" style="width:20px;height:20px;color:#fff"></i>
+        <div>
+          <p class="font-bold text-white text-sm">Cierre Mensual RESICO</p>
+          <p class="text-xs" style="color:rgba(255,255,255,.75)">Reporte para declaración al SAT</p>
+        </div>
+      </div>
+      <button onclick="closeCierreResico()" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/20" style="color:#fff">
+        <i data-lucide="x" style="width:15px;height:15px"></i>
+      </button>
+    </div>
+    <!-- Body -->
+    <div class="p-5 space-y-4">
+      <!-- Info box -->
+      <div class="rounded-xl p-3 flex items-start gap-2" style="background:#E0F2FE;border:1px solid #BAE8FF">
+        <i data-lucide="info" style="width:15px;height:15px;color:#0891B2;flex-shrink:0;margin-top:1px"></i>
+        <p class="text-xs" style="color:#0C4A6E;line-height:1.5">Genera un PDF mensual con resumen diario y detalle de ventas para entregar a tu contador y declarar ingresos bajo RESICO.</p>
+      </div>
+      <!-- Month / Year selectors -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color:#374151">Mes</label>
+          <select id="cierre-mes" class="w-full h-10 px-3 rounded-xl border text-sm outline-none" style="border-color:#E2E8F0;font-family:Inter,sans-serif">
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color:#374151">Año</label>
+          <input id="cierre-anio" type="number" min="2020" max="2100" class="w-full h-10 px-3 rounded-xl border text-sm outline-none" style="border-color:#E2E8F0;font-family:Inter,sans-serif">
+        </div>
+      </div>
+    </div>
+    <!-- Footer buttons -->
+    <div class="flex gap-2 px-5 pb-5">
+      <button onclick="closeCierreResico()" class="flex-1 h-10 rounded-xl text-sm font-semibold border" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="generarCierreResico()" class="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style="background:linear-gradient(135deg,#0891B2,#0e7490)">
+        <i data-lucide="download" style="width:15px;height:15px"></i> Generar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL TERMINAL MP ═══════════ -->
 <div id="modal-mp-terminal" class="fixed inset-0 z-[999] hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.7);backdrop-filter:blur(6px)"></div>
@@ -1577,6 +1636,11 @@
                   class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:bg-slate-50"
                   style="border-color:#E2E8F0;color:#374151">
             <i data-lucide="file-text" style="width:14px;height:14px;color:#EF4444"></i> PDF
+          </button>
+          <button onclick="openCierreResico()"
+                  class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:opacity-90"
+                  style="border-color:#0891B2;color:#0891B2;background:#E0F2FE">
+            <i data-lucide="file-badge" style="width:14px;height:14px"></i> Cierre RESICO
           </button>
         </div>
 
@@ -7556,6 +7620,72 @@ async function exportVentasPDF() {
   } catch(e) {
     toast('Error de conexión', 'error');
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// CIERRE MENSUAL RESICO
+// ══════════════════════════════════════════════════════════
+function openCierreResico() {
+  const hoy = new Date();
+  // Default: mes anterior
+  const mesAnterior = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
+  const anioAnterior = hoy.getMonth() === 0 ? hoy.getFullYear() - 1 : hoy.getFullYear();
+  document.getElementById('cierre-mes').value  = mesAnterior;
+  document.getElementById('cierre-anio').value = anioAnterior;
+  const m = document.getElementById('modal-cierre-resico');
+  m.classList.remove('hidden');
+  m.classList.add('flex');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeCierreResico() {
+  const m = document.getElementById('modal-cierre-resico');
+  m.classList.add('hidden');
+  m.classList.remove('flex');
+}
+
+async function generarCierreResico() {
+  const mes  = document.getElementById('cierre-mes').value;
+  const anio = document.getElementById('cierre-anio').value;
+  if (!mes || !anio) { toast('Selecciona mes y año', 'warning'); return; }
+  const qs = `mes=${mes}&anio=${anio}`;
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const defaultName = `Cierre_RESICO_${meses[+mes-1]}_${anio}.pdf`;
+
+  // Desktop: native Save-As dialog
+  if (window.pywebview?.api?.get_pdf_save_path) {
+    const savePath = await window.pywebview.api.get_pdf_save_path(defaultName);
+    if (!savePath) return;
+    closeCierreResico();
+    toast('Generando cierre RESICO…', 'info');
+    try {
+      const res = await fetch(`/api/reportes/save-cierre-mensual-pdf?${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${S.token}` },
+        body: JSON.stringify({ path: savePath }),
+      });
+      if (!res.ok) { toast('Error al guardar PDF', 'error'); return; }
+      toast(`PDF guardado: ${savePath.split(/[\\/]/).pop()}`, 'success');
+    } catch(e) { toast('Error de conexión', 'error'); }
+    return;
+  }
+
+  // Web fallback: blob download
+  closeCierreResico();
+  toast('Generando cierre RESICO…', 'info');
+  try {
+    const res = await api(`/reportes/cierre-mensual-pdf?${qs}`);
+    if (!res.ok) { toast('Error al generar PDF', 'error'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = defaultName;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('PDF cierre RESICO descargado', 'success');
+  } catch(e) { toast('Error de conexión', 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════
