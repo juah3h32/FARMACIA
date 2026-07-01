@@ -8,6 +8,11 @@ PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 443-423-1168"
 PHARMACY_RFC = "BESA9907157AA"
+# Datos fiscales para CFDI (persona física RESICO) — el nombre del emisor en el CFDI
+# debe ser el nombre registrado ante el SAT, no el nombre comercial de la farmacia.
+PHARMACY_RAZON_SOCIAL_FISCAL = "ADRIANA LIZETH BEDOLLA SALINAS"
+PHARMACY_CP_FISCAL = "58314"
+PHARMACY_REGIMEN_FISCAL = "626"  # Régimen Simplificado de Confianza (RESICO)
 
 BASE_DIR = Path(__file__).parent.parent
 

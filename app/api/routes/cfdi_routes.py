@@ -36,10 +36,10 @@ def _leer_config_facturacion(db) -> dict:
         "facturama_user":       d.get("facturama_user", ""),
         "facturama_password":   d.get("facturama_password", ""),
         "facturama_sandbox":    d.get("facturama_sandbox", "1") == "1",
-        "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_NAME,
+        "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_RAZON_SOCIAL_FISCAL,
         "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
-        "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal") or "626",
-        "emisor_cp":            d.get("emisor_cp", ""),
+        "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal") or cfg.PHARMACY_REGIMEN_FISCAL,
+        "emisor_cp":            d.get("emisor_cp") or cfg.PHARMACY_CP_FISCAL,
     }
 
 
