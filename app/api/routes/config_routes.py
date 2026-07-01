@@ -251,3 +251,76 @@ def test_alerta(payload: dict = Depends(get_current_api_user)):
         return {"ok": True}
     finally:
         db.close()
+
+
+# ── Facturación CFDI (Facturama) ─────────────────────────────────────────────
+
+_FACT_KEYS = [
+    "facturama_user", "facturama_password", "facturama_sandbox",
+    "emisor_razon_social", "emisor_rfc", "emisor_regimen_fiscal", "emisor_cp",
+]
+
+
+@router.get("/facturacion")
+def get_facturacion(payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        rows = db.query(Configuracion).filter(Configuracion.clave.in_(_FACT_KEYS)).all()
+        d = {r.clave: r.valor for r in rows}
+        return {
+            "facturama_user":       d.get("facturama_user", ""),
+            "facturama_password":   d.get("facturama_password", ""),
+            "facturama_sandbox":    d.get("facturama_sandbox", "1") == "1",
+            "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_NAME,
+            "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
+            "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal", ""),
+            "emisor_cp":            d.get("emisor_cp", ""),
+        }
+    finally:
+        db.close()
+
+
+class FacturacionIn(BaseModel):
+    facturama_user: str = ""
+    facturama_password: str = ""
+    facturama_sandbox: bool = True
+    emisor_razon_social: str = ""
+    emisor_rfc: str = ""
+    emisor_regimen_fiscal: str = ""
+    emisor_cp: str = ""
+
+
+@router.post("/facturacion")
+def set_facturacion(body: FacturacionIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        updates = {
+            "facturama_user":        body.facturama_user.strip(),
+            "facturama_password":    body.facturama_password.strip(),
+            "facturama_sandbox":     "1" if body.facturama_sandbox else "0",
+            "emisor_razon_social":   body.emisor_razon_social.strip(),
+            "emisor_rfc":            body.emisor_rfc.strip().upper(),
+            "emisor_regimen_fiscal": body.emisor_regimen_fiscal.strip(),
+            "emisor_cp":             body.emisor_cp.strip(),
+        }
+        for clave, valor in updates.items():
+            row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+            if row:
+                row.valor = valor
+            else:
+                db.add(Configuracion(clave=clave, valor=valor))
+        db.commit()
+        return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

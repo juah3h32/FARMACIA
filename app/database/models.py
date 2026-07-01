@@ -177,16 +177,20 @@ class Venta(Base):
     creado_en = Column(DateTime, default=_dt.now)
     eliminado = Column(Boolean, default=False)
     eliminado_en = Column(DateTime, nullable=True)
+    facturada = Column(Boolean, default=False)
+    cfdi_global_id = Column(Integer, ForeignKey("cfdi_facturas_globales.id"), nullable=True)
 
     usuario = relationship("Usuario", back_populates="ventas")
     cliente = relationship("Cliente", back_populates="ventas")
     items = relationship("ItemVenta", back_populates="venta", cascade="all, delete-orphan")
+    cfdi_global = relationship("CfdiFacturaGlobal", back_populates="ventas")
 
     __table_args__ = (
         Index("ix_ventas_creado_en",  "creado_en"),
         Index("ix_ventas_usuario_id", "usuario_id"),
         Index("ix_ventas_estado",     "estado"),
         Index("ix_ventas_eliminado",  "eliminado"),
+        Index("ix_ventas_facturada",  "facturada"),
     )
 
 
@@ -203,6 +207,37 @@ class ItemVenta(Base):
 
     venta = relationship("Venta", back_populates="items")
     producto = relationship("Producto", back_populates="items_venta")
+
+
+class CfdiFacturaGlobal(Base):
+    """Factura global mensual (CFDI 4.0) timbrada vía Facturama, concentra ventas del periodo"""
+    __tablename__ = "cfdi_facturas_globales"
+
+    id = Column(Integer, primary_key=True)
+    mes = Column(Integer, nullable=False)
+    anio = Column(Integer, nullable=False)
+    subtotal = Column(Float, default=0.0)
+    iva = Column(Float, default=0.0)
+    total = Column(Float, default=0.0)
+    num_ventas = Column(Integer, default=0)
+    estado = Column(String(20), default="timbrada")  # timbrada | cancelada | error
+    facturama_id = Column(String(50))
+    uuid_fiscal = Column(String(50))
+    serie = Column(String(10))
+    folio = Column(String(20))
+    xml_path = Column(String(300))
+    pdf_path = Column(String(300))
+    error_mensaje = Column(Text)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    creado_en = Column(DateTime, default=_dt.now)
+    cancelado_en = Column(DateTime, nullable=True)
+
+    usuario = relationship("Usuario")
+    ventas = relationship("Venta", back_populates="cfdi_global")
+
+    __table_args__ = (
+        Index("ix_cfdi_global_periodo", "anio", "mes"),
+    )
 
 
 class Compra(Base):

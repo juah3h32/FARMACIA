@@ -14,7 +14,7 @@ from app.api.routes import historial_routes, marketing_routes, config_routes
 from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, catalogo_web_routes
 from app.api.routes import credito_routes, recetas_routes, promociones_routes
 from app.api.routes import ordenes_compra_routes, citas_routes, inventario_ciclico_routes
-from app.api.routes import gastos_routes, alertas_routes
+from app.api.routes import gastos_routes, alertas_routes, cfdi_routes
 import uvicorn
 import app.config as cfg
 
@@ -195,6 +195,7 @@ app.include_router(citas_routes.router,              prefix="/api/citas",       
 app.include_router(inventario_ciclico_routes.router, prefix="/api/inventario-ciclico", tags=["Inventario Cíclico"])
 app.include_router(gastos_routes.router,             prefix="/api/gastos",             tags=["Gastos"])
 app.include_router(alertas_routes.router,            prefix="/api/alertas",            tags=["Alertas"])
+app.include_router(cfdi_routes.router,               prefix="/api/cfdi",               tags=["CFDI"])
 
 
 @app.get("/api/health")
