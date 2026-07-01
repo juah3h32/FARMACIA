@@ -735,8 +735,8 @@ def _build_cierre_mensual_pdf_bytes(mes: int, anio: int) -> bytes:  # noqa: C901
                                fontName="Helvetica-Bold", leading=10,
                                alignment=TA_CENTER))],
                 [Paragraph(money(total_ingresos),
-                           sty("tb2", fontSize=24, textColor=C_NAVY,
-                               fontName="Helvetica-Bold", leading=28,
+                           sty("tb2", fontSize=20, textColor=C_NAVY,
+                               fontName="Helvetica-Bold", leading=24,
                                alignment=TA_CENTER))],
                 [Paragraph(f"Período: {per_label}  ·  RFC: {rfc_val}",
                            sty("tb3", fontSize=7, textColor=C_MUTED,
@@ -748,23 +748,28 @@ def _build_cierre_mensual_pdf_bytes(mes: int, anio: int) -> bytes:  # noqa: C901
             ("BOX",           (0, 0), (-1, -1), 1.2, C_NAVY),
             ("LINEBELOW",     (0, 0), (-1, 0),  4,   C_NAVY),
             ("BACKGROUND",    (0, 0), (-1, -1), C_LIGHT),
-            ("TOPPADDING",    (0, 0), (-1, -1), 10),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING",    (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("LEFTPADDING",   (0, 0), (-1, -1), 0),
             ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
         ]))
-        story.append(KeepTogether(total_box))
-        story.append(Spacer(1, 0.5 * cm))
+        story.append(total_box)
+        story.append(Spacer(1, 0.9 * cm))
 
-        # 3 líneas de firma simétricas
+        # 3 líneas de firma simétricas — más altas
+        class _SigLineWide(_SigLine):
+            def __init__(self, w, label, subtext=""):
+                super().__init__(w, label, subtext)
+                self.height = 2.4 * cm  # más espacio para firmar
+
         sw = cw / 3
         sig_row = Table([[
-            _SigLine(sw, "Firma y Sello del Contador Público",
-                     "Cédula Profesional / RFC del Contador"),
-            _SigLine(sw, "Vo. Bo. del Responsable del Negocio",
-                     cfg.PHARMACY_NAME),
-            _SigLine(sw, "Fecha de Revisión y Entrega",
-                     "dd / mm / aaaa"),
+            _SigLineWide(sw, "Firma y Sello del Contador Público",
+                         "Cédula Profesional / RFC del Contador"),
+            _SigLineWide(sw, "Vo. Bo. del Responsable del Negocio",
+                         cfg.PHARMACY_NAME),
+            _SigLineWide(sw, "Fecha de Revisión y Entrega",
+                         "dd / mm / aaaa"),
         ]], colWidths=[sw, sw, sw])
         sig_row.setStyle(TableStyle([
             ("LEFTPADDING",   (0, 0), (-1, -1), 6),
@@ -773,19 +778,8 @@ def _build_cierre_mensual_pdf_bytes(mes: int, anio: int) -> bytes:  # noqa: C901
             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ("VALIGN",        (0, 0), (-1, -1), "BOTTOM"),
         ]))
-        story.append(KeepTogether(sig_row))
-        story.append(Spacer(1, 0.5 * cm))
-
-        # Nota legal
-        story.append(HRFlowable(width=cw, thickness=0.4, color=C_LINE, spaceAfter=4))
-        story.append(Paragraph(
-            "Este documento ha sido generado electrónicamente por el sistema de Punto de Venta. "
-            "Los ingresos consignados corresponden a las ventas realizadas y registradas durante el período indicado "
-            "para efectos de declaración mensual bajo el Régimen Simplificado de Confianza (RESICO) conforme al "
-            "Título IV, Capítulo II, Sección IV de la Ley del Impuesto Sobre la Renta (LISR). "
-            "Este reporte no sustituye al CFDI, ni a la declaración fiscal oficial presentada ante el SAT.",
-            s_legal,
-        ))
+        story.append(sig_row)
+        story.append(Spacer(1, 0.9 * cm))
 
         # ═══════════════════════════════════════════════════════════════════
         # BLOQUE QR — estilo constancia SAT / situación fiscal
@@ -818,21 +812,23 @@ def _build_cierre_mensual_pdf_bytes(mes: int, anio: int) -> bytes:  # noqa: C901
         pil_img.save(qr_buf, format="PNG")
         qr_buf.seek(0)
 
-        qr_size = 3.0 * cm
+        qr_size = 2.8 * cm
         qr_rl = RLImage(qr_buf, width=qr_size, height=qr_size)
 
-        txt_col = cw - qr_size - 0.5 * cm
-        qr_row = Table([[
+        # QR izquierda, info derecha
+        info_col = cw - qr_size - 0.4 * cm
+        qr_block = Table([[
+            qr_rl,
             [
                 Paragraph(
                     "VERIFICACIÓN DEL DOCUMENTO",
                     sty("qrtit", fontSize=7, textColor=C_NAVY,
                         fontName="Helvetica-Bold", leading=10),
                 ),
-                Spacer(1, 4),
+                Spacer(1, 5),
                 Paragraph(
                     f"<b>Contribuyente:</b> {cfg.PHARMACY_NAME}<br/>"
-                    f"<b>RFC:</b> {rfc_val}&nbsp;&nbsp;&nbsp;"
+                    f"<b>RFC:</b> {rfc_val}<br/>"
                     f"<b>Régimen:</b> Simplificado de Confianza (RESICO)<br/>"
                     f"<b>Período:</b> {per_label}&nbsp;&nbsp;&nbsp;"
                     f"<b>Total declarado:</b> {money(total_ingresos)}<br/>"
@@ -841,30 +837,39 @@ def _build_cierre_mensual_pdf_bytes(mes: int, anio: int) -> bytes:  # noqa: C901
                     sty("qrdet", fontSize=7, textColor=C_MUTED,
                         fontName="Helvetica", leading=11),
                 ),
-                Spacer(1, 6),
+                Spacer(1, 5),
                 Paragraph(
                     "Escanee el código QR para verificar los datos de esta declaración.",
                     sty("qrhint", fontSize=6, textColor=C_MUTED,
                         fontName="Helvetica", leading=9),
                 ),
             ],
-            qr_rl,
-        ]], colWidths=[txt_col, qr_size + 0.5 * cm])
-        qr_row.setStyle(TableStyle([
-            ("BOX",           (0, 0), (-1, -1), 0.8, C_NAVY),
-            ("LINEAFTER",     (0, 0), (0, -1),  0.4, C_LINE),
-            ("BACKGROUND",    (0, 0), (0, -1),  C_LIGHT),
-            ("BACKGROUND",    (1, 0), (1, -1),  C_WHITE),
+        ]], colWidths=[qr_size + 0.4 * cm, info_col])
+        qr_block.setStyle(TableStyle([
+            ("BOX",           (0, 0), (-1, -1), 0.6, C_NAVY),
+            ("LINEBEFORE",    (1, 0), (1, -1),  0.4, C_LINE),
+            ("BACKGROUND",    (0, 0), (-1, -1), C_LIGHT),
             ("TOPPADDING",    (0, 0), (-1, -1), 10),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-            ("VALIGN",        (0, 0), (0, -1),  "MIDDLE"),
-            ("VALIGN",        (1, 0), (1, -1),  "MIDDLE"),
-            ("ALIGN",         (1, 0), (1, -1),  "CENTER"),
+            ("LEFTPADDING",   (0, 0), (0, -1),  8),
+            ("RIGHTPADDING",  (0, 0), (0, -1),  8),
+            ("LEFTPADDING",   (1, 0), (1, -1),  10),
+            ("RIGHTPADDING",  (1, 0), (1, -1),  10),
+            ("ALIGN",         (0, 0), (0, -1),  "CENTER"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
         ]))
-        story.append(Spacer(1, 0.35 * cm))
-        story.append(KeepTogether(qr_row))
+        story.append(Spacer(1, 1.8 * cm))
+        story.append(KeepTogether(qr_block))
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(HRFlowable(width=cw, thickness=0.4, color=C_LINE, spaceAfter=5))
+        story.append(Paragraph(
+            "Este documento ha sido generado electrónicamente por el sistema de Punto de Venta. "
+            "Los ingresos consignados corresponden a las ventas realizadas y registradas durante el período indicado "
+            "para efectos de declaración mensual bajo el Régimen Simplificado de Confianza (RESICO) conforme al "
+            "Título IV, Capítulo II, Sección IV de la Ley del Impuesto Sobre la Renta (LISR). "
+            "Este reporte no sustituye al CFDI, ni a la declaración fiscal oficial presentada ante el SAT.",
+            s_legal,
+        ))
 
     finally:
         db.close()
