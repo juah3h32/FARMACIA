@@ -48,11 +48,12 @@ def crear_factura_global(
         "CfdiType": "I",
         "NameId": "1",
         "ExpeditionPlace": emisor_cp,
+        "Exportation": "01",  # Catálogo c_Exportacion — obligatorio en CFDI 4.0, "01" = No aplica
         "PaymentForm": "99",
         "PaymentMethod": "PUE",
         "Currency": "MXN",
         "GlobalInformation": {
-            "Periodicity": "04",  # Mensual (catálogo SAT c_Periodicidad)
+            "Periodicity": "04",  # Mensual (catálogo SAT c_Periodicidad) — único válido para RESICO
             "Months": f"{mes:02d}",
             "Year": str(anio),
         },
@@ -73,6 +74,7 @@ def crear_factura_global(
                 "UnitPrice": round(subtotal, 2),
                 "Quantity": 1,
                 "Subtotal": round(subtotal, 2),
+                "TaxObject": "02",  # Catálogo c_ObjetoImp — obligatorio en CFDI 4.0, "02" = Sí objeto de impuesto
                 "Taxes": [
                     {"Total": round(iva, 2), "Name": "IVA", "Base": round(subtotal, 2), "Rate": 0.16, "IsRetention": False}
                 ] if iva > 0 else [],
@@ -82,7 +84,7 @@ def crear_factura_global(
     }
 
     r = requests.post(
-        f"{_base_url(sandbox)}/api/2/cfdis",
+        f"{_base_url(sandbox)}/3/cfdis",
         headers=_auth_header(user, password),
         json=payload, timeout=30,
     )
@@ -130,13 +132,14 @@ def descargar_xml(user: str, password: str, sandbox: bool, facturama_id: str) ->
 
 
 def cancelar_cfdi(*, user: str, password: str, sandbox: bool, facturama_id: str, motivo: str = "02") -> None:
-    """motivo: catálogo SAT c_MotivoCancelacion. '02' = CFDI con errores sin relación (default seguro)."""
+    """motivo: catálogo SAT c_MotivoCancelacion. '02' = CFDI con errores sin relación (default seguro).
+    '01' (relacionada) requeriría uuidReplacement — no soportado aquí porque la factura global no tiene sustituta."""
     if not (user and password):
         raise FacturamaError("Credenciales de Facturama no configuradas")
     r = requests.delete(
-        f"{_base_url(sandbox)}/api/cfdi/{facturama_id}",
+        f"{_base_url(sandbox)}/cfdi/{facturama_id}",
         headers=_auth_header(user, password),
-        params={"motive": motivo},
+        params={"type": "issued", "motive": motivo},
         timeout=30,
     )
     _raise_for_facturama(r)

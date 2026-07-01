@@ -12228,6 +12228,7 @@ async function abrirConfirmacionTimbrado() {
     if (d.sandbox) {
       html += `<div class="mb-3 p-2 rounded-xl text-xs font-bold text-center" style="background:#FEF3C7;color:#92400E">MODO PRUEBA (SANDBOX) — este timbrado no es fiscalmente válido</div>`;
     }
+    html += `<div class="mb-3 p-2 rounded-xl text-xs text-center" style="background:#EFF6FF;color:#1d2140">Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24 horas siguientes al cierre del periodo. Para RESICO la periodicidad debe ser mensual — tímbrala apenas cierre el mes.</div>`;
 
     const hoy = new Date().toLocaleDateString('es-MX');
     html += `
