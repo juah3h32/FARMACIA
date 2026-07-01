@@ -240,6 +240,33 @@ class CfdiFacturaGlobal(Base):
     )
 
 
+class FacturaCompra(Base):
+    """Control de facturas (CFDI) recibidas de proveedores por compra de medicamentos"""
+    __tablename__ = "facturas_compra"
+
+    id = Column(Integer, primary_key=True)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"), nullable=True)
+    proveedor_nombre = Column(String(150), nullable=False)
+    proveedor_rfc = Column(String(20))
+    folio_fiscal = Column(String(50))  # UUID del CFDI emitido por el proveedor
+    fecha_factura = Column(Date, nullable=False)
+    subtotal = Column(Float, default=0.0)
+    iva = Column(Float, default=0.0)
+    total = Column(Float, nullable=False)
+    concepto = Column(Text)
+    xml_path = Column(String(300))
+    pdf_path = Column(String(300))
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    creado_en = Column(DateTime, default=_dt.now)
+
+    proveedor = relationship("Proveedor")
+    usuario = relationship("Usuario")
+
+    __table_args__ = (
+        Index("ix_facturas_compra_fecha", "fecha_factura"),
+    )
+
+
 class Compra(Base):
     """Entrada de mercancía de proveedores"""
     __tablename__ = "compras"

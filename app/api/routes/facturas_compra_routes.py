@@ -1,0 +1,194 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import Response
+from typing import Optional
+from datetime import date, datetime
+from pathlib import Path
+
+from app.database.connection import get_db_session
+from app.database.models import FacturaCompra
+from app.api.routes.auth_routes import get_current_api_user
+import app.config as cfg
+
+router = APIRouter()
+
+
+def _require_admin(payload):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+
+
+def _dir() -> Path:
+    d = cfg.DATA_DIR / "facturas_compra"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@router.get("")
+def listar_facturas_compra(
+    fecha_inicio: Optional[date] = Query(None),
+    fecha_fin: Optional[date] = Query(None),
+    proveedor_rfc: Optional[str] = Query(None),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        q = db.query(FacturaCompra)
+        if fecha_inicio:
+            q = q.filter(FacturaCompra.fecha_factura >= fecha_inicio)
+        if fecha_fin:
+            q = q.filter(FacturaCompra.fecha_factura <= fecha_fin)
+        if proveedor_rfc:
+            q = q.filter(FacturaCompra.proveedor_rfc == proveedor_rfc.strip().upper())
+        rows = q.order_by(FacturaCompra.fecha_factura.desc(), FacturaCompra.creado_en.desc()).all()
+        return [
+            {
+                "id": r.id,
+                "proveedor_nombre": r.proveedor_nombre,
+                "proveedor_rfc": r.proveedor_rfc or "",
+                "folio_fiscal": r.folio_fiscal or "",
+                "fecha_factura": r.fecha_factura.isoformat() if r.fecha_factura else None,
+                "subtotal": r.subtotal or 0.0,
+                "iva": r.iva or 0.0,
+                "total": r.total or 0.0,
+                "concepto": r.concepto or "",
+                "tiene_xml": bool(r.xml_path),
+                "tiene_pdf": bool(r.pdf_path),
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+@router.get("/resumen")
+def resumen_facturas_compra(
+    fecha_inicio: date = Query(...),
+    fecha_fin: date = Query(...),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        rows = db.query(FacturaCompra).filter(
+            FacturaCompra.fecha_factura >= fecha_inicio,
+            FacturaCompra.fecha_factura <= fecha_fin,
+        ).all()
+        return {
+            "num_facturas": len(rows),
+            "subtotal": sum(r.subtotal or 0.0 for r in rows),
+            "iva": sum(r.iva or 0.0 for r in rows),
+            "total": sum(r.total or 0.0 for r in rows),
+        }
+    finally:
+        db.close()
+
+
+@router.post("")
+async def crear_factura_compra(
+    proveedor_nombre: str = Form(...),
+    proveedor_rfc: str = Form(""),
+    folio_fiscal: str = Form(""),
+    fecha_factura: date = Form(...),
+    subtotal: float = Form(0.0),
+    iva: float = Form(0.0),
+    total: float = Form(...),
+    concepto: str = Form(""),
+    xml: Optional[UploadFile] = File(None),
+    pdf: Optional[UploadFile] = File(None),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = FacturaCompra(
+            proveedor_nombre=proveedor_nombre.strip(),
+            proveedor_rfc=proveedor_rfc.strip().upper() or None,
+            folio_fiscal=folio_fiscal.strip() or None,
+            fecha_factura=fecha_factura,
+            subtotal=subtotal, iva=iva, total=total,
+            concepto=concepto.strip() or None,
+            usuario_id=int(payload["sub"]) if payload.get("sub") else None,
+        )
+        db.add(r)
+        db.commit()
+        db.refresh(r)
+
+        d = _dir()
+        if xml is not None and xml.filename:
+            p = d / f"{r.id}.xml"
+            p.write_bytes(await xml.read())
+            r.xml_path = str(p)
+        if pdf is not None and pdf.filename:
+            p = d / f"{r.id}.pdf"
+            p.write_bytes(await pdf.read())
+            r.pdf_path = str(p)
+        db.commit()
+        return {"ok": True, "id": r.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/{fid}/xml")
+def descargar_xml(fid: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(FacturaCompra).filter(FacturaCompra.id == fid).first()
+        if not r or not r.xml_path:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        p = Path(r.xml_path)
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="Archivo no encontrado en disco")
+        return Response(content=p.read_bytes(), media_type="application/xml", headers={
+            "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.xml"'
+        })
+    finally:
+        db.close()
+
+
+@router.get("/{fid}/pdf")
+def descargar_pdf(fid: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(FacturaCompra).filter(FacturaCompra.id == fid).first()
+        if not r or not r.pdf_path:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        p = Path(r.pdf_path)
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="Archivo no encontrado en disco")
+        return Response(content=p.read_bytes(), media_type="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="factura_compra_{r.id}.pdf"'
+        })
+    finally:
+        db.close()
+
+
+@router.delete("/{fid}")
+def eliminar_factura_compra(fid: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(FacturaCompra).filter(FacturaCompra.id == fid).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        for path_str in (r.xml_path, r.pdf_path):
+            if path_str:
+                p = Path(path_str)
+                if p.exists():
+                    p.unlink()
+        db.delete(r)
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

@@ -3219,6 +3219,50 @@
         </div>
       </div>
 
+      <!-- ─── FACTURAS DE COMPRA (PROVEEDORES) ──────────────── -->
+      <div data-page="facturas-compra" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#D97706,#B45309)">
+              <i data-lucide="file-input" style="width:20px;height:20px;color:#fff"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-black" style="color:#0F172A">Facturas de Compra</h2>
+              <p class="text-xs" style="color:#64748B">Control de CFDI recibidos de proveedores por compra de medicamentos</p>
+            </div>
+          </div>
+          <button onclick="abrirModalFacturaCompra()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">
+            <i data-lucide="plus" style="width:14px;height:14px;display:inline"></i> Registrar factura
+          </button>
+        </div>
+
+        <div class="flex gap-3 mb-4 flex-shrink-0 items-end">
+          <div>
+            <label class="text-xs" style="color:#64748B">Desde</label>
+            <input type="date" id="fc-fi" class="px-3 py-2 rounded-xl text-sm border block" style="border-color:#E2E8F0">
+          </div>
+          <div>
+            <label class="text-xs" style="color:#64748B">Hasta</label>
+            <input type="date" id="fc-ff" class="px-3 py-2 rounded-xl text-sm border block" style="border-color:#E2E8F0">
+          </div>
+          <button onclick="loadFacturasCompra()" class="px-4 py-2 rounded-xl text-sm font-semibold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Filtrar</button>
+        </div>
+
+        <div id="fc-kpi" class="grid grid-cols-3 gap-3 mb-4 flex-shrink-0"></div>
+
+        <div class="flex-1 overflow-auto bg-white rounded-2xl border" style="border-color:#E2E8F0">
+          <table class="w-full text-sm">
+            <thead style="position:sticky;top:0;background:#fff">
+              <tr style="color:#94A3B8;text-align:left;border-bottom:1px solid #F1F5F9">
+                <th class="p-3">Fecha</th><th class="p-3">Proveedor</th><th class="p-3">RFC</th>
+                <th class="p-3">Folio fiscal</th><th class="p-3">Total</th><th class="p-3">Archivos</th><th class="p-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="fc-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </main>
   </div><!-- /right panel -->
 </div><!-- /app -->
@@ -3246,6 +3290,66 @@
       <button id="cfdi-confirmar-btn" onclick="confirmarYTimbrarFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
         <i data-lucide="stamp" style="width:14px;height:14px;display:inline"></i> Todo correcto, timbrar
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: REGISTRAR FACTURA DE COMPRA (PROVEEDOR)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-factura-compra" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-factura-compra')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:520px;max-height:88vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <p class="text-base font-black" style="color:#0F172A">Registrar factura de compra</p>
+      <button onclick="closeModal('modal-factura-compra')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="px-5 pb-3 overflow-auto" style="flex:1">
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <input id="fc-proveedor" type="text" placeholder="Proveedor" class="col-span-2 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        <input id="fc-rfc" type="text" placeholder="RFC proveedor" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        <input id="fc-folio" type="text" placeholder="Folio fiscal (UUID)" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="text-xs" style="color:#64748B">Fecha factura</label>
+          <input id="fc-fecha" type="date" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#64748B">Concepto</label>
+          <input id="fc-concepto" type="text" placeholder="Medicamentos, insumos..." class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <label class="text-xs" style="color:#64748B">Subtotal</label>
+          <input id="fc-subtotal" type="number" step="0.01" oninput="fcCalcularTotal()" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#64748B">IVA</label>
+          <input id="fc-iva" type="number" step="0.01" oninput="fcCalcularTotal()" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#64748B">Total</label>
+          <input id="fc-total" type="number" step="0.01" class="w-full px-3 py-2 rounded-xl border text-sm font-bold" style="border-color:#E2E8F0">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs" style="color:#64748B">Archivo XML</label>
+          <input id="fc-xml" type="file" accept=".xml" class="w-full text-xs">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#64748B">Archivo PDF</label>
+          <input id="fc-pdf" type="file" accept=".pdf" class="w-full text-xs">
+        </div>
+      </div>
+    </div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end" style="border-top:1px solid #F1F5F9">
+      <button onclick="closeModal('modal-factura-compra')" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Cancelar</button>
+      <button onclick="guardarFacturaCompra()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">Guardar</button>
     </div>
   </div>
 </div>
@@ -5416,6 +5520,7 @@ const TITLES={
   'historial-precios':'Historial de Precios', facturacion:'Facturación Simplificada',
   'inventario-ciclico':'Conteo Físico de Inventario',
   'cfdi-global':'Factura Global CFDI (Facturama)',
+  'facturas-compra':'Facturas de Compra (Proveedores)',
 };
 
 function navigate(page) {
@@ -5514,6 +5619,12 @@ function loadPage(page) {
   if (page==='reorden')       loadReorden();
   if (page==='inventario-ciclico') loadInventarioCiclico?.();
   if (page==='cfdi-global')   loadCfdiGlobal();
+  if (page==='facturas-compra') {
+    const hoy=new Date().toISOString().split('T')[0];
+    const fi=document.getElementById('fc-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
+    const ff=document.getElementById('fc-ff'); if(ff&&!ff.value)ff.value=hoy;
+    loadFacturasCompra();
+  }
   icons();
 }
 
@@ -12373,6 +12484,131 @@ async function cancelarFacturaGlobal(id) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// ── Facturas de Compra (proveedores) ─────────────────────────────────────────
+async function loadFacturasCompra() {
+  const fi = document.getElementById('fc-fi')?.value;
+  const ff = document.getElementById('fc-ff')?.value;
+  const tbody = document.getElementById('fc-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-xs" style="color:#94A3B8">Cargando...</td></tr>';
+  try {
+    let url = '/facturas-compra';
+    if (fi && ff) url += `?fecha_inicio=${fi}&fecha_fin=${ff}`;
+    const [rows, resumen] = await Promise.all([
+      apiFetch(url),
+      (fi && ff) ? apiFetch(`/facturas-compra/resumen?fecha_inicio=${fi}&fecha_fin=${ff}`) : Promise.resolve(null),
+    ]);
+
+    if (resumen) {
+      document.getElementById('fc-kpi').innerHTML = `
+        <div class="rounded-xl p-3 text-center" style="background:#FFF7ED;border:1px solid #FDE68A">
+          <p class="text-[10px]" style="color:#64748B">Facturas del periodo</p>
+          <p class="text-xl font-black" style="color:#D97706">${resumen.num_facturas}</p>
+        </div>
+        <div class="rounded-xl p-3 text-center" style="background:#F0F9FF;border:1px solid #BAE6FD">
+          <p class="text-[10px]" style="color:#64748B">IVA acreditable</p>
+          <p class="text-xl font-black" style="color:#0284C7">$${resumen.iva.toFixed(2)}</p>
+        </div>
+        <div class="rounded-xl p-3 text-center" style="background:#F0FDF4;border:1px solid #BBF7D0">
+          <p class="text-[10px]" style="color:#64748B">Total gastado</p>
+          <p class="text-xl font-black" style="color:#16A34A">$${resumen.total.toFixed(2)}</p>
+        </div>`;
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-xs" style="color:#94A3B8">Sin facturas registradas</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr class="border-b hover:bg-slate-50" style="border-color:#F1F5F9">
+        <td class="p-3 text-xs">${r.fecha_factura ? new Date(r.fecha_factura+'T00:00:00').toLocaleDateString('es-MX') : '—'}</td>
+        <td class="p-3 text-xs">${r.proveedor_nombre}</td>
+        <td class="p-3 text-xs font-mono">${r.proveedor_rfc || '—'}</td>
+        <td class="p-3 text-xs font-mono" title="${r.folio_fiscal}">${r.folio_fiscal ? r.folio_fiscal.slice(0,8)+'…' : '—'}</td>
+        <td class="p-3 text-xs font-mono font-bold">$${r.total.toFixed(2)}</td>
+        <td class="p-3 text-xs">
+          ${r.tiene_xml ? `<button onclick="descargarArchivoFacturaCompra(${r.id},'xml')" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">XML</button>` : ''}
+          ${r.tiene_pdf ? `<button onclick="descargarArchivoFacturaCompra(${r.id},'pdf')" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">PDF</button>` : ''}
+          ${(!r.tiene_xml && !r.tiene_pdf) ? '<span style="color:#94A3B8">—</span>' : ''}
+        </td>
+        <td class="p-3 text-xs">
+          <button onclick="eliminarFacturaCompra(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">Eliminar</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-xs text-red-500">${e.message}</td></tr>`; }
+}
+
+function fcCalcularTotal() {
+  const sub = parseFloat(document.getElementById('fc-subtotal').value) || 0;
+  const iva = parseFloat(document.getElementById('fc-iva').value) || 0;
+  document.getElementById('fc-total').value = (sub + iva).toFixed(2);
+}
+
+function abrirModalFacturaCompra() {
+  ['fc-proveedor','fc-rfc','fc-folio','fc-concepto'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fc-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fc-subtotal').value = '';
+  document.getElementById('fc-iva').value = '';
+  document.getElementById('fc-total').value = '';
+  document.getElementById('fc-xml').value = '';
+  document.getElementById('fc-pdf').value = '';
+  openModal('modal-factura-compra');
+}
+
+async function guardarFacturaCompra() {
+  const proveedor = document.getElementById('fc-proveedor').value.trim();
+  const fecha = document.getElementById('fc-fecha').value;
+  const total = parseFloat(document.getElementById('fc-total').value);
+  if (!proveedor || !fecha || !total) { toast('Proveedor, fecha y total son obligatorios', 'warning'); return; }
+
+  const fd = new FormData();
+  fd.append('proveedor_nombre', proveedor);
+  fd.append('proveedor_rfc', document.getElementById('fc-rfc').value.trim());
+  fd.append('folio_fiscal', document.getElementById('fc-folio').value.trim());
+  fd.append('fecha_factura', fecha);
+  fd.append('subtotal', document.getElementById('fc-subtotal').value || '0');
+  fd.append('iva', document.getElementById('fc-iva').value || '0');
+  fd.append('total', total);
+  fd.append('concepto', document.getElementById('fc-concepto').value.trim());
+  const xmlFile = document.getElementById('fc-xml').files[0];
+  const pdfFile = document.getElementById('fc-pdf').files[0];
+  if (xmlFile) fd.append('xml', xmlFile);
+  if (pdfFile) fd.append('pdf', pdfFile);
+
+  try {
+    const res = await fetch('/api/facturas-compra', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + S.token },
+      body: fd,
+    });
+    if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.detail || 'Error al guardar'); }
+    toast('Factura de compra registrada', 'success');
+    closeModal('modal-factura-compra');
+    loadFacturasCompra();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function descargarArchivoFacturaCompra(id, tipo) {
+  try {
+    const res = await api(`/facturas-compra/${id}/${tipo}`);
+    if (!res.ok) throw new Error('No se pudo descargar el archivo');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `factura_compra_${id}.${tipo}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function eliminarFacturaCompra(id) {
+  if (!confirm('¿Eliminar este registro de factura de compra? Se borrarán también los archivos adjuntos.')) return;
+  try {
+    await apiFetch(`/facturas-compra/${id}`, { method:'DELETE' });
+    toast('Factura eliminada', 'success');
+    loadFacturasCompra();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ── Historial Precio ──────────────────────────────────────────────────────────
 async function openHistorialPrecio(pid, nombre) {
   document.getElementById('hp-titulo').textContent = nombre;
@@ -12826,6 +13062,7 @@ const QM_GROUPS = [
       { key:'reorden',         icon:'package-plus',   label:'Reorden Auto',       desc:'Productos bajo mínimo — genera orden de compra', admin:true },
       { key:'facturacion',     icon:'file-text',      label:'Facturación',        desc:'Generar factura simplificada con RFC del cliente', admin:true },
       { key:'cfdi-global',     icon:'file-check-2',   label:'Factura Global CFDI',desc:'Timbra la factura mensual del negocio vía Facturama', admin:true },
+      { key:'facturas-compra', icon:'file-input',     label:'Facturas de Compra', desc:'Control de facturas de proveedores (medicamentos)', admin:true },
     ]
   },
   {
