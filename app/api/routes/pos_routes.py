@@ -7,9 +7,19 @@ from app.database.models import Venta, ItemVenta, Producto, Lote, MovimientoStoc
 from app.api.routes.auth_routes import get_current_api_user
 import random
 import string
+import threading
 from datetime import datetime as _dtnow
 
 router = APIRouter()
+
+# Serializa la creación de ventas dentro de este proceso — sin esto, dos ventas
+# simultáneas del mismo producto (ej. doble click, o dos requests casi al mismo
+# tiempo desde la misma instancia) podían leer el mismo stock disponible antes
+# de que cualquiera hiciera commit, y ambas descontar pensando que alcanzaba.
+# Nota: esto NO resuelve sobreventa entre DOS COMPUTADORAS distintas (cada una
+# con su propia base local que sincroniza a Turso por separado) — ese es un
+# problema de consistencia distribuida, no de bloqueo en un solo proceso.
+_venta_lock = threading.Lock()
 
 
 def _cerrar_corte_viejo_si_existe(db, usuario_id: int) -> None:
@@ -75,6 +85,7 @@ def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
 @router.post("/")
 def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
+    _venta_lock.acquire()
     try:
         # Guard: if there is an open corte from a previous day, auto-close it NOW
         # so today's sale is never mixed into yesterday's shift totals.
@@ -324,6 +335,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        _venta_lock.release()
         db.close()
 
 

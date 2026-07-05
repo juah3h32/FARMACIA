@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from app.database.connection import get_db_session
-from app.database.models import OrdenCompra, ItemOrdenCompra, Producto
+from app.database.models import OrdenCompra, ItemOrdenCompra, Producto, Lote, MovimientoStock, TipoMovimiento, EstadoOrdenCompra
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -147,19 +147,53 @@ def obtener_orden(oid: int, payload: dict = Depends(get_current_api_user)):
 
 
 @router.patch("/{oid}/estado")
-def cambiar_estado(oid: int, estado: str, payload: dict = Depends(get_current_api_user)):
+def cambiar_estado(oid: int, estado: str, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    if estado not in EstadoOrdenCompra._value2member_map_:
+        raise HTTPException(400, f"Estado inválido: {estado}")
     db = get_db_session()
     try:
         o = db.query(OrdenCompra).filter(OrdenCompra.id == oid).first()
         if not o:
             raise HTTPException(404, "Orden no encontrada")
+
+        ya_recibida = o.estado == EstadoOrdenCompra.recibida
         o.estado = estado
         if estado == "enviada" and not o.enviada_en:
             o.enviada_en = datetime.now()
-        elif estado == "recibida" and not o.recibida_en:
+        elif estado == "recibida" and not ya_recibida:
+            # Marcar "recibida" ahora sí suma stock real — antes solo cambiaba el
+            # texto de estado y había que ir aparte a capturar la entrada manual.
             o.recibida_en = datetime.now()
+            usuario_id = int(payload["sub"])
+            for item in o.items:
+                prod = db.query(Producto).filter(Producto.id == item.producto_id).first()
+                if not prod:
+                    continue
+                stock_ant = prod.stock or 0
+                prod.stock = stock_ant + item.cantidad
+                db.add(Lote(
+                    producto_id=prod.id,
+                    cantidad=item.cantidad,
+                    precio_compra=item.precio_unitario,
+                ))
+                db.add(MovimientoStock(
+                    producto_id=prod.id,
+                    tipo=TipoMovimiento.entrada,
+                    cantidad=item.cantidad,
+                    stock_anterior=stock_ant,
+                    stock_nuevo=prod.stock,
+                    usuario_id=usuario_id,
+                    referencia_id=o.id,
+                    referencia_tipo="orden_compra",
+                    notas=f"Recepción orden {o.folio or o.id}",
+                ))
         db.commit()
+
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
         return _orden_dict(o)
     except HTTPException:
         raise

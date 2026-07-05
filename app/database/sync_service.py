@@ -68,6 +68,10 @@ _watermarks: dict[str, int] = _load_watermarks()
 _lock  = threading.RLock()
 _dirty = threading.Event()   # set after any local write → immediate sync
 
+# Se marca cuando termina el primer ciclo push+pull al arrancar — el modal de
+# carga en el frontend espera esta señal antes de dejar entrar al usuario.
+initial_sync_done = threading.Event()
+
 # Callbacks fired (in sync thread) after every successful sync_from_turso pull.
 _post_sync_hooks: list = []
 
@@ -521,10 +525,20 @@ def sync_from_turso() -> int:
                                 if str(turso_stock) != str(local_stock):
                                     print(f"[Sync] productos id={row[id_idx]}: Turso={turso_stock} -> kept local={local_stock}")
                     elif table == "ventas" and "eliminado" in cols:
-                        # Monotonic: eliminado=1 can never go back to 0
+                        # eliminado: monotonic, nunca retrocede de 1 a 0.
+                        # facturada/cfdi_global_id (y demás campos mutables): last-writer-wins
+                        # por actualizado_en, igual que productos — sin esto, un pull podía
+                        # pisar con una copia vieja de Turso el "facturada=True" que se acaba
+                        # de poner localmente al timbrar un CFDI (bug real detectado en producción:
+                        # ventas quedaban desvinculadas de su factura tras un pull).
+                        _has_ts = "actualizado_en" in cols
                         set_clause = ", ".join(
                             "eliminado = MAX(excluded.eliminado, ventas.eliminado)"
                             if c == "eliminado"
+                            else (
+                                f"{c}=CASE WHEN excluded.actualizado_en > ventas.actualizado_en"
+                                f" THEN excluded.{c} ELSE ventas.{c} END"
+                            ) if _has_ts and c != "actualizado_en"
                             else f"{c} = excluded.{c}"
                             for c in cols if c != "id"
                         )
@@ -650,6 +664,7 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
             sync_from_turso()
         except Exception as e:
             print(f"[Sync] Initial pull error: {e}")
+        initial_sync_done.set()
 
         while True:
             # Returns True if event fired (dirty write), False if timed out (heartbeat)

@@ -90,6 +90,34 @@ def _get_corte_activo(db, usuario_id: int) -> Optional[CortesCaja]:
     )
 
 
+def _sumar_totales_ventas(ventas: list) -> tuple[float, float, float, float]:
+    """Suma efectivo/tarjeta/transferencia/total de una lista de Venta ya cargada
+    (sin query) — helper puro, reutilizado por _calcular_totales_corte y por
+    reconstruir_historicos (que agrupa ventas en memoria para evitar N+1 queries).
+    El total incluye también ventas con metodo_pago='mixto' (no tiene bucket propio
+    de efectivo/tarjeta/transferencia, pero sí debe contar en el total del corte —
+    antes se perdía del total_ventas guardado al cerrar turno, aunque sí aparecía
+    en la vista en vivo, dando cifras distintas entre "corte abierto" y "ya cerrado")."""
+    ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
+    tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
+    tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
+    mx = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.mixto)
+    return ef, tj, tr, ef + tj + tr + mx
+
+
+def _costo_ventas(db, venta_ids: list) -> float:
+    """Costo de mercancía vendida (join ItemVenta → Producto.precio_compra)."""
+    if not venta_ids:
+        return 0.0
+    cost_rows = (
+        db.query(ItemVenta.cantidad, Producto.precio_compra)
+        .join(Producto, ItemVenta.producto_id == Producto.id)
+        .filter(ItemVenta.venta_id.in_(venta_ids))
+        .all()
+    )
+    return sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+
+
 def _calcular_totales_corte(db, c: CortesCaja, hasta: datetime):
     """Calculate and set totals on a CortesCaja object (does NOT commit)."""
     ventas = (
@@ -103,21 +131,8 @@ def _calcular_totales_corte(db, c: CortesCaja, hasta: datetime):
         )
         .all()
     )
-    ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
-    tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
-    tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-    tv = ef + tj + tr
-    venta_ids = [v.id for v in ventas]
-    if venta_ids:
-        cost_rows = (
-            db.query(ItemVenta.cantidad, Producto.precio_compra)
-            .join(Producto, ItemVenta.producto_id == Producto.id)
-            .filter(ItemVenta.venta_id.in_(venta_ids))
-            .all()
-        )
-        total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-    else:
-        total_costo = 0.0
+    ef, tj, tr, tv = _sumar_totales_ventas(ventas)
+    total_costo = _costo_ventas(db, [v.id for v in ventas])
     c.total_ventas        = tv
     c.total_efectivo      = ef
     c.total_tarjeta       = tj
@@ -165,24 +180,9 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             .all()
         )
         retiros = db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
-        ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
-        tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
-        tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-        tv = sum(v.total for v in ventas)
+        ef, tj, tr, tv = _sumar_totales_ventas(ventas)
         total_retiros = sum(r.monto for r in retiros)
-
-        # Cost of goods sold — join ItemVenta → Producto.precio_compra
-        venta_ids = [v.id for v in ventas]
-        if venta_ids:
-            cost_rows = (
-                db.query(ItemVenta.cantidad, Producto.precio_compra)
-                .join(Producto, ItemVenta.producto_id == Producto.id)
-                .filter(ItemVenta.venta_id.in_(venta_ids))
-                .all()
-            )
-            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-        else:
-            total_costo = 0.0
+        total_costo = _costo_ventas(db, [v.id for v in ventas])
         ganancia   = tv - total_costo
         disponible = ganancia - total_retiros
 
@@ -262,47 +262,15 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             raise HTTPException(status_code=404, detail="No hay turno abierto")
 
         ahora = datetime.now()
-        ventas = (
-            db.query(Venta)
-            .filter(
-                Venta.usuario_id == usuario_id,
-                Venta.creado_en >= c.abierto_en,
-                Venta.creado_en <= ahora,
-                Venta.estado == EstadoVenta.completada,
-                Venta.eliminado.is_not(True),
-            )
-            .all()
-        )
-        ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
-        tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
-        tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-        tv = ef + tj + tr
-        venta_ids = [v.id for v in ventas]
+        ef, tj, tr, tv, total_costo = _calcular_totales_corte(db, c, ahora)
 
-        # Cost of goods sold
-        if venta_ids:
-            cost_rows = (
-                db.query(ItemVenta.cantidad, Producto.precio_compra)
-                .join(Producto, ItemVenta.producto_id == Producto.id)
-                .filter(ItemVenta.venta_id.in_(venta_ids))
-                .all()
-            )
-            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-        else:
-            total_costo = 0.0
-
-        c.monto_cierre        = body.monto_cierre
-        c.cerrado_en          = datetime.now()
-        c.total_ventas        = tv
-        c.total_efectivo      = ef
-        c.total_tarjeta       = tj
-        c.total_transferencia = tr
-        c.total_costo         = total_costo
-        c.num_ventas          = len(ventas)
+        c.monto_cierre = body.monto_cierre
+        c.cerrado_en   = ahora
         if body.notas:
             c.notas = body.notas
 
         apertura = c.monto_apertura  # cache before commit (object expires after commit)
+        num_ventas = c.num_ventas
         total_devoluciones = _calc_devoluciones(db, usuario_id, c.abierto_en, ahora)
         ventas_netas = tv - total_devoluciones
         db.commit()
@@ -313,7 +281,7 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         diferencia = body.monto_cierre - (apertura + ef)
         return {
             "ok":                 True,
-            "num_ventas":         len(ventas),
+            "num_ventas":         num_ventas,
             "total_ventas":       tv,
             "efectivo":           ef,
             "tarjeta":            tj,
@@ -672,38 +640,7 @@ def recalcular_historicos(bg: BackgroundTasks, payload: dict = Depends(get_curre
         for c in cortes:
             if not c.abierto_en or not c.cerrado_en:
                 continue
-            ventas = (
-                db.query(Venta)
-                .filter(
-                    Venta.usuario_id == c.usuario_id,
-                    Venta.creado_en >= c.abierto_en,
-                    Venta.creado_en <= c.cerrado_en,
-                    Venta.estado == EstadoVenta.completada,
-                    Venta.eliminado.is_not(True),
-                )
-                .all()
-            )
-            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
-            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
-            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-            tv = ef + tj + tr
-            venta_ids = [v.id for v in ventas]
-            if venta_ids:
-                cost_rows = (
-                    db.query(ItemVenta.cantidad, Producto.precio_compra)
-                    .join(Producto, ItemVenta.producto_id == Producto.id)
-                    .filter(ItemVenta.venta_id.in_(venta_ids))
-                    .all()
-                )
-                total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-            else:
-                total_costo = 0.0
-            c.total_ventas        = tv
-            c.total_efectivo      = ef
-            c.total_tarjeta       = tj
-            c.total_transferencia = tr
-            c.total_costo         = total_costo
-            c.num_ventas          = len(ventas)
+            _calcular_totales_corte(db, c, c.cerrado_en)
             actualizados += 1
         db.commit()
         import app.config as _cfg
@@ -850,21 +787,8 @@ def reconstruir_historicos(bg: BackgroundTasks, payload: dict = Depends(get_curr
             open_dt  = datetime.combine(day, _time_type(8, 0, 0))
             close_dt = datetime.combine(day, _time_type(21, 0, 0))
 
-            ef = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.efectivo)
-            tj = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.tarjeta)
-            tr = sum(v.total for v in ventas if v.metodo_pago == MetodoPago.transferencia)
-            tv = ef + tj + tr
-            venta_ids = [v.id for v in ventas]
-            if venta_ids:
-                cost_rows = (
-                    db.query(ItemVenta.cantidad, Producto.precio_compra)
-                    .join(Producto, ItemVenta.producto_id == Producto.id)
-                    .filter(ItemVenta.venta_id.in_(venta_ids))
-                    .all()
-                )
-                total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-            else:
-                total_costo = 0.0
+            ef, tj, tr, tv = _sumar_totales_ventas(ventas)
+            total_costo = _costo_ventas(db, [v.id for v in ventas])
 
             new_c = CortesCaja(
                 usuario_id=usuario_id,

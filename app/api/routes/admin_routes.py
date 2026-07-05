@@ -69,6 +69,7 @@ class InstallUpdateIn(BaseModel):
 
 @router.post("/update/install")
 def install_update(body: InstallUpdateIn | None = None, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     if _update_state["running"]:
         raise HTTPException(status_code=409, detail="Instalación en progreso")
     if not getattr(sys, "frozen", False):
@@ -121,6 +122,7 @@ def update_progress():
 
 @router.post("/update/cancel")
 def cancel_update(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     from app.services import updater_service
     updater_service.cancel_download()
     _update_state.update({"running": False, "error": "Actualización cancelada", "done": False})

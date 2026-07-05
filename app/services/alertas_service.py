@@ -15,15 +15,23 @@ def _get_config(db):
 
 def _send_whatsapp(numero: str, token: str, mensaje: str):
     try:
-        import urllib.request, urllib.parse
-        url = (
-            f"https://api.callmebot.com/whatsapp.php"
-            f"?phone={numero}&text={urllib.parse.quote(mensaje)}&apikey={token}"
-        )
-        urllib.request.urlopen(url, timeout=10)
-        _log.info(f"WhatsApp enviado a {numero}")
+        enviar_whatsapp(numero, token, mensaje)
     except Exception as e:
         _log.error(f"Error WhatsApp: {e}")
+
+
+def enviar_whatsapp(numero: str, token: str, mensaje: str) -> None:
+    """Versión que SÍ propaga el error — úsala cuando el caller necesite saber si falló
+    (ej. envío de factura), a diferencia de _send_whatsapp que solo loguea y sigue."""
+    import urllib.request, urllib.parse
+    if not (numero and token):
+        raise ValueError("WhatsApp no configurado (falta número o API key de CallMeBot)")
+    url = (
+        f"https://api.callmebot.com/whatsapp.php"
+        f"?phone={numero}&text={urllib.parse.quote(mensaje)}&apikey={token}"
+    )
+    urllib.request.urlopen(url, timeout=10)
+    _log.info(f"WhatsApp enviado a {numero}")
 
 
 def enviar_alertas_diarias():

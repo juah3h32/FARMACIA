@@ -204,6 +204,16 @@ def health_check():
     return {"status": "ok", "version": cfg.VERSION, "app": cfg.APP_NAME}
 
 
+@app.get("/api/sync-status")
+def sync_status():
+    """Estado de la sincronización inicial con Turso — el modal de carga al abrir
+    la app espera 'done=true' antes de dejar entrar (o hace timeout y avisa)."""
+    if not cfg.TURSO_SYNC:
+        return {"enabled": False, "done": True}
+    from app.database.sync_service import initial_sync_done
+    return {"enabled": True, "done": initial_sync_done.is_set()}
+
+
 @app.get("/api/dev/stamp")
 def dev_stamp():
     if not cfg.DEV_MODE:

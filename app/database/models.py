@@ -175,6 +175,7 @@ class Venta(Base):
     estado = Column(SAEnum(EstadoVenta), default=EstadoVenta.completada)
     notas = Column(Text)
     creado_en = Column(DateTime, default=_dt.now)
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
     eliminado = Column(Boolean, default=False)
     eliminado_en = Column(DateTime, nullable=True)
     facturada = Column(Boolean, default=False)
@@ -240,6 +241,41 @@ class CfdiFacturaGlobal(Base):
     __table_args__ = (
         Index("ix_cfdi_global_periodo", "anio", "mes"),
     )
+
+
+class CfdiFacturaIndividual(Base):
+    """CFDI 4.0 de ingreso timbrado para una venta específica (a solicitud del cliente),
+    distinto de la factura global mensual que concentra Público en General."""
+    __tablename__ = "cfdi_facturas_individuales"
+
+    id = Column(Integer, primary_key=True)
+    venta_id = Column(Integer, ForeignKey("ventas.id"), nullable=False)
+    cliente_nombre = Column(String(255))
+    cliente_rfc = Column(String(20))
+    cliente_regimen_fiscal = Column(String(5))
+    cliente_cp = Column(String(10))
+    cliente_email = Column(String(150))
+    uso_cfdi = Column(String(10))
+    forma_pago = Column(String(5))
+    subtotal = Column(Float, default=0.0)
+    iva = Column(Float, default=0.0)
+    total = Column(Float, default=0.0)
+    estado = Column(String(20), default="timbrada")  # timbrada | cancelada | error
+    facturacom_id = Column(String(50))
+    uuid_fiscal = Column(String(50))
+    serie = Column(String(10))
+    folio = Column(String(20))
+    xml_path = Column(String(300))
+    pdf_path = Column(String(300))
+    xml_url = Column(String(500))
+    pdf_url = Column(String(500))
+    error_mensaje = Column(Text)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    creado_en = Column(DateTime, default=_dt.now)
+    cancelado_en = Column(DateTime, nullable=True)
+
+    venta = relationship("Venta")
+    usuario = relationship("Usuario")
 
 
 class FacturaCompra(Base):

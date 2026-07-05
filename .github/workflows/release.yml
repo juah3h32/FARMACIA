@@ -82,11 +82,23 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path "dist\FarmaciaPOS\*" -DestinationPath "dist\FarmaciaPOS.zip"
 
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $installer = "instalador/FarmaciaPOS_Instalador_v${{ steps.ver.outputs.VERSION }}.exe"
+          $zip = "dist/FarmaciaPOS.zip"
+          $lines = @()
+          $lines += "$((Get-FileHash $installer -Algorithm SHA256).Hash.ToLower())  $(Split-Path $installer -Leaf)"
+          $lines += "$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower())  $(Split-Path $zip -Leaf)"
+          $lines | Out-File -FilePath "checksums.txt" -Encoding utf8
+          Get-Content "checksums.txt"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             instalador/FarmaciaPOS_Instalador_v${{ steps.ver.outputs.VERSION }}.exe
             dist/FarmaciaPOS.zip
+            checksums.txt
           generate_release_notes: true
           name: "FarmaciaPOS ${{ github.ref_name }}"

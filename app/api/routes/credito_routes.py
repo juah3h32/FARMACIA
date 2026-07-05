@@ -49,6 +49,15 @@ def registrar_pago(cid: int, body: PagoIn, payload: dict = Depends(get_current_a
             raise HTTPException(404, "Cliente no encontrado")
         if body.monto <= 0:
             raise HTTPException(400, "Monto debe ser mayor a 0")
+        # Antes: max(0, saldo - monto) dejaba que un pago de más se "perdiera"
+        # silenciosamente (el excedente no quedaba registrado en ningún lado).
+        # Se rechaza el pago si excede la deuda — evita perder dinero de vista.
+        if body.monto > c.saldo_deuda:
+            raise HTTPException(
+                400,
+                f"El pago (${body.monto:.2f}) es mayor a la deuda actual (${c.saldo_deuda:.2f}) — "
+                f"ajusta el monto a pagar (máximo ${c.saldo_deuda:.2f})",
+            )
         pago = PagoCredito(cliente_id=cid, monto=body.monto, notas=body.notas, usuario_id=int(payload["sub"]))
         c.saldo_deuda = max(0, c.saldo_deuda - body.monto)
         db.add(pago)

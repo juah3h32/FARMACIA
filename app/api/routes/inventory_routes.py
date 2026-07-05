@@ -276,9 +276,7 @@ def movimientos_stock(
     limite: int = Query(100),
     payload: dict = Depends(get_current_api_user),
 ):
-    if payload.get("rol") != "admin":
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Solo administradores")
+    _require_admin(payload)
     db = get_db_session()
     try:
         q = db.query(MovimientoStock)

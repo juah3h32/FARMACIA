@@ -74,13 +74,17 @@ def resumen(
             MovimientoStock.creado_en <= ff,
         ).all()
         total_devoluciones = 0.0
-        for mov in dev_movs:
-            orig = db.query(ItemVenta).filter(
-                ItemVenta.venta_id == mov.referencia_id,
-                ItemVenta.producto_id == mov.producto_id,
-            ).first()
-            if orig:
-                total_devoluciones += orig.precio_unitario * mov.cantidad
+        if dev_movs:
+            venta_ids_dev = {mov.referencia_id for mov in dev_movs}
+            # Una sola consulta por lote en vez de una por cada movimiento (evita N+1).
+            precios_por_par = {
+                (i.venta_id, i.producto_id): i.precio_unitario
+                for i in db.query(ItemVenta).filter(ItemVenta.venta_id.in_(venta_ids_dev)).all()
+            }
+            for mov in dev_movs:
+                precio = precios_por_par.get((mov.referencia_id, mov.producto_id))
+                if precio is not None:
+                    total_devoluciones += precio * mov.cantidad
         ventas_netas = total - total_devoluciones
         ganancia = ventas_netas - total_costo
 
@@ -1361,6 +1365,7 @@ def rentabilidad_cajero(
 
 @router.get("/inventario-excel")
 def exportar_inventario_excel(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from fastapi.responses import Response

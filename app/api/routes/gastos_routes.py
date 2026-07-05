@@ -61,6 +61,8 @@ def listar_gastos(
 @router.post("")
 def crear_gasto(body: GastoIn, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    if body.monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
     db = get_db_session()
     try:
         cat = CategoriaGasto(body.categoria) if body.categoria in CategoriaGasto.__members__ else CategoriaGasto.otros

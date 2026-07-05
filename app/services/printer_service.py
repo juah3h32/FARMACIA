@@ -61,7 +61,7 @@ class PrinterService:
                             success = True
                             _log(f"Conectado USB: {hex(vid)}:{hex(pid)}")
                             break
-                        except: continue
+                        except Exception: continue
                     
                     if not success:
                         # Fallback a windows si USB falla
@@ -126,7 +126,7 @@ class PrinterService:
 
             if not best_match:
                 try: best_match = win32print.GetDefaultPrinter()
-                except: pass
+                except Exception: pass
 
             if best_match:
                 _log(f"Windows Auto-detect: {best_match}")
@@ -154,10 +154,10 @@ class PrinterService:
                         if c: c.valor = v
                         else: db.add(Configuracion(clave=k, valor=v))
                     db.commit()
-                except: db.rollback()
+                except Exception: db.rollback()
                 finally: db.close()
             threading.Thread(target=_save, daemon=True).start()
-        except: pass
+        except Exception: pass
 
     @staticmethod
     def list_windows_printers() -> list:
@@ -171,7 +171,7 @@ class PrinterService:
                           win32print.PRINTER_ENUM_NAME]:
                 try:
                     all_found.extend([p[2] for p in win32print.EnumPrinters(flags)])
-                except: pass
+                except Exception: pass
         except Exception as e:
             _log(f"Error cargando win32print: {e}")
         
@@ -201,7 +201,7 @@ class PrinterService:
             import win32print
             default = win32print.GetDefaultPrinter()
             if default: all_found.append(default)
-        except: pass
+        except Exception: pass
             
         final_list = sorted(list(set(all_found)))
         _log(f"Enumeración completada. Encontradas ({len(final_list)}): {final_list}")
@@ -641,14 +641,14 @@ class PrinterService:
                     else:
                         db.add(Configuracion(clave="impresora_nombre", valor=name))
                     db.commit()
-                except:
+                except Exception:
                     db.rollback()
                 finally:
                     db.close()
             
             # Ejecutar en hilo separado para no bloquear la impresion
             threading.Thread(target=_save, daemon=True).start()
-        except:
+        except Exception:
             pass
 
     def test_printer(self) -> bool:

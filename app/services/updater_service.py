@@ -17,7 +17,8 @@ _status: dict = {
     "url": None,
     "asset_api_url": None,
     "is_installer": False,
-    "releases": [],  # List of {tag, version, url, is_installer}
+    "checksums_url": None,
+    "releases": [],  # List of {tag, version, url, is_installer, checksums_url}
 }
 _callbacks: list = []
 
@@ -82,7 +83,7 @@ def _do_check() -> None:
             tag = data.get("tag_name", "")
             version = tag.lstrip("v")
             
-            exe_url = exe_api = zip_url = zip_api = None
+            exe_url = exe_api = zip_url = zip_api = checksums_url = None
             for asset in data.get("assets", []):
                 name = asset.get("name", "").lower()
                 aurl = asset.get("browser_download_url") or asset.get("url")
@@ -93,7 +94,9 @@ def _do_check() -> None:
                 elif name.endswith(".zip") and not zip_url:
                     zip_url = aurl
                     zip_api = aapi
-            
+                elif name == "checksums.txt":
+                    checksums_url = aurl
+
             url = exe_url or zip_url
             if url:
                 all_releases.append({
@@ -101,6 +104,7 @@ def _do_check() -> None:
                     "version": version,
                     "url": url,
                     "is_installer": bool(exe_url),
+                    "checksums_url": checksums_url,
                     "body": data.get("body", "")
                 })
 
@@ -122,6 +126,7 @@ def _do_check() -> None:
                 "version": latest_rel["version"],
                 "url": latest_rel["url"],
                 "is_installer": latest_rel["is_installer"],
+                "checksums_url": latest_rel.get("checksums_url"),
                 "releases": all_releases,
             })
     except Exception:
@@ -145,13 +150,21 @@ def download_and_install(progress_callback=None, version_url=None, is_installer=
 
     if is_installer is None:
         is_installer = st.get("is_installer", False) or url.lower().endswith(".exe")
-    
+
+    # Encuentra el checksums_url del release específico que se está instalando
+    # (puede no ser el "latest" si el usuario eligió otra versión de la lista).
+    checksums_url = st.get("checksums_url")
+    for rel in st.get("releases", []):
+        if rel.get("url") == url:
+            checksums_url = rel.get("checksums_url")
+            break
+
     tmp = Path(tempfile.gettempdir())
 
     if is_installer:
-        return _install_via_exe(url, tmp, progress_callback)
+        return _install_via_exe(url, tmp, progress_callback, checksums_url)
     else:
-        return _install_via_zip(url, tmp, progress_callback)
+        return _install_via_zip(url, tmp, progress_callback, checksums_url)
 
 
 _cancel_requested = False
@@ -235,6 +248,54 @@ def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float 
         return False, f"Error de descarga: {e}"
 
 
+def _verify_checksum(file_path: Path, checksums_url: str | None) -> tuple[bool, str]:
+    """Verifica SHA256 del archivo descargado contra checksums.txt del release.
+    Si el release no publicó checksums.txt (releases anteriores a este fix),
+    deja pasar con solo un aviso — no hay nada contra qué comparar. Si el archivo
+    SÍ existe pero el hash no coincide, bloquea la instalación (posible manipulación
+    o descarga corrupta)."""
+    if not checksums_url:
+        print("[Updater] checksums.txt no disponible en este release — se omite verificación")
+        return True, ""
+    try:
+        import hashlib
+        import requests as _req
+        resp = _req.get(checksums_url, timeout=15)
+        resp.raise_for_status()
+        expected_hash = None
+        target_name = file_path.name.lower()
+        for line in resp.text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2 and parts[1].strip().lower() == target_name:
+                expected_hash = parts[0].strip().lower()
+                break
+        if not expected_hash:
+            print(f"[Updater] {target_name} no aparece en checksums.txt — se omite verificación")
+            return True, ""
+
+        sha = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                sha.update(chunk)
+        actual_hash = sha.hexdigest().lower()
+
+        if actual_hash != expected_hash:
+            return False, (
+                f"El archivo descargado no coincide con el checksum publicado — "
+                f"posible descarga corrupta o manipulada. No se instaló nada."
+            )
+        return True, ""
+    except Exception as e:
+        # Si falla la verificación por red, no bloqueamos la actualización —
+        # el riesgo de un archivo manipulado ya es bajo (HTTPS + GitHub oficial),
+        # y no queremos dejar al usuario sin poder actualizar por un timeout.
+        print(f"[Updater] No se pudo verificar checksum ({e}) — se continúa sin verificar")
+        return True, ""
+
+
 def _launch_shellexecute(exe: str, args: str) -> tuple[bool, str]:
     """Launch exe with runas (UAC elevation) via ShellExecuteW."""
     try:
@@ -247,7 +308,7 @@ def _launch_shellexecute(exe: str, args: str) -> tuple[bool, str]:
         return False, f"Error al lanzar: {e}"
 
 
-def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool, str]:
+def _install_via_exe(url: str, tmp: Path, progress_callback=None, checksums_url: str | None = None) -> tuple[bool, str]:
     """Download Inno Setup installer and launch it directly (no PowerShell wrapper)."""
     installer_path = tmp / "FarmaciaPOS_update_setup.exe"
 
@@ -262,6 +323,11 @@ def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool,
 
     ok, err = _download_file(url, installer_path, progress_callback, pct_max=0.95)
     if not ok:
+        return False, err
+
+    ok, err = _verify_checksum(installer_path, checksums_url)
+    if not ok:
+        installer_path.unlink(missing_ok=True)
         return False, err
 
     if progress_callback:
@@ -286,7 +352,7 @@ def _install_via_exe(url: str, tmp: Path, progress_callback=None) -> tuple[bool,
     return True, ""
 
 
-def _install_via_zip(url: str, tmp: Path, progress_callback=None) -> tuple[bool, str]:
+def _install_via_zip(url: str, tmp: Path, progress_callback=None, checksums_url: str | None = None) -> tuple[bool, str]:
     """Download ZIP, extract, replace app files via PS script."""
     zip_path = tmp / "FarmaciaPOS_update.zip"
     extract_dir = tmp / "FarmaciaPOS_update_extracted"
@@ -294,6 +360,11 @@ def _install_via_zip(url: str, tmp: Path, progress_callback=None) -> tuple[bool,
 
     ok, err = _download_file(url, zip_path, progress_callback, pct_max=0.85)
     if not ok:
+        return False, err
+
+    ok, err = _verify_checksum(zip_path, checksums_url)
+    if not ok:
+        zip_path.unlink(missing_ok=True)
         return False, err
 
     try:

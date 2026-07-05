@@ -125,7 +125,9 @@ def login(body: LoginIn, request: Request):
 
 
 @router.post("/google")
-def google_login(body: GoogleIn):
+def google_login(body: GoogleIn, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    _rate_limit(ip)
     db = get_db_session()
     try:
         cliente = db.query(ClienteApp).filter(ClienteApp.google_id == body.google_id).first()

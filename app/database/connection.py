@@ -119,6 +119,7 @@ def _migrate():
         ("clientes",     "notas_internas",    "TEXT"),
         ("ventas",       "facturada",         "INTEGER NOT NULL DEFAULT 0"),
         ("ventas",       "cfdi_global_id",    "INTEGER"),
+        ("ventas",       "actualizado_en",    "TEXT"),
         ("cfdi_facturas_globales", "xml_url", "VARCHAR(500)"),
         ("cfdi_facturas_globales", "pdf_url", "VARCHAR(500)"),
         ("facturas_compra",        "xml_url", "VARCHAR(500)"),

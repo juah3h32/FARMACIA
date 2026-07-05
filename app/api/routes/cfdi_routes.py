@@ -5,16 +5,22 @@ from datetime import datetime, date
 from pathlib import Path
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, Configuracion, FacturaCompra
+from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta
 from app.api.routes.auth_routes import get_current_api_user
-from app.services import facturama_service
+from app.services import facturacom_service
 import app.config as cfg
 
 router = APIRouter()
 
 _FACT_KEYS = [
-    "facturama_user", "facturama_password", "facturama_sandbox",
+    "facturacom_api_key", "facturacom_secret_key", "facturacom_sandbox",
     "emisor_razon_social", "emisor_rfc", "emisor_regimen_fiscal", "emisor_cp",
+    "email_smtp_host", "email_smtp_port", "email_smtp_user", "email_smtp_password",
+]
+
+MESES_ES = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
 
 
@@ -51,13 +57,17 @@ def _leer_config_facturacion(db) -> dict:
     rows = db.query(Configuracion).filter(Configuracion.clave.in_(_FACT_KEYS)).all()
     d = {r.clave: r.valor for r in rows}
     return {
-        "facturama_user":       d.get("facturama_user", ""),
-        "facturama_password":   d.get("facturama_password", ""),
-        "facturama_sandbox":    d.get("facturama_sandbox", "1") == "1",
+        "facturacom_api_key":    d.get("facturacom_api_key", ""),
+        "facturacom_secret_key": d.get("facturacom_secret_key", ""),
+        "facturacom_sandbox":    d.get("facturacom_sandbox", "1") == "1",
         "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_RAZON_SOCIAL_FISCAL,
         "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
         "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal") or cfg.PHARMACY_REGIMEN_FISCAL,
         "emisor_cp":            d.get("emisor_cp") or cfg.PHARMACY_CP_FISCAL,
+        "email_smtp_host":      d.get("email_smtp_host", ""),
+        "email_smtp_port":      d.get("email_smtp_port", "587"),
+        "email_smtp_user":      d.get("email_smtp_user", ""),
+        "email_smtp_password":  d.get("email_smtp_password", ""),
     }
 
 
@@ -65,6 +75,65 @@ def _cfdi_dir() -> Path:
     d = cfg.DATA_DIR / "cfdi"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _extraer_fe(xml_path: str | None) -> str | None:
+    """Últimos 8 caracteres del sello digital (parámetro 'fe' del validador SAT)
+    — sin esto el validador puede dar match ambiguo en vez de encontrar el CFDI exacto."""
+    if not xml_path:
+        return None
+    try:
+        import re
+        from urllib.parse import quote
+        contenido = Path(xml_path).read_text(encoding="utf-8", errors="ignore")
+        m = re.search(r'Sello="([^"]+)"', contenido)
+        if not m:
+            return None
+        return quote(m.group(1)[-8:], safe="")
+    except Exception:
+        return None
+
+
+def _cfdi_periodo_dir(mes: int, anio: int) -> Path:
+    """Carpeta por periodo, ej. 'cfdi/Junio 2026/' — para que todas las facturas
+    queden ordenadas por mes y sean fáciles de navegar en el explorador."""
+    d = _cfdi_dir() / f"{MESES_ES[mes-1]} {anio}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _descargar_y_guardar_documentos(db, registro: "CfdiFacturaGlobal", fconf: dict) -> bool:
+    """Descarga PDF/XML de un CFDI ya timbrado y los guarda. Nunca vuelve a timbrar
+    nada — puede reintentarse tantas veces como haga falta si falla la descarga."""
+    try:
+        docs = facturacom_service.descargar_documentos(
+            api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+            sandbox=fconf["facturacom_sandbox"], facturacom_id=registro.facturama_id,
+        )
+    except facturacom_service.FacturaComError:
+        return False
+
+    cfdi_dir = _cfdi_periodo_dir(registro.mes, registro.anio)
+    pdf_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}.pdf"
+    xml_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}.xml"
+    pdf_path.write_bytes(docs["pdf_bytes"])
+    xml_path.write_bytes(docs["xml_bytes"])
+
+    pdf_url = xml_url = None
+    try:
+        from app.services.cloudinary_service import upload_documento
+        public_id = f"{registro.anio}-{registro.mes:02d}"
+        pdf_url = upload_documento(str(pdf_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.pdf")
+        xml_url = upload_documento(str(xml_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.xml")
+    except Exception:
+        pass
+
+    registro.pdf_path = str(pdf_path)
+    registro.xml_path = str(xml_path)
+    registro.pdf_url = pdf_url
+    registro.xml_url = xml_url
+    db.commit()
+    return True
 
 
 def _agregar_ventas_pendientes(db, mes: int, anio: int):
@@ -181,9 +250,17 @@ def preview_factura_global(
         )
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, mes, anio)
         fconf = _leer_config_facturacion(db)
+
+        # Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24h
+        # siguientes al cierre del periodo. Esto NO bloquea el timbrado (a veces
+        # hay que presentarla tarde igual), solo informa si ya se pasó la ventana.
+        _, fin_periodo = _rango(mes, anio)
+        horas_desde_cierre = (datetime.now() - fin_periodo).total_seconds() / 3600
+        fuera_ventana_24h = horas_desde_cierre > 24
+
         faltantes = [
             campo for campo, label in [
-                ("facturama_user", "usuario Facturama"), ("facturama_password", "contraseña Facturama"),
+                ("facturacom_api_key", "API key Factura.com"), ("facturacom_secret_key", "Secret key Factura.com"),
                 ("emisor_rfc", "RFC emisor"), ("emisor_regimen_fiscal", "régimen fiscal emisor"),
                 ("emisor_cp", "código postal emisor"),
             ] if not fconf.get(campo)
@@ -202,7 +279,7 @@ def preview_factura_global(
                 "cp": fconf["emisor_cp"],
             },
             "receptor": {
-                "rfc": facturama_service.RFC_PUBLICO_GENERAL,
+                "rfc": facturacom_service.RFC_PUBLICO_GENERAL,
                 "nombre": "PUBLICO EN GENERAL",
                 "uso_cfdi": "S01",
                 "regimen_fiscal": "616",
@@ -212,7 +289,8 @@ def preview_factura_global(
                 "descripcion": f"Venta de mercancías periodo {mes:02d}/{anio} (factura global)",
                 "clave_unidad": "ACT",
             },
-            "sandbox": fconf["facturama_sandbox"],
+            "sandbox": fconf["facturacom_sandbox"],
+            "fuera_ventana_24h": fuera_ventana_24h,
             "datos_incompletos": faltantes,
         }
     finally:
@@ -245,15 +323,14 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         fconf = _leer_config_facturacion(db)
 
         try:
-            resultado = facturama_service.crear_factura_global(
-                user=fconf["facturama_user"], password=fconf["facturama_password"],
-                sandbox=fconf["facturama_sandbox"],
+            resultado = facturacom_service.crear_factura_global(
+                api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                sandbox=fconf["facturacom_sandbox"],
                 mes=body.mes, anio=body.anio,
                 subtotal=subtotal, iva=iva, total=total,
-                emisor_rfc=fconf["emisor_rfc"], emisor_razon_social=fconf["emisor_razon_social"],
-                emisor_regimen_fiscal=fconf["emisor_regimen_fiscal"], emisor_cp=fconf["emisor_cp"],
+                emisor_cp=fconf["emisor_cp"],
             )
-        except facturama_service.FacturamaError as e:
+        except facturacom_service.FacturaComError as e:
             registro = CfdiFacturaGlobal(
                 mes=body.mes, anio=body.anio, subtotal=subtotal, iva=iva, total=total,
                 num_ventas=len(ventas), estado="error", error_mensaje=str(e),
@@ -263,30 +340,15 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             db.commit()
             raise HTTPException(status_code=502, detail=str(e))
 
-        cfdi_dir = _cfdi_dir()
-        pdf_path = cfdi_dir / f"{body.anio}-{body.mes:02d}.pdf"
-        xml_path = cfdi_dir / f"{body.anio}-{body.mes:02d}.xml"
-        pdf_path.write_bytes(resultado["pdf_bytes"])
-        xml_path.write_bytes(resultado["xml_bytes"])
-
-        # Respaldo en la nube (Cloudinary) — no debe tumbar el timbrado si falla,
-        # el CFDI ya quedó fiscalmente válido en este punto.
-        pdf_url = xml_url = None
-        try:
-            from app.services.cloudinary_service import upload_documento
-            public_id = f"{body.anio}-{body.mes:02d}"
-            pdf_url = upload_documento(str(pdf_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.pdf")
-            xml_url = upload_documento(str(xml_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.xml")
-        except Exception:
-            pass
-
+        # El CFDI ya quedó timbrado y es fiscalmente válido — se graba YA como
+        # "timbrada" antes de intentar descargar PDF/XML. Si la descarga falla más
+        # abajo, NO debe quedar como "error" (eso llevaría a un reintento que
+        # generaría un segundo CFDI global real duplicado ante el SAT).
         registro = CfdiFacturaGlobal(
             mes=body.mes, anio=body.anio, subtotal=subtotal, iva=iva, total=total,
             num_ventas=len(ventas), estado="timbrada",
-            facturama_id=resultado["facturama_id"], uuid_fiscal=resultado["uuid"],
+            facturama_id=resultado["facturacom_id"], uuid_fiscal=resultado["uuid"],
             serie=resultado["serie"], folio=resultado["folio"],
-            pdf_path=str(pdf_path), xml_path=str(xml_path),
-            pdf_url=pdf_url, xml_url=xml_url,
             usuario_id=int(payload["sub"]) if payload.get("sub") else None,
         )
         db.add(registro)
@@ -295,6 +357,9 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             v.facturada = True
             v.cfdi_global_id = registro.id
         db.commit()
+
+        _descargar_y_guardar_documentos(db, registro, fconf)
+
         return {
             "ok": True, "id": registro.id, "uuid": registro.uuid_fiscal,
             "total": registro.total, "num_ventas": registro.num_ventas,
@@ -325,11 +390,144 @@ def historial_facturas(payload: dict = Depends(get_current_api_user)):
                 "num_ventas": r.num_ventas, "estado": r.estado,
                 "uuid": r.uuid_fiscal, "serie": r.serie, "folio": r.folio,
                 "error_mensaje": r.error_mensaje,
+                "documentos_pendientes": r.estado == "timbrada" and not r.pdf_path and not r.pdf_url,
+                "carpeta_periodo": f"Facturas / {MESES_ES[r.mes-1]} {r.anio}" if r.pdf_path else None,
                 "creado_en": r.creado_en.isoformat() if r.creado_en else None,
                 "cancelado_en": r.cancelado_en.isoformat() if r.cancelado_en else None,
             }
             for r in rows
         ]
+    finally:
+        db.close()
+
+
+@router.post("/abrir-carpeta-todas")
+def abrir_carpeta_todas(payload: dict = Depends(get_current_api_user)):
+    """Abre la carpeta raíz donde quedan todas las facturas globales, organizadas
+    en subcarpetas por periodo (ej. 'Junio 2026')."""
+    _require_admin(payload)
+    d = _cfdi_dir()
+    import subprocess
+    subprocess.Popen(["explorer", str(d)])
+    return {"ok": True, "path": str(d)}
+
+
+@router.post("/{cfdi_id}/abrir-carpeta")
+def abrir_carpeta_cfdi(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
+        if not r or not r.pdf_path:
+            raise HTTPException(status_code=404, detail="No hay archivo guardado localmente para esta factura")
+        p = Path(r.pdf_path)
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="El archivo ya no existe en disco")
+        import subprocess
+        subprocess.Popen(["explorer", "/select,", str(p)])
+        return {"ok": True, "path": str(p)}
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+@router.post("/{cfdi_id}/redescargar")
+def redescargar_documentos(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "timbrada":
+            raise HTTPException(status_code=400, detail="Solo aplica a facturas ya timbradas")
+        fconf = _leer_config_facturacion(db)
+        ok = _descargar_y_guardar_documentos(db, r, fconf)
+        if not ok:
+            raise HTTPException(status_code=502, detail="No se pudo descargar el PDF/XML todavía, intenta de nuevo más tarde")
+        return {"ok": True}
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+@router.get("/{cfdi_id}/estatus-sat")
+def estatus_sat(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    """Consulta el estatus REAL ante el SAT (vía Factura.com) y lo compara contra
+    lo que dice la base local — detecta si alguien canceló el CFDI directo en el
+    dashboard de Factura.com sin pasar por el botón "Cancelar" del POS."""
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado not in ("timbrada", "cancelada"):
+            raise HTTPException(status_code=400, detail="Solo aplica a facturas timbradas o canceladas")
+
+        fconf = _leer_config_facturacion(db)
+
+        # El link al validador público del SAT no depende de que la consulta de estatus
+        # de Factura.com funcione — el webservice del SAT es conocido por fallar
+        # intermitentemente, pero eso no debe tumbar el link de verificación en sí.
+        fe = _extraer_fe(r.xml_path)
+        url_verificacion_sat = (
+            "https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx"
+            f"?id={r.uuid_fiscal}&re={fconf['emisor_rfc']}&rr={facturacom_service.RFC_PUBLICO_GENERAL}"
+            f"&tt={r.total:.6f}"
+            + (f"&fe={fe}" if fe else "")
+        )
+
+        try:
+            sat = facturacom_service.consultar_estatus_sat(
+                api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                sandbox=fconf["facturacom_sandbox"], facturacom_id=r.facturama_id,
+            )
+        except facturacom_service.FacturaComError as e:
+            return {
+                "estado_local": r.estado, "estado_sat": None, "coincide": None,
+                "detalle_sat": None, "url_verificacion_sat": url_verificacion_sat,
+                "error_consulta": str(e),
+            }
+
+        estado_sat = sat["estado"]  # "Vigente" o "Cancelado"
+        estado_esperado = "Cancelado" if r.estado == "cancelada" else "Vigente"
+        coincide = estado_sat == estado_esperado
+
+        return {
+            "estado_local": r.estado,
+            "estado_sat": estado_sat,
+            "coincide": coincide,
+            "detalle_sat": sat,
+            "url_verificacion_sat": url_verificacion_sat,
+            "error_consulta": None,
+        }
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+@router.delete("/{cfdi_id}")
+def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "error":
+            raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error, no facturas timbradas")
+        db.delete(r)
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
@@ -391,12 +589,12 @@ def cancelar_factura(cfdi_id: int, body: CancelarIn, payload: dict = Depends(get
 
         fconf = _leer_config_facturacion(db)
         try:
-            facturama_service.cancelar_cfdi(
-                user=fconf["facturama_user"], password=fconf["facturama_password"],
-                sandbox=fconf["facturama_sandbox"],
-                facturama_id=r.facturama_id, motivo=body.motivo,
+            facturacom_service.cancelar_cfdi(
+                api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                sandbox=fconf["facturacom_sandbox"],
+                facturacom_id=r.facturama_id, motivo=body.motivo,
             )
-        except facturama_service.FacturamaError as e:
+        except facturacom_service.FacturaComError as e:
             raise HTTPException(status_code=502, detail=str(e))
 
         r.estado = "cancelada"
@@ -412,5 +610,415 @@ def cancelar_factura(cfdi_id: int, body: CancelarIn, payload: dict = Depends(get
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# FACTURA INDIVIDUAL POR VENTA (CFDI 4.0 de ingreso, a nombre del cliente real)
+# ══════════════════════════════════════════════════════════════════════════
+
+def _cfdi_individual_dir(mes: int, anio: int) -> Path:
+    d = _cfdi_dir() / "Facturas Individuales" / f"{MESES_ES[mes-1]} {anio}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _descargar_y_guardar_documentos_individual(db, registro: "CfdiFacturaIndividual", fconf: dict) -> bool:
+    """Igual que _descargar_y_guardar_documentos pero para factura individual —
+    nunca vuelve a timbrar, solo descarga PDF/XML de un CFDI ya emitido."""
+    try:
+        docs = facturacom_service.descargar_documentos(
+            api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+            sandbox=fconf["facturacom_sandbox"], facturacom_id=registro.facturacom_id,
+        )
+    except facturacom_service.FacturaComError:
+        return False
+
+    creado = registro.creado_en or datetime.now()
+    cfdi_dir = _cfdi_individual_dir(creado.month, creado.year)
+    nombre_base = f"venta-{registro.venta_id}-{registro.folio or registro.id}"
+    pdf_path = cfdi_dir / f"{nombre_base}.pdf"
+    xml_path = cfdi_dir / f"{nombre_base}.xml"
+    pdf_path.write_bytes(docs["pdf_bytes"])
+    xml_path.write_bytes(docs["xml_bytes"])
+
+    pdf_url = xml_url = None
+    try:
+        from app.services.cloudinary_service import upload_documento
+        pdf_url = upload_documento(str(pdf_path), "FARMACIA/CFDI_INDIVIDUAL", f"{nombre_base}.pdf")
+        xml_url = upload_documento(str(xml_path), "FARMACIA/CFDI_INDIVIDUAL", f"{nombre_base}.xml")
+    except Exception:
+        pass
+
+    registro.pdf_path = str(pdf_path)
+    registro.xml_path = str(xml_path)
+    registro.pdf_url = pdf_url
+    registro.xml_url = xml_url
+    db.commit()
+    return True
+
+
+class TimbrarIndividualIn(BaseModel):
+    venta_id: int
+    cliente_rfc: str
+    cliente_nombre: str
+    cliente_regimen_fiscal: str
+    cliente_cp: str
+    cliente_email: str = ""
+    uso_cfdi: str = "G03"
+    forma_pago: str = "01"
+
+
+@router.post("/individual/timbrar")
+def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        venta = db.query(Venta).filter(Venta.id == body.venta_id).first()
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+        if venta.facturada:
+            raise HTTPException(status_code=400, detail="Esta venta ya fue facturada (individual o dentro de la factura global del mes) — no se puede facturar dos veces")
+
+        # Regla comercial estándar en México: si no se facturó al momento de la compra,
+        # se puede facturar individual a más tardar el último día del mes de la compra.
+        # Después de esa fecha ya debe quedar cubierta por la factura global mensual —
+        # facturarla aparte duplicaría el ingreso declarado ante el SAT.
+        venta_fecha = venta.creado_en or datetime.now()
+        _, fin_mes_venta = _rango(venta_fecha.month, venta_fecha.year)
+        if datetime.now() > fin_mes_venta:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Esta venta es de {MESES_ES[venta_fecha.month-1]} {venta_fecha.year} — ya pasó el plazo para "
+                       "facturarla individual (hasta el último día de ese mes). Ya debe estar cubierta por la factura global mensual.",
+            )
+
+        ya_existe = (
+            db.query(CfdiFacturaIndividual)
+            .filter(CfdiFacturaIndividual.venta_id == body.venta_id, CfdiFacturaIndividual.estado == "timbrada")
+            .first()
+        )
+        if ya_existe:
+            raise HTTPException(status_code=400, detail="Esta venta ya tiene una factura individual timbrada")
+
+        items_venta = db.query(ItemVenta).filter(ItemVenta.venta_id == body.venta_id).all()
+        if not items_venta:
+            raise HTTPException(status_code=400, detail="La venta no tiene artículos")
+
+        items = [{
+            "descripcion": i.producto.nombre if i.producto else f"Producto {i.producto_id}",
+            "cantidad": i.cantidad,
+            "precio_unitario": i.precio_unitario,
+            "aplica_iva": bool(i.producto.aplica_iva) if i.producto else False,
+        } for i in items_venta]
+
+        subtotal = sum(i.subtotal or 0.0 for i in items_venta)
+        iva = sum((i.subtotal or 0.0) * 0.16 for i in items_venta if i.producto and i.producto.aplica_iva)
+        total = subtotal + iva
+
+        fconf = _leer_config_facturacion(db)
+        try:
+            resultado = facturacom_service.crear_factura_individual(
+                api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                sandbox=fconf["facturacom_sandbox"],
+                cliente_rfc=body.cliente_rfc, cliente_nombre=body.cliente_nombre,
+                cliente_regimen_fiscal=body.cliente_regimen_fiscal, cliente_cp=body.cliente_cp,
+                cliente_email=body.cliente_email, uso_cfdi=body.uso_cfdi, forma_pago=body.forma_pago,
+                items=items,
+            )
+        except facturacom_service.FacturaComError as e:
+            registro = CfdiFacturaIndividual(
+                venta_id=body.venta_id, cliente_nombre=body.cliente_nombre, cliente_rfc=body.cliente_rfc,
+                cliente_regimen_fiscal=body.cliente_regimen_fiscal, cliente_cp=body.cliente_cp,
+                cliente_email=body.cliente_email, uso_cfdi=body.uso_cfdi, forma_pago=body.forma_pago,
+                subtotal=subtotal, iva=iva, total=total,
+                estado="error", error_mensaje=str(e),
+                usuario_id=int(payload["sub"]) if payload.get("sub") else None,
+            )
+            db.add(registro)
+            db.commit()
+            raise HTTPException(status_code=502, detail=str(e))
+
+        # Igual que en la factura global: se graba "timbrada" apenas se confirma el
+        # timbrado real, ANTES de intentar descargar PDF/XML — un fallo de red en la
+        # descarga no debe disparar un reintento que duplicaría el CFDI real.
+        registro = CfdiFacturaIndividual(
+            venta_id=body.venta_id, cliente_nombre=body.cliente_nombre, cliente_rfc=body.cliente_rfc,
+            cliente_regimen_fiscal=body.cliente_regimen_fiscal, cliente_cp=body.cliente_cp,
+            cliente_email=body.cliente_email, uso_cfdi=body.uso_cfdi, forma_pago=body.forma_pago,
+            subtotal=subtotal, iva=iva, total=total,
+            estado="timbrada", facturacom_id=resultado["facturacom_id"], uuid_fiscal=resultado["uuid"],
+            serie=resultado["serie"], folio=resultado["folio"],
+            usuario_id=int(payload["sub"]) if payload.get("sub") else None,
+        )
+        venta.facturada = True
+        db.add(registro)
+        db.commit()
+
+        _descargar_y_guardar_documentos_individual(db, registro, fconf)
+
+        return {
+            "ok": True, "id": registro.id, "uuid": registro.uuid_fiscal,
+            "total": registro.total,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/individual/historial")
+def historial_facturas_individuales(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        rows = (
+            db.query(CfdiFacturaIndividual)
+            .order_by(CfdiFacturaIndividual.creado_en.desc())
+            .limit(200)
+            .all()
+        )
+        return [
+            {
+                "id": r.id, "venta_id": r.venta_id,
+                "cliente_nombre": r.cliente_nombre, "cliente_rfc": r.cliente_rfc,
+                "subtotal": r.subtotal, "iva": r.iva, "total": r.total,
+                "estado": r.estado, "uuid": r.uuid_fiscal, "serie": r.serie, "folio": r.folio,
+                "error_mensaje": r.error_mensaje,
+                "documentos_pendientes": r.estado == "timbrada" and not r.pdf_path and not r.pdf_url,
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+                "cancelado_en": r.cancelado_en.isoformat() if r.cancelado_en else None,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+@router.post("/individual/{cfdi_id}/redescargar")
+def redescargar_documentos_individual(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "timbrada":
+            raise HTTPException(status_code=400, detail="Solo aplica a facturas ya timbradas")
+        fconf = _leer_config_facturacion(db)
+        ok = _descargar_y_guardar_documentos_individual(db, r, fconf)
+        if not ok:
+            raise HTTPException(status_code=502, detail="No se pudo descargar el PDF/XML todavía, intenta de nuevo más tarde")
+        return {"ok": True}
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+@router.post("/individual/{cfdi_id}/abrir-carpeta")
+def abrir_carpeta_individual(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r or not r.pdf_path:
+            raise HTTPException(status_code=404, detail="No hay archivo guardado localmente para esta factura")
+        p = Path(r.pdf_path)
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="El archivo ya no existe en disco")
+        import subprocess
+        subprocess.Popen(["explorer", "/select,", str(p)])
+        return {"ok": True, "path": str(p)}
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+@router.get("/individual/{cfdi_id}/pdf")
+def descargar_pdf_individual(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r or (not r.pdf_path and not r.pdf_url):
+            raise HTTPException(status_code=404, detail="No encontrado")
+        p = Path(r.pdf_path) if r.pdf_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/pdf", headers={
+                "Content-Disposition": f'attachment; filename="factura_{r.folio or r.id}.pdf"'
+            })
+        if r.pdf_url:
+            return RedirectResponse(r.pdf_url)
+        raise HTTPException(status_code=404, detail="Archivo PDF no encontrado")
+    finally:
+        db.close()
+
+
+@router.get("/individual/{cfdi_id}/xml")
+def descargar_xml_individual(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r or (not r.xml_path and not r.xml_url):
+            raise HTTPException(status_code=404, detail="No encontrado")
+        p = Path(r.xml_path) if r.xml_path else None
+        if p and p.exists():
+            return Response(content=p.read_bytes(), media_type="application/xml", headers={
+                "Content-Disposition": f'attachment; filename="factura_{r.folio or r.id}.xml"'
+            })
+        if r.xml_url:
+            return RedirectResponse(r.xml_url)
+        raise HTTPException(status_code=404, detail="Archivo XML no encontrado")
+    finally:
+        db.close()
+
+
+@router.post("/individual/{cfdi_id}/cancelar")
+def cancelar_factura_individual(cfdi_id: int, body: CancelarIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "timbrada":
+            raise HTTPException(status_code=400, detail="Solo se puede cancelar una factura timbrada")
+
+        fconf = _leer_config_facturacion(db)
+        try:
+            facturacom_service.cancelar_cfdi(
+                api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                sandbox=fconf["facturacom_sandbox"],
+                facturacom_id=r.facturacom_id, motivo=body.motivo,
+            )
+        except facturacom_service.FacturaComError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+
+        r.estado = "cancelada"
+        r.cancelado_en = datetime.now()
+        venta = db.query(Venta).filter(Venta.id == r.venta_id).first()
+        if venta:
+            venta.facturada = False
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/individual/{cfdi_id}")
+def eliminar_factura_individual_error(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "error":
+            raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error")
+        db.delete(r)
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+class EnviarWhatsappIn(BaseModel):
+    numero: str = ""
+
+
+@router.post("/individual/{cfdi_id}/enviar-whatsapp")
+def enviar_whatsapp_individual(cfdi_id: int, body: EnviarWhatsappIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "timbrada":
+            raise HTTPException(status_code=400, detail="Solo se puede enviar una factura timbrada")
+        if not r.pdf_url:
+            raise HTTPException(status_code=400, detail="Todavía no hay link de descarga en la nube — reintenta la descarga de documentos primero")
+
+        from app.database.models import Configuracion
+        rows = db.query(Configuracion).filter(Configuracion.clave.in_(["whatsapp_token", "whatsapp_numero"])).all()
+        wconf = {x.clave: x.valor for x in rows}
+        numero = body.numero.strip() or wconf.get("whatsapp_numero", "")
+        token = wconf.get("whatsapp_token", "")
+
+        mensaje = (
+            f"Tu factura CFDI folio {r.folio or r.id}, total ${r.total:.2f}. "
+            f"Descárgala aquí: {r.pdf_url}"
+        )
+        try:
+            from app.services.alertas_service import enviar_whatsapp
+            enviar_whatsapp(numero, token, mensaje)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        return {"ok": True}
+    except HTTPException:
+        raise
+    finally:
+        db.close()
+
+
+class EnviarCorreoIn(BaseModel):
+    destinatario: str = ""
+
+
+@router.post("/individual/{cfdi_id}/enviar-correo")
+def enviar_correo_individual(cfdi_id: int, body: EnviarCorreoIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        r = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id == cfdi_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        if r.estado != "timbrada":
+            raise HTTPException(status_code=400, detail="Solo se puede enviar una factura timbrada")
+        if not r.pdf_path or not r.xml_path:
+            raise HTTPException(status_code=400, detail="Todavía no hay archivos locales — reintenta la descarga de documentos primero")
+
+        destinatario = body.destinatario.strip() or r.cliente_email
+        if not destinatario:
+            raise HTTPException(status_code=400, detail="Falta el correo del destinatario")
+
+        fconf = _leer_config_facturacion(db)
+        pdf_bytes = Path(r.pdf_path).read_bytes()
+        xml_bytes = Path(r.xml_path).read_bytes()
+        nombre_base = f"factura_{r.folio or r.id}"
+
+        from app.services.email_service import enviar_email, EmailError
+        try:
+            enviar_email(
+                smtp_host=fconf["email_smtp_host"], smtp_port=int(fconf["email_smtp_port"] or 587),
+                smtp_user=fconf["email_smtp_user"], smtp_password=fconf["email_smtp_password"],
+                destinatario=destinatario,
+                asunto=f"Tu factura {nombre_base}",
+                cuerpo=f"Adjuntamos tu CFDI folio {r.folio or r.id}, total ${r.total:.2f}.\nUUID: {r.uuid_fiscal}",
+                archivos_adjuntos=[(f"{nombre_base}.pdf", pdf_bytes), (f"{nombre_base}.xml", xml_bytes)],
+            )
+        except EmailError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        return {"ok": True}
+    except HTTPException:
+        raise
     finally:
         db.close()

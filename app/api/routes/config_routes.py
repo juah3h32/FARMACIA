@@ -256,8 +256,9 @@ def test_alerta(payload: dict = Depends(get_current_api_user)):
 # ── Facturación CFDI (Facturama) ─────────────────────────────────────────────
 
 _FACT_KEYS = [
-    "facturama_user", "facturama_password", "facturama_sandbox",
+    "facturacom_api_key", "facturacom_secret_key", "facturacom_sandbox",
     "emisor_razon_social", "emisor_rfc", "emisor_regimen_fiscal", "emisor_cp",
+    "email_smtp_host", "email_smtp_port", "email_smtp_user", "email_smtp_password",
 ]
 
 
@@ -272,26 +273,34 @@ def get_facturacion(payload: dict = Depends(get_current_api_user)):
         rows = db.query(Configuracion).filter(Configuracion.clave.in_(_FACT_KEYS)).all()
         d = {r.clave: r.valor for r in rows}
         return {
-            "facturama_user":       d.get("facturama_user", ""),
-            "facturama_password":   d.get("facturama_password", ""),
-            "facturama_sandbox":    d.get("facturama_sandbox", "1") == "1",
+            "facturacom_api_key":    d.get("facturacom_api_key", ""),
+            "facturacom_secret_key": d.get("facturacom_secret_key", ""),
+            "facturacom_sandbox":    d.get("facturacom_sandbox", "1") == "1",
             "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_RAZON_SOCIAL_FISCAL,
             "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
             "emisor_regimen_fiscal": d.get("emisor_regimen_fiscal") or cfg.PHARMACY_REGIMEN_FISCAL,
             "emisor_cp":            d.get("emisor_cp") or cfg.PHARMACY_CP_FISCAL,
+            "email_smtp_host":      d.get("email_smtp_host", ""),
+            "email_smtp_port":      d.get("email_smtp_port", "587"),
+            "email_smtp_user":      d.get("email_smtp_user", ""),
+            "email_smtp_password":  d.get("email_smtp_password", ""),
         }
     finally:
         db.close()
 
 
 class FacturacionIn(BaseModel):
-    facturama_user: str = ""
-    facturama_password: str = ""
-    facturama_sandbox: bool = True
+    facturacom_api_key: str = ""
+    facturacom_secret_key: str = ""
+    facturacom_sandbox: bool = True
     emisor_razon_social: str = ""
     emisor_rfc: str = ""
     emisor_regimen_fiscal: str = ""
     emisor_cp: str = ""
+    email_smtp_host: str = ""
+    email_smtp_port: str = "587"
+    email_smtp_user: str = ""
+    email_smtp_password: str = ""
 
 
 @router.post("/facturacion")
@@ -303,13 +312,17 @@ def set_facturacion(body: FacturacionIn, payload: dict = Depends(get_current_api
     db = get_db_session()
     try:
         updates = {
-            "facturama_user":        body.facturama_user.strip(),
-            "facturama_password":    body.facturama_password.strip(),
-            "facturama_sandbox":     "1" if body.facturama_sandbox else "0",
+            "facturacom_api_key":    body.facturacom_api_key.strip(),
+            "facturacom_secret_key": body.facturacom_secret_key.strip(),
+            "facturacom_sandbox":    "1" if body.facturacom_sandbox else "0",
             "emisor_razon_social":   body.emisor_razon_social.strip(),
             "emisor_rfc":            body.emisor_rfc.strip().upper(),
             "emisor_regimen_fiscal": body.emisor_regimen_fiscal.strip(),
             "emisor_cp":             body.emisor_cp.strip(),
+            "email_smtp_host":       body.email_smtp_host.strip(),
+            "email_smtp_port":       body.email_smtp_port.strip() or "587",
+            "email_smtp_user":       body.email_smtp_user.strip(),
+            "email_smtp_password":   body.email_smtp_password.strip(),
         }
         for clave, valor in updates.items():
             row = db.query(Configuracion).filter(Configuracion.clave == clave).first()

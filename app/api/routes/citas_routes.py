@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from app.database.connection import get_db_session
-from app.database.models import Cita
+from app.database.models import Cita, EstadoCita
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
+
+# No hay campo de duración en el modelo Cita — se asume un slot fijo para
+# detectar traslapes. Ajusta si tus citas normalmente duran otra cosa.
+DURACION_CITA_MIN = 30
 
 
 class CitaIn(BaseModel):
@@ -60,11 +64,36 @@ def crear_cita(body: CitaIn, payload: dict = Depends(get_current_api_user)):
         data = body.model_dump()
         if not data.get("usuario_id"):
             data["usuario_id"] = int(payload["sub"])
+
+        # Traslape: mismo usuario_id (doctor/encargado) con otra cita activa
+        # dentro de la misma ventana de tiempo (no hay campo de duración —
+        # se usa un slot fijo DURACION_CITA_MIN).
+        ventana = timedelta(minutes=DURACION_CITA_MIN)
+        nueva_inicio = data["fecha_hora"]
+        conflicto = (
+            db.query(Cita)
+            .filter(
+                Cita.usuario_id == data["usuario_id"],
+                Cita.estado.in_([EstadoCita.programada, EstadoCita.completada]),
+                Cita.fecha_hora > nueva_inicio - ventana,
+                Cita.fecha_hora < nueva_inicio + ventana,
+            )
+            .first()
+        )
+        if conflicto:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Ya hay una cita a las {conflicto.fecha_hora.strftime('%H:%M')} para este mismo horario/encargado — "
+                       f"elige otra hora (mínimo {DURACION_CITA_MIN} min de diferencia)",
+            )
+
         c = Cita(**data)
         db.add(c)
         db.commit()
         db.refresh(c)
         return _cita_dict(c)
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(500, str(e))
@@ -76,6 +105,8 @@ def crear_cita(body: CitaIn, payload: dict = Depends(get_current_api_user)):
 def cambiar_estado(cid: int, estado: str, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
+        if estado not in EstadoCita._value2member_map_:
+            raise HTTPException(400, f"Estado inválido: {estado}")
         c = db.query(Cita).filter(Cita.id == cid).first()
         if not c:
             raise HTTPException(404, "Cita no encontrada")

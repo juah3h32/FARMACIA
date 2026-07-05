@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Farmacia Eben-Ezer"
-VERSION = "2.3.55"
+VERSION = "2.3.56"
 PHARMACY_NAME = "FARMACIA EBEN-EZER"
 PHARMACY_ADDRESS = "ESFUERZO #47 COL. 13 DE ABRIL"
 PHARMACY_PHONE = "Tel: 443-423-1168"
@@ -23,7 +23,9 @@ _ON_VERCEL = bool(os.getenv("VERCEL"))
 # Vercel:  /tmp (único dir escribible en lambdas — ephemeral, Turso es la fuente real)
 # EXE:     %APPDATA%\FarmaciaEbenEzer\
 # Dev:     /data/ junto al proyecto
-if _ON_VERCEL:
+if os.getenv('FARMACIA_DATA_DIR'):
+    DATA_DIR = Path(os.getenv('FARMACIA_DATA_DIR'))
+elif _ON_VERCEL:
     DATA_DIR = Path("/tmp/FarmaciaEbenEzer")
 elif getattr(sys, 'frozen', False):
     DATA_DIR = Path(os.getenv('APPDATA', Path.home())) / "FarmaciaEbenEzer"
@@ -82,10 +84,43 @@ TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key") or (
     ".B3nY0-9gzbXkqNlj8MlzBjw44JP9OpVrG9QGrdx_tkB19QF8l7f5IgYoW3mLjOqUq4sTOVNQu78GEJMaVA0sDg"
 )
 
-# Vercel: Turso es la BD primaria (no hay disco persistente)
-# EXE local: SQLite local + sync a Turso en background
+# -- Modo de sincronización (elegido en el asistente de primer arranque) ------
+# "turso"   = SQLite local + sincroniza con la nube (multi-PC)
+# "local"   = solo SQLite local, nunca intenta red — un solo equipo para siempre
+# "offline" = igual que local, pero pensado como estado temporal (sin internet
+#             ahora mismo) — se puede volver a activar Turso después
+import json as _json
+
+SETUP_FILE = DATA_DIR / "setup.json"
+
+
+def _load_setup() -> dict:
+    if SETUP_FILE.exists():
+        try:
+            return _json.loads(SETUP_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def reload_setup() -> None:
+    """Re-lee setup.json y actualiza SYNC_MODE/USE_TURSO/TURSO_SYNC en caliente —
+    se llama justo después de que el asistente de primer arranque guarda la elección."""
+    global SYNC_MODE, USE_TURSO, TURSO_SYNC, NEEDS_FIRST_RUN_SETUP
+    _setup = _load_setup()
+    SYNC_MODE = _setup.get("sync_mode", "turso")
+    NEEDS_FIRST_RUN_SETUP = (not _ON_VERCEL) and "sync_mode" not in _setup
+    USE_TURSO  = _ON_VERCEL
+    TURSO_SYNC = (not _ON_VERCEL) and SYNC_MODE == "turso"
+
+
+# Vercel: Turso es la BD primaria (no hay disco persistente) — siempre, sin asistente.
+# EXE local: el asistente de primer arranque decide (turso/local/offline), guardado en setup.json.
+SYNC_MODE = "turso"
+NEEDS_FIRST_RUN_SETUP = False
 USE_TURSO  = _ON_VERCEL
-TURSO_SYNC = not _ON_VERCEL  # solo sincroniza local->Turso desde el EXE
+TURSO_SYNC = not _ON_VERCEL
+reload_setup()
 
 API_HOST = "127.0.0.1"
 API_PORT = 8000

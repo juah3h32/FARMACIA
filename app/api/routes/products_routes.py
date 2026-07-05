@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 import os, tempfile
 from app.database.connection import get_db_session
@@ -31,11 +31,11 @@ class ProductoIn(BaseModel):
     def _upper_optional(cls, v):
         return v.strip().upper() if v else v
     categoria_id: Optional[int] = None
-    precio_compra: float = 0.0
-    precio_venta: float
+    precio_compra: float = Field(0.0, ge=0)
+    precio_venta: float = Field(..., ge=0)
     aplica_iva: bool = False
-    stock: int = 0
-    stock_minimo: int = 10
+    stock: int = Field(0, ge=0)
+    stock_minimo: int = Field(10, ge=0)
     requiere_receta: bool = False
     presentacion: Optional[str] = None
     concentracion: Optional[str] = None
@@ -44,11 +44,11 @@ class ProductoIn(BaseModel):
     imagen_url: Optional[str] = None
     proveedor_id: Optional[int] = None
     venta_fraccionada: bool = False
-    unidades_por_caja: int = 1
-    precio_pieza: float = 0.0
+    unidades_por_caja: int = Field(1, ge=1)
+    precio_pieza: float = Field(0.0, ge=0)
     unidad_pieza: Optional[str] = "pieza"
     unidad_caja: Optional[str] = "caja"
-    piezas_sueltas: int = 0
+    piezas_sueltas: int = Field(0, ge=0)
 
 
 class ProductoResponse(BaseModel):

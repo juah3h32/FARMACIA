@@ -3121,40 +3121,128 @@
       </div>
 
       <!-- ─── FACTURACIÓN SIMPLIFICADA ──────────────────────── -->
-      <div data-page="facturacion" class="page" style="display:none;flex-direction:column;height:100%;overflow:hidden;padding:1.25rem">
+      <div data-page="facturacion" class="page" style="display:none;flex-direction:column;height:100%;overflow:auto;padding:1.25rem">
         <div class="flex items-center gap-3 mb-4 flex-shrink-0">
           <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#1d2140,#312E81)">
             <i data-lucide="file-text" style="width:20px;height:20px;color:#fff"></i>
           </div>
           <div>
-            <h2 class="text-lg font-black" style="color:#0F172A">Facturación Simplificada</h2>
-            <p class="text-xs" style="color:#64748B">Genera factura PDF con RFC del cliente (sin CFDI)</p>
+            <h2 class="text-lg font-black" style="color:#0F172A">Facturación Individual</h2>
+            <p class="text-xs" style="color:#64748B">Timbra un CFDI 4.0 real ante el SAT a nombre del cliente, por una venta específica</p>
           </div>
         </div>
+        <details class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
+          <summary class="text-xs font-bold cursor-pointer" style="color:#64748B">CONFIGURAR ENVÍO POR CORREO (SMTP) — opcional, solo si vas a mandar facturas por email</summary>
+          <div class="grid grid-cols-4 gap-2 mt-3">
+            <input id="fact-smtp-host" type="text" placeholder="smtp.gmail.com" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            <input id="fact-smtp-port" type="text" placeholder="587" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            <input id="fact-smtp-user" type="text" placeholder="tu-correo@gmail.com" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            <input id="fact-smtp-pass" type="password" placeholder="Contraseña de aplicación" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+          </div>
+          <button onclick="guardarConfigSmtp()" class="mt-3 px-4 py-2 rounded-xl text-sm font-bold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Guardar SMTP</button>
+        </details>
         <div class="grid grid-cols-2 gap-4 flex-shrink-0 mb-4">
           <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
-            <p class="text-xs font-bold mb-3" style="color:#64748B">DATOS DEL CLIENTE</p>
-            <input id="fact-nombre" type="text" placeholder="Nombre o razón social" class="w-full px-3 py-2 rounded-xl border text-sm mb-2" style="border-color:#E2E8F0">
-            <input id="fact-rfc" type="text" placeholder="RFC" class="w-full px-3 py-2 rounded-xl border text-sm mb-2" style="border-color:#E2E8F0">
-            <input id="fact-direccion" type="text" placeholder="Dirección" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            <p class="text-xs font-bold mb-3" style="color:#64748B">DATOS FISCALES DEL CLIENTE</p>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">Nombre o razón social</label>
+                <input id="fact-nombre" type="text" placeholder="Nombre completo" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+              </div>
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">RFC</label>
+                <input id="fact-rfc" type="text" placeholder="RFC" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">Régimen fiscal</label>
+                <select id="fact-regimen" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+                  <option value="605">605 — Sueldos y salarios</option>
+                  <option value="606">606 — Arrendamiento</option>
+                  <option value="608">608 — Demás ingresos</option>
+                  <option value="612" selected>612 — Personas Físicas Act. Empresariales</option>
+                  <option value="614">614 — Ingresos por intereses</option>
+                  <option value="616">616 — Sin obligaciones fiscales</option>
+                  <option value="621">621 — Incorporación Fiscal</option>
+                  <option value="626">626 — RESICO</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">Código postal</label>
+                <input id="fact-cp" type="text" placeholder="CP" maxlength="5" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">Uso de CFDI</label>
+                <select id="fact-usocfdi" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+                  <option value="G01">G01 — Adquisición de mercancías</option>
+                  <option value="G03" selected>G03 — Gastos en general</option>
+                  <option value="P01">P01 — Por definir</option>
+                  <option value="D01">D01 — Honorarios médicos</option>
+                  <option value="S01">S01 — Sin efectos fiscales</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[10px]" style="color:#94A3B8">Forma de pago</label>
+                <select id="fact-formapago" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+                  <option value="01" selected>01 — Efectivo</option>
+                  <option value="03">03 — Transferencia</option>
+                  <option value="04">04 — Tarjeta de crédito</option>
+                  <option value="28">28 — Tarjeta de débito</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="text-[10px]" style="color:#94A3B8">Correo (para enviarle la factura, opcional)</label>
+              <input id="fact-email" type="email" placeholder="cliente@correo.com" class="w-full px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
           </div>
           <div class="bg-white rounded-2xl border p-4" style="border-color:#E2E8F0">
             <p class="text-xs font-bold mb-3" style="color:#64748B">FOLIO DE VENTA</p>
             <div class="flex gap-2">
-              <input id="fact-folio" type="text" placeholder="Folio de venta (ej. F12345678)" class="flex-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+              <select id="fact-folio" class="flex-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+                <option value="">Cargando ventas...</option>
+              </select>
               <button onclick="cargarVentaFactura()" class="px-3 py-2 rounded-xl text-sm font-bold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Cargar</button>
             </div>
-            <div id="fact-items" class="mt-3 text-sm" style="color:#64748B">Ingresa un folio de venta para cargar los artículos.</div>
+            <div id="fact-items" class="mt-3 text-sm" style="color:#64748B">Selecciona una venta de la lista para cargar los artículos.</div>
           </div>
         </div>
-        <div class="flex justify-end flex-shrink-0">
-          <button onclick="generarFacturaPDF()" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#1d2140,#312E81);border:none;cursor:pointer">
-            <i data-lucide="download" style="width:15px;height:15px"></i> Generar PDF
+        <div class="flex justify-end flex-shrink-0 mb-4">
+          <button id="fact-timbrar-btn" onclick="timbrarFacturaIndividual()" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
+            <i data-lucide="stamp" style="width:15px;height:15px"></i> Timbrar factura
           </button>
+        </div>
+
+        <!-- Historial de facturas individuales -->
+        <div class="bg-white rounded-2xl border p-4 flex-1" style="border-color:#E2E8F0">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EFF6FF">
+                <i data-lucide="history" style="width:14px;height:14px;color:#1d2140"></i>
+              </div>
+              <p class="text-xs font-bold tracking-wide" style="color:#64748B">HISTORIAL DE FACTURAS INDIVIDUALES</p>
+            </div>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr style="color:#94A3B8;text-align:left">
+                <th class="pb-2 text-[10px] font-bold tracking-wide">CLIENTE</th>
+                <th class="pb-2 text-[10px] font-bold tracking-wide">RFC</th>
+                <th class="pb-2 text-[10px] font-bold tracking-wide">TOTAL</th>
+                <th class="pb-2 text-[10px] font-bold tracking-wide">ESTADO</th>
+                <th class="pb-2 text-[10px] font-bold tracking-wide">UUID</th>
+                <th class="pb-2 text-[10px] font-bold tracking-wide">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="fact-ind-tbody"></tbody>
+          </table>
         </div>
       </div>
 
-      <!-- ─── FACTURA GLOBAL CFDI (FACTURAMA) ───────────────── -->
+      <!-- ─── FACTURA GLOBAL CFDI (FACTURA.COM) ───────────────── -->
       <div data-page="cfdi-global" class="page" style="display:none;flex-direction:column;height:100%;overflow:auto;padding:1.25rem">
         <div class="flex items-center gap-3 mb-4 flex-shrink-0">
           <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#16A34A,#15803D)">
@@ -3162,34 +3250,58 @@
           </div>
           <div>
             <h2 class="text-lg font-black" style="color:#0F172A">Factura Global Mensual (CFDI)</h2>
-            <p class="text-xs" style="color:#64748B">Timbra ante el SAT vía Facturama toda la venta del mes, receptor Público en General</p>
+            <p class="text-xs" style="color:#64748B">Timbra ante el SAT vía Factura.com toda la venta del mes, receptor Público en General</p>
           </div>
         </div>
 
-        <!-- Resumen para Declaración Mensual (ingresos + compras + IVA neto + ISR) -->
-        <div class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
-          <div class="flex items-center justify-between mb-3">
-            <p class="text-xs font-bold" style="color:#64748B">RESUMEN — DECLARACIÓN MENSUAL (día 17)</p>
-            <button onclick="loadDeclaracionMensual()" class="px-3 py-1.5 rounded-xl text-xs font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Actualizar</button>
+        <!-- Config Factura.com -->
+        <div class="bg-white rounded-2xl border p-5 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
+          <div class="flex items-center gap-2.5 mb-1">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EFF6FF">
+              <i data-lucide="key-round" style="width:14px;height:14px;color:#1d2140"></i>
+            </div>
+            <p class="text-xs font-bold tracking-wide" style="color:#64748B">CONEXIÓN FACTURA.COM Y DATOS FISCALES DEL EMISOR</p>
           </div>
-          <div id="decl-mensual-body" class="text-xs" style="color:#94A3B8">Selecciona mes/año abajo y presiona Actualizar.</div>
-        </div>
+          <p class="text-xs mb-4" style="color:#94A3B8;padding-left:34px">Se configura una sola vez — el emisor real (RFC, régimen, CSD) vive en tu cuenta de Factura.com</p>
 
-        <!-- Config Facturama -->
-        <div class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
-          <p class="text-xs font-bold mb-3" style="color:#64748B">CONEXIÓN FACTURAMA Y DATOS FISCALES DEL EMISOR</p>
-          <div class="grid grid-cols-3 gap-3 mb-3">
-            <input id="cfdi-user" type="text" placeholder="Usuario Facturama" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-            <input id="cfdi-pass" type="password" placeholder="Contraseña Facturama" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-            <label class="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-              <input id="cfdi-sandbox" type="checkbox" checked> Modo prueba (sandbox)
-            </label>
+          <p class="text-[10px] font-bold tracking-wide mb-2" style="color:#94A3B8">CREDENCIALES API</p>
+          <div class="grid grid-cols-3 gap-3 mb-4">
+            <div>
+              <label class="text-xs" style="color:#64748B">F-Api-Key</label>
+              <input id="cfdi-apikey" type="password" placeholder="Tu API key de Factura.com" class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
+            <div>
+              <label class="text-xs" style="color:#64748B">F-Secret-Key</label>
+              <input id="cfdi-secretkey" type="password" placeholder="Tu Secret key de Factura.com" class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
+            <div>
+              <label class="text-xs" style="color:#64748B">Ambiente</label>
+              <label class="flex items-center gap-2 mt-1 px-3 py-2 rounded-xl border text-sm cursor-pointer" style="border-color:#E2E8F0">
+                <input id="cfdi-sandbox" type="checkbox" checked> Modo prueba (sandbox)
+              </label>
+            </div>
           </div>
-          <div class="grid grid-cols-4 gap-3 mb-3">
-            <input id="cfdi-razon" type="text" placeholder="Razón social emisor" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-            <input id="cfdi-rfc" type="text" placeholder="RFC emisor" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-            <input id="cfdi-regimen" type="text" placeholder="Régimen fiscal (ej. 626)" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
-            <input id="cfdi-cp" type="text" placeholder="Código postal" class="px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+
+          <div style="height:1px;background:#F1F5F9;margin:0 0 16px"></div>
+
+          <p class="text-[10px] font-bold tracking-wide mb-2" style="color:#94A3B8">DATOS FISCALES DEL EMISOR</p>
+          <div class="grid grid-cols-4 gap-3 mb-4">
+            <div>
+              <label class="text-xs" style="color:#64748B">Razón social</label>
+              <input id="cfdi-razon" type="text" placeholder="Razón social emisor" class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
+            <div>
+              <label class="text-xs" style="color:#64748B">RFC</label>
+              <input id="cfdi-rfc" type="text" placeholder="RFC emisor" class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
+            <div>
+              <label class="text-xs" style="color:#64748B">Régimen fiscal</label>
+              <input id="cfdi-regimen" type="text" placeholder="Ej. 626" class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
+            <div>
+              <label class="text-xs" style="color:#64748B">Código postal</label>
+              <input id="cfdi-cp" type="text" placeholder="C.P." class="w-full mt-1 px-3 py-2 rounded-xl border text-sm" style="border-color:#E2E8F0">
+            </div>
           </div>
           <div class="flex justify-end">
             <button onclick="guardarConfigCfdi()" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#1d2140;color:#fff;border:none;cursor:pointer">Guardar configuración</button>
@@ -3197,30 +3309,62 @@
         </div>
 
         <!-- Timbrado del periodo -->
-        <div class="bg-white rounded-2xl border p-4 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
-          <p class="text-xs font-bold mb-1" style="color:#64748B">TIMBRAR PERIODO</p>
-          <p class="text-xs mb-3" style="color:#94A3B8">Timbra dentro de las 24h del cierre del mes (regla 2.7.1.21) · Pago definitivo IVA/ISR RESICO vence el día 17 del mes siguiente</p>
+        <div class="rounded-2xl p-5 mb-4 flex-shrink-0 text-white" style="background:linear-gradient(135deg,#1d2140,#2d3358);box-shadow:0 12px 32px rgba(29,33,64,.25)">
+          <div class="flex items-center gap-2.5 mb-1">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.12)">
+              <i data-lucide="stamp" style="width:14px;height:14px;color:#fff"></i>
+            </div>
+            <p class="text-xs font-bold tracking-wide" style="color:#CBD5E1">TIMBRAR PERIODO</p>
+          </div>
+          <p class="text-xs mb-4" style="color:#94A3B8;padding-left:34px">Timbra dentro de las 24h del cierre del mes (regla 2.7.1.21) · Pago definitivo IVA/ISR RESICO vence el día 17 del mes siguiente</p>
           <div class="flex items-end gap-3 flex-wrap">
             <div>
-              <label class="text-xs" style="color:#64748B">Mes</label>
-              <select id="cfdi-mes" class="px-3 py-2 rounded-xl border text-sm block" style="border-color:#E2E8F0"></select>
+              <label class="text-xs" style="color:#94A3B8">Mes</label>
+              <select id="cfdi-mes" onchange="loadDeclaracionMensual()" class="px-3 py-2 rounded-xl text-sm block mt-1" style="border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff"></select>
             </div>
             <div>
-              <label class="text-xs" style="color:#64748B">Año</label>
-              <input id="cfdi-anio" type="number" class="px-3 py-2 rounded-xl border text-sm block" style="border-color:#E2E8F0;width:100px">
+              <label class="text-xs" style="color:#94A3B8">Año</label>
+              <input id="cfdi-anio" type="number" onchange="loadDeclaracionMensual()" class="px-3 py-2 rounded-xl text-sm block mt-1" style="border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;width:100px">
             </div>
-            <button onclick="abrirConfirmacionTimbrado()" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Vista previa</button>
+            <button onclick="abrirConfirmacionTimbrado()" class="px-5 py-2 rounded-xl text-sm font-bold" style="background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,.35)">
+              <i data-lucide="file-check-2" style="width:14px;height:14px;display:inline;vertical-align:-2px"></i> Vista previa
+            </button>
           </div>
         </div>
 
+        <!-- Resumen para Declaración Mensual (ingresos + compras + IVA neto + ISR) -->
+        <div class="bg-white rounded-2xl border p-5 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0F9FF">
+                <i data-lucide="calculator" style="width:14px;height:14px;color:#0284C7"></i>
+              </div>
+              <p class="text-xs font-bold tracking-wide" style="color:#64748B">RESUMEN — DECLARACIÓN MENSUAL DEL PERIODO DE ARRIBA</p>
+            </div>
+            <button onclick="loadDeclaracionMensual()" class="px-3 py-1.5 rounded-xl text-xs font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Actualizar</button>
+          </div>
+          <div id="decl-mensual-body" class="text-xs" style="color:#94A3B8;padding-left:34px">Elige mes/año arriba — el resumen se actualiza solo.</div>
+        </div>
+
         <!-- Historial -->
-        <div class="bg-white rounded-2xl border p-4 flex-1" style="border-color:#E2E8F0">
-          <p class="text-xs font-bold mb-3" style="color:#64748B">HISTORIAL DE FACTURAS GLOBALES</p>
+        <div class="bg-white rounded-2xl border p-5 flex-1" style="border-color:#E2E8F0">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F8FAFC">
+                <i data-lucide="history" style="width:14px;height:14px;color:#64748B"></i>
+              </div>
+              <p class="text-xs font-bold tracking-wide" style="color:#64748B">HISTORIAL DE FACTURAS GLOBALES</p>
+            </div>
+            <button onclick="abrirCarpetaTodasFacturas()" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Ver todas las facturas (carpeta)</button>
+          </div>
           <table class="w-full text-sm">
             <thead>
-              <tr style="color:#94A3B8;text-align:left">
-                <th class="pb-2">Periodo</th><th class="pb-2">Total</th><th class="pb-2">Estado</th>
-                <th class="pb-2">UUID</th><th class="pb-2">Acciones</th>
+              <tr style="color:#94A3B8;text-align:left;border-bottom:1px solid #F1F5F9">
+                <th class="pb-2.5 text-[10px] font-bold tracking-wide">PERIODO</th>
+                <th class="pb-2.5 text-[10px] font-bold tracking-wide">TOTAL</th>
+                <th class="pb-2.5 text-[10px] font-bold tracking-wide">ESTADO</th>
+                <th class="pb-2.5 text-[10px] font-bold tracking-wide">UUID</th>
+                <th class="pb-2.5 text-[10px] font-bold tracking-wide">ACCIONES</th>
               </tr>
             </thead>
             <tbody id="cfdi-tbody"></tbody>
@@ -3299,6 +3443,178 @@
       <button id="cfdi-confirmar-btn" onclick="confirmarYTimbrarFacturaGlobal()" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:linear-gradient(135deg,#16A34A,#15803D);border:none;cursor:pointer">
         <i data-lucide="stamp" style="width:14px;height:14px;display:inline"></i> Todo correcto, timbrar
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: VER FACTURA GLOBAL CFDI (HISTORIAL)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-ver" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-ver')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:480px;max-height:90vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">Factura global</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Detalle del CFDI timbrado ante el SAT</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-ver')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="cfdi-ver-body" class="px-5 pb-3 overflow-auto text-sm" style="flex:1"></div>
+    <div id="cfdi-ver-sat-status" class="px-5 pb-2 text-xs" style="display:none"></div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end flex-wrap" style="border-top:1px solid #F1F5F9">
+      <button id="cfdi-ver-sat-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Verificar con SAT</button>
+      <button id="cfdi-ver-cancelar-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">Cancelar factura</button>
+      <button id="cfdi-ver-preview-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Vista previa</button>
+      <button id="cfdi-ver-xml-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Descargar XML</button>
+      <button id="cfdi-ver-pdf-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">Descargar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: VISTA PREVIA PDF (VISOR EMBEBIDO)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-pdf" class="fixed inset-0 z-[96] hidden items-center justify-center" style="padding:24px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.75);backdrop-filter:blur(12px)" onclick="cerrarVistaPreviaPdf()"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:1100px;height:95vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.45)">
+    <div class="flex items-center justify-between px-6 py-4 flex-shrink-0" style="border-bottom:1px solid #F1F5F9">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#1d2140,#2d3358)">
+          <i data-lucide="file-text" style="width:16px;height:16px;color:#fff"></i>
+        </div>
+        <div>
+          <p class="text-sm font-black" style="color:#0F172A">Vista previa del PDF</p>
+          <p class="text-xs" style="color:#94A3B8">Factura Global CFDI 4.0</p>
+        </div>
+      </div>
+      <button onclick="cerrarVistaPreviaPdf()" class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
+    </div>
+    <div id="cfdi-pdf-preview-body" style="flex:1;background:#525659;display:flex;align-items:center;justify-content:center">
+      <p class="text-xs" style="color:#CBD5E1">Cargando PDF...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: CONFIRMAR ELIMINAR FACTURA GLOBAL CON ERROR
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-eliminar" class="fixed inset-0 z-[96] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-eliminar')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:420px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">¿Eliminar este intento fallido?</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">No es una factura fiscal válida, se puede borrar sin riesgo</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-eliminar')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="cfdi-eliminar-body" class="px-5 pb-3 text-sm"></div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end" style="border-top:1px solid #F1F5F9">
+      <button onclick="closeModal('modal-cfdi-eliminar')" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Cancelar</button>
+      <button id="cfdi-eliminar-confirmar-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#EF4444;border:none;cursor:pointer">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: CANCELAR FACTURA GLOBAL ANTE EL SAT
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-cancelar" class="fixed inset-0 z-[97] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-cancelar')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:440px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">Cancelar factura ante el SAT</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Las ventas del periodo quedarán disponibles para re-facturar</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-cancelar')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="px-5 pb-3 text-sm">
+      <p class="text-xs font-bold mb-2" style="color:#64748B">MOTIVO DE CANCELACIÓN (SAT)</p>
+      <div class="space-y-2">
+        <label class="flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer" style="border-color:#E2E8F0">
+          <input type="radio" name="cfdi-cancelar-motivo" value="02" checked class="mt-0.5">
+          <span class="text-xs"><b style="color:#0F172A">02 — Comprobante con errores sin relación</b><br><span style="color:#94A3B8">El motivo más común, sin factura sustituta</span></span>
+        </label>
+        <label class="flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer" style="border-color:#E2E8F0">
+          <input type="radio" name="cfdi-cancelar-motivo" value="03" class="mt-0.5">
+          <span class="text-xs"><b style="color:#0F172A">03 — No se llevó a cabo la operación</b></span>
+        </label>
+        <label class="flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer" style="border-color:#E2E8F0">
+          <input type="radio" name="cfdi-cancelar-motivo" value="04" class="mt-0.5">
+          <span class="text-xs"><b style="color:#0F172A">04 — Operación nominativa en factura global</b></span>
+        </label>
+      </div>
+    </div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end" style="border-top:1px solid #F1F5F9">
+      <button onclick="closeModal('modal-cfdi-cancelar')" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Cerrar</button>
+      <button id="cfdi-cancelar-confirmar-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#EF4444;border:none;cursor:pointer">Cancelar factura</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: VER FACTURA INDIVIDUAL (HISTORIAL)
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-ind-ver" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-ind-ver')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:480px;max-height:90vh;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">Factura individual</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">Detalle del CFDI timbrado ante el SAT</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-ind-ver')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="cfdi-ind-ver-body" class="px-5 pb-3 overflow-auto text-sm" style="flex:1"></div>
+    <div id="cfdi-ind-ver-envio-status" class="px-5 pb-2 text-xs" style="display:none"></div>
+    <div class="px-5 pb-3 flex-shrink-0 flex gap-2" style="border-top:1px solid #F1F5F9;padding-top:10px">
+      <input id="cfdi-ind-whatsapp-numero" type="text" placeholder="Número WhatsApp (opcional)" class="flex-1 px-3 py-2 rounded-xl border text-xs" style="border-color:#E2E8F0">
+      <button id="cfdi-ind-whatsapp-btn" class="px-3 py-2 rounded-xl text-xs font-bold" style="background:#DCFCE7;color:#15803D;border:none;cursor:pointer">Enviar WhatsApp</button>
+    </div>
+    <div class="px-5 pb-3 flex-shrink-0 flex gap-2">
+      <input id="cfdi-ind-correo-destino" type="email" placeholder="Correo destino (opcional)" class="flex-1 px-3 py-2 rounded-xl border text-xs" style="border-color:#E2E8F0">
+      <button id="cfdi-ind-correo-btn" class="px-3 py-2 rounded-xl text-xs font-bold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Enviar correo</button>
+    </div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end flex-wrap" style="border-top:1px solid #F1F5F9">
+      <button id="cfdi-ind-cancelar-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">Cancelar factura</button>
+      <button id="cfdi-ind-preview-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Vista previa</button>
+      <button id="cfdi-ind-xml-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Descargar XML</button>
+      <button id="cfdi-ind-pdf-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">Descargar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: ELIMINAR FACTURA INDIVIDUAL CON ERROR
+══════════════════════════════════════════════════════════════════════════════ -->
+<div id="modal-cfdi-ind-eliminar" class="fixed inset-0 z-[96] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.6);backdrop-filter:blur(10px)" onclick="closeModal('modal-cfdi-ind-eliminar')"></div>
+  <div class="modal-pane relative flex flex-col" style="width:100%;max-width:420px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+      <div>
+        <p class="text-base font-black" style="color:#0F172A">¿Eliminar este intento fallido?</p>
+        <p class="text-xs mt-0.5" style="color:#94A3B8">No es una factura fiscal válida, se puede borrar sin riesgo</p>
+      </div>
+      <button onclick="closeModal('modal-cfdi-ind-eliminar')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#64748B;border:none">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="cfdi-ind-eliminar-body" class="px-5 pb-3 text-sm"></div>
+    <div class="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2 justify-end" style="border-top:1px solid #F1F5F9">
+      <button onclick="closeModal('modal-cfdi-ind-eliminar')" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Cancelar</button>
+      <button id="cfdi-ind-eliminar-confirmar-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#EF4444;border:none;cursor:pointer">Eliminar</button>
     </div>
   </div>
 </div>
@@ -5528,7 +5844,7 @@ const TITLES={
   devoluciones:'Devoluciones', lealtad:'Programa de Puntos', reorden:'Reorden Automático',
   'historial-precios':'Historial de Precios', facturacion:'Facturación Simplificada',
   'inventario-ciclico':'Conteo Físico de Inventario',
-  'cfdi-global':'Factura Global CFDI (Facturama)',
+  'cfdi-global':'Factura Global CFDI (Factura.com)',
   'facturas-compra':'Facturas de Compra (Proveedores)',
 };
 
@@ -5628,6 +5944,11 @@ function loadPage(page) {
   if (page==='reorden')       loadReorden();
   if (page==='inventario-ciclico') loadInventarioCiclico?.();
   if (page==='cfdi-global')   loadCfdiGlobal();
+  if (page==='facturacion') {
+    cargarListaVentasFactura();
+    cargarHistorialFacturasIndividuales();
+    cargarConfigSmtp();
+  }
   if (page==='facturas-compra') {
     const hoy=new Date().toISOString().split('T')[0];
     const fi=document.getElementById('fc-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
@@ -12275,15 +12596,17 @@ async function testAlertaWA() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-// ── Facturación CFDI (Factura Global Mensual / Facturama) ────────────────────
+// ── Facturación CFDI (Factura Global Mensual / Factura.com) ────────────────────
 const CFDI_ESTADO_LABEL = { timbrada:'Timbrada', cancelada:'Cancelada', error:'Error' };
 const CFDI_ESTADO_COLOR = { timbrada:'#16A34A', cancelada:'#94A3B8', error:'#EF4444' };
+const CFDI_ESTADO_ICON = { timbrada:'circle-check', cancelada:'ban', error:'circle-x' };
 const CFDI_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let _cfdiHistorialRows = [];
 
 async function loadCfdiGlobal() {
   const selMes = document.getElementById('cfdi-mes');
   if (selMes && !selMes.options.length) {
-    selMes.innerHTML = CFDI_MESES.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+    selMes.innerHTML = CFDI_MESES.map((m,i) => `<option value="${i+1}" style="color:#0F172A;background:#fff">${m}</option>`).join('');
   }
   const now = new Date();
   if (selMes && !selMes.value) selMes.value = now.getMonth()+1;
@@ -12292,9 +12615,9 @@ async function loadCfdiGlobal() {
 
   try {
     const d = await apiFetch('/config/facturacion');
-    document.getElementById('cfdi-user').value     = d.facturama_user || '';
-    document.getElementById('cfdi-pass').value     = d.facturama_password || '';
-    document.getElementById('cfdi-sandbox').checked = !!d.facturama_sandbox;
+    document.getElementById('cfdi-apikey').value    = d.facturacom_api_key || '';
+    document.getElementById('cfdi-secretkey').value = d.facturacom_secret_key || '';
+    document.getElementById('cfdi-sandbox').checked = !!d.facturacom_sandbox;
     document.getElementById('cfdi-razon').value    = d.emisor_razon_social || '';
     document.getElementById('cfdi-rfc').value      = d.emisor_rfc || '';
     document.getElementById('cfdi-regimen').value  = d.emisor_regimen_fiscal || '';
@@ -12315,7 +12638,17 @@ async function loadDeclaracionMensual() {
     const d = await apiFetch(`/cfdi/declaracion-mensual?mes=${mes}&anio=${anio}`);
     const ivaColor = d.iva_a_pagar >= 0 ? '#EF4444' : '#16A34A';
     const ivaLabel = d.iva_a_pagar >= 0 ? 'IVA a pagar' : 'Saldo a favor de IVA';
+    const mesSig = mes == 12 ? 1 : Number(mes) + 1;
+    const anioSig = mes == 12 ? Number(anio) + 1 : Number(anio);
+    const vence = new Date(anioSig, mesSig - 1, 17);
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const diasFaltan = Math.ceil((vence - hoy) / 86400000);
+    const venceColor = diasFaltan < 0 ? '#EF4444' : (diasFaltan <= 5 ? '#D97706' : '#16A34A');
+    const venceTexto = diasFaltan < 0 ? `venció hace ${Math.abs(diasFaltan)} día(s)` : (diasFaltan === 0 ? 'vence hoy' : `faltan ${diasFaltan} día(s)`);
     box.innerHTML = `
+      <div class="mb-3 px-3 py-2 rounded-xl text-xs font-bold text-center" style="background:${venceColor}1A;color:${venceColor}">
+        Declaración vence: ${CFDI_MESES[mesSig-1]} 17, ${anioSig} — ${venceTexto}
+      </div>
       <div class="grid grid-cols-4 gap-3 mb-3">
         <div class="rounded-xl p-3 text-center" style="background:#F0FDF4;border:1px solid #BBF7D0">
           <p class="text-[10px]" style="color:#64748B">Ingresos (${d.ingresos.num_ventas} ventas)</p>
@@ -12344,9 +12677,9 @@ async function loadDeclaracionMensual() {
 
 async function guardarConfigCfdi() {
   const body = {
-    facturama_user: document.getElementById('cfdi-user').value.trim(),
-    facturama_password: document.getElementById('cfdi-pass').value.trim(),
-    facturama_sandbox: document.getElementById('cfdi-sandbox').checked,
+    facturacom_api_key: document.getElementById('cfdi-apikey').value.trim(),
+    facturacom_secret_key: document.getElementById('cfdi-secretkey').value.trim(),
+    facturacom_sandbox: document.getElementById('cfdi-sandbox').checked,
     emisor_razon_social: document.getElementById('cfdi-razon').value.trim(),
     emisor_rfc: document.getElementById('cfdi-rfc').value.trim(),
     emisor_regimen_fiscal: document.getElementById('cfdi-regimen').value.trim(),
@@ -12386,6 +12719,9 @@ async function abrirConfirmacionTimbrado() {
     }
     if (d.sandbox) {
       html += `<div class="mb-3 p-2 rounded-xl text-xs font-bold text-center" style="background:#FEF3C7;color:#92400E">MODO PRUEBA (SANDBOX) — este timbrado no es fiscalmente válido</div>`;
+    }
+    if (d.fuera_ventana_24h) {
+      html += `<div class="mb-3 p-2 rounded-xl text-xs font-bold text-center" style="background:#FEF2F2;color:#EF4444">Ya pasaron más de 24h desde el cierre de este periodo (regla 2.7.1.21 RMF) — igual puedes timbrarla, pero ya no está dentro del plazo estricto</div>`;
     }
     html += `<div class="mb-3 p-2 rounded-xl text-xs text-center" style="background:#EFF6FF;color:#1d2140">Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24 horas siguientes al cierre del periodo. Para RESICO la periodicidad debe ser mensual — tímbrala apenas cierre el mes.</div>`;
 
@@ -12451,7 +12787,7 @@ async function abrirConfirmacionTimbrado() {
       </div>
 
       <div style="margin-top:12px;padding-top:8px;border-top:1px dashed #CBD5E1;font-size:9px;color:#94A3B8;text-align:center">
-        El sello digital del SAT y el código QR se agregan automáticamente al timbrar con Facturama.<br>Esta es una vista previa del contenido — no es el documento fiscal final.
+        El sello digital del SAT y el código QR se agregan automáticamente al timbrar con Factura.com.<br>Esta es una vista previa del contenido — no es el documento fiscal final.
       </div>
     </div>`;
     body.innerHTML = html;
@@ -12486,25 +12822,182 @@ async function loadHistorialCfdi() {
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-xs" style="color:#94A3B8">Cargando...</td></tr>';
   try {
     const rows = await apiFetch('/cfdi/historial');
+    _cfdiHistorialRows = rows;
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-xs" style="color:#94A3B8">Sin facturas globales generadas</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(r => `
-      <tr class="border-b hover:bg-slate-50" style="border-color:#F1F5F9">
-        <td class="py-2 text-xs">${CFDI_MESES[r.mes-1]} ${r.anio}</td>
-        <td class="py-2 text-xs font-mono">$${(r.total||0).toFixed(2)}</td>
-        <td class="py-2 text-xs"><span style="color:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'};font-weight:700">${CFDI_ESTADO_LABEL[r.estado]||r.estado}</span></td>
-        <td class="py-2 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
-        <td class="py-2 text-xs">
-          ${r.estado==='timbrada' ? `
-            <button onclick="descargarArchivoCfdi(${r.id},'pdf')" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">PDF</button>
-            <button onclick="descargarArchivoCfdi(${r.id},'xml')" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">XML</button>
-            <button onclick="cancelarFacturaGlobal(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">Cancelar</button>
+      <tr class="border-b hover:bg-slate-50 transition-colors" style="border-color:#F1F5F9">
+        <td class="py-3 text-xs font-semibold" style="color:#0F172A">${CFDI_MESES[r.mes-1]} ${r.anio}</td>
+        <td class="py-3 text-xs font-mono">$${(r.total||0).toFixed(2)}</td>
+        <td class="py-3 text-xs">
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg" style="color:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'};background:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'}1A;font-weight:700">
+            <i data-lucide="${CFDI_ESTADO_ICON[r.estado]||'circle'}" style="width:12px;height:12px"></i>
+            ${CFDI_ESTADO_LABEL[r.estado]||r.estado}
+          </span>
+        </td>
+        <td class="py-3 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
+        <td class="py-3 text-xs">
+          ${r.estado==='timbrada' && r.documentos_pendientes ? `
+            <button onclick="redescargarDocumentosCfdi(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF3C7;color:#92400E;border:none;cursor:pointer">Descargar documentos</button>
+          ` : ''}
+          ${r.estado==='timbrada' && !r.documentos_pendientes ? `
+            <button onclick="abrirVerFacturaGlobal(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Ver factura</button>
+          ` : ''}
+          ${r.estado==='error' ? `
+            <button onclick="eliminarFacturaGlobalError(${r.id})" title="Eliminar intento fallido" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">
+              <i data-lucide="trash-2" style="width:12px;height:12px;display:inline"></i>
+            </button>
           ` : ''}
         </td>
       </tr>`).join('');
+    icons();
   } catch(e) { tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-xs text-red-500">${e.message}</td></tr>`; }
+}
+
+function abrirVerFacturaGlobal(id) {
+  const r = _cfdiHistorialRows.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('cfdi-ver-body').innerHTML = `
+    <div style="border:1px solid #E2E8F0;border-radius:16px;padding:16px;background:#FAFBFF">
+      <div class="flex items-center justify-between mb-3" style="border-bottom:1px solid #E2E8F0;padding-bottom:10px">
+        <div>
+          <p class="text-sm font-black" style="color:#0F172A">${CFDI_MESES[r.mes-1]} ${r.anio}</p>
+          <p class="text-xs" style="color:#94A3B8">Factura Global CFDI 4.0</p>
+        </div>
+        <span class="text-xs font-bold px-2 py-1 rounded-lg" style="color:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'};background:#fff;border:1px solid #E2E8F0">${CFDI_ESTADO_LABEL[r.estado]||r.estado}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+        <div><p style="color:#94A3B8">Folio fiscal (UUID)</p><p class="font-mono font-bold" style="color:#0F172A;word-break:break-all">${r.uuid || '—'}</p></div>
+        <div><p style="color:#94A3B8">Serie / Folio</p><p class="font-bold" style="color:#0F172A">${r.serie || '—'} / ${r.folio || '—'}</p></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-xs mb-3">
+        <div><p style="color:#94A3B8">Subtotal</p><p class="font-mono font-bold" style="color:#0F172A">$${(r.subtotal||0).toFixed(2)}</p></div>
+        <div><p style="color:#94A3B8">IVA</p><p class="font-mono font-bold" style="color:#0F172A">$${(r.iva||0).toFixed(2)}</p></div>
+        <div><p style="color:#94A3B8">Total</p><p class="font-mono font-bold" style="color:#16A34A">$${(r.total||0).toFixed(2)}</p></div>
+      </div>
+      ${r.carpeta_periodo ? `
+      <div class="text-xs pt-2 flex items-center justify-between" style="border-top:1px solid #E2E8F0">
+        <div>
+          <p style="color:#94A3B8">Guardado en</p>
+          <p class="font-bold" style="color:#334155">${r.carpeta_periodo}</p>
+        </div>
+        <button onclick="abrirCarpetaCfdi(${r.id})" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Abrir carpeta</button>
+      </div>` : ''}
+    </div>`;
+  const cancelBtn = document.getElementById('cfdi-ver-cancelar-btn');
+  if (r.estado === 'timbrada') {
+    cancelBtn.style.display = '';
+    cancelBtn.onclick = () => cancelarFacturaGlobal(r.id);
+  } else {
+    cancelBtn.style.display = 'none';
+  }
+  document.getElementById('cfdi-ver-pdf-btn').onclick = () => descargarArchivoCfdi(r.id, 'pdf');
+  document.getElementById('cfdi-ver-xml-btn').onclick = () => descargarArchivoCfdi(r.id, 'xml');
+  document.getElementById('cfdi-ver-preview-btn').onclick = () => verVistaPreviaPdf(r.id);
+
+  const satStatus = document.getElementById('cfdi-ver-sat-status');
+  satStatus.style.display = 'none';
+  const satBtn = document.getElementById('cfdi-ver-sat-btn');
+  if (r.estado === 'timbrada' || r.estado === 'cancelada') {
+    satBtn.style.display = '';
+    satBtn.onclick = () => verificarCfdiConSat(r.id);
+  } else {
+    satBtn.style.display = 'none';
+  }
+  openModal('modal-cfdi-ver');
+}
+
+async function verificarCfdiConSat(id) {
+  const box = document.getElementById('cfdi-ver-sat-status');
+  box.style.display = '';
+  box.innerHTML = 'Consultando SAT...';
+  try {
+    const d = await apiFetch(`/cfdi/${id}/estatus-sat`);
+    let estadoHtml = '';
+    if (d.error_consulta) {
+      estadoHtml = `<div class="p-2 rounded-xl" style="background:#FEF3C7;color:#92400E">El SAT no respondió la consulta automática ahora mismo (esto es normal, su servicio es inestable) — usa el link de abajo para verificar manualmente.</div>`;
+    } else {
+      const color = d.coincide ? '#16A34A' : '#EF4444';
+      estadoHtml = `<div class="p-2 rounded-xl" style="background:${d.coincide?'#F0FDF4':'#FEF2F2'};color:${color}">
+        <b>Estado SAT: ${d.estado_sat}</b> ${d.coincide ? '(coincide con lo local)' : '(NO coincide con el estado local: ' + d.estado_local + ')'}
+      </div>`;
+    }
+    box.innerHTML = estadoHtml + `<a href="#" onclick="abrirUrlExterna('${d.url_verificacion_sat}');return false;" class="block mt-2 underline" style="color:#1d2140">Ver en el validador oficial del SAT →</a>`;
+  } catch(e) {
+    box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`;
+  }
+}
+
+function abrirUrlExterna(url) {
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.abrir_url_externa) {
+    window.pywebview.api.abrir_url_externa(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
+let _cfdiPdfBlobUrl = null;
+
+async function verVistaPreviaPdf(id, ruta = `/cfdi/${id}/pdf`) {
+  const body = document.getElementById('cfdi-pdf-preview-body');
+  body.innerHTML = '<p class="text-xs" style="color:#CBD5E1">Cargando PDF...</p>';
+  openModal('modal-cfdi-pdf');
+  try {
+    const res = await api(ruta);
+    if (!res.ok) throw new Error('No se pudo cargar el PDF');
+    const blob = await res.blob();
+    _cfdiPdfBlobUrl = URL.createObjectURL(blob);
+    body.innerHTML = `<iframe src="${_cfdiPdfBlobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
+  } catch(e) {
+    body.innerHTML = `<p class="text-xs font-bold" style="color:#FCA5A5">${e.message}</p>`;
+  }
+}
+
+function cerrarVistaPreviaPdf() {
+  closeModal('modal-cfdi-pdf');
+  if (_cfdiPdfBlobUrl) { URL.revokeObjectURL(_cfdiPdfBlobUrl); _cfdiPdfBlobUrl = null; }
+}
+
+async function abrirCarpetaTodasFacturas() {
+  try {
+    await apiFetch('/cfdi/abrir-carpeta-todas', { method: 'POST' });
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function abrirCarpetaCfdi(id) {
+  try {
+    await apiFetch(`/cfdi/${id}/abrir-carpeta`, { method: 'POST' });
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function redescargarDocumentosCfdi(id) {
+  try {
+    await apiFetch(`/cfdi/${id}/redescargar`, { method: 'POST' });
+    toast('Documentos descargados', 'success');
+    loadHistorialCfdi();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function eliminarFacturaGlobalError(id) {
+  const r = _cfdiHistorialRows.find(x => x.id === id);
+  const body = document.getElementById('cfdi-eliminar-body');
+  body.innerHTML = r ? `
+    <div style="border:1px solid #E2E8F0;border-radius:16px;padding:12px;background:#FAFBFF">
+      <p class="text-xs" style="color:#94A3B8">Periodo</p>
+      <p class="text-sm font-bold" style="color:#0F172A">${CFDI_MESES[r.mes-1]} ${r.anio}</p>
+      ${r.error_mensaje ? `<p class="text-xs mt-2" style="color:#EF4444;word-break:break-word">${r.error_mensaje}</p>` : ''}
+    </div>` : '';
+  document.getElementById('cfdi-eliminar-confirmar-btn').onclick = async () => {
+    try {
+      await apiFetch(`/cfdi/${id}`, { method: 'DELETE' });
+      toast('Eliminado', 'success');
+      closeModal('modal-cfdi-eliminar');
+      loadHistorialCfdi();
+    } catch(e) { toast(e.message, 'error'); }
+  };
+  openModal('modal-cfdi-eliminar');
 }
 
 async function descargarArchivoCfdi(id, tipo) {
@@ -12517,18 +13010,28 @@ async function descargarArchivoCfdi(id, tipo) {
     a.href = url; a.download = `factura_global.${tipo}`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
+    toast(`${tipo.toUpperCase()} descargado a tu carpeta de Descargas`, 'success');
   } catch(e) { toast(e.message, 'error'); }
 }
 
-async function cancelarFacturaGlobal(id) {
-  const motivo = prompt('Motivo de cancelación SAT (código, ej. 02 = con errores sin relación):', '02');
-  if (motivo === null) return;
-  if (!confirm('¿Cancelar esta factura global ante el SAT? Las ventas del periodo quedarán disponibles para re-facturar.')) return;
-  try {
-    await apiFetch(`/cfdi/${id}/cancelar`, { method:'POST', body: JSON.stringify({ motivo }) });
-    toast('Factura cancelada', 'success');
-    loadHistorialCfdi();
-  } catch(e) { toast(e.message, 'error'); }
+function cancelarFacturaGlobal(id) {
+  const btn = document.getElementById('cfdi-cancelar-confirmar-btn');
+  btn.disabled = false; btn.style.opacity = 1;
+  btn.onclick = async () => {
+    const motivo = document.querySelector('input[name="cfdi-cancelar-motivo"]:checked')?.value || '02';
+    btn.disabled = true; btn.style.opacity = .6;
+    try {
+      await apiFetch(`/cfdi/${id}/cancelar`, { method:'POST', body: JSON.stringify({ motivo }) });
+      toast('Factura cancelada', 'success');
+      closeModal('modal-cfdi-cancelar');
+      closeModal('modal-cfdi-ver');
+      loadHistorialCfdi();
+    } catch(e) {
+      toast(e.message, 'error');
+      btn.disabled = false; btn.style.opacity = 1;
+    }
+  };
+  openModal('modal-cfdi-cancelar');
 }
 
 // ── Facturas de Compra (proveedores) ─────────────────────────────────────────
@@ -13108,7 +13611,7 @@ const QM_GROUPS = [
       { key:'promociones',     icon:'tag',            label:'Promociones',        desc:'2x1, descuentos %, fechas automáticas', admin:true },
       { key:'reorden',         icon:'package-plus',   label:'Reorden Auto',       desc:'Productos bajo mínimo — genera orden de compra', admin:true },
       { key:'facturacion',     icon:'file-text',      label:'Facturación',        desc:'Generar factura simplificada con RFC del cliente', admin:true },
-      { key:'cfdi-global',     icon:'file-check-2',   label:'Factura Global CFDI',desc:'Timbra la factura mensual del negocio vía Facturama', admin:true },
+      { key:'cfdi-global',     icon:'file-check-2',   label:'Factura Global CFDI',desc:'Timbra la factura mensual del negocio vía Factura.com', admin:true },
       { key:'facturas-compra', icon:'file-input',     label:'Facturas de Compra', desc:'Control de facturas de proveedores (medicamentos)', admin:true },
     ]
   },
@@ -13407,7 +13910,7 @@ async function buscarVentaDevolucion() {
   const cont = document.getElementById('devp-result');
   cont.innerHTML = '<p class="text-sm py-4" style="color:#94A3B8">Buscando…</p>';
   try {
-    const ventas = await apiFetch(`/ventas?folio=${encodeURIComponent(folio)}`);
+    const ventas = await apiFetch(`/ventas/?folio=${encodeURIComponent(folio)}`);
     const v = Array.isArray(ventas) ? ventas[0] : null;
     if (!v) { cont.innerHTML = '<p class="text-sm py-4 text-red-500">Venta no encontrada</p>'; return; }
     cont.innerHTML = `
@@ -13562,11 +14065,29 @@ async function buscarProductoHistorialPrecios(q) {
 // ══════════════════════════════════════════════════════════
 // FACTURACIÓN SIMPLIFICADA
 // ══════════════════════════════════════════════════════════
+async function cargarListaVentasFactura() {
+  const sel = document.getElementById('fact-folio');
+  if (!sel) return;
+  try {
+    const ventas = await apiFetch('/ventas/?limite=50');
+    if (!ventas.length) {
+      sel.innerHTML = '<option value="">Sin ventas registradas</option>';
+      return;
+    }
+    sel.innerHTML = ventas.map(v => {
+      const fecha = v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-MX', {day:'2-digit', month:'short'}) : '';
+      return `<option value="${v.folio}">${v.folio} — ${fecha} — ${fmt(v.total)}</option>`;
+    }).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error al cargar ventas</option>';
+  }
+}
+
 async function cargarVentaFactura() {
   const folio = document.getElementById('fact-folio')?.value.trim();
   if (!folio) return;
   try {
-    const ventas = await apiFetch(`/ventas?folio=${encodeURIComponent(folio)}`);
+    const ventas = await apiFetch(`/ventas/?folio=${encodeURIComponent(folio)}`);
     const v = Array.isArray(ventas) ? ventas[0] : null;
     if (!v) { toast('Venta no encontrada','error'); return; }
     document.getElementById('fact-items').innerHTML = `
@@ -13583,14 +14104,231 @@ async function cargarVentaFactura() {
   } catch(e) { toast('Error al cargar venta','error'); }
 }
 
-function generarFacturaPDF() {
+async function timbrarFacturaIndividual() {
   const nombre = document.getElementById('fact-nombre')?.value.trim();
   const rfc = document.getElementById('fact-rfc')?.value.trim();
+  const regimen = document.getElementById('fact-regimen')?.value;
+  const cp = document.getElementById('fact-cp')?.value.trim();
+  const usoCfdi = document.getElementById('fact-usocfdi')?.value;
+  const formaPago = document.getElementById('fact-formapago')?.value;
+  const email = document.getElementById('fact-email')?.value.trim();
   if (!nombre || !rfc) { toast('Nombre y RFC son requeridos','error'); return; }
-  const ventaEl = document.getElementById('fact-items');
-  const v = ventaEl?._venta;
+  if (!cp || cp.length !== 5) { toast('Código postal debe tener 5 dígitos','error'); return; }
+  const v = document.getElementById('fact-items')?._venta;
   if (!v) { toast('Carga una venta primero','error'); return; }
-  toast('Función de PDF en desarrollo — exportar desde Reportes por ahora','info');
+
+  const btn = document.getElementById('fact-timbrar-btn');
+  btn.disabled = true; btn.style.opacity = .6;
+  try {
+    const r = await apiFetch('/cfdi/individual/timbrar', {
+      method: 'POST',
+      body: JSON.stringify({
+        venta_id: v.id, cliente_rfc: rfc, cliente_nombre: nombre,
+        cliente_regimen_fiscal: regimen, cliente_cp: cp,
+        cliente_email: email, uso_cfdi: usoCfdi, forma_pago: formaPago,
+      }),
+    });
+    toast(`Factura timbrada — UUID ${r.uuid.slice(0,8)}…`, 'success');
+    cargarHistorialFacturasIndividuales();
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.style.opacity = 1;
+  }
+}
+
+let _cfdiIndHistorialRows = [];
+
+async function cargarHistorialFacturasIndividuales() {
+  const tbody = document.getElementById('fact-ind-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-xs" style="color:#94A3B8">Cargando...</td></tr>';
+  try {
+    const rows = await apiFetch('/cfdi/individual/historial');
+    _cfdiIndHistorialRows = rows;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-xs" style="color:#94A3B8">Sin facturas individuales generadas</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr class="border-b hover:bg-slate-50 transition-colors" style="border-color:#F1F5F9">
+        <td class="py-3 text-xs font-semibold" style="color:#0F172A">${r.cliente_nombre||'—'}</td>
+        <td class="py-3 text-xs font-mono" style="color:#64748B">${r.cliente_rfc||'—'}</td>
+        <td class="py-3 text-xs font-mono">$${(r.total||0).toFixed(2)}</td>
+        <td class="py-3 text-xs">
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg" style="color:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'};background:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'}1A;font-weight:700">
+            <i data-lucide="${CFDI_ESTADO_ICON[r.estado]||'circle'}" style="width:12px;height:12px"></i>
+            ${CFDI_ESTADO_LABEL[r.estado]||r.estado}
+          </span>
+        </td>
+        <td class="py-3 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
+        <td class="py-3 text-xs">
+          ${r.estado==='timbrada' && r.documentos_pendientes ? `
+            <button onclick="redescargarDocumentosIndividual(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF3C7;color:#92400E;border:none;cursor:pointer">Descargar documentos</button>
+          ` : ''}
+          ${r.estado==='timbrada' && !r.documentos_pendientes ? `
+            <button onclick="abrirVerFacturaIndividual(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Ver factura</button>
+          ` : ''}
+          ${r.estado==='error' ? `
+            <button onclick="eliminarFacturaIndividualError(${r.id})" title="Eliminar intento fallido" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">
+              <i data-lucide="trash-2" style="width:12px;height:12px;display:inline"></i>
+            </button>
+          ` : ''}
+        </td>
+      </tr>`).join('');
+    icons();
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-xs text-red-500">${e.message}</td></tr>`; }
+}
+
+async function redescargarDocumentosIndividual(id) {
+  try {
+    await apiFetch(`/cfdi/individual/${id}/redescargar`, { method: 'POST' });
+    toast('Documentos descargados', 'success');
+    cargarHistorialFacturasIndividuales();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function abrirVerFacturaIndividual(id) {
+  const r = _cfdiIndHistorialRows.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('cfdi-ind-ver-body').innerHTML = `
+    <div style="border:1px solid #E2E8F0;border-radius:16px;padding:16px;background:#FAFBFF">
+      <div class="flex items-center justify-between mb-3" style="border-bottom:1px solid #E2E8F0;padding-bottom:10px">
+        <div>
+          <p class="text-sm font-black" style="color:#0F172A">${r.cliente_nombre||'—'}</p>
+          <p class="text-xs" style="color:#94A3B8">${r.cliente_rfc||'—'} · Factura Individual CFDI 4.0</p>
+        </div>
+        <span class="text-xs font-bold px-2 py-1 rounded-lg" style="color:${CFDI_ESTADO_COLOR[r.estado]||'#64748B'};background:#fff;border:1px solid #E2E8F0">${CFDI_ESTADO_LABEL[r.estado]||r.estado}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+        <div><p style="color:#94A3B8">Folio fiscal (UUID)</p><p class="font-mono font-bold" style="color:#0F172A;word-break:break-all">${r.uuid || '—'}</p></div>
+        <div><p style="color:#94A3B8">Serie / Folio</p><p class="font-bold" style="color:#0F172A">${r.serie || '—'} / ${r.folio || '—'}</p></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-xs">
+        <div><p style="color:#94A3B8">Subtotal</p><p class="font-mono font-bold" style="color:#0F172A">$${(r.subtotal||0).toFixed(2)}</p></div>
+        <div><p style="color:#94A3B8">IVA</p><p class="font-mono font-bold" style="color:#0F172A">$${(r.iva||0).toFixed(2)}</p></div>
+        <div><p style="color:#94A3B8">Total</p><p class="font-mono font-bold" style="color:#16A34A">$${(r.total||0).toFixed(2)}</p></div>
+      </div>
+    </div>`;
+
+  document.getElementById('cfdi-ind-ver-envio-status').style.display = 'none';
+  document.getElementById('cfdi-ind-whatsapp-numero').value = '';
+  document.getElementById('cfdi-ind-correo-destino').value = '';
+
+  const cancelBtn = document.getElementById('cfdi-ind-cancelar-btn');
+  if (r.estado === 'timbrada') {
+    cancelBtn.style.display = '';
+    cancelBtn.onclick = () => cancelarFacturaIndividual(r.id);
+  } else {
+    cancelBtn.style.display = 'none';
+  }
+  document.getElementById('cfdi-ind-pdf-btn').onclick = () => descargarArchivoCfdiIndividual(r.id, 'pdf');
+  document.getElementById('cfdi-ind-xml-btn').onclick = () => descargarArchivoCfdiIndividual(r.id, 'xml');
+  document.getElementById('cfdi-ind-preview-btn').onclick = () => verVistaPreviaPdf(r.id, `/cfdi/individual/${r.id}/pdf`);
+  document.getElementById('cfdi-ind-whatsapp-btn').onclick = () => enviarWhatsappIndividual(r.id);
+  document.getElementById('cfdi-ind-correo-btn').onclick = () => enviarCorreoIndividual(r.id);
+  openModal('modal-cfdi-ind-ver');
+}
+
+async function descargarArchivoCfdiIndividual(id, tipo) {
+  try {
+    const res = await api(`/cfdi/individual/${id}/${tipo}`);
+    if (!res.ok) throw new Error('No se pudo descargar el archivo');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `factura_individual.${tipo}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast(`${tipo.toUpperCase()} descargado a tu carpeta de Descargas`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function cancelarFacturaIndividual(id) {
+  const btn = document.getElementById('cfdi-cancelar-confirmar-btn');
+  btn.disabled = false; btn.style.opacity = 1;
+  btn.onclick = async () => {
+    const motivo = document.querySelector('input[name="cfdi-cancelar-motivo"]:checked')?.value || '02';
+    btn.disabled = true; btn.style.opacity = .6;
+    try {
+      await apiFetch(`/cfdi/individual/${id}/cancelar`, { method:'POST', body: JSON.stringify({ motivo }) });
+      toast('Factura cancelada', 'success');
+      closeModal('modal-cfdi-cancelar');
+      closeModal('modal-cfdi-ind-ver');
+      cargarHistorialFacturasIndividuales();
+    } catch(e) {
+      toast(e.message, 'error');
+      btn.disabled = false; btn.style.opacity = 1;
+    }
+  };
+  openModal('modal-cfdi-cancelar');
+}
+
+function eliminarFacturaIndividualError(id) {
+  const r = _cfdiIndHistorialRows.find(x => x.id === id);
+  document.getElementById('cfdi-ind-eliminar-body').innerHTML = r ? `
+    <p>Cliente: <b>${r.cliente_nombre||'—'}</b></p>
+    ${r.error_mensaje ? `<p class="mt-2 text-xs" style="color:#EF4444">${r.error_mensaje}</p>` : ''}
+  ` : '';
+  const btn = document.getElementById('cfdi-ind-eliminar-confirmar-btn');
+  btn.onclick = async () => {
+    try {
+      await apiFetch(`/cfdi/individual/${id}`, { method: 'DELETE' });
+      toast('Eliminado', 'success');
+      closeModal('modal-cfdi-ind-eliminar');
+      cargarHistorialFacturasIndividuales();
+    } catch(e) { toast(e.message, 'error'); }
+  };
+  openModal('modal-cfdi-ind-eliminar');
+}
+
+async function enviarWhatsappIndividual(id) {
+  const numero = document.getElementById('cfdi-ind-whatsapp-numero')?.value.trim();
+  const box = document.getElementById('cfdi-ind-ver-envio-status');
+  box.style.display = ''; box.innerHTML = 'Enviando WhatsApp...';
+  try {
+    await apiFetch(`/cfdi/individual/${id}/enviar-whatsapp`, { method: 'POST', body: JSON.stringify({ numero: numero || '' }) });
+    box.innerHTML = '<span style="color:#16A34A">Enviado por WhatsApp</span>';
+  } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
+}
+
+async function enviarCorreoIndividual(id) {
+  const destinatario = document.getElementById('cfdi-ind-correo-destino')?.value.trim();
+  const box = document.getElementById('cfdi-ind-ver-envio-status');
+  box.style.display = ''; box.innerHTML = 'Enviando correo...';
+  try {
+    await apiFetch(`/cfdi/individual/${id}/enviar-correo`, { method: 'POST', body: JSON.stringify({ destinatario: destinatario || '' }) });
+    box.innerHTML = '<span style="color:#16A34A">Correo enviado</span>';
+  } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
+}
+
+async function cargarConfigSmtp() {
+  try {
+    const d = await apiFetch('/config/facturacion');
+    document.getElementById('fact-smtp-host').value = d.email_smtp_host || '';
+    document.getElementById('fact-smtp-port').value = d.email_smtp_port || '587';
+    document.getElementById('fact-smtp-user').value = d.email_smtp_user || '';
+    document.getElementById('fact-smtp-pass').value = d.email_smtp_password || '';
+  } catch(e) {}
+}
+
+async function guardarConfigSmtp() {
+  try {
+    // Trae la config completa actual para no borrar credenciales de Factura.com
+    // al guardar (el endpoint /config/facturacion reemplaza todos los campos).
+    const actual = await apiFetch('/config/facturacion');
+    await apiFetch('/config/facturacion', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...actual,
+        email_smtp_host: document.getElementById('fact-smtp-host').value.trim(),
+        email_smtp_port: document.getElementById('fact-smtp-port').value.trim() || '587',
+        email_smtp_user: document.getElementById('fact-smtp-user').value.trim(),
+        email_smtp_password: document.getElementById('fact-smtp-pass').value.trim(),
+      }),
+    });
+    toast('Configuración de correo guardada', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // Ctrl+K abre el menú rápido, ESC lo cierra
