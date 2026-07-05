@@ -23,10 +23,11 @@ _WATERMARK_FILE = cfg.DATA_DIR / "watermarks.json"
 
 # FK-dependency order (import & sync must respect this)
 # cfdi_facturas_globales va antes de ventas porque ventas.cfdi_global_id la referencia
+# cfdi_facturas_individuales va después de ventas porque ella referencia venta_id
 _TABLE_ORDER = [
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
-    "productos", "lotes", "cfdi_facturas_globales", "ventas", "items_venta",
-    "compras", "items_compra", "facturas_compra", "cortes_caja", "retiros_caja",
+    "productos", "lotes", "cfdi_facturas_globales", "ventas", "cfdi_facturas_individuales",
+    "items_venta", "compras", "items_compra", "facturas_compra", "cortes_caja", "retiros_caja",
     "movimientos_stock", "auditoria_log",
 ]
 
@@ -36,14 +37,14 @@ _TABLE_ORDER = [
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
-    "cfdi_facturas_globales", "facturas_compra",
+    "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
 # (each PC may have a subset; deletions happen via soft-delete / purge only)
 _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
                                "compras", "items_compra", "cortes_caja", "retiros_caja",
-                               "cfdi_facturas_globales", "facturas_compra"})
+                               "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra"})
 
 # Watermark per table: last id synced to Turso (append-only tables only)
 # Persisted to disk so restarts don't re-send the entire history.
@@ -184,7 +185,7 @@ def _turso_read_table(table: str) -> tuple[list[str], list[tuple]]:
 _PURGE_ORDER = [
     "auditoria_log", "movimientos_stock", "cortes_caja",
     "items_compra", "compras", "facturas_compra",
-    "items_venta", "ventas", "cfdi_facturas_globales",
+    "cfdi_facturas_individuales", "items_venta", "ventas", "cfdi_facturas_globales",
     "lotes", "productos",
     "clientes", "proveedores", "categorias",
 ]
@@ -193,7 +194,7 @@ _PURGE_ORDER = [
 # Tables for partial purge: ventas + historial + cierres (keeps products/clients/etc.)
 _PURGE_VENTAS = [
     "auditoria_log", "movimientos_stock", "cortes_caja",
-    "items_venta", "ventas",
+    "cfdi_facturas_individuales", "items_venta", "ventas",
 ]
 
 
@@ -461,6 +462,22 @@ def sync_to_turso() -> None:
                 _save_watermarks()
         finally:
             lconn.close()
+
+
+def delete_ids_from_turso(table: str, ids: list[int]) -> None:
+    """
+    Explicit, immediate delete of specific row ids in Turso.
+    Used for admin-initiated deletes (e.g. purging an errored CFDI attempt) on
+    tables listed in _NO_TURSO_DELETE, where the periodic full-sync deliberately
+    never deletes by absence (since another PC's local DB may still have rows
+    this PC hasn't pulled yet). Here the ids are explicitly known-bad and the
+    delete is intentional, not inferred from a diff — safe to push directly.
+    """
+    if not ids:
+        return
+    with _lock:
+        ids_str = ", ".join(str(int(i)) for i in ids)
+        _turso_batch([{"sql": f"DELETE FROM {table} WHERE id IN ({ids_str})", "args": []}])
 
 
 def sync_from_turso() -> int:

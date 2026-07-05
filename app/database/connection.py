@@ -156,6 +156,15 @@ def _migrate():
         "subtotal REAL DEFAULT 0.0, iva REAL DEFAULT 0.0, total REAL NOT NULL, concepto TEXT, "
         "xml_path VARCHAR(300), pdf_path VARCHAR(300), xml_url VARCHAR(500), pdf_url VARCHAR(500), "
         "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS cfdi_facturas_individuales ("
+        "id INTEGER PRIMARY KEY, venta_id INTEGER NOT NULL REFERENCES ventas(id), "
+        "cliente_nombre VARCHAR(255), cliente_rfc VARCHAR(20), cliente_regimen_fiscal VARCHAR(5), "
+        "cliente_cp VARCHAR(10), cliente_email VARCHAR(150), uso_cfdi VARCHAR(10), forma_pago VARCHAR(5), "
+        "subtotal REAL DEFAULT 0.0, iva REAL DEFAULT 0.0, total REAL DEFAULT 0.0, "
+        "estado VARCHAR(20) DEFAULT 'timbrada', facturacom_id VARCHAR(50), uuid_fiscal VARCHAR(50), "
+        "serie VARCHAR(10), folio VARCHAR(20), xml_path VARCHAR(300), pdf_path VARCHAR(300), "
+        "xml_url VARCHAR(500), pdf_url VARCHAR(500), error_mensaje TEXT, "
+        "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME, cancelado_en DATETIME)",
     ]
 
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).

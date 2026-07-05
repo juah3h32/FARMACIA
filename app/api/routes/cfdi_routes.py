@@ -8,9 +8,23 @@ from app.database.connection import get_db_session
 from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta
 from app.api.routes.auth_routes import get_current_api_user
 from app.services import facturacom_service
+from app.database import sync_service
 import app.config as cfg
 
 router = APIRouter()
+
+
+def _purgar_de_turso(tabla: str, ids: list[int]) -> None:
+    """Best-effort: borra en Turso los ids ya eliminados localmente.
+    No bloquea la respuesta si falla (Turso puede estar offline) — la
+    fuente de verdad es la BD local; el intento de borrado remoto es
+    para que un pull posterior no resucite el registro eliminado."""
+    if not (cfg.TURSO_SYNC and ids):
+        return
+    try:
+        sync_service.delete_ids_from_turso(tabla, ids)
+    except Exception as e:
+        print(f"[CFDI] No se pudo borrar {tabla} {ids} en Turso: {e}")
 
 _FACT_KEYS = [
     "facturacom_api_key", "facturacom_secret_key", "facturacom_sandbox",
@@ -522,9 +536,37 @@ def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api
             raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error, no facturas timbradas")
         db.delete(r)
         db.commit()
+        _purgar_de_turso("cfdi_facturas_globales", [cfdi_id])
         return {"ok": True}
     except HTTPException:
         raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+class EliminarLoteIn(BaseModel):
+    ids: list[int]
+
+
+@router.post("/eliminar-lote")
+def eliminar_facturas_error_lote(body: EliminarLoteIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="Sin ids para eliminar")
+    db = get_db_session()
+    try:
+        rows = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id.in_(body.ids)).all()
+        borrables = [r for r in rows if r.estado == "error"]
+        omitidos = len(body.ids) - len(borrables)
+        ids_borrados = [r.id for r in borrables]
+        for r in borrables:
+            db.delete(r)
+        db.commit()
+        _purgar_de_turso("cfdi_facturas_globales", ids_borrados)
+        return {"eliminados": len(ids_borrados), "omitidos": omitidos}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -930,9 +972,33 @@ def eliminar_factura_individual_error(cfdi_id: int, payload: dict = Depends(get_
             raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error")
         db.delete(r)
         db.commit()
+        _purgar_de_turso("cfdi_facturas_individuales", [cfdi_id])
         return {"ok": True}
     except HTTPException:
         raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/individual/eliminar-lote")
+def eliminar_facturas_individuales_error_lote(body: EliminarLoteIn, payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="Sin ids para eliminar")
+    db = get_db_session()
+    try:
+        rows = db.query(CfdiFacturaIndividual).filter(CfdiFacturaIndividual.id.in_(body.ids)).all()
+        borrables = [r for r in rows if r.estado == "error"]
+        omitidos = len(body.ids) - len(borrables)
+        ids_borrados = [r.id for r in borrables]
+        for r in borrables:
+            db.delete(r)
+        db.commit()
+        _purgar_de_turso("cfdi_facturas_individuales", ids_borrados)
+        return {"eliminados": len(ids_borrados), "omitidos": omitidos}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
