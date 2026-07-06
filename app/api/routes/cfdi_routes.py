@@ -270,14 +270,34 @@ def preview_factura_global(
     _require_admin(payload)
     db = get_db_session()
     try:
+        fconf = _leer_config_facturacion(db)
         ya_existe = (
             db.query(CfdiFacturaGlobal)
             .filter(CfdiFacturaGlobal.mes == mes, CfdiFacturaGlobal.anio == anio,
                     CfdiFacturaGlobal.estado == "timbrada")
             .first()
         )
+        # No basta con lo que dice la base local: si alguien canceló el CFDI directo
+        # en el dashboard de Factura.com (sin pasar por el botón "Cancelar" del POS),
+        # este registro se queda en "timbrada" para siempre y bloquea volver a
+        # declarar el periodo. Se verifica contra Factura.com/SAT y se autocorrige
+        # el estado local antes de decidir si el periodo sigue bloqueado.
+        if ya_existe and ya_existe.facturama_id:
+            try:
+                sat = facturacom_service.consultar_estatus_sat(
+                    api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
+                    sandbox=fconf["facturacom_sandbox"], facturacom_id=ya_existe.facturama_id,
+                )
+                if sat["estado"] == "Cancelado":
+                    ya_existe.estado = "cancelada"
+                    ya_existe.cancelado_en = datetime.now()
+                    for v in db.query(Venta).filter(Venta.cfdi_global_id == ya_existe.id).all():
+                        v.facturada = False
+                    db.commit()
+                    ya_existe = None
+            except facturacom_service.FacturaComError:
+                pass  # SAT/Factura.com no respondió — se mantiene el estado local tal cual
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, mes, anio)
-        fconf = _leer_config_facturacion(db)
 
         # Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24h
         # siguientes al cierre del periodo. Esto NO bloquea el timbrado (a veces
@@ -340,8 +360,13 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             sync_service.sync_from_turso()
         except Exception as e:
             print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
-    _timbrado_lock.acquire()
-    db = get_db_session()
+    if not _timbrado_lock.acquire(timeout=30):
+        raise HTTPException(status_code=409, detail="Ya hay un timbrado en proceso, intenta de nuevo en unos segundos")
+    try:
+        db = get_db_session()
+    except Exception:
+        _timbrado_lock.release()
+        raise
     try:
         existe = (
             db.query(CfdiFacturaGlobal)
@@ -534,6 +559,18 @@ def estatus_sat(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
         estado_sat = sat["estado"]  # "Vigente" o "Cancelado"
         estado_esperado = "Cancelado" if r.estado == "cancelada" else "Vigente"
         coincide = estado_sat == estado_esperado
+
+        # Alguien canceló el CFDI directo en Factura.com sin pasar por el botón
+        # "Cancelar" del POS — sin esto, r.estado se queda en "timbrada" para
+        # siempre y el periodo queda bloqueado (no se puede volver a declarar ese
+        # mes aunque el CFDI ya no sea válido ante el SAT). Se sincroniza el estado
+        # local y se liberan las ventas para que el mes vuelva a estar disponible.
+        if r.estado == "timbrada" and estado_sat == "Cancelado":
+            r.estado = "cancelada"
+            r.cancelado_en = datetime.now()
+            for v in db.query(Venta).filter(Venta.cfdi_global_id == r.id).all():
+                v.facturada = False
+            db.commit()
 
         return {
             "estado_local": r.estado,
@@ -749,8 +786,13 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
             sync_service.sync_from_turso()
         except Exception as e:
             print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
-    _timbrado_lock.acquire()
-    db = get_db_session()
+    if not _timbrado_lock.acquire(timeout=30):
+        raise HTTPException(status_code=409, detail="Ya hay un timbrado en proceso, intenta de nuevo en unos segundos")
+    try:
+        db = get_db_session()
+    except Exception:
+        _timbrado_lock.release()
+        raise
     try:
         venta = db.query(Venta).filter(Venta.id == body.venta_id).first()
         if not venta:
