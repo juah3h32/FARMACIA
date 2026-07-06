@@ -29,10 +29,30 @@ def _rate_limit(ip: str):
         _attempts[ip] = recent
 
 
+def _client_ip(request: Request) -> str:
+    # Detrás de un proxy (Vercel) request.client.host es la IP del proxy, no la
+    # del cliente real — usar X-Forwarded-For evita que todos los clientes
+    # compartan el mismo contador de intentos.
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def get_current_cliente_app(credentials: HTTPAuthorizationCredentials = Depends(security)):
     payload = verify_api_token(credentials.credentials)
     if not payload or payload.get("rol") not in ("cliente_app", "admin_web", "admin"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    # Revalidar contra la BD: una cuenta desactivada no debe seguir con acceso
+    # solo porque su JWT viejo aún no expiró.
+    db = get_db_session()
+    try:
+        cliente = db.query(ClienteApp).filter(ClienteApp.id == int(payload["sub"])).first()
+        if not cliente or not cliente.activo:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Cuenta inactiva")
+        payload["rol"] = getattr(cliente, "rol", "cliente_app") or "cliente_app"
+    finally:
+        db.close()
     return payload
 
 
@@ -80,8 +100,10 @@ def _token_response(cliente: ClienteApp) -> dict:
 
 @router.post("/register")
 def register(body: RegisterIn, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     _rate_limit(ip)
+    if not body.password or len(body.password) < 4:
+        raise HTTPException(status_code=400, detail="Contraseña requerida (mínimo 4 caracteres)")
     db = get_db_session()
     try:
         if db.query(ClienteApp).filter(ClienteApp.email == body.email.lower()).first():
@@ -107,7 +129,7 @@ def register(body: RegisterIn, request: Request):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     _rate_limit(ip)
     db = get_db_session()
     try:
@@ -126,15 +148,30 @@ def login(body: LoginIn, request: Request):
 
 @router.post("/google")
 def google_login(body: GoogleIn, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     _rate_limit(ip)
     db = get_db_session()
     try:
         cliente = db.query(ClienteApp).filter(ClienteApp.google_id == body.google_id).first()
+        if cliente and not cliente.activo:
+            raise HTTPException(status_code=401, detail="Cuenta inactiva")
         if not cliente:
-            # Buscar por email
+            # Buscar por email. OJO: este endpoint no verifica un id_token firmado
+            # por Google, confía en lo que envía el cliente — por eso solo se
+            # permite auto-vincular una cuenta encontrada por email si ESA cuenta
+            # todavía no tiene dueño (sin password ni google_id previos). Si ya
+            # tiene contraseña o un google_id distinto, vincularla aquí sería un
+            # account takeover (cualquiera podría iniciar sesión como esa cuenta
+            # con solo conocer su email).
             cliente = db.query(ClienteApp).filter(ClienteApp.email == body.email.lower()).first()
             if cliente:
+                if cliente.google_id or cliente.password_hash:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Ya existe una cuenta con este correo. Inicia sesión con tu contraseña.",
+                    )
+                if not cliente.activo:
+                    raise HTTPException(status_code=401, detail="Cuenta inactiva")
                 cliente.google_id = body.google_id
                 if body.photo:
                     cliente.foto_url = body.photo

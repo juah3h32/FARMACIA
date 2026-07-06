@@ -311,6 +311,7 @@ _TURNO_CFG_KEYS = {"turno_auto_activo", "turno_auto_inicio", "turno_auto_fin"}
 
 @router.get("/config")
 def get_config(payload: dict = Depends(get_current_api_user)):
+    _require_admin(payload)
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
     db = get_db_session()

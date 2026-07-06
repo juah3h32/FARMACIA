@@ -29,6 +29,17 @@ def _clear_attempts(ip: str):
         _attempts.pop(ip, None)
 
 
+def _client_ip(request: Request) -> str:
+    # Detrás de un proxy (Vercel) request.client.host es la IP del proxy, no la
+    # del cliente real — usar X-Forwarded-For evita que todos los usuarios
+    # compartan el mismo contador de intentos (lo que permitiría a un solo
+    # atacante bloquear el login de todos por 5 minutos).
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -48,12 +59,22 @@ def get_current_api_user(credentials: HTTPAuthorizationCredentials = Depends(sec
     payload = verify_api_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
-    return payload
+    # Revalidar contra la BD: un usuario desactivado (o con rol cambiado) no debe
+    # seguir teniendo acceso solo porque su JWT viejo aún no expiró.
+    db = get_db_session()
+    try:
+        user = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+        if not user or not user.activo:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo o eliminado")
+        payload["rol"] = user.rol.value
+        return payload
+    finally:
+        db.close()
 
 
 @router.post("/login", response_model=TokenResponse)
 def api_login(body: LoginRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     _check_rate_limit(ip)
     db = get_db_session()
     try:

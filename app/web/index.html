@@ -12102,7 +12102,7 @@ async function codExportPdf(masivo) {
     toast(masivo ? `Generando PDF con ${ids.length} etiquetas...` : 'Generando PDF...', 'info');
     const res = await fetch('/api/productos/etiquetas-pdf', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('pos_token') || '') },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (S.token || '') },
       body: JSON.stringify({ ids, tipo: codGetTipo() })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
@@ -13421,14 +13421,18 @@ function openRecetaModal(ventaId) {
 }
 
 async function saveReceta() {
+  const medico      = document.getElementById('rec-medico').value.trim();
+  const cedula      = document.getElementById('rec-cedula').value.trim();
+  const diagnostico = document.getElementById('rec-diagnostico').value.trim();
+  const notas       = document.getElementById('rec-notas').value.trim();
   const body = {
-    venta_id:    _recetaVentaId,
-    medico:      document.getElementById('rec-medico').value.trim(),
-    cedula:      document.getElementById('rec-cedula').value.trim(),
-    diagnostico: document.getElementById('rec-diagnostico').value.trim(),
-    notas:       document.getElementById('rec-notas').value.trim(),
+    venta_id:      _recetaVentaId,
+    medico_nombre: medico,
+    cedula,
+    // El modelo RecetaIn no tiene campo "diagnostico" — se conserva en notas para no perder el dato.
+    notas: diagnostico ? `Diagnóstico: ${diagnostico}${notas ? ' | ' + notas : ''}` : notas,
   };
-  if (!body.medico) { toast('Ingresa el nombre del médico', 'warning'); return; }
+  if (!medico) { toast('Ingresa el nombre del médico', 'warning'); return; }
   try {
     await apiFetch('/recetas', { method:'POST', body: JSON.stringify(body) });
     toast('Receta guardada', 'success');
@@ -13447,7 +13451,7 @@ async function openInventarioCiclico() {
   const res = await api('/inventario-ciclico');
   if (res.ok) {
     const data = await res.json();
-    const enCurso = data.find(s => s.estado === 'en_curso');
+    const enCurso = data.find(s => s.estado === 'en_progreso');
     if (enCurso) {
       _sesionInventarioId = enCurso.id;
       loadSesionConteo(enCurso.id);
@@ -13476,12 +13480,12 @@ async function loadSesionConteo(sid) {
           <p class="text-xs font-semibold truncate" style="color:#0F172A">${c.producto_nombre}</p>
           <p class="text-[10px]" style="color:#94A3B8">Sistema: ${c.cantidad_sistema} uds</p>
         </div>
-        <input type="number" min="0" step="0.001" id="cnt-${c.id}" value="${c.cantidad_contada ?? ''}"
+        <input type="number" min="0" step="0.001" id="cnt-${c.producto_id}" value="${c.cantidad_contada ?? ''}"
                class="w-20 h-8 px-2 rounded-lg border text-xs text-right font-mono" style="border-color:#C5CEDE"
                placeholder="0">
       </div>`).join('');
     icons();
-    if (d.estado !== 'en_curso') {
+    if (d.estado !== 'en_progreso') {
       document.getElementById('inv-cicl-guardar').classList.add('hidden');
       document.getElementById('inv-cicl-aplicar').classList.add('hidden');
     }
@@ -13492,13 +13496,13 @@ async function guardarConteos() {
   const inputs = document.querySelectorAll('[id^="cnt-"]');
   const conteos = [];
   inputs.forEach(inp => {
-    const conteo_id = parseInt(inp.id.replace('cnt-',''));
+    const producto_id = parseInt(inp.id.replace('cnt-',''));
     const val = inp.value.trim();
-    if (val !== '') conteos.push({ conteo_id, cantidad_contada: parseFloat(val) });
+    if (val !== '') conteos.push({ producto_id, cantidad_contada: parseFloat(val) });
   });
   if (!conteos.length) { toast('Ingresa al menos un conteo', 'warning'); return; }
   try {
-    await apiFetch(`/inventario-ciclico/${_sesionInventarioId}/conteos`, { method:'POST', body: JSON.stringify(conteos) });
+    await apiFetch(`/inventario-ciclico/${_sesionInventarioId}/conteos`, { method:'POST', body: JSON.stringify({ conteos }) });
     toast('Conteos guardados', 'success');
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -13507,7 +13511,7 @@ async function aplicarAjustesInventario() {
   if (!confirm('¿Aplicar ajustes al stock real? Esta acción no se puede deshacer.')) return;
   try {
     const d = await apiFetch(`/inventario-ciclico/${_sesionInventarioId}/aplicar`, { method:'POST' });
-    toast(`Ajustes aplicados: ${d.ajustes_aplicados} productos`, 'success');
+    toast(`Ajustes aplicados: ${d.ajustados} productos`, 'success');
     closeModal('modal-inventario-ciclico');
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -13573,7 +13577,7 @@ async function loadCitas() {
       return;
     }
     list.innerHTML = data.map(c => {
-      const color = { pendiente:'#F59E0B', confirmada:'#3B82F6', completada:'#16A34A', cancelada:'#EF4444' }[c.estado] || '#94A3B8';
+      const color = { programada:'#F59E0B', completada:'#16A34A', cancelada:'#EF4444', no_asistio:'#94A3B8' }[c.estado] || '#94A3B8';
       const hora = c.fecha_hora ? new Date(c.fecha_hora).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'}) : '';
       return `<div class="bg-white rounded-2xl border p-4 flex items-center gap-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.05)">
         <div class="w-1.5 self-stretch rounded-full flex-shrink-0" style="background:${color}"></div>
@@ -13763,7 +13767,7 @@ async function loadPromociones() {
 }
 
 function tipoPromoLabel(tipo) {
-  return { porcentaje:'Descuento %', monto_fijo:'Descuento fijo', dos_por_uno:'2x1', tres_por_dos:'3x2' }[tipo] || tipo;
+  return { porcentaje:'Descuento %', monto_fijo:'Descuento fijo', dos_x_uno:'2x1', tres_x_dos:'3x2' }[tipo] || tipo;
 }
 
 async function togglePromocion(pid, activa) {
@@ -14807,8 +14811,8 @@ async function exportarInventarioExcel() {
           <select id="promo-tipo" class="inp">
             <option value="porcentaje">Descuento %</option>
             <option value="monto_fijo">Monto fijo $</option>
-            <option value="dos_por_uno">2x1</option>
-            <option value="tres_por_dos">3x2</option>
+            <option value="dos_x_uno">2x1</option>
+            <option value="tres_x_dos">3x2</option>
           </select>
         </div>
         <div><label class="lbl">Valor (% o $)</label><input id="promo-valor" type="number" min="0" step="0.01" class="inp" placeholder="0"></div>

@@ -58,6 +58,21 @@ def _gen_folio() -> str:
     return "F" + "".join(random.choices(string.digits, k=8))
 
 
+def _precio_esperado(prod, es_pieza: bool) -> float:
+    """
+    Server-side authoritative unit price for a cart line — NEVER trust the
+    precio_unitario the client sends. Without this, a request crafted/edited
+    outside the UI (e.g. curl with a valid cashier token) could set any price
+    it wants and the backend would total the sale on that fabricated number.
+    Mirrors the same fallback the frontend uses to display the price.
+    """
+    if prod.venta_fraccionada and es_pieza:
+        if prod.precio_pieza and prod.precio_pieza > 0:
+            return prod.precio_pieza
+        return round(prod.precio_venta / (prod.unidades_por_caja or 1), 2)
+    return prod.precio_venta
+
+
 def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
     """
     Decrement lote quantities in FEFO order (earliest expiry first).
@@ -97,6 +112,15 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             p.id: p
             for p in db.query(Producto).filter(Producto.id.in_(product_ids)).all()
         }
+
+        # Guard: reject non-positive quantities — without this, a negative
+        # cantidad would slip through the stock check below (stock is never
+        # "insufficient" against a negative number), then INCREASE stock and
+        # make the item's subtotal negative, dragging the sale total below
+        # zero and inflating "cambio" (change given back) for free.
+        for item in body.items:
+            if item.cantidad <= 0:
+                raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
         # Guard: reject if all available lotes are expired (no usable stock)
         from datetime import date as _date
@@ -144,19 +168,33 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                         detail=f"Stock insuficiente: '{prod.nombre}' — disponible {prod.stock or 0}, solicitado {item.cantidad}",
                     )
 
-        # Calculate totals in one pass
+        # Calculate totals in one pass — precio_unitario/descuento are
+        # recomputed/clamped server-side (see _precio_esperado): the client's
+        # values are never trusted directly for money math or storage.
         subtotal  = 0.0
         iva_total = 0.0
-        for item in body.items:
+        precios_validos    = {}
+        descuentos_validos = {}
+        for idx, item in enumerate(body.items):
             prod = products.get(item.producto_id)
             if not prod:
                 raise HTTPException(status_code=404, detail=f"Producto {item.producto_id} no encontrado")
-            item_base = (item.precio_unitario * item.cantidad) - item.descuento
+            precio = _precio_esperado(prod, item.es_pieza)
+            item_full = precio * item.cantidad
+            # Clamp: an item's discount can never be negative (would inflate
+            # price) nor exceed its own subtotal (would make it negative).
+            descuento = min(max(item.descuento, 0.0), item_full)
+            precios_validos[idx]    = precio
+            descuentos_validos[idx] = descuento
+            item_base = item_full - descuento
             subtotal  += item_base
             if prod.aplica_iva:
                 iva_total += item_base * 0.16
 
-        base   = subtotal - body.descuento_global
+        # Same clamp for the global discount — can't be negative nor exceed
+        # the sale's own subtotal (both would push total below zero).
+        descuento_global = min(max(body.descuento_global, 0.0), subtotal)
+        base   = subtotal - descuento_global
         total  = base + iva_total
         cambio = max(0.0, body.monto_pagado - total)
         folio  = _gen_folio()
@@ -166,7 +204,12 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Método de pago inválido: '{body.metodo_pago}'")
 
-        if metodo == MetodoPago.efectivo and body.monto_pagado < total:
+        # Antes solo se validaba para efectivo — con tarjeta/transferencia el
+        # frontend siempre manda monto_pagado==total, pero un request armado
+        # a mano podía mandar cualquier monto_pagado menor y la venta se
+        # registraba igual como pagada por completo (no hay flujo de crédito
+        # que justifique un pago parcial en ningún método).
+        if body.monto_pagado < total - 0.01:
             raise HTTPException(
                 status_code=400,
                 detail=f"Monto pagado (${body.monto_pagado:.2f}) insuficiente para total (${total:.2f})"
@@ -178,7 +221,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             usuario_id=int(payload["sub"]),
             cliente_id=body.cliente_id,
             subtotal=subtotal,
-            descuento=body.descuento_global,
+            descuento=descuento_global,
             iva=iva_total,
             total=total,
             metodo_pago=metodo,
@@ -192,14 +235,16 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         db.flush()  # Get venta.id for items
 
         usuario_id = int(payload["sub"])
-        for item in body.items:
+        for idx, item in enumerate(body.items):
+            precio    = precios_validos[idx]
+            descuento = descuentos_validos[idx]
             db.add(ItemVenta(
                 venta_id=venta.id,
                 producto_id=item.producto_id,
                 cantidad=item.cantidad,
-                precio_unitario=item.precio_unitario,
-                descuento=item.descuento,
-                subtotal=(item.precio_unitario * item.cantidad) - item.descuento,
+                precio_unitario=precio,
+                descuento=descuento,
+                subtotal=(precio * item.cantidad) - descuento,
             ))
             prod = products[item.producto_id]
             stock_ant = prod.stock
@@ -304,12 +349,12 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 {
                     "nombre": products[i.producto_id].nombre,
                     "cantidad": i.cantidad,
-                    "subtotal": (i.precio_unitario * i.cantidad) - i.descuento,
+                    "subtotal": (precios_validos[idx] * i.cantidad) - descuentos_validos[idx],
                 }
-                for i in body.items
+                for idx, i in enumerate(body.items)
             ],
             "subtotal": subtotal,
-            "descuento": body.descuento_global,
+            "descuento": descuento_global,
             "iva": iva_total,
             "total": total,
             "metodo_pago": body.metodo_pago,

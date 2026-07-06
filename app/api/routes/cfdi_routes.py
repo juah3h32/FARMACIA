@@ -1,3 +1,5 @@
+import threading
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
@@ -12,6 +14,14 @@ from app.database import sync_service
 import app.config as cfg
 
 router = APIRouter()
+
+# Serializa timbrado (global e individual) dentro de este proceso: sin este lock,
+# dos requests casi simultáneas (doble clic, dos pestañas) pueden pasar ambas el
+# check "ya existe/ya facturada" antes de que la primera haga commit, y terminar
+# timbrando el mismo periodo o la misma venta dos veces ante el SAT (CFDI duplicado
+# real, no solo un registro local duplicado). El sync con Turso ya reduce la ventana
+# entre PCs distintas; este lock cierra la ventana dentro de la misma PC/proceso.
+_timbrado_lock = threading.Lock()
 
 
 def _purgar_de_turso(tabla: str, ids: list[int]) -> None:
@@ -330,6 +340,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             sync_service.sync_from_turso()
         except Exception as e:
             print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
+    _timbrado_lock.acquire()
     db = get_db_session()
     try:
         existe = (
@@ -398,6 +409,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+        _timbrado_lock.release()
 
 
 @router.get("/historial")
@@ -737,6 +749,7 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
             sync_service.sync_from_turso()
         except Exception as e:
             print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
+    _timbrado_lock.acquire()
     db = get_db_session()
     try:
         venta = db.query(Venta).filter(Venta.id == body.venta_id).first()
@@ -749,6 +762,19 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
             raise HTTPException(status_code=400, detail=f"Esta venta está en estado '{venta.estado.value}' (no completada) — no se puede facturar")
         if venta.facturada:
             raise HTTPException(status_code=400, detail="Esta venta ya fue facturada (individual o dentro de la factura global del mes) — no se puede facturar dos veces")
+        # venta.descuento es un descuento GLOBAL sobre el ticket (no por artículo); los
+        # Conceptos del CFDI individual se arman a partir de item.subtotal (precio*cantidad
+        # por artículo, sin este descuento) — timbrar así facturaría de más frente al SAT
+        # (el CFDI no coincidiría con lo realmente cobrado al cliente). La factura GLOBAL
+        # mensual sí es correcta porque suma venta.subtotal/iva/total ya con el descuento
+        # aplicado, así que esta venta queda cubierta ahí sin necesidad de más cambios.
+        if venta.descuento:
+            raise HTTPException(
+                status_code=400,
+                detail="Esta venta tiene un descuento global aplicado al ticket — no se puede facturar "
+                       "individual (el CFDI no podría reflejar el descuento y facturaría de más). "
+                       "Quedará cubierta por la factura global mensual del periodo.",
+            )
 
         # Regla comercial estándar en México: si no se facturó al momento de la compra,
         # se puede facturar individual a más tardar el último día del mes de la compra.
@@ -840,6 +866,7 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+        _timbrado_lock.release()
 
 
 @router.get("/individual/historial")

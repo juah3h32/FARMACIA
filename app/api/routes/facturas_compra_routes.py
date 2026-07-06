@@ -7,6 +7,7 @@ from pathlib import Path
 from app.database.connection import get_db_session
 from app.database.models import FacturaCompra
 from app.api.routes.auth_routes import get_current_api_user
+from app.database import sync_service
 import app.config as cfg
 
 router = APIRouter()
@@ -206,6 +207,14 @@ def eliminar_factura_compra(fid: int, payload: dict = Depends(get_current_api_us
             pass
         db.delete(r)
         db.commit()
+        # "facturas_compra" está en _NO_TURSO_DELETE: el sync periódico nunca borra por
+        # ausencia (cada PC puede tener un subconjunto), así que sin esta purga explícita
+        # el siguiente sync_from_turso() resucitaría el registro recién eliminado.
+        if cfg.TURSO_SYNC:
+            try:
+                sync_service.delete_ids_from_turso("facturas_compra", [fid])
+            except Exception as e:
+                print(f"[FacturasCompra] No se pudo borrar factura {fid} en Turso: {e}")
         return {"ok": True}
     except HTTPException:
         raise

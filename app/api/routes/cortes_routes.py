@@ -263,6 +263,14 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
 
         ahora = datetime.now()
         ef, tj, tr, tv, total_costo = _calcular_totales_corte(db, c, ahora)
+        # Cash physically withdrawn during the shift must come out of the
+        # expected drawer amount — the live "/activo" view already does this
+        # (esperado_caja = apertura + ef - total_retiros), but this endpoint
+        # was comparing against apertura+ef only, so any retiro during the
+        # shift showed up as a phantom "faltante" at close time.
+        total_retiros = sum(
+            r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
+        )
 
         c.monto_cierre = body.monto_cierre
         c.cerrado_en   = ahora
@@ -278,7 +286,8 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
-        diferencia = body.monto_cierre - (apertura + ef)
+        esperado   = apertura + ef - total_retiros
+        diferencia = body.monto_cierre - esperado
         return {
             "ok":                 True,
             "num_ventas":         num_ventas,
@@ -290,7 +299,8 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             "ganancia":           tv - total_costo,
             "monto_apertura":     apertura,
             "monto_cierre":       body.monto_cierre,
-            "esperado":           apertura + ef,
+            "total_retiros":      total_retiros,
+            "esperado":           esperado,
             "diferencia":         diferencia,
             "total_devoluciones": total_devoluciones,
             "ventas_netas":       ventas_netas,
@@ -331,7 +341,14 @@ def historial_cajero(
             tv  = c.total_ventas         or 0.0
             tc  = c.total_costo          or 0.0
             ape = c.monto_apertura       or 0.0
-            dif = (c.monto_cierre - (ape + ef)) if c.monto_cierre is not None else None
+            # Same fix as /cerrar: withdrawals during the shift reduce what's
+            # actually expected in the drawer — omitting them here made the
+            # historial show a "diferencia" (faltante) that never existed.
+            total_retiros_c = sum(
+                r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
+            )
+            esperado_caja = ape + ef - total_retiros_c
+            dif = (c.monto_cierre - esperado_caja) if c.monto_cierre is not None else None
             hasta = c.cerrado_en or datetime.now()
             total_dev = _calc_devoluciones(db, usuario_id, c.abierto_en, hasta) if c.abierto_en else 0.0
             result.append({
@@ -348,7 +365,8 @@ def historial_cajero(
                 "ganancia":         tv - tc,
                 "monto_apertura":   ape,
                 "monto_cierre":     c.monto_cierre,
-                "esperado_caja":    ape + ef,
+                "total_retiros":    total_retiros_c,
+                "esperado_caja":    esperado_caja,
                 "diferencia":       dif,
                 "abierto":          c.cerrado_en is None,
                 "total_devoluciones": total_dev,
