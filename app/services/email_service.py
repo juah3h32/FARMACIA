@@ -31,9 +31,17 @@ def enviar_email(
         msg.attach(parte)
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, [destinatario], msg.as_string())
+        # Puerto 465 = SSL implícito desde la conexión (no STARTTLS) — proveedores
+        # comunes (ej. Hostinger, algunos de Gmail/Outlook alternativos) lo exigen.
+        # Usar STARTTLS ahí falla con un error críptico de protocolo sin pista de la causa.
+        if int(smtp_port) == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, [destinatario], msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, [destinatario], msg.as_string())
     except Exception as e:
         raise EmailError(f"Error enviando correo: {e}")

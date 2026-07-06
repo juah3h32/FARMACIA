@@ -124,6 +124,10 @@ def _migrate():
         ("cfdi_facturas_globales", "pdf_url", "VARCHAR(500)"),
         ("facturas_compra",        "xml_url", "VARCHAR(500)"),
         ("facturas_compra",        "pdf_url", "VARCHAR(500)"),
+        ("cfdi_facturas_globales",     "actualizado_en", "TEXT"),
+        ("cfdi_facturas_individuales", "actualizado_en", "TEXT"),
+        ("cfdi_facturas_globales",     "sandbox", "BOOLEAN DEFAULT 0"),
+        ("cfdi_facturas_individuales", "sandbox", "BOOLEAN DEFAULT 0"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
@@ -170,23 +174,31 @@ def _migrate():
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).
     # We cannot rely on `added` here because columns added manually to local DB won't be
     # in `added`, yet Turso may still be missing them.
+    # Runs in a background thread — a slow/unreachable Turso must never block app startup
+    # (it used to hold init_db() for up to 15s, which could blow past the pywebview
+    # readiness window and force a fallback to the legacy CustomTkinter UI).
     if cfg.TURSO_SYNC:
-        from app.database.sync_service import _turso_pipeline_url, _turso_headers
-        import requests as _req
-        url, hdrs = _turso_pipeline_url(), _turso_headers()
-        try:
-            payload = {
-                "requests": [
-                    {"type": "execute", "stmt": {"sql": ddl, "args": []}}
-                    for ddl in new_tables_ddl
-                ] + [
-                    {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
-                    for t, c, ct in new_cols
-                ] + [{"type": "close"}]
-            }
-            _req.post(url, headers=hdrs, json=payload, timeout=15)
-        except Exception:
-            pass  # network error — safe to ignore, columns get created on next migration run
+        import threading as _threading
+
+        def _push_turso_schema():
+            from app.database.sync_service import _turso_pipeline_url, _turso_headers
+            import requests as _req
+            url, hdrs = _turso_pipeline_url(), _turso_headers()
+            try:
+                payload = {
+                    "requests": [
+                        {"type": "execute", "stmt": {"sql": ddl, "args": []}}
+                        for ddl in new_tables_ddl
+                    ] + [
+                        {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
+                        for t, c, ct in new_cols
+                    ] + [{"type": "close"}]
+                }
+                _req.post(url, headers=hdrs, json=payload, timeout=15)
+            except Exception:
+                pass  # network error — safe to ignore, columns get created on next migration run
+
+        _threading.Thread(target=_push_turso_schema, daemon=True, name="TursoSchemaPush").start()
 
 
 def init_db():

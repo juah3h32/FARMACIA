@@ -222,6 +222,7 @@ class CfdiFacturaGlobal(Base):
     total = Column(Float, default=0.0)
     num_ventas = Column(Integer, default=0)
     estado = Column(String(20), default="timbrada")  # timbrada | cancelada | error
+    sandbox = Column(Boolean, default=False)  # True si se timbró en modo prueba — no es válida ante el SAT
     facturama_id = Column(String(50))
     uuid_fiscal = Column(String(50))
     serie = Column(String(10))
@@ -234,6 +235,7 @@ class CfdiFacturaGlobal(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     creado_en = Column(DateTime, default=_dt.now)
     cancelado_en = Column(DateTime, nullable=True)
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
     usuario = relationship("Usuario")
     ventas = relationship("Venta", back_populates="cfdi_global")
@@ -261,6 +263,7 @@ class CfdiFacturaIndividual(Base):
     iva = Column(Float, default=0.0)
     total = Column(Float, default=0.0)
     estado = Column(String(20), default="timbrada")  # timbrada | cancelada | error
+    sandbox = Column(Boolean, default=False)  # True si se timbró en modo prueba — no es válida ante el SAT
     facturacom_id = Column(String(50))
     uuid_fiscal = Column(String(50))
     serie = Column(String(10))
@@ -273,6 +276,7 @@ class CfdiFacturaIndividual(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     creado_en = Column(DateTime, default=_dt.now)
     cancelado_en = Column(DateTime, nullable=True)
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
     venta = relationship("Venta")
     usuario = relationship("Usuario")

@@ -202,6 +202,7 @@ def registrar_devolucion(
             raise HTTPException(status_code=400, detail="Venta ya marcada como devolución completa")
 
         orig_items = {i.producto_id: i for i in venta.items}
+        cantidad_original = {i.producto_id: i.cantidad for i in venta.items}
         usuario_id = int(payload["sub"])
         total_devuelto = 0.0
         nota_parts = []
@@ -239,11 +240,29 @@ def registrar_devolucion(
             nombre = orig.producto.nombre if orig.producto else str(dev.producto_id)
             nota_parts.append(f"{nombre[:20]} x{dev.cantidad}")
 
+            # Ajustar el item: reducir cantidad/subtotal/descuento proporcionalmente —
+            # sin esto, la venta seguía "completada" por el monto ORIGINAL completo,
+            # inflando ingresos/impuestos declarados y sobre-facturando si se timbra
+            # como factura individual (bug real: devolución parcial no bajaba nada).
+            cant_previa = orig.cantidad
+            cant_nueva = cant_previa - dev.cantidad
+            ratio_kept = (cant_nueva / cant_previa) if cant_previa else 0.0
+            orig.cantidad = cant_nueva
+            orig.subtotal = round((orig.subtotal or 0.0) * ratio_kept, 2)
+            orig.descuento = round((orig.descuento or 0.0) * ratio_kept, 2)
+
+        # Recalcular totales de la venta sobre lo que realmente quedó (no lo original)
+        venta.subtotal = round(sum(i.subtotal or 0.0 for i in venta.items), 2)
+        venta.iva = round(sum(
+            (i.subtotal or 0.0) * 0.16 for i in venta.items if i.producto and i.producto.aplica_iva
+        ), 2)
+        venta.total = round((venta.subtotal - (venta.descuento or 0.0)) + venta.iva, 2)
+
         # Full return → mark sale as devolucion
         dev_map = {d.producto_id: d.cantidad for d in body.items if d.cantidad > 0}
         all_returned = all(
-            dev_map.get(pid, 0) >= orig.cantidad
-            for pid, orig in orig_items.items()
+            dev_map.get(pid, 0) >= cant_orig
+            for pid, cant_orig in cantidad_original.items()
         )
         if all_returned:
             venta.estado = EstadoVenta.devolucion

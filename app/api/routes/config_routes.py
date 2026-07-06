@@ -261,6 +261,17 @@ _FACT_KEYS = [
     "email_smtp_host", "email_smtp_port", "email_smtp_user", "email_smtp_password",
 ]
 
+# Prefijo que marca un valor como "enmascarado, sin cambios" — si el front lo regresa
+# tal cual (usuario no tocó el campo), el POST sabe que debe conservar el valor real
+# guardado en vez de sobreescribirlo con la máscara.
+_MASK_PREFIX = "••••"
+
+
+def _mask(v: str) -> str:
+    if not v:
+        return ""
+    return _MASK_PREFIX + (v[-4:] if len(v) > 4 else "")
+
 
 @router.get("/facturacion")
 def get_facturacion(payload: dict = Depends(get_current_api_user)):
@@ -273,8 +284,10 @@ def get_facturacion(payload: dict = Depends(get_current_api_user)):
         rows = db.query(Configuracion).filter(Configuracion.clave.in_(_FACT_KEYS)).all()
         d = {r.clave: r.valor for r in rows}
         return {
-            "facturacom_api_key":    d.get("facturacom_api_key", ""),
-            "facturacom_secret_key": d.get("facturacom_secret_key", ""),
+            # Nunca se regresan en texto plano al navegador — solo los últimos 4
+            # caracteres, para que no queden expuestas en devtools/historial de red.
+            "facturacom_api_key":    _mask(d.get("facturacom_api_key", "")),
+            "facturacom_secret_key": _mask(d.get("facturacom_secret_key", "")),
             "facturacom_sandbox":    d.get("facturacom_sandbox", "1") == "1",
             "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_RAZON_SOCIAL_FISCAL,
             "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,
@@ -283,7 +296,7 @@ def get_facturacion(payload: dict = Depends(get_current_api_user)):
             "email_smtp_host":      d.get("email_smtp_host", ""),
             "email_smtp_port":      d.get("email_smtp_port", "587"),
             "email_smtp_user":      d.get("email_smtp_user", ""),
-            "email_smtp_password":  d.get("email_smtp_password", ""),
+            "email_smtp_password":  _mask(d.get("email_smtp_password", "")),
         }
     finally:
         db.close()
@@ -324,6 +337,13 @@ def set_facturacion(body: FacturacionIn, payload: dict = Depends(get_current_api
             "email_smtp_user":       body.email_smtp_user.strip(),
             "email_smtp_password":   body.email_smtp_password.strip(),
         }
+        # Si el campo llega vacío o con el prefijo de máscara, el usuario no lo tocó
+        # (el front no reenvía el valor precargado si no cambió) — no sobreescribir
+        # el secreto real guardado con un valor vacío o con la máscara.
+        _secret_keys = ("facturacom_api_key", "facturacom_secret_key", "email_smtp_password")
+        for clave in _secret_keys:
+            if not updates[clave] or updates[clave].startswith(_MASK_PREFIX):
+                del updates[clave]
         for clave, valor in updates.items():
             row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
             if row:

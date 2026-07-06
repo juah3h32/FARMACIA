@@ -127,16 +127,20 @@ def _descargar_y_guardar_documentos(db, registro: "CfdiFacturaGlobal", fconf: di
     except facturacom_service.FacturaComError:
         return False
 
+    # El id del registro va en el nombre de archivo — un periodo puede timbrarse más
+    # de una vez a lo largo del tiempo (se cancela y se vuelve a timbrar); sin el id,
+    # el segundo timbrado sobreescribe silenciosamente el PDF/XML de la factura
+    # cancelada anterior, perdiendo la evidencia de lo que realmente se canceló.
     cfdi_dir = _cfdi_periodo_dir(registro.mes, registro.anio)
-    pdf_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}.pdf"
-    xml_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}.xml"
+    pdf_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}_id{registro.id}.pdf"
+    xml_path = cfdi_dir / f"{registro.anio}-{registro.mes:02d}_id{registro.id}.xml"
     pdf_path.write_bytes(docs["pdf_bytes"])
     xml_path.write_bytes(docs["xml_bytes"])
 
     pdf_url = xml_url = None
     try:
         from app.services.cloudinary_service import upload_documento
-        public_id = f"{registro.anio}-{registro.mes:02d}"
+        public_id = f"{registro.anio}-{registro.mes:02d}_id{registro.id}"
         pdf_url = upload_documento(str(pdf_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.pdf")
         xml_url = upload_documento(str(xml_path), "FARMACIA/CFDI_GLOBAL", f"{public_id}.xml")
     except Exception:
@@ -319,6 +323,13 @@ class TimbrarIn(BaseModel):
 @router.post("/timbrar-global")
 def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    # Igual que en individual: sincroniza con Turso antes de checar si el periodo ya
+    # está timbrado, para achicar la ventana de doble-timbrado entre dos PCs.
+    if cfg.TURSO_SYNC:
+        try:
+            sync_service.sync_from_turso()
+        except Exception as e:
+            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
     db = get_db_session()
     try:
         existe = (
@@ -348,6 +359,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             registro = CfdiFacturaGlobal(
                 mes=body.mes, anio=body.anio, subtotal=subtotal, iva=iva, total=total,
                 num_ventas=len(ventas), estado="error", error_mensaje=str(e),
+                sandbox=fconf["facturacom_sandbox"],
                 usuario_id=int(payload["sub"]) if payload.get("sub") else None,
             )
             db.add(registro)
@@ -363,6 +375,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
             num_ventas=len(ventas), estado="timbrada",
             facturama_id=resultado["facturacom_id"], uuid_fiscal=resultado["uuid"],
             serie=resultado["serie"], folio=resultado["folio"],
+            sandbox=fconf["facturacom_sandbox"],
             usuario_id=int(payload["sub"]) if payload.get("sub") else None,
         )
         db.add(registro)
@@ -401,7 +414,7 @@ def historial_facturas(payload: dict = Depends(get_current_api_user)):
             {
                 "id": r.id, "mes": r.mes, "anio": r.anio,
                 "subtotal": r.subtotal, "iva": r.iva, "total": r.total,
-                "num_ventas": r.num_ventas, "estado": r.estado,
+                "num_ventas": r.num_ventas, "estado": r.estado, "sandbox": bool(r.sandbox),
                 "uuid": r.uuid_fiscal, "serie": r.serie, "folio": r.folio,
                 "error_mensaje": r.error_mensaje,
                 "documentos_pendientes": r.estado == "timbrada" and not r.pdf_path and not r.pdf_url,
@@ -715,12 +728,25 @@ class TimbrarIndividualIn(BaseModel):
 @router.post("/individual/timbrar")
 def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
+    # Trae el estado más reciente de Turso antes de decidir si ya está facturada —
+    # reduce (no elimina del todo) la ventana en la que dos PCs timbran la misma
+    # venta casi al mismo tiempo antes de que el sync periódico (cada 30s) alcance
+    # a avisarle a esta PC que la otra ya la facturó.
+    if cfg.TURSO_SYNC:
+        try:
+            sync_service.sync_from_turso()
+        except Exception as e:
+            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
     db = get_db_session()
     try:
         venta = db.query(Venta).filter(Venta.id == body.venta_id).first()
         if not venta:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
 
+        if venta.eliminado:
+            raise HTTPException(status_code=400, detail="Esta venta fue eliminada — no se puede facturar")
+        if venta.estado != EstadoVenta.completada:
+            raise HTTPException(status_code=400, detail=f"Esta venta está en estado '{venta.estado.value}' (no completada) — no se puede facturar")
         if venta.facturada:
             raise HTTPException(status_code=400, detail="Esta venta ya fue facturada (individual o dentro de la factura global del mes) — no se puede facturar dos veces")
 
@@ -777,6 +803,7 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
                 cliente_email=body.cliente_email, uso_cfdi=body.uso_cfdi, forma_pago=body.forma_pago,
                 subtotal=subtotal, iva=iva, total=total,
                 estado="error", error_mensaje=str(e),
+                sandbox=fconf["facturacom_sandbox"],
                 usuario_id=int(payload["sub"]) if payload.get("sub") else None,
             )
             db.add(registro)
@@ -793,6 +820,7 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
             subtotal=subtotal, iva=iva, total=total,
             estado="timbrada", facturacom_id=resultado["facturacom_id"], uuid_fiscal=resultado["uuid"],
             serie=resultado["serie"], folio=resultado["folio"],
+            sandbox=fconf["facturacom_sandbox"],
             usuario_id=int(payload["sub"]) if payload.get("sub") else None,
         )
         venta.facturada = True
@@ -830,7 +858,7 @@ def historial_facturas_individuales(payload: dict = Depends(get_current_api_user
                 "id": r.id, "venta_id": r.venta_id,
                 "cliente_nombre": r.cliente_nombre, "cliente_rfc": r.cliente_rfc,
                 "subtotal": r.subtotal, "iva": r.iva, "total": r.total,
-                "estado": r.estado, "uuid": r.uuid_fiscal, "serie": r.serie, "folio": r.folio,
+                "estado": r.estado, "sandbox": bool(r.sandbox), "uuid": r.uuid_fiscal, "serie": r.serie, "folio": r.folio,
                 "error_mensaje": r.error_mensaje,
                 "documentos_pendientes": r.estado == "timbrada" and not r.pdf_path and not r.pdf_url,
                 "creado_en": r.creado_en.isoformat() if r.creado_en else None,
@@ -1023,10 +1051,18 @@ def enviar_whatsapp_individual(cfdi_id: int, body: EnviarWhatsappIn, payload: di
         if not r.pdf_url:
             raise HTTPException(status_code=400, detail="Todavía no hay link de descarga en la nube — reintenta la descarga de documentos primero")
 
+        numero = body.numero.strip()
+        if not numero:
+            raise HTTPException(
+                status_code=400,
+                detail="Falta el número de WhatsApp del cliente. Nota: CallMeBot exige que "
+                       "ese número se haya autorizado antes con el API key configurado — "
+                       "no basta con escribirlo aquí si nunca se dio de alta con CallMeBot.",
+            )
+
         from app.database.models import Configuracion
-        rows = db.query(Configuracion).filter(Configuracion.clave.in_(["whatsapp_token", "whatsapp_numero"])).all()
+        rows = db.query(Configuracion).filter(Configuracion.clave.in_(["whatsapp_token"])).all()
         wconf = {x.clave: x.valor for x in rows}
-        numero = body.numero.strip() or wconf.get("whatsapp_numero", "")
         token = wconf.get("whatsapp_token", "")
 
         mensaje = (

@@ -108,6 +108,19 @@ def reload_setup() -> None:
     se llama justo después de que el asistente de primer arranque guarda la elección."""
     global SYNC_MODE, USE_TURSO, TURSO_SYNC, NEEDS_FIRST_RUN_SETUP
     _setup = _load_setup()
+
+    # Instalación existente (viene de una versión anterior a este asistente, o
+    # simplemente nunca guardó setup.json) — ya tiene farmacia.db con datos reales.
+    # Eso es una ACTUALIZACIÓN, no una instalación nueva: no mostrar el asistente,
+    # solo asumir "turso" (el comportamiento de siempre antes de que existiera este
+    # asistente) y persistirlo en silencio para no volver a preguntar.
+    if "sync_mode" not in _setup and DB_PATH.exists():
+        _setup["sync_mode"] = "turso"
+        try:
+            SETUP_FILE.write_text(_json.dumps(_setup), encoding="utf-8")
+        except Exception:
+            pass
+
     SYNC_MODE = _setup.get("sync_mode", "turso")
     NEEDS_FIRST_RUN_SETUP = (not _ON_VERCEL) and "sync_mode" not in _setup
     USE_TURSO  = _ON_VERCEL

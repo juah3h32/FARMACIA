@@ -268,9 +268,14 @@ async def serve_spa(path: str = ""):
     if path and file_path.exists() and file_path.is_file():
         return FileResponse(str(file_path))
 
+    # index.html es el shell de la SPA — nunca debe quedar cacheado por el
+    # webview (WebView2/Edge cachea agresivamente por defecto), o el usuario
+    # ve un diseño viejo tras una actualización hasta que borre caché a mano.
     index = _WEB_DIR / "index.html"
     if index.exists():
-        return FileResponse(str(index))
+        return FileResponse(str(index), headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        })
     return {"error": "SPA not found"}
 
 

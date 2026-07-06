@@ -24,7 +24,7 @@ def _find_free_port(start: int, attempts: int = 10) -> int | None:
         return s.getsockname()[1]
 
 
-def _wait_for_api(port: int, timeout: int = 12) -> bool:
+def _wait_for_api(port: int, timeout: int = 30) -> bool:
     import urllib.request
     url = f"http://127.0.0.1:{port}/api/health"
     deadline = time.time() + timeout

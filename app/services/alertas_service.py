@@ -22,7 +22,13 @@ def _send_whatsapp(numero: str, token: str, mensaje: str):
 
 def enviar_whatsapp(numero: str, token: str, mensaje: str) -> None:
     """Versión que SÍ propaga el error — úsala cuando el caller necesite saber si falló
-    (ej. envío de factura), a diferencia de _send_whatsapp que solo loguea y sigue."""
+    (ej. envío de factura), a diferencia de _send_whatsapp que solo loguea y sigue.
+
+    Nota: CallMeBot exige que CADA número destino se haya registrado/autorizado
+    manualmente con el API key que se usa para enviar — un apikey vinculado al número
+    de la farmacia no sirve automáticamente para mandarle mensajes a un número de
+    cliente distinto, aunque la petición HTTP regrese 200 OK. Verifica en la app que
+    el mensaje realmente haya llegado la primera vez que uses un número nuevo."""
     import urllib.request, urllib.parse
     if not (numero and token):
         raise ValueError("WhatsApp no configurado (falta número o API key de CallMeBot)")

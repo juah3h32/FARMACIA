@@ -1074,7 +1074,7 @@
         Iniciar Sesión
       </button>
 
-      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer &nbsp;·&nbsp; v1.0.0</p>
+      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer &nbsp;·&nbsp; <span id="l-version">v1.0.0</span></p>
     </div>
   </div>
 </div>
@@ -2009,7 +2009,7 @@
               <div>
                 <label class="text-xs" style="color:#64748B">Ambiente</label>
                 <label class="flex items-center gap-2 mt-1 px-3 py-2 rounded-xl border text-sm cursor-pointer" style="border-color:#E2E8F0">
-                  <input id="cfdi-sandbox" type="checkbox" checked> Modo prueba (sandbox)
+                  <input id="cfdi-sandbox" type="checkbox" checked onchange="confirmarCambioSandbox(this)"> Modo prueba (sandbox)
                 </label>
               </div>
             </div>
@@ -3639,9 +3639,12 @@
     </div>
     <div id="cfdi-ind-ver-body" class="px-5 pb-3 overflow-auto text-sm" style="flex:1"></div>
     <div id="cfdi-ind-ver-envio-status" class="px-5 pb-2 text-xs" style="display:none"></div>
-    <div class="px-5 pb-3 flex-shrink-0 flex gap-2" style="border-top:1px solid #F1F5F9;padding-top:10px">
-      <input id="cfdi-ind-whatsapp-numero" type="text" placeholder="Número WhatsApp (opcional)" class="flex-1 px-3 py-2 rounded-xl border text-xs" style="border-color:#E2E8F0">
-      <button id="cfdi-ind-whatsapp-btn" class="px-3 py-2 rounded-xl text-xs font-bold" style="background:#DCFCE7;color:#15803D;border:none;cursor:pointer">Enviar WhatsApp</button>
+    <div class="px-5 pt-2 flex-shrink-0" style="border-top:1px solid #F1F5F9">
+      <div class="flex gap-2">
+        <input id="cfdi-ind-whatsapp-numero" type="text" placeholder="Número WhatsApp del cliente (obligatorio)" class="flex-1 px-3 py-2 rounded-xl border text-xs" style="border-color:#E2E8F0">
+        <button id="cfdi-ind-whatsapp-btn" class="px-3 py-2 rounded-xl text-xs font-bold" style="background:#DCFCE7;color:#15803D;border:none;cursor:pointer">Enviar WhatsApp</button>
+      </div>
+      <p class="text-[10px] mt-1 pb-2" style="color:#94A3B8">CallMeBot solo envía a números ya autorizados con tu API key — si es la primera vez que le mandas a este cliente, dile que active CallMeBot antes.</p>
     </div>
     <div class="px-5 pb-3 flex-shrink-0 flex gap-2">
       <input id="cfdi-ind-correo-destino" type="email" placeholder="Correo destino (opcional)" class="flex-1 px-3 py-2 rounded-xl border text-xs" style="border-color:#E2E8F0">
@@ -10691,6 +10694,12 @@ window.addEventListener('load', () => {
     api('/auth/me').then(r=>{ if (r.ok) launchApp(); else { S.token=null; localStorage.removeItem('token'); } }).catch(()=>{});
   }
   document.getElementById('l-user').focus();
+  fetch('/api/health').then(r=>r.json()).then(d=>{
+    if (d.version) {
+      const vEl = document.getElementById('l-version');
+      if (vEl) vEl.textContent = `v${d.version}`;
+    }
+  }).catch(()=>{});
 });
 
 // ══════════════════════════════════════════════════════════
@@ -12685,11 +12694,20 @@ async function loadCfdiGlobal() {
   loadDeclaracionMensual();
 }
 
+// El backend regresa las llaves enmascaradas (••••últimos4) — se guardan estos
+// valores "tal como llegaron" para poder detectar en guardarConfigCfdi() si el
+// usuario realmente los editó o si el campo se queda igual (y por lo tanto no se
+// debe reenviar la máscara como si fuera la llave real).
+let _cfdiApiKeyCargada = '';
+let _cfdiSecretKeyCargada = '';
+
 async function loadConexionesFacturacom() {
   try {
     const d = await apiFetch('/config/facturacion');
-    document.getElementById('cfdi-apikey').value    = d.facturacom_api_key || '';
-    document.getElementById('cfdi-secretkey').value = d.facturacom_secret_key || '';
+    _cfdiApiKeyCargada = d.facturacom_api_key || '';
+    _cfdiSecretKeyCargada = d.facturacom_secret_key || '';
+    document.getElementById('cfdi-apikey').value    = _cfdiApiKeyCargada;
+    document.getElementById('cfdi-secretkey').value = _cfdiSecretKeyCargada;
     document.getElementById('cfdi-sandbox').checked = !!d.facturacom_sandbox;
     document.getElementById('cfdi-razon').value    = d.emisor_razon_social || '';
     document.getElementById('cfdi-rfc').value      = d.emisor_rfc || '';
@@ -12800,10 +12818,26 @@ async function loadDeclaracionMensual() {
   } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
 }
 
+function confirmarCambioSandbox(checkbox) {
+  if (checkbox.checked) return; // volver a modo prueba no tiene riesgo, no requiere confirmar
+  checkbox.checked = true; // revertir hasta que confirme — evita activar producción sin querer
+  showConfirm({
+    title: '¿Pasar a modo producción (real)?',
+    message: 'Vas a desactivar el modo prueba. A partir de ahora, CADA factura que timbres será fiscalmente real ante el SAT y no se puede deshacer con un clic — para corregir hay que cancelar el CFDI formalmente.\n\n¿Confirmas que quieres facturar en modo real?',
+    confirmText: 'Sí, usar modo producción', danger: true, icon: 'alert-triangle',
+    onConfirm: () => { checkbox.checked = false; },
+  });
+}
+
 async function guardarConfigCfdi() {
+  const apiKeyActual = document.getElementById('cfdi-apikey').value.trim();
+  const secretKeyActual = document.getElementById('cfdi-secretkey').value.trim();
   const body = {
-    facturacom_api_key: document.getElementById('cfdi-apikey').value.trim(),
-    facturacom_secret_key: document.getElementById('cfdi-secretkey').value.trim(),
+    // Si el campo quedó igual a como se cargó (enmascarado), no reenviar esa
+    // máscara como si fuera la llave real — mandar vacío para que el backend
+    // conserve la llave ya guardada.
+    facturacom_api_key: apiKeyActual === _cfdiApiKeyCargada ? '' : apiKeyActual,
+    facturacom_secret_key: secretKeyActual === _cfdiSecretKeyCargada ? '' : secretKeyActual,
     facturacom_sandbox: document.getElementById('cfdi-sandbox').checked,
     emisor_razon_social: document.getElementById('cfdi-razon').value.trim(),
     emisor_rfc: document.getElementById('cfdi-rfc').value.trim(),
@@ -12917,7 +12951,7 @@ async function abrirConfirmacionTimbrado() {
     </div>`;
     body.innerHTML = html;
 
-    _cfdiPendiente = { mes, anio };
+    _cfdiPendiente = { mes, anio, num_ventas: d.num_ventas, total: d.total };
     const bloqueado = (d.datos_incompletos && d.datos_incompletos.length);
     btn.disabled = !!bloqueado; btn.style.opacity = bloqueado ? .5 : 1;
   } catch(e) {
@@ -12927,7 +12961,34 @@ async function abrirConfirmacionTimbrado() {
 
 async function confirmarYTimbrarFacturaGlobal() {
   if (!_cfdiPendiente) return;
-  const { mes, anio } = _cfdiPendiente;
+  const { mes, anio, num_ventas, total } = _cfdiPendiente;
+  const btn = document.getElementById('cfdi-confirmar-btn');
+  btn.disabled = true; btn.style.opacity = .5;
+
+  // Re-checa justo antes de timbrar: si entraron ventas nuevas mientras el modal
+  // estaba abierto, el CFDI real incluiría más de lo que la administradora vio y
+  // aprobó en pantalla — avisar y pedir confirmación explícita del monto nuevo.
+  try {
+    const actual = await apiFetch(`/cfdi/preview?mes=${mes}&anio=${anio}`);
+    if (actual.num_ventas !== num_ventas || Math.abs(actual.total - total) > 0.01) {
+      btn.disabled = false; btn.style.opacity = 1;
+      showConfirm({
+        title: 'El monto cambió desde que abriste la vista previa',
+        message: `Habías revisado ${num_ventas} venta(s) por $${total.toFixed(2)}. Ahora hay ${actual.num_ventas} venta(s) por $${actual.total.toFixed(2)} (entraron ventas nuevas mientras tenías el modal abierto).\n\n¿Timbrar con el monto actualizado?`,
+        confirmText: 'Sí, timbrar con el monto actualizado', danger: true, icon: 'alert-triangle',
+        onConfirm: () => { _cfdiPendiente = { mes, anio, num_ventas: actual.num_ventas, total: actual.total }; _timbrarFacturaGlobalReal(mes, anio); },
+      });
+      return;
+    }
+  } catch(e) {
+    btn.disabled = false; btn.style.opacity = 1;
+    toast(e.message, 'error');
+    return;
+  }
+  await _timbrarFacturaGlobalReal(mes, anio);
+}
+
+async function _timbrarFacturaGlobalReal(mes, anio) {
   const btn = document.getElementById('cfdi-confirmar-btn');
   btn.disabled = true; btn.style.opacity = .5;
   try {
@@ -12966,6 +13027,7 @@ async function loadHistorialCfdi() {
             <i data-lucide="${CFDI_ESTADO_ICON[r.estado]||'circle'}" style="width:12px;height:12px"></i>
             ${CFDI_ESTADO_LABEL[r.estado]||r.estado}
           </span>
+          ${r.sandbox ? `<span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style="background:#FEF3C7;color:#92400E" title="Timbrada en modo prueba — no es válida ante el SAT">PRUEBA</span>` : ''}
         </td>
         <td class="py-3 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
         <td class="py-3 text-xs">
@@ -13092,6 +13154,7 @@ async function verificarCfdiConSat(id) {
       </div>`;
     }
     box.innerHTML = estadoHtml + `<a href="#" onclick="abrirUrlExterna('${d.url_verificacion_sat}');return false;" class="block mt-2 underline" style="color:#1d2140">Ver en el validador oficial del SAT →</a>`;
+    abrirUrlExterna(d.url_verificacion_sat);
   } catch(e) {
     box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`;
   }
@@ -14331,6 +14394,7 @@ async function cargarHistorialFacturasIndividuales() {
             <i data-lucide="${CFDI_ESTADO_ICON[r.estado]||'circle'}" style="width:12px;height:12px"></i>
             ${CFDI_ESTADO_LABEL[r.estado]||r.estado}
           </span>
+          ${r.sandbox ? `<span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style="background:#FEF3C7;color:#92400E" title="Timbrada en modo prueba — no es válida ante el SAT">PRUEBA</span>` : ''}
         </td>
         <td class="py-3 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
         <td class="py-3 text-xs">
@@ -14493,6 +14557,7 @@ function eliminarFacturaIndividualError(id) {
 async function enviarWhatsappIndividual(id) {
   const numero = document.getElementById('cfdi-ind-whatsapp-numero')?.value.trim();
   const box = document.getElementById('cfdi-ind-ver-envio-status');
+  if (!numero) { toast('Escribe el número de WhatsApp del cliente', 'warning'); return; }
   box.style.display = ''; box.innerHTML = 'Enviando WhatsApp...';
   try {
     await apiFetch(`/cfdi/individual/${id}/enviar-whatsapp`, { method: 'POST', body: JSON.stringify({ numero: numero || '' }) });

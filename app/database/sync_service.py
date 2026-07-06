@@ -414,6 +414,20 @@ def sync_to_turso() -> None:
                                     f"INSERT INTO ventas ({col_str}) VALUES ({ph_str}) "
                                     f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
                                 )
+                            # cfdi_facturas_globales/individuales: last-writer-wins por
+                            # actualizado_en — sin esto, una PC con copia vieja (ej. antes
+                            # de que otra PC cancelara el CFDI) puede "resucitar" un estado
+                            # ya superado con cada push periódico.
+                            elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales") and "actualizado_en" in cols:
+                                set_parts = [
+                                    f"{c} = CASE WHEN excluded.actualizado_en > {table}.actualizado_en "
+                                    f"THEN excluded.{c} ELSE {table}.{c} END"
+                                    for c in cols if c != "id"
+                                ]
+                                upsert = (
+                                    f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
+                                    f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
+                                )
                             else:
                                 upsert = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
 
@@ -561,6 +575,19 @@ def sync_from_turso() -> int:
                         )
                         sql = (
                             f"INSERT INTO ventas ({col_str}) VALUES ({ph_str}) "
+                            f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
+                        )
+                        lconn.executemany(sql, rows)
+                    elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales") and "actualizado_en" in cols:
+                        # Mismo criterio last-writer-wins que ventas/productos — evita que
+                        # un pull resucite un estado ("timbrada") ya cancelado localmente.
+                        set_clause = ", ".join(
+                            f"{c}=CASE WHEN excluded.actualizado_en > {table}.actualizado_en"
+                            f" THEN excluded.{c} ELSE {table}.{c} END"
+                            for c in cols if c != "id"
+                        )
+                        sql = (
+                            f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql, rows)

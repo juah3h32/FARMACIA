@@ -26,6 +26,36 @@ def _headers(api_key: str, secret_key: str) -> dict:
     }
 
 
+def _get(url: str, headers: dict, timeout: int):
+    try:
+        return requests.get(url, headers=headers, timeout=timeout)
+    except requests.exceptions.RequestException as e:
+        raise FacturaComError(f"Error de red al conectar con Factura.com: {e}") from e
+
+
+def _post(url: str, headers: dict, json_body: dict, timeout: int):
+    try:
+        return requests.post(url, headers=headers, json=json_body, timeout=timeout)
+    except requests.exceptions.RequestException as e:
+        raise FacturaComError(f"Error de red al conectar con Factura.com: {e}") from e
+
+
+def _post_timbrado(url: str, headers: dict, json_body: dict):
+    """POST específico del timbrado (create). Si la conexión se cae ANTES de recibir
+    respuesta, no hay forma de saber si Factura.com sí llegó a generar el CFDI del
+    lado del SAT — el mensaje debe dejarlo explícito para que un humano verifique
+    antes de reintentar (un reintento ciego puede generar un CFDI real duplicado)."""
+    try:
+        return requests.post(url, headers=headers, json=json_body, timeout=30)
+    except requests.exceptions.RequestException as e:
+        raise FacturaComError(
+            "No se recibió respuesta de Factura.com al timbrar (posible corte de red). "
+            "IMPORTANTE: el CFDI pudo haberse generado igual del lado de Factura.com/SAT. "
+            "Antes de reintentar, revisa tu cuenta de Factura.com o usa 'Verificar con SAT' "
+            f"para confirmar si ya existe. Detalle técnico: {e}"
+        ) from e
+
+
 def _raise_for_facturacom(r: requests.Response):
     try:
         data = r.json()
@@ -41,7 +71,7 @@ def _raise_for_facturacom(r: requests.Response):
 
 
 def _serie_id_factura(api_key: str, secret_key: str, sandbox: bool) -> int:
-    r = requests.get(f"{_base_url(sandbox)}/v1/series", headers=_headers(api_key, secret_key), timeout=20)
+    r = _get(f"{_base_url(sandbox)}/v1/series", headers=_headers(api_key, secret_key), timeout=20)
     _raise_for_facturacom(r)
     for s in r.json().get("data", []):
         if s.get("SerieType") == "F":
@@ -53,13 +83,13 @@ def _get_or_create_receptor_publico_general(api_key: str, secret_key: str, sandb
     base = _base_url(sandbox)
     headers = _headers(api_key, secret_key)
 
-    r = requests.get(f"{base}/v1/clients/rfc/{RFC_PUBLICO_GENERAL}", headers=headers, timeout=20)
+    r = _get(f"{base}/v1/clients/rfc/{RFC_PUBLICO_GENERAL}", headers=headers, timeout=20)
     if r.ok:
         data = r.json().get("Data") or []
         if data:
             return data[0]["UID"]
 
-    r = requests.post(f"{base}/v1/clients/create", headers=headers, json={
+    r = _post(f"{base}/v1/clients/create", headers=headers, json_body={
         "rfc": RFC_PUBLICO_GENERAL,
         "razons": "PUBLICO EN GENERAL",
         "codpos": emisor_cp,
@@ -85,25 +115,44 @@ def crear_factura_global(
     client_uid = _get_or_create_receptor_publico_general(api_key, secret_key, sandbox, emisor_cp)
     serie_id = _serie_id_factura(api_key, secret_key, sandbox)
 
-    concepto = {
-        "ClaveProdServ": "01010101",
-        "Cantidad": 1,
-        "ClaveUnidad": "ACT",
-        "Unidad": "Unidad de servicio",
-        "ValorUnitario": round(subtotal, 2),
-        "Descripcion": f"Venta de mercancías periodo {mes:02d}/{anio} (factura global)",
-        "ObjetoImp": "02",
-    }
-    if iva > 0:
-        concepto["Impuestos"] = {
-            "Traslados": [{"Base": round(subtotal, 2), "Impuesto": "002", "TipoFactor": "Tasa", "TasaOCuota": "0.160000", "Importe": round(iva, 2)}]
-        }
+    # El mes puede mezclar ventas gravadas (16%, TAX_RATE) y exentas (0%, medicinas —
+    # Art. 2-A LIVA). Un solo Concepto no puede llevar dos tasas distintas sobre su
+    # propio importe, así que se separan en dos Conceptos: uno con la base gravada
+    # (recuperada de iva/0.16, ya que así se calculó al vender) y otro con el resto
+    # como base exenta a tasa 0% — ambos ObjetoImp=02 (sí objeto) con su Traslado,
+    # nunca ObjetoImp=01 ni un Traslado faltante.
+    base_gravada = round(iva / 0.16, 2) if iva > 0 else 0.0
+    base_exenta = round(subtotal - base_gravada, 2)
+
+    conceptos = []
+    if base_gravada > 0:
+        conceptos.append({
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "Unidad": "Unidad de servicio", "ValorUnitario": base_gravada,
+            "Descripcion": f"Venta de mercancías gravadas periodo {mes:02d}/{anio} (factura global)",
+            "ObjetoImp": "02",
+            "Impuestos": {"Traslados": [{
+                "Base": base_gravada, "Impuesto": "002", "TipoFactor": "Tasa",
+                "TasaOCuota": "0.160000", "Importe": round(iva, 2),
+            }]},
+        })
+    if base_exenta > 0 or not conceptos:
+        conceptos.append({
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "Unidad": "Unidad de servicio", "ValorUnitario": base_exenta,
+            "Descripcion": f"Venta de mercancías tasa 0% periodo {mes:02d}/{anio} (factura global)",
+            "ObjetoImp": "02",
+            "Impuestos": {"Traslados": [{
+                "Base": base_exenta, "Impuesto": "002", "TipoFactor": "Tasa",
+                "TasaOCuota": "0.000000", "Importe": 0.00,
+            }]},
+        })
 
     payload = {
         "Receptor": {"UID": client_uid},
         "TipoDocumento": "factura",
         "InformacionGlobal": {"Periodicidad": "04", "Meses": f"{mes:02d}", "Año": str(anio)},
-        "Conceptos": [concepto],
+        "Conceptos": conceptos,
         "UsoCFDI": "S01",
         "Serie": serie_id,
         "FormaPago": "99",
@@ -112,7 +161,7 @@ def crear_factura_global(
         "EnviarCorreo": False,
     }
 
-    r = requests.post(f"{_base_url(sandbox)}/v4/cfdi40/create", headers=_headers(api_key, secret_key), json=payload, timeout=30)
+    r = _post_timbrado(f"{_base_url(sandbox)}/v4/cfdi40/create", headers=_headers(api_key, secret_key), json_body=payload)
     _raise_for_facturacom(r)
     data = r.json()
 
@@ -140,7 +189,7 @@ def _get_or_create_cliente(
     headers = _headers(api_key, secret_key)
     rfc = rfc.strip().upper()
 
-    r = requests.get(f"{base}/v1/clients/rfc/{rfc}", headers=headers, timeout=20)
+    r = _get(f"{base}/v1/clients/rfc/{rfc}", headers=headers, timeout=20)
     if r.ok:
         data = r.json().get("Data") or []
         if data:
@@ -150,7 +199,7 @@ def _get_or_create_cliente(
     # receptor genérico "Público en General"), aunque el campo sea opcional en el POS.
     email_final = email.strip() if email and email.strip() else f"sin-email-{rfc.lower()}@facturacion.local"
 
-    r = requests.post(f"{base}/v1/clients/create", headers=headers, json={
+    r = _post(f"{base}/v1/clients/create", headers=headers, json_body={
         "rfc": rfc, "razons": nombre.strip().upper(), "codpos": cp,
         "email": email_final, "regimen": regimen_fiscal, "pais": "MEX", "usocfdi": uso_cfdi,
     }, timeout=20)
@@ -179,8 +228,13 @@ def crear_factura_individual(
     )
     serie_id = _serie_id_factura(api_key, secret_key, sandbox)
 
+    # Todo artículo de farmacia es "sí objeto de impuesto" (ObjetoImp=02) — los que no
+    # llevan IVA (medicinas, Art. 2-A LIVA) son tasa 0%, no "no objeto" (01). Usar "01"
+    # incorrectamente omite el Traslado obligatorio y clasifica mal casi toda la venta.
     conceptos = []
     for it in items:
+        base_imp = round(it["cantidad"] * it["precio_unitario"], 2)
+        aplica_iva = bool(it.get("aplica_iva"))
         concepto = {
             "ClaveProdServ": "01010101",
             "ClaveUnidad": "ACT",
@@ -188,13 +242,13 @@ def crear_factura_individual(
             "Cantidad": it["cantidad"],
             "ValorUnitario": round(it["precio_unitario"], 2),
             "Descripcion": it["descripcion"],
-            "ObjetoImp": "02" if it.get("aplica_iva") else "01",
+            "ObjetoImp": "02",
+            "Impuestos": {"Traslados": [{
+                "Base": base_imp, "Impuesto": "002", "TipoFactor": "Tasa",
+                "TasaOCuota": "0.160000" if aplica_iva else "0.000000",
+                "Importe": round(base_imp * 0.16, 2) if aplica_iva else 0.00,
+            }]},
         }
-        if it.get("aplica_iva"):
-            base_imp = round(it["cantidad"] * it["precio_unitario"], 2)
-            concepto["Impuestos"] = {
-                "Traslados": [{"Base": base_imp, "Impuesto": "002", "TipoFactor": "Tasa", "TasaOCuota": "0.160000", "Importe": round(base_imp * 0.16, 2)}]
-            }
         conceptos.append(concepto)
 
     payload = {
@@ -209,7 +263,7 @@ def crear_factura_individual(
         "EnviarCorreo": False,
     }
 
-    r = requests.post(f"{_base_url(sandbox)}/v4/cfdi40/create", headers=_headers(api_key, secret_key), json=payload, timeout=30)
+    r = _post_timbrado(f"{_base_url(sandbox)}/v4/cfdi40/create", headers=_headers(api_key, secret_key), json_body=payload)
     _raise_for_facturacom(r)
     data = r.json()
 
@@ -235,7 +289,7 @@ def descargar_documentos(*, api_key: str, secret_key: str, sandbox: bool, factur
 
 
 def _descargar(api_key: str, secret_key: str, sandbox: bool, facturacom_id: str, tipo: str) -> bytes:
-    r = requests.get(f"{_base_url(sandbox)}/v4/cfdi40/{facturacom_id}/{tipo}", headers=_headers(api_key, secret_key), timeout=30)
+    r = _get(f"{_base_url(sandbox)}/v4/cfdi40/{facturacom_id}/{tipo}", headers=_headers(api_key, secret_key), timeout=30)
     _raise_for_facturacom(r)
     ctype = r.headers.get("Content-Type", "")
     if "application/json" in ctype:
@@ -252,7 +306,7 @@ def consultar_estatus_sat(*, api_key: str, secret_key: str, sandbox: bool, factu
     puede seguir apareciendo como 'Vigente' por un rato (limitación documentada del SAT)."""
     if not (api_key and secret_key):
         raise FacturaComError("Credenciales de Factura.com no configuradas")
-    r = requests.get(
+    r = _get(
         f"{_base_url(sandbox)}/v4/cfdi40/{facturacom_id}/cancel_status",
         headers=_headers(api_key, secret_key), timeout=30,
     )
@@ -270,10 +324,10 @@ def cancelar_cfdi(*, api_key: str, secret_key: str, sandbox: bool, facturacom_id
     """motivo: catálogo SAT c_MotivoCancelacion. '02' = CFDI con errores sin relación (default seguro)."""
     if not (api_key and secret_key):
         raise FacturaComError("Credenciales de Factura.com no configuradas")
-    r = requests.post(
+    r = _post(
         f"{_base_url(sandbox)}/v4/cfdi40/{facturacom_id}/cancel",
         headers=_headers(api_key, secret_key),
-        json={"motivo": motivo},
+        json_body={"motivo": motivo},
         timeout=30,
     )
     _raise_for_facturacom(r)
