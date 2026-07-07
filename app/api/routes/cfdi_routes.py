@@ -7,7 +7,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta
+from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta, PagoSat
 from app.api.routes.auth_routes import get_current_api_user
 from app.services import facturacom_service
 from app.database import sync_service
@@ -257,6 +257,80 @@ def declaracion_mensual(
                         "Tributario o con tu contador antes de declarar.",
             },
         }
+    finally:
+        db.close()
+
+
+class PagoSatIn(BaseModel):
+    mes: int
+    anio: int
+    monto_iva: float = 0.0
+    monto_isr: float = 0.0
+    fecha_pago: date
+    linea_captura: str = ""
+    notas: str = ""
+
+
+@router.get("/pago-sat")
+def obtener_pago_sat(
+    mes: int = Query(..., ge=1, le=12),
+    anio: int = Query(..., ge=2020, le=2100),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Estado del pago de la declaración mensual (IVA+ISR) al SAT para el periodo dado."""
+    db = get_db_session()
+    try:
+        p = db.query(PagoSat).filter(PagoSat.mes == mes, PagoSat.anio == anio).first()
+        if not p:
+            return {"pagado": False}
+        return {
+            "pagado": True,
+            "monto_iva": p.monto_iva, "monto_isr": p.monto_isr, "monto_total": p.monto_total,
+            "fecha_pago": p.fecha_pago.isoformat() if p.fecha_pago else None,
+            "linea_captura": p.linea_captura, "notas": p.notas,
+        }
+    finally:
+        db.close()
+
+
+@router.post("/pago-sat")
+def registrar_pago_sat(body: PagoSatIn, payload: dict = Depends(get_current_api_user)):
+    """Marca el periodo como pagado ante el SAT (o corrige un registro ya guardado) —
+    upsert por mes/año, un solo registro por periodo."""
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        p = db.query(PagoSat).filter(PagoSat.mes == body.mes, PagoSat.anio == body.anio).first()
+        if not p:
+            p = PagoSat(mes=body.mes, anio=body.anio, usuario_id=int(payload["sub"]) if payload.get("sub") else None)
+            db.add(p)
+        p.monto_iva = body.monto_iva
+        p.monto_isr = body.monto_isr
+        p.monto_total = round(body.monto_iva + body.monto_isr, 2)
+        p.fecha_pago = body.fecha_pago
+        p.linea_captura = body.linea_captura.strip()
+        p.notas = body.notas.strip()
+        db.commit()
+        return {"ok": True}
+    finally:
+        db.close()
+
+
+@router.delete("/pago-sat")
+def quitar_pago_sat(
+    mes: int = Query(..., ge=1, le=12),
+    anio: int = Query(..., ge=2020, le=2100),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Revierte un registro de pago marcado por error — vuelve el periodo a pendiente."""
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        p = db.query(PagoSat).filter(PagoSat.mes == mes, PagoSat.anio == anio).first()
+        if p:
+            db.delete(p)
+            db.commit()
+        return {"ok": True}
     finally:
         db.close()
 

@@ -28,7 +28,7 @@ _TABLE_ORDER = [
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cfdi_facturas_globales", "ventas", "cfdi_facturas_individuales",
     "items_venta", "compras", "items_compra", "facturas_compra", "cortes_caja", "retiros_caja",
-    "movimientos_stock", "auditoria_log",
+    "movimientos_stock", "auditoria_log", "pagos_sat",
 ]
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
@@ -37,7 +37,7 @@ _TABLE_ORDER = [
 _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
-    "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra",
+    "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra", "pagos_sat",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
@@ -418,7 +418,7 @@ def sync_to_turso() -> None:
                             # actualizado_en — sin esto, una PC con copia vieja (ej. antes
                             # de que otra PC cancelara el CFDI) puede "resucitar" un estado
                             # ya superado con cada push periódico.
-                            elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales") and "actualizado_en" in cols:
+                            elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales", "pagos_sat") and "actualizado_en" in cols:
                                 set_parts = [
                                     f"{c} = CASE WHEN excluded.actualizado_en > {table}.actualizado_en "
                                     f"THEN excluded.{c} ELSE {table}.{c} END"
@@ -578,7 +578,7 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql, rows)
-                    elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales") and "actualizado_en" in cols:
+                    elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales", "pagos_sat") and "actualizado_en" in cols:
                         # Mismo criterio last-writer-wins que ventas/productos — evita que
                         # un pull resucite un estado ("timbrada") ya cancelado localmente.
                         set_clause = ", ".join(

@@ -311,6 +311,33 @@ class FacturaCompra(Base):
     )
 
 
+class PagoSat(Base):
+    """Registro de pago de la declaración mensual (IVA + ISR) al SAT bajo RESICO —
+    un registro por periodo (mes/año); permite marcar el mes como pagado y guardar
+    la línea de captura/comprobante para el cierre mensual."""
+    __tablename__ = "pagos_sat"
+
+    id = Column(Integer, primary_key=True)
+    mes = Column(Integer, nullable=False)
+    anio = Column(Integer, nullable=False)
+    monto_iva = Column(Float, default=0.0)
+    monto_isr = Column(Float, default=0.0)
+    monto_total = Column(Float, default=0.0)
+    fecha_pago = Column(Date, nullable=True)
+    linea_captura = Column(String(50))
+    comprobante_url = Column(String(500))
+    notas = Column(Text)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    creado_en = Column(DateTime, default=_dt.now)
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
+
+    usuario = relationship("Usuario")
+
+    __table_args__ = (
+        Index("ix_pago_sat_periodo", "anio", "mes", unique=True),
+    )
+
+
 class Compra(Base):
     """Entrada de mercancía de proveedores"""
     __tablename__ = "compras"

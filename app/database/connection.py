@@ -169,6 +169,11 @@ def _migrate():
         "serie VARCHAR(10), folio VARCHAR(20), xml_path VARCHAR(300), pdf_path VARCHAR(300), "
         "xml_url VARCHAR(500), pdf_url VARCHAR(500), error_mensaje TEXT, "
         "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME, cancelado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS pagos_sat ("
+        "id INTEGER PRIMARY KEY, mes INTEGER NOT NULL, anio INTEGER NOT NULL, "
+        "monto_iva REAL DEFAULT 0.0, monto_isr REAL DEFAULT 0.0, monto_total REAL DEFAULT 0.0, "
+        "fecha_pago DATE, linea_captura VARCHAR(50), comprobante_url VARCHAR(500), notas TEXT, "
+        "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME, actualizado_en DATETIME)",
     ]
 
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).
