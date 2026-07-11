@@ -348,7 +348,8 @@ def preview_factura_global(
         ya_existe = (
             db.query(CfdiFacturaGlobal)
             .filter(CfdiFacturaGlobal.mes == mes, CfdiFacturaGlobal.anio == anio,
-                    CfdiFacturaGlobal.estado == "timbrada")
+                    CfdiFacturaGlobal.estado == "timbrada",
+                    CfdiFacturaGlobal.sandbox == fconf["facturacom_sandbox"])
             .first()
         )
         # No basta con lo que dice la base local: si alguien canceló el CFDI directo
@@ -442,10 +443,15 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         _timbrado_lock.release()
         raise
     try:
+        fconf = _leer_config_facturacion(db)
+
+        # No cruzar ambientes: una factura sandbox (pruebas) del periodo no debe
+        # bloquear el timbrado real en producción, ni viceversa.
         existe = (
             db.query(CfdiFacturaGlobal)
             .filter(CfdiFacturaGlobal.mes == body.mes, CfdiFacturaGlobal.anio == body.anio,
-                    CfdiFacturaGlobal.estado == "timbrada")
+                    CfdiFacturaGlobal.estado == "timbrada",
+                    CfdiFacturaGlobal.sandbox == fconf["facturacom_sandbox"])
             .first()
         )
         if existe:
@@ -454,8 +460,6 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, body.mes, body.anio)
         if not ventas:
             raise HTTPException(status_code=400, detail="No hay ventas pendientes de facturar en este periodo")
-
-        fconf = _leer_config_facturacion(db)
 
         try:
             resultado = facturacom_service.crear_factura_global(
@@ -672,6 +676,12 @@ def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api
         # estado. Las reales solo se borran si fallaron (proteger el historial fiscal).
         if r.estado != "error" and not r.sandbox:
             raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error o facturas de prueba (sandbox), no facturas reales timbradas")
+        # Si estaba timbrada (típicamente sandbox), las ventas quedaron marcadas
+        # facturada=True apuntando a este registro — liberarlas o se quedan
+        # "atrapadas" y nunca vuelven a aparecer como pendientes de facturar.
+        for v in db.query(Venta).filter(Venta.cfdi_global_id == r.id).all():
+            v.facturada = False
+            v.cfdi_global_id = None
         db.delete(r)
         db.commit()
         _purgar_de_turso("cfdi_facturas_globales", [cfdi_id])
@@ -701,6 +711,11 @@ def eliminar_facturas_error_lote(body: EliminarLoteIn, payload: dict = Depends(g
         omitidos = len(body.ids) - len(borrables)
         ids_borrados = [r.id for r in borrables]
         for r in borrables:
+            # Igual que en eliminar_factura_error: liberar ventas atrapadas por un
+            # timbrado sandbox antes de borrar el registro.
+            for v in db.query(Venta).filter(Venta.cfdi_global_id == r.id).all():
+                v.facturada = False
+                v.cfdi_global_id = None
             db.delete(r)
         db.commit()
         _purgar_de_turso("cfdi_facturas_globales", ids_borrados)
