@@ -8872,8 +8872,8 @@ async function autoAbrirTurnoSiCorresponde() {
   try {
     const now  = new Date();
     const hora = now.getHours();
-    // Auto-open only if login happens between 08:00 and 09:59
-    if (hora < 8 || hora >= 10) return;
+    // Auto-open only within the morning window 09:00–10:59
+    if (hora < 9 || hora >= 11) return;
 
     const turnoRes = await api('/cortes/activo');
     if (!turnoRes.ok) return;
@@ -8933,6 +8933,10 @@ function iniciarSchedulerCierreAutomatico() {
 
     // Close stale shifts from previous days (runs every tick)
     await _cerrarCorteViejo();
+
+    // Auto-open the shift if it's within the morning window — not just at login.
+    // Terminals often stay logged in overnight, so login-time-only never fires.
+    await autoAbrirTurnoSiCorresponde();
 
     // At 21:00, also close today's shift
     if (now.getHours() === 21 && now.getMinutes() < 2 && _eodDoneOn !== todayStr) {
