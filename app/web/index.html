@@ -5789,17 +5789,21 @@ async function doLogoutSafe() {
     if (r.ok) {
       const t = await r.json();
       if (t.abierto) {
+        const ahora = new Date();
+        const minutos = ahora.getHours() * 60 + ahora.getMinutes();
+        // Solo pregunta cerca de la hora de cierre (8pm-9pm) — a media tarde el
+        // cajero puede salir a comer o cerrar sesión sin que le interrumpa esto.
+        const enVentanaCierre = minutos >= 20 * 60 && minutos < 21 * 60;
+        if (!enVentanaCierre) { doLogout(); return; }
+
         const horaAbierto = t.abierto_en
           ? new Date(t.abierto_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
           : '—';
-        const ahora = new Date();
-        const minutos = ahora.getHours() * 60 + ahora.getMinutes();
-        const esHoraCierre = minutos >= 20 * 60; // 8pm+
 
         _showCierreLogoutModal({
           horaAbierto,
           esperado: t.esperado_caja ?? 0,
-          esHoraCierre,
+          esHoraCierre: true,
           onCerrarYSalir: async () => {
             await api('/cortes/cerrar', {
               method: 'POST',
