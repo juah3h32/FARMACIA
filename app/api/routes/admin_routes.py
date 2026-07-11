@@ -430,3 +430,96 @@ async def restaurar_backup_upload(
         shutil.copy2(str(cfg.DB_PATH), str(backup_path))
     shutil.move(tmp_path, str(cfg.DB_PATH))
     return {"ok": True, "mensaje": "Base de datos restaurada. Reinicia la aplicación para aplicar los cambios.", "backup_previo": backup_path.name}
+
+
+# ── Estado de integraciones (campana de notificaciones) ─────────────────────
+
+def _check_turso() -> dict:
+    if not (cfg.USE_TURSO or cfg.TURSO_SYNC):
+        return {"ok": True, "enabled": False, "message": "Sincronización con Turso desactivada (modo local)."}
+    try:
+        from app.database.sync_service import _turso_pipeline_url, _turso_headers
+        import requests as _req
+        url, hdrs = _turso_pipeline_url(), _turso_headers()
+        payload = {"requests": [{"type": "execute", "stmt": {"sql": "SELECT 1", "args": []}}, {"type": "close"}]}
+        r = _req.post(url, headers=hdrs, json=payload, timeout=6)
+        if not r.ok:
+            return {"ok": False, "enabled": True, "message": f"Turso respondió HTTP {r.status_code}."}
+        data = r.json()
+        first = (data.get("results") or [{}])[0]
+        if first.get("type") == "error":
+            msg = first.get("error", {}).get("message", "error desconocido")
+            return {"ok": False, "enabled": True, "message": f"Turso: {msg}"}
+        return {"ok": True, "enabled": True, "message": "Conectado."}
+    except Exception as e:
+        return {"ok": False, "enabled": True, "message": f"Sin conexión con Turso: {e}"}
+
+
+def _check_facturacom() -> dict:
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        rows = db.query(Configuracion).filter(
+            Configuracion.clave.in_(["facturacom_api_key", "facturacom_secret_key", "facturacom_sandbox"])
+        ).all()
+        d = {r.clave: r.valor for r in rows}
+        api_key = d.get("facturacom_api_key", "")
+        secret_key = d.get("facturacom_secret_key", "")
+        sandbox = d.get("facturacom_sandbox", "1") == "1"
+        if not api_key or not secret_key:
+            return {"ok": True, "enabled": False, "message": "Factura.com no está configurado."}
+        from app.services.facturacom_service import _serie_id_factura, FacturaComError
+        try:
+            _serie_id_factura(api_key, secret_key, sandbox)
+            return {"ok": True, "enabled": True, "message": "Conectado y credenciales válidas."}
+        except FacturaComError as e:
+            return {"ok": False, "enabled": True, "message": str(e)}
+    except Exception as e:
+        return {"ok": False, "enabled": True, "message": f"Error al verificar Factura.com: {e}"}
+    finally:
+        db.close()
+
+
+def _check_openai() -> dict:
+    if not cfg.OPENAI_API_KEY:
+        return {"ok": True, "enabled": False, "message": "OpenAI no está configurado."}
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=cfg.OPENAI_API_KEY, timeout=6.0)
+        client.models.retrieve("gpt-4o-mini")
+        return {"ok": True, "enabled": True, "message": "Conectado."}
+    except Exception as e:
+        msg = str(e)
+        if "429" in msg or "quota" in msg.lower() or "billing" in msg.lower():
+            return {"ok": False, "enabled": True, "message": "Sin créditos en OpenAI (revisa billing)."}
+        if "401" in msg or "invalid_api_key" in msg.lower() or "incorrect api key" in msg.lower():
+            return {"ok": False, "enabled": True, "message": "API key de OpenAI inválida."}
+        return {"ok": False, "enabled": True, "message": f"Sin conexión con OpenAI: {msg[:150]}"}
+
+
+@router.get("/integrations-status")
+def integrations_status(payload: dict = Depends(get_current_api_user)):
+    """Prueba en vivo la conexión a Turso, Factura.com y OpenAI — usado por la
+    campana de notificaciones del header para avisar si alguna integración cayó."""
+    _require_admin(payload)
+    from concurrent.futures import ThreadPoolExecutor
+
+    checks = {"turso": _check_turso, "facturacom": _check_facturacom, "openai": _check_openai}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        results = dict(zip(checks.keys(), pool.map(lambda f: f(), checks.values())))
+
+    labels = {
+        "turso": "Turso (Base de datos)",
+        "facturacom": "Factura.com (CFDI)",
+        "openai": "OpenAI (Farmacito / IA)",
+    }
+    integrations = [
+        {"key": k, "label": labels[k], **v} for k, v in results.items()
+    ]
+    any_down = any((not it["ok"]) and it["enabled"] for it in integrations)
+    return {
+        "checked_at": datetime.now().isoformat(),
+        "integrations": integrations,
+        "any_down": any_down,
+    }

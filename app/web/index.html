@@ -1163,6 +1163,27 @@
           <span id="turno-dot" class="w-2 h-2 rounded-full" style="background:#94A3B8"></span>
           <span id="turno-label">Sin turno</span>
         </button>
+        <!-- Estado de integraciones (Turso / Factura.com / OpenAI) -->
+        <div id="integraciones-wrap" class="relative hidden">
+          <button id="btn-integraciones" onclick="toggleIntegracionesPanel()"
+                  class="relative h-8 w-8 rounded-xl flex items-center justify-center transition-all hover:bg-slate-100"
+                  title="Estado de integraciones" style="border:1px solid #E2E8F0">
+            <i data-lucide="bell" style="width:15px;height:15px;color:#94A3B8"></i>
+            <span id="integraciones-dot"
+                  class="absolute -top-1 -right-1 w-3 h-3 rounded-full hidden"
+                  style="background:#EF4444;border:2px solid #fff"></span>
+          </button>
+          <div id="integraciones-panel" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.18);border:1px solid #E2E8F0;z-index:200;overflow:hidden;contain:layout style paint;transform:translateZ(0)">
+            <div style="padding:14px 16px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;font-weight:800;color:#0F172A">Estado de integraciones</span>
+              <button onclick="loadIntegracionesStatus(true)" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#64748B;display:flex" title="Verificar ahora">
+                <i data-lucide="refresh-cw" style="width:13px;height:13px"></i>
+              </button>
+            </div>
+            <div id="integraciones-list" style="max-height:340px;overflow-y:auto"></div>
+            <div id="integraciones-updated" style="padding:8px 16px;font-size:10px;color:#94A3B8;border-top:1px solid #F1F5F9"></div>
+          </div>
+        </div>
         <!-- Alerta caducidad bell -->
         <button id="btn-alertas-cad" onclick="openAlertasCaducidad()"
                 class="relative h-8 w-8 rounded-xl flex items-center justify-center transition-all hover:bg-slate-100"
@@ -1181,7 +1202,7 @@
         </button>
         <div class="flex items-center gap-1.5 text-xs" style="color:#94A3B8">
           <i data-lucide="clock" style="width:13px;height:13px"></i>
-          <span id="clock"></span>
+          <span id="clock" class="tabular-nums"></span>
         </div>
       </div>
     </header>
@@ -3322,6 +3343,19 @@
           </button>
         </div>
 
+        <!-- Accesos rápidos — facturas ya emitidas y trámites SAT -->
+        <div class="flex flex-wrap items-center gap-2 mb-4 flex-shrink-0">
+          <button onclick="navigate('facturas-compra')" class="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" style="background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;cursor:pointer">
+            <i data-lucide="file-input" style="width:13px;height:13px"></i> Ver facturas de compra (medicamentos)
+          </button>
+          <button onclick="abrirUrlExterna('https://wwwmatnp.sat.gob.mx/consultas/42968/consulta-y-recuperacion-de-comprobantes-%28nuevo%29')" class="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" style="background:#F0F9FF;color:#0284C7;border:1px solid #BAE6FD;cursor:pointer">
+            <i data-lucide="external-link" style="width:13px;height:13px"></i> Verificar mis facturas en el SAT
+          </button>
+          <button onclick="abrirUrlExterna('https://wwwmat.sat.gob.mx/declaracion/53359/simulador-de-declaraciones-de-pagos-mensuales-y-definitivos')" class="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;cursor:pointer">
+            <i data-lucide="external-link" style="width:13px;height:13px"></i> Presentar declaración en el SAT
+          </button>
+        </div>
+
         <!-- Timbrado del periodo -->
         <div class="rounded-2xl p-5 mb-4 flex-shrink-0 text-white" style="background:linear-gradient(135deg,#1d2140,#2d3358);box-shadow:0 12px 32px rgba(29,33,64,.25)">
           <div class="flex items-center gap-2.5 mb-1">
@@ -3342,6 +3376,18 @@
           </div>
         </div>
 
+        <!-- Card dinámica: guía paso a paso para declarar el mes, con tus datos reales -->
+        <button onclick="abrirGuiaResico()" class="w-full text-left rounded-2xl p-4 mb-4 flex-shrink-0 flex items-center gap-3 transition-all hover:opacity-95" style="background:linear-gradient(135deg,#0EA5E9,#0284C7);border:none;cursor:pointer;box-shadow:0 8px 24px rgba(2,132,199,.25)">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.18)">
+            <i data-lucide="list-checks" style="width:18px;height:18px;color:#fff"></i>
+          </div>
+          <div style="min-width:0">
+            <p class="text-sm font-black" style="color:#fff">¿Cómo declaro este mes? — Guía paso a paso</p>
+            <p id="guia-resico-preview" class="text-xs mt-0.5" style="color:rgba(255,255,255,.85)">Selecciona un periodo arriba para ver tus datos aquí.</p>
+          </div>
+          <i data-lucide="chevron-right" style="width:16px;height:16px;color:#fff;margin-left:auto;flex-shrink:0"></i>
+        </button>
+
         <!-- Resumen para Declaración Mensual (ingresos + compras + IVA neto + ISR) -->
         <div class="bg-white rounded-2xl border p-5 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
           <div class="flex items-center justify-between mb-3">
@@ -3352,7 +3398,7 @@
               <p class="text-xs font-bold tracking-wide" style="color:#64748B">RESUMEN — DECLARACIÓN MENSUAL DEL PERIODO SELECCIONADO</p>
             </div>
             <div class="flex gap-2">
-              <button onclick="openModal('modal-guia-resico')" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5" style="background:#F0F9FF;color:#0284C7;border:1px solid #BAE6FD;cursor:pointer">
+              <button onclick="abrirGuiaResico()" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5" style="background:#F0F9FF;color:#0284C7;border:1px solid #BAE6FD;cursor:pointer">
                 <i data-lucide="list-checks" style="width:13px;height:13px"></i> Guía paso a paso
               </button>
               <button onclick="loadDeclaracionMensual()" class="px-3 py-1.5 rounded-xl text-xs font-bold" style="background:#EFF6FF;color:#1d2140;border:1px solid #E2E8F0;cursor:pointer">Actualizar</button>
@@ -3379,6 +3425,19 @@
               </div>
               <button onclick="abrirCarpetaTodasFacturas()" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Ver todas las facturas (carpeta)</button>
             </div>
+          </div>
+          <!-- Pestañas: producción (fiscalmente reales) vs sandbox (pruebas, borrables) -->
+          <div class="flex items-center gap-1 mb-3" style="border-bottom:1px solid #F1F5F9">
+            <button id="cfdi-tab-prod" onclick="cambiarTabCfdiGlobal('prod')" class="px-3 py-2 text-xs font-bold" style="color:#1d2140;border-bottom:2px solid #1d2140;margin-bottom:-1px">
+              Producción <span id="cfdi-tab-prod-count" style="color:#94A3B8;font-weight:600"></span>
+            </button>
+            <button id="cfdi-tab-sandbox" onclick="cambiarTabCfdiGlobal('sandbox')" class="px-3 py-2 text-xs font-bold" style="color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-1px">
+              <i data-lucide="flask-conical" style="width:11px;height:11px;display:inline;vertical-align:-1px"></i>
+              Sandbox (pruebas) <span id="cfdi-tab-sandbox-count" style="color:#94A3B8;font-weight:600"></span>
+            </button>
+            <button id="cfdi-eliminar-sandbox-btn" onclick="eliminarTodasSandboxCfdiGlobal()" class="px-3 py-1.5 rounded-lg text-xs font-semibold" style="display:none;margin-left:auto;background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">
+              <i data-lucide="trash-2" style="width:12px;height:12px;display:inline;vertical-align:-1px"></i> Eliminar todas las de prueba
+            </button>
           </div>
           <table class="w-full text-sm">
             <thead>
@@ -3552,6 +3611,7 @@
       </button>
     </div>
     <div class="px-5 pb-5 overflow-auto" style="flex:1">
+      <div id="guia-resico-resumen" class="rounded-xl p-3 mb-4" style="background:#F8FAFC;border:1px solid #E2E8F0"></div>
       <ol class="flex flex-col gap-3">
         <li class="flex gap-3">
           <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black text-white" style="background:#1d2140">1</div>
@@ -3559,7 +3619,7 @@
         </li>
         <li class="flex gap-3">
           <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black text-white" style="background:#1d2140">2</div>
-          <p class="text-sm" style="color:#334155">Revisa el resumen de arriba (Ingresos, Compras, IVA a pagar, ISR estimado) — te sirve para comparar contra lo que el SAT te muestre prellenado.</p>
+          <p class="text-sm" style="color:#334155">Revisa tus datos de arriba (Ingresos, IVA a pagar, ISR estimado de este mes) — te sirven para comparar contra lo que el SAT te muestre prellenado.</p>
         </li>
         <li class="flex gap-3">
           <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black text-white" style="background:#1d2140">3</div>
@@ -5841,7 +5901,17 @@ function launchApp() {
   if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
   const devBtn = document.getElementById('btn-devolucion');
   if (devBtn) devBtn.style.display = S.user?.rol === 'admin' ? '' : 'none';
+  const integracionesWrap = document.getElementById('integraciones-wrap');
+  if (integracionesWrap) integracionesWrap.classList.toggle('hidden', S.user?.rol !== 'admin');
+  if (S.user?.rol === 'admin') {
+    loadIntegracionesStatus();
+    setInterval(loadIntegracionesStatus, 2 * 60 * 1000); // cada 2 min — avisa pronto si cae Turso/Factura.com/OpenAI
+  }
   loadTurnoStatus();
+  // Refresca el botón de turno periódicamente — el turno puede haberse cerrado
+  // por el scheduler automático (21:00) o desde otro dispositivo, y sin esto el
+  // botón se quedaba mostrando "Turno abierto" hasta el próximo evento manual.
+  setInterval(loadTurnoStatus, 60 * 1000);
   autoAbrirTurnoSiCorresponde();
   iniciarSchedulerCierreAutomatico();
   loadAlertasCaducidad();
@@ -8024,6 +8094,69 @@ async function bajaTodasVencidas() {
       openVencidosModal();
     }
   });
+}
+
+// ── Estado de integraciones (campana Turso / Factura.com / OpenAI) ─────────
+let _integracionesData = null;
+
+async function loadIntegracionesStatus(manual) {
+  const dot  = document.getElementById('integraciones-dot');
+  const list = document.getElementById('integraciones-list');
+  const upd  = document.getElementById('integraciones-updated');
+  // Placeholders del mismo alto que las filas reales — un mensaje corto tipo
+  // "Verificando..." aquí hacía que el panel saltara de ~130px a ~255px de
+  // golpe al llegar la respuesta (efecto de "brinco" en pantalla).
+  if (manual && list) {
+    list.innerHTML = Array(3).fill(`
+      <div style="padding:10px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #F8FAFC">
+        <span style="width:8px;height:8px;border-radius:50%;background:#E2E8F0;margin-top:4px;flex-shrink:0"></span>
+        <div style="min-width:0;flex:1">
+          <div style="height:11px;width:55%;border-radius:4px;background:#E2E8F0"></div>
+          <div style="height:9px;width:80%;border-radius:4px;background:#F1F5F9;margin-top:6px"></div>
+        </div>
+      </div>`).join('');
+  }
+  try {
+    const res = await api('/admin/integrations-status');
+    if (!res.ok) return;
+    const d = await res.json();
+    _integracionesData = d;
+    if (dot) dot.classList.toggle('hidden', !d.any_down);
+    if (list) {
+      list.innerHTML = d.integrations.map(it => {
+        const color = !it.enabled ? '#94A3B8' : (it.ok ? '#16A34A' : '#EF4444');
+        const bg    = !it.enabled ? '#F8FAFC' : (it.ok ? '#F0FDF4' : '#FEF2F2');
+        return `
+        <div style="padding:10px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #F8FAFC">
+          <span style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:4px;flex-shrink:0"></span>
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:700;color:#0F172A">${it.label}</div>
+            <div style="font-size:11px;color:#64748B;margin-top:2px">${it.message}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    if (upd) upd.textContent = 'Actualizado: ' + new Date(d.checked_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+  } catch (e) { /* silencioso — no interrumpir el flujo por un fallo de red */ }
+}
+
+function toggleIntegracionesPanel() {
+  const panel = document.getElementById('integraciones-panel');
+  if (!panel) return;
+  const opening = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (opening) {
+    loadIntegracionesStatus(true);
+    document.addEventListener('click', _closeIntegracionesOnOutsideClick);
+  }
+}
+
+function _closeIntegracionesOnOutsideClick(e) {
+  const wrap = document.getElementById('integraciones-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('integraciones-panel')?.classList.add('hidden');
+    document.removeEventListener('click', _closeIntegracionesOnOutsideClick);
+  }
 }
 
 // ── Alertas de caducidad (notificación global) ─────────────────────────────
@@ -12934,11 +13067,58 @@ async function loadDeclaracionMensual() {
       <div class="p-2 rounded-xl mb-3" style="background:#F8FAFC;color:#64748B">${d.isr.nota}</div>
       <div id="pago-sat-box">Consultando estado de pago...</div>`;
     _pagoSatCtx = { mes: Number(mes), anio: Number(anio), iva: d.iva_a_pagar, isr: d.isr.isr_acumulado_estimado };
+    _declaracionMensualData = d;
+    _actualizarPreviewGuiaResico();
     renderPagoSat();
   } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
 }
 
 let _pagoSatCtx = null; // { mes, anio, iva, isr } del periodo mostrado en el resumen de declaración
+let _declaracionMensualData = null; // respuesta completa de /cfdi/declaracion-mensual del periodo seleccionado
+
+// Card dinámica "¿Cómo declaro este mes?" — refleja el periodo seleccionado arriba
+function _actualizarPreviewGuiaResico() {
+  const el = document.getElementById('guia-resico-preview');
+  if (!el) return;
+  if (_declaracionMensualData && _pagoSatCtx) {
+    const d = _declaracionMensualData;
+    const mesNombre = CFDI_MESES[_pagoSatCtx.mes - 1];
+    el.textContent = `${mesNombre} ${_pagoSatCtx.anio} — Ingresos $${d.ingresos.subtotal.toFixed(2)} · IVA a pagar $${Math.abs(_pagoSatCtx.iva).toFixed(2)} · ISR estimado $${_pagoSatCtx.isr.toFixed(2)}`;
+  } else {
+    el.textContent = 'Selecciona un periodo arriba para ver tus datos aquí.';
+  }
+}
+
+function abrirGuiaResico() {
+  const box = document.getElementById('guia-resico-resumen');
+  if (box) {
+    if (_declaracionMensualData && _pagoSatCtx) {
+      const d = _declaracionMensualData;
+      const mesNombre = CFDI_MESES[_pagoSatCtx.mes - 1];
+      const ivaColor = _pagoSatCtx.iva >= 0 ? '#EF4444' : '#16A34A';
+      const ivaLabel = _pagoSatCtx.iva >= 0 ? 'IVA a pagar' : 'Saldo a favor IVA';
+      box.innerHTML = `
+        <p class="text-xs font-bold mb-2" style="color:#64748B">TUS DATOS DE ${mesNombre.toUpperCase()} ${_pagoSatCtx.anio}</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="rounded-lg p-2 text-center" style="background:#F0FDF4">
+            <p class="text-[10px]" style="color:#64748B">Ingresos</p>
+            <p class="text-sm font-black" style="color:#16A34A">$${d.ingresos.subtotal.toFixed(2)}</p>
+          </div>
+          <div class="rounded-lg p-2 text-center" style="background:#FEF2F2">
+            <p class="text-[10px]" style="color:#64748B">${ivaLabel}</p>
+            <p class="text-sm font-black" style="color:${ivaColor}">$${Math.abs(_pagoSatCtx.iva).toFixed(2)}</p>
+          </div>
+          <div class="rounded-lg p-2 text-center" style="background:#F0F9FF">
+            <p class="text-[10px]" style="color:#64748B">ISR estimado</p>
+            <p class="text-sm font-black" style="color:#0284C7">$${_pagoSatCtx.isr.toFixed(2)}</p>
+          </div>
+        </div>`;
+    } else {
+      box.innerHTML = `<p class="text-xs" style="color:#94A3B8">Selecciona un periodo en la pantalla anterior para ver tus datos reales aquí.</p>`;
+    }
+  }
+  openModal('modal-guia-resico');
+}
 
 async function renderPagoSat() {
   const box = document.getElementById('pago-sat-box');
@@ -12969,7 +13149,7 @@ async function renderPagoSat() {
             <p class="text-xs font-bold" style="color:#EF4444">Pendiente de pago ante el SAT</p>
           </div>
           <div class="flex gap-2 flex-shrink-0">
-            <button onclick="abrirUrlExterna('https://loginda.siat.sat.gob.mx/nidp/wsfed/ep?id=ciec&sid=0&option=credential&sid=0')" title="Abre el login del SAT (RFC/CIEC) — entra a Declaraciones y Pagos para pagar con tu línea de captura" class="px-3 py-1.5 rounded-lg text-xs font-bold flex-shrink-0" style="background:#fff;color:#EF4444;border:1px solid #FECACA;cursor:pointer">
+            <button onclick="abrirUrlExterna('https://wwwmat.sat.gob.mx/declaracion/53359/simulador-de-declaraciones-de-pagos-mensuales-y-definitivos')" title="Abre Declaraciones y Pagos del SAT para pagar con tu línea de captura" class="px-3 py-1.5 rounded-lg text-xs font-bold flex-shrink-0" style="background:#fff;color:#EF4444;border:1px solid #FECACA;cursor:pointer">
               <i data-lucide="external-link" style="width:12px;height:12px;display:inline;vertical-align:-2px"></i> Pagar en el SAT
             </button>
             <button onclick="abrirModalPagoSat(false)" class="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex-shrink-0" style="background:#EF4444;border:none;cursor:pointer">
@@ -13226,6 +13406,7 @@ async function _timbrarFacturaGlobalReal(mes, anio) {
 }
 
 let _cfdiSeleccionados = new Set();
+let _cfdiTabActual = 'prod'; // 'prod' = facturas reales (fiscalmente válidas) | 'sandbox' = pruebas, borrables libremente
 
 async function loadHistorialCfdi() {
   const tbody = document.getElementById('cfdi-tbody');
@@ -13235,13 +13416,46 @@ async function loadHistorialCfdi() {
   try {
     const rows = await apiFetch('/cfdi/historial');
     _cfdiHistorialRows = rows;
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-xs" style="color:#94A3B8">Sin facturas globales generadas</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(r => `
+    _renderCfdiGlobalTbody();
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-xs text-red-500">${e.message}</td></tr>`; }
+}
+
+function cambiarTabCfdiGlobal(tab) {
+  _cfdiTabActual = tab;
+  _cfdiSeleccionados.clear();
+  actualizarBarraCfdiGlobalBulk();
+  const prodBtn = document.getElementById('cfdi-tab-prod');
+  const sbBtn   = document.getElementById('cfdi-tab-sandbox');
+  const delBtn  = document.getElementById('cfdi-eliminar-sandbox-btn');
+  const activo  = 'color:#1d2140;border-bottom:2px solid #1d2140;margin-bottom:-1px';
+  const inactivo= 'color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-1px';
+  prodBtn.style.cssText = tab === 'prod'    ? activo : inactivo;
+  sbBtn.style.cssText   = tab === 'sandbox' ? activo : inactivo;
+  delBtn.style.display  = tab === 'sandbox' ? '' : 'none';
+  _renderCfdiGlobalTbody();
+}
+
+function _renderCfdiGlobalTbody() {
+  const tbody = document.getElementById('cfdi-tbody');
+  const rows = (_cfdiHistorialRows || []);
+  const prodRows    = rows.filter(r => !r.sandbox);
+  const sandboxRows = rows.filter(r => r.sandbox);
+  document.getElementById('cfdi-tab-prod-count').textContent    = prodRows.length    ? `(${prodRows.length})`    : '';
+  document.getElementById('cfdi-tab-sandbox-count').textContent = sandboxRows.length ? `(${sandboxRows.length})` : '';
+
+  const visibles = _cfdiTabActual === 'sandbox' ? sandboxRows : prodRows;
+  if (!visibles.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-xs" style="color:#94A3B8">${_cfdiTabActual === 'sandbox' ? 'Sin facturas de prueba (sandbox)' : 'Sin facturas globales generadas'}</td></tr>`;
+    icons();
+    return;
+  }
+  // En producción solo se puede eliminar un intento fallido (protege el historial fiscal real);
+  // en sandbox se puede eliminar cualquier fila, sea cual sea su estado, porque no tiene validez ante el SAT.
+  tbody.innerHTML = visibles.map(r => {
+    const puedeEliminar = r.estado === 'error' || r.sandbox;
+    return `
       <tr class="border-b hover:bg-slate-50 transition-colors" style="border-color:#F1F5F9">
-        <td class="py-3">${r.estado==='error' ? `<input type="checkbox" class="cfdi-check-row" onchange="toggleCfdiGlobalSeleccion(${r.id}, this.checked)">` : ''}</td>
+        <td class="py-3">${puedeEliminar ? `<input type="checkbox" class="cfdi-check-row" onchange="toggleCfdiGlobalSeleccion(${r.id}, this.checked)">` : ''}</td>
         <td class="py-3 text-xs font-semibold" style="color:#0F172A">${CFDI_MESES[r.mes-1]} ${r.anio}</td>
         <td class="py-3 text-xs font-mono">$${(r.total||0).toFixed(2)}</td>
         <td class="py-3 text-xs">
@@ -13249,7 +13463,6 @@ async function loadHistorialCfdi() {
             <i data-lucide="${CFDI_ESTADO_ICON[r.estado]||'circle'}" style="width:12px;height:12px"></i>
             ${CFDI_ESTADO_LABEL[r.estado]||r.estado}
           </span>
-          ${r.sandbox ? `<span class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A" title="Timbrada en modo prueba (sandbox) — no es válida ante el SAT"><i data-lucide="flask-conical" style="width:9px;height:9px"></i>PRUEBA</span>` : ''}
         </td>
         <td class="py-3 text-xs font-mono" title="${r.uuid||''}">${r.uuid ? r.uuid.slice(0,8)+'…' : (r.error_mensaje ? `<span style="color:#EF4444" title="${r.error_mensaje.replace(/"/g,'')}">error</span>` : '—')}</td>
         <td class="py-3 text-xs">
@@ -13259,15 +13472,32 @@ async function loadHistorialCfdi() {
           ${r.estado==='timbrada' && !r.documentos_pendientes ? `
             <button onclick="abrirVerFacturaGlobal(${r.id})" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Ver factura</button>
           ` : ''}
-          ${r.estado==='error' ? `
-            <button onclick="eliminarFacturaGlobalError(${r.id})" title="Eliminar intento fallido" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">
+          ${puedeEliminar ? `
+            <button onclick="eliminarFacturaGlobalError(${r.id})" title="${r.sandbox ? 'Eliminar factura de prueba' : 'Eliminar intento fallido'}" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">
               <i data-lucide="trash-2" style="width:12px;height:12px;display:inline"></i>
             </button>
           ` : ''}
         </td>
-      </tr>`).join('');
-    icons();
-  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-xs text-red-500">${e.message}</td></tr>`; }
+      </tr>`;
+  }).join('');
+  icons();
+}
+
+function eliminarTodasSandboxCfdiGlobal() {
+  const ids = (_cfdiHistorialRows || []).filter(r => r.sandbox).map(r => r.id);
+  if (!ids.length) { toast('No hay facturas de prueba para eliminar', 'warning'); return; }
+  showConfirm({
+    title: 'Eliminar todas las facturas de prueba',
+    message: `Se eliminarán ${ids.length} factura(s) de sandbox (no tienen validez fiscal). Esta acción no se puede deshacer.`,
+    confirmText: 'Eliminar todas', danger: true, icon: 'trash-2',
+    onConfirm: async () => {
+      try {
+        const r = await apiFetch('/cfdi/eliminar-lote', { method: 'POST', body: JSON.stringify({ ids }) });
+        toast(`${r.eliminados} factura(s) de prueba eliminada(s)`, 'success');
+        loadHistorialCfdi();
+      } catch(e) { toast(e.message, 'error'); }
+    }
+  });
 }
 
 function toggleCfdiGlobalSeleccion(id, checked) {
@@ -13295,7 +13525,7 @@ function eliminarCfdiGlobalLote() {
   if (!ids.length) return;
   showConfirm({
     title: 'Eliminar facturas seleccionadas',
-    message: `Se eliminarán ${ids.length} intento(s) fallido(s) de la BD local y de Turso. Esta acción no se puede deshacer.`,
+    message: `Se eliminarán ${ids.length} factura(s) de la BD local y de Turso (intentos fallidos y/o de prueba sandbox). Esta acción no se puede deshacer.`,
     confirmText: 'Eliminar', danger: true, icon: 'trash-2',
     onConfirm: async () => {
       try {

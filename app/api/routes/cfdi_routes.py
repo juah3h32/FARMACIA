@@ -668,8 +668,10 @@ def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="No encontrado")
-        if r.estado != "error":
-            raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error, no facturas timbradas")
+        # Las de sandbox no tienen validez fiscal — se pueden borrar sin importar su
+        # estado. Las reales solo se borran si fallaron (proteger el historial fiscal).
+        if r.estado != "error" and not r.sandbox:
+            raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error o facturas de prueba (sandbox), no facturas reales timbradas")
         db.delete(r)
         db.commit()
         _purgar_de_turso("cfdi_facturas_globales", [cfdi_id])
@@ -695,7 +697,7 @@ def eliminar_facturas_error_lote(body: EliminarLoteIn, payload: dict = Depends(g
     db = get_db_session()
     try:
         rows = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id.in_(body.ids)).all()
-        borrables = [r for r in rows if r.estado == "error"]
+        borrables = [r for r in rows if r.estado == "error" or r.sandbox]
         omitidos = len(body.ids) - len(borrables)
         ids_borrados = [r.id for r in borrables]
         for r in borrables:
