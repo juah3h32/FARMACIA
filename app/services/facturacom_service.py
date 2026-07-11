@@ -127,7 +127,7 @@ def crear_factura_global(
     conceptos = []
     if base_gravada > 0:
         conceptos.append({
-            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "E48",
             "Unidad": "Unidad de servicio", "ValorUnitario": base_gravada,
             "Descripcion": f"Venta de mercancías gravadas periodo {mes:02d}/{anio} (factura global)",
             "ObjetoImp": "02",
@@ -138,7 +138,7 @@ def crear_factura_global(
         })
     if base_exenta > 0 or not conceptos:
         conceptos.append({
-            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "E48",
             "Unidad": "Unidad de servicio", "ValorUnitario": base_exenta,
             "Descripcion": f"Venta de mercancías tasa 0% periodo {mes:02d}/{anio} (factura global)",
             "ObjetoImp": "02",
