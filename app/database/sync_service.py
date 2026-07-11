@@ -591,6 +591,23 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql, rows)
+                    elif table == "configuracion" and "actualizado_en" in cols:
+                        # Mismo criterio last-writer-wins — sin esto, un pull podía pisar con
+                        # una copia vieja de Turso credenciales (Factura.com, etc.) recién
+                        # guardadas localmente (bug real: la llave de Factura.com quedaba
+                        # revertida a un valor viejo cada vez que la app sincronizaba).
+                        # Conflicto por "clave" (única), no "id" — el id puede diferir entre
+                        # el registro local y el de Turso para la misma configuración.
+                        set_clause = ", ".join(
+                            f"{c}=CASE WHEN excluded.actualizado_en > configuracion.actualizado_en"
+                            f" THEN excluded.{c} ELSE configuracion.{c} END"
+                            for c in cols if c not in ("id", "clave")
+                        )
+                        sql = (
+                            f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
+                            f"ON CONFLICT(clave) DO UPDATE SET {set_clause}"
+                        )
+                        lconn.executemany(sql, rows)
                     else:
                         sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql, rows)
