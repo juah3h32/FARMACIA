@@ -12932,20 +12932,20 @@ async function loadCfdiGlobal() {
   loadDeclaracionMensual();
 }
 
-// El backend regresa las llaves enmascaradas (••••últimos4) — se guardan estos
-// valores "tal como llegaron" para poder detectar en guardarConfigCfdi() si el
-// usuario realmente los editó o si el campo se queda igual (y por lo tanto no se
-// debe reenviar la máscara como si fuera la llave real).
-let _cfdiApiKeyCargada = '';
-let _cfdiSecretKeyCargada = '';
-
 async function loadConexionesFacturacom() {
   try {
     const d = await apiFetch('/config/facturacion');
-    _cfdiApiKeyCargada = d.facturacom_api_key || '';
-    _cfdiSecretKeyCargada = d.facturacom_secret_key || '';
-    document.getElementById('cfdi-apikey').value    = _cfdiApiKeyCargada;
-    document.getElementById('cfdi-secretkey').value = _cfdiSecretKeyCargada;
+    // No se precarga el valor enmascarado en el campo: al ser type="password" se ve
+    // igual de puntitos que un campo vacío, y si el usuario escribe sin seleccionar
+    // todo primero, su llave real queda pegada detrás de la máscara vieja (credencial
+    // corrupta guardada). Se deja vacío y solo se muestra como pista en el placeholder;
+    // el campo se envía tal cual se escriba, o vacío si no se toca (conserva la actual).
+    const apiKeyEl = document.getElementById('cfdi-apikey');
+    const secretKeyEl = document.getElementById('cfdi-secretkey');
+    apiKeyEl.value = '';
+    secretKeyEl.value = '';
+    apiKeyEl.placeholder    = d.facturacom_api_key    ? `Actual: ${d.facturacom_api_key} — escribe para reemplazar` : 'Tu API key de Factura.com';
+    secretKeyEl.placeholder = d.facturacom_secret_key ? `Actual: ${d.facturacom_secret_key} — escribe para reemplazar` : 'Tu Secret key de Factura.com';
     document.getElementById('cfdi-sandbox').checked = !!d.facturacom_sandbox;
     document.getElementById('cfdi-razon').value    = d.emisor_razon_social || '';
     document.getElementById('cfdi-rfc').value      = d.emisor_rfc || '';
@@ -13195,13 +13195,18 @@ function quitarPagoSat() {
 }
 
 function confirmarCambioSandbox(checkbox) {
-  if (checkbox.checked) return; // volver a modo prueba no tiene riesgo, no requiere confirmar
+  // Marcar/desmarcar este checkbox por sí solo NO guardaba nada — quedaba solo
+  // en la pantalla hasta apretar "Guardar configuración" aparte, y si el usuario
+  // no lo hacía (o navegaba a otra pantalla antes), al volver se recargaba el
+  // valor viejo del servidor y el checkbox "regresaba" a modo prueba. Ahora cada
+  // cambio se guarda de inmediato, en ambos sentidos.
+  if (checkbox.checked) { guardarConfigCfdi(); return; } // volver a modo prueba no tiene riesgo, no requiere confirmar
   checkbox.checked = true; // revertir hasta que confirme — evita activar producción sin querer
   showConfirm({
     title: '¿Pasar a modo producción (real)?',
     message: 'Vas a desactivar el modo prueba. A partir de ahora, CADA factura que timbres será fiscalmente real ante el SAT y no se puede deshacer con un clic — para corregir hay que cancelar el CFDI formalmente.\n\n¿Confirmas que quieres facturar en modo real?',
     confirmText: 'Sí, usar modo producción', danger: true, icon: 'alert-triangle',
-    onConfirm: () => { checkbox.checked = false; },
+    onConfirm: () => { checkbox.checked = false; guardarConfigCfdi(); },
   });
 }
 
@@ -13209,11 +13214,10 @@ async function guardarConfigCfdi() {
   const apiKeyActual = document.getElementById('cfdi-apikey').value.trim();
   const secretKeyActual = document.getElementById('cfdi-secretkey').value.trim();
   const body = {
-    // Si el campo quedó igual a como se cargó (enmascarado), no reenviar esa
-    // máscara como si fuera la llave real — mandar vacío para que el backend
-    // conserve la llave ya guardada.
-    facturacom_api_key: apiKeyActual === _cfdiApiKeyCargada ? '' : apiKeyActual,
-    facturacom_secret_key: secretKeyActual === _cfdiSecretKeyCargada ? '' : secretKeyActual,
+    // Los campos empiezan vacíos (ver loadConexionesFacturacom) — vacío significa
+    // "no lo toqué, conserva la llave guardada"; el backend ya ignora valores vacíos.
+    facturacom_api_key: apiKeyActual,
+    facturacom_secret_key: secretKeyActual,
     facturacom_sandbox: document.getElementById('cfdi-sandbox').checked,
     emisor_razon_social: document.getElementById('cfdi-razon').value.trim(),
     emisor_rfc: document.getElementById('cfdi-rfc').value.trim(),
