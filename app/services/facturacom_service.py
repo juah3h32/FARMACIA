@@ -151,7 +151,7 @@ def crear_factura_global(
     payload = {
         "Receptor": {"UID": client_uid},
         "TipoDocumento": "factura",
-        "GlobalInformation": {"Periodicity": "04", "Months": f"{mes:02d}", "Year": str(anio)},
+        "InformacionGlobal": {"Periodicidad": "04", "Meses": f"{mes:02d}", "Año": str(anio)},
         "Conceptos": conceptos,
         "UsoCFDI": "S01",
         "Serie": serie_id,
