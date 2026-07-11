@@ -342,6 +342,15 @@ def preview_factura_global(
     payload: dict = Depends(get_current_api_user),
 ):
     _require_admin(payload)
+    # Sincroniza con Turso antes de checar el estado del periodo — sin esto, la
+    # vista previa en una PC podía no enterarse de que el periodo ya se timbró
+    # en otra PC, dejando avanzar hasta la pantalla de confirmación con datos
+    # viejos (el timbrado real sí lo bloqueaba al final, pero de forma confusa).
+    if cfg.TURSO_SYNC:
+        try:
+            sync_service.sync_from_turso()
+        except Exception as e:
+            print(f"[CFDI] Pre-vista-previa: no se pudo sincronizar con Turso: {e}")
     db = get_db_session()
     try:
         fconf = _leer_config_facturacion(db)
