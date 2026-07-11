@@ -3376,18 +3376,6 @@
           </div>
         </div>
 
-        <!-- Card dinámica: guía paso a paso para declarar el mes, con tus datos reales -->
-        <button onclick="abrirGuiaResico()" class="w-full text-left rounded-2xl p-4 mb-4 flex-shrink-0 flex items-center gap-3 transition-all hover:opacity-95" style="background:linear-gradient(135deg,#0EA5E9,#0284C7);border:none;cursor:pointer;box-shadow:0 8px 24px rgba(2,132,199,.25)">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.18)">
-            <i data-lucide="list-checks" style="width:18px;height:18px;color:#fff"></i>
-          </div>
-          <div style="min-width:0">
-            <p class="text-sm font-black" style="color:#fff">¿Cómo declaro este mes? — Guía paso a paso</p>
-            <p id="guia-resico-preview" class="text-xs mt-0.5" style="color:rgba(255,255,255,.85)">Selecciona un periodo arriba para ver tus datos aquí.</p>
-          </div>
-          <i data-lucide="chevron-right" style="width:16px;height:16px;color:#fff;margin-left:auto;flex-shrink:0"></i>
-        </button>
-
         <!-- Resumen para Declaración Mensual (ingresos + compras + IVA neto + ISR) -->
         <div class="bg-white rounded-2xl border p-5 mb-4 flex-shrink-0" style="border-color:#E2E8F0">
           <div class="flex items-center justify-between mb-3">
@@ -13068,26 +13056,12 @@ async function loadDeclaracionMensual() {
       <div id="pago-sat-box">Consultando estado de pago...</div>`;
     _pagoSatCtx = { mes: Number(mes), anio: Number(anio), iva: d.iva_a_pagar, isr: d.isr.isr_acumulado_estimado };
     _declaracionMensualData = d;
-    _actualizarPreviewGuiaResico();
     renderPagoSat();
   } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
 }
 
 let _pagoSatCtx = null; // { mes, anio, iva, isr } del periodo mostrado en el resumen de declaración
 let _declaracionMensualData = null; // respuesta completa de /cfdi/declaracion-mensual del periodo seleccionado
-
-// Card dinámica "¿Cómo declaro este mes?" — refleja el periodo seleccionado arriba
-function _actualizarPreviewGuiaResico() {
-  const el = document.getElementById('guia-resico-preview');
-  if (!el) return;
-  if (_declaracionMensualData && _pagoSatCtx) {
-    const d = _declaracionMensualData;
-    const mesNombre = CFDI_MESES[_pagoSatCtx.mes - 1];
-    el.textContent = `${mesNombre} ${_pagoSatCtx.anio} — Ingresos $${d.ingresos.subtotal.toFixed(2)} · IVA a pagar $${Math.abs(_pagoSatCtx.iva).toFixed(2)} · ISR estimado $${_pagoSatCtx.isr.toFixed(2)}`;
-  } else {
-    el.textContent = 'Selecciona un periodo arriba para ver tus datos aquí.';
-  }
-}
 
 function abrirGuiaResico() {
   const box = document.getElementById('guia-resico-resumen');
