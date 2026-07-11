@@ -93,7 +93,7 @@ def _get_or_create_receptor_publico_general(api_key: str, secret_key: str, sandb
         "rfc": RFC_PUBLICO_GENERAL,
         "razons": "PUBLICO EN GENERAL",
         "codpos": emisor_cp,
-        "email": "",
+        "email": "publico.general@facturacion.com",
         "regimen": "616",
         "pais": "MEX",
         "usocfdi": "S01",
