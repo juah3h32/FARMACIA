@@ -3693,8 +3693,7 @@
       <button id="cfdi-ver-sat-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#EFF6FF;color:#1d2140;border:none;cursor:pointer">Verificar con SAT</button>
       <button id="cfdi-ver-cancelar-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#FEF2F2;color:#EF4444;border:none;cursor:pointer">Cancelar factura</button>
       <button id="cfdi-ver-preview-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Vista previa</button>
-      <button id="cfdi-ver-xml-btn" class="px-4 py-2 rounded-xl text-sm font-bold" style="background:#F1F5F9;color:#334155;border:none;cursor:pointer">Descargar XML</button>
-      <button id="cfdi-ver-pdf-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">Descargar PDF</button>
+      <button id="cfdi-ver-pdf-btn" class="px-4 py-2 rounded-xl text-sm font-bold text-white" style="background:#1d2140;border:none;cursor:pointer">Descargar (PDF + XML)</button>
     </div>
   </div>
 </div>
@@ -13552,8 +13551,7 @@ function abrirVerFacturaGlobal(id) {
   } else {
     cancelBtn.style.display = 'none';
   }
-  document.getElementById('cfdi-ver-pdf-btn').onclick = () => descargarArchivoCfdi(r.id, 'pdf');
-  document.getElementById('cfdi-ver-xml-btn').onclick = () => descargarArchivoCfdi(r.id, 'xml');
+  document.getElementById('cfdi-ver-pdf-btn').onclick = () => descargarArchivosCfdi(r.id);
   document.getElementById('cfdi-ver-preview-btn').onclick = () => verVistaPreviaPdf(r.id);
 
   const satStatus = document.getElementById('cfdi-ver-sat-status');
@@ -13660,17 +13658,22 @@ function eliminarFacturaGlobalError(id) {
   openModal('modal-cfdi-eliminar');
 }
 
-async function descargarArchivoCfdi(id, tipo) {
+async function _descargarUnArchivoCfdi(id, tipo) {
+  const res = await api(`/cfdi/${id}/${tipo}`);
+  if (!res.ok) throw new Error(`No se pudo descargar el ${tipo.toUpperCase()}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `factura_global.${tipo}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function descargarArchivosCfdi(id) {
   try {
-    const res = await api(`/cfdi/${id}/${tipo}`);
-    if (!res.ok) throw new Error('No se pudo descargar el archivo');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `factura_global.${tipo}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    toast(`${tipo.toUpperCase()} descargado a tu carpeta de Descargas`, 'success');
+    await _descargarUnArchivoCfdi(id, 'pdf');
+    await _descargarUnArchivoCfdi(id, 'xml');
+    toast('PDF y XML descargados a tu carpeta de Descargas', 'success');
   } catch(e) { toast(e.message, 'error'); }
 }
 
