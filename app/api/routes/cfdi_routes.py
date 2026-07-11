@@ -560,9 +560,20 @@ def abrir_carpeta_cfdi(cfdi_id: int, payload: dict = Depends(get_current_api_use
     db = get_db_session()
     try:
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
-        if not r or not r.pdf_path:
-            raise HTTPException(status_code=404, detail="No hay archivo guardado localmente para esta factura")
-        p = Path(r.pdf_path)
+        if not r:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        # Cada PC tiene su propio disco — si esta factura se timbró en otra máquina
+        # (o la carpeta local se borró), el archivo no existe aquí aunque el registro
+        # sí llegó por Turso. Se re-descarga de Factura.com antes de rendirse, así
+        # "Abrir carpeta" funciona igual sin importar en qué PC se timbró.
+        p = Path(r.pdf_path) if r.pdf_path else None
+        if not p or not p.exists():
+            if r.estado != "timbrada":
+                raise HTTPException(status_code=404, detail="No hay archivo guardado localmente para esta factura")
+            fconf = _leer_config_facturacion(db)
+            if not _descargar_y_guardar_documentos(db, r, fconf):
+                raise HTTPException(status_code=502, detail="No se pudo recuperar el archivo de Factura.com — intenta de nuevo más tarde")
+            p = Path(r.pdf_path)
         if not p.exists():
             raise HTTPException(status_code=404, detail="El archivo ya no existe en disco")
         import subprocess
@@ -733,7 +744,7 @@ def descargar_pdf(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
-        if not r or (not r.pdf_path and not r.pdf_url):
+        if not r:
             raise HTTPException(status_code=404, detail="No encontrado")
         p = Path(r.pdf_path) if r.pdf_path else None
         if p and p.exists():
@@ -742,6 +753,14 @@ def descargar_pdf(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
             })
         if r.pdf_url:
             return RedirectResponse(r.pdf_url)
+        # Ni en disco de esta PC ni en la nube (subida a Cloudinary falló en su momento)
+        # — último intento: volver a pedirlo a Factura.com antes de rendirse.
+        if r.estado == "timbrada":
+            fconf = _leer_config_facturacion(db)
+            if _descargar_y_guardar_documentos(db, r, fconf) and r.pdf_path and Path(r.pdf_path).exists():
+                return Response(content=Path(r.pdf_path).read_bytes(), media_type="application/pdf", headers={
+                    "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.pdf"'
+                })
         raise HTTPException(status_code=404, detail="Archivo PDF no encontrado en disco ni en la nube")
     finally:
         db.close()
@@ -753,7 +772,7 @@ def descargar_xml(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         r = db.query(CfdiFacturaGlobal).filter(CfdiFacturaGlobal.id == cfdi_id).first()
-        if not r or (not r.xml_path and not r.xml_url):
+        if not r:
             raise HTTPException(status_code=404, detail="No encontrado")
         p = Path(r.xml_path) if r.xml_path else None
         if p and p.exists():
@@ -762,6 +781,12 @@ def descargar_xml(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
             })
         if r.xml_url:
             return RedirectResponse(r.xml_url)
+        if r.estado == "timbrada":
+            fconf = _leer_config_facturacion(db)
+            if _descargar_y_guardar_documentos(db, r, fconf) and r.xml_path and Path(r.xml_path).exists():
+                return Response(content=Path(r.xml_path).read_bytes(), media_type="application/xml", headers={
+                    "Content-Disposition": f'attachment; filename="factura_global_{r.anio}-{r.mes:02d}.xml"'
+                })
         raise HTTPException(status_code=404, detail="Archivo XML no encontrado en disco ni en la nube")
     finally:
         db.close()
