@@ -4015,8 +4015,9 @@
         <div>
           <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color:#64748B">Tamaño de etiqueta</p>
           <select id="cg-tamano" class="inp text-xs" onchange="cgPreview()">
+            <option value="58mm" selected>Ticket térmico 58mm (genérico)</option>
             <option value="sm">Pequeño (40×20mm)</option>
-            <option value="md" selected>Mediano (60×30mm)</option>
+            <option value="md">Mediano (60×30mm)</option>
             <option value="lg">Grande (90×40mm)</option>
           </select>
         </div>
@@ -12775,7 +12776,10 @@ function cgExportPDF() {
 
   const imgData = canvas.toDataURL('image/png');
   const tamano = document.getElementById('cg-tamano').value;
-  const [wMm, hMm] = tamano === 'sm' ? [40,20] : tamano === 'lg' ? [90,40] : [60,30];
+  const esTicket58 = tamano === '58mm';
+  // Etiqueta genérica estándar que cabe en rollo térmico de 58mm (ancho útil ~50mm)
+  const [wMm, hMm] = esTicket58 ? [48, 25]
+    : tamano === 'sm' ? [40,20] : tamano === 'lg' ? [90,40] : [60,30];
 
   let etiquetas = '';
   for (let i = 0; i < copias; i++) {
@@ -12788,6 +12792,15 @@ function cgExportPDF() {
       </div>`;
   }
 
+  const pageCSS = esTicket58
+    ? `@page { size: 58mm auto; margin:0; }`
+    : `@page { margin:5mm; }`;
+  const bodyCSS = esTicket58 ? `width:58mm;` : '';
+  const gridCSS = esTicket58
+    ? `display:flex; flex-direction:column; align-items:center; gap:2mm; padding:2mm;`
+    : `display:flex; flex-wrap:wrap; gap:3mm; padding:5mm;`;
+  const etiquetaBorder = esTicket58 ? 'border:none;' : 'border:0.5px solid #ccc; border-radius:2mm;';
+
   const pw = window.open('', '_blank', 'width=600,height=800');
   if (!pw) { toast('Permitir ventanas emergentes para imprimir', 'warning'); return; }
   pw.document.write(`<!DOCTYPE html>
@@ -12797,15 +12810,15 @@ function cgExportPDF() {
 <title>Etiquetas — ${codigo}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, sans-serif; background:#fff; }
+  body { font-family: Arial, sans-serif; background:#fff; ${bodyCSS} }
   @media print {
     body { margin:0; }
-    @page { margin:5mm; }
+    ${pageCSS}
   }
-  .grid { display:flex; flex-wrap:wrap; gap:3mm; padding:5mm; }
+  .grid { ${gridCSS} }
   .etiqueta {
     width:${wMm}mm; min-height:${hMm}mm;
-    border:0.5px solid #ccc; border-radius:2mm;
+    ${etiquetaBorder}
     padding:2mm; display:flex; flex-direction:column;
     align-items:center; justify-content:center; gap:1mm;
     page-break-inside:avoid;
