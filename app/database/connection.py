@@ -77,6 +77,23 @@ def get_db_session() -> Session:
     return SessionLocal()
 
 
+# Indices Base.metadata.create_all only applies to brand-new tables/DBs — Turso
+# never runs create_all at all (see note below), so these must be pushed by hand.
+# CREATE INDEX IF NOT EXISTS is idempotent, safe to re-run every startup.
+_INDEX_DDL = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_productos_codigo_barras ON productos(codigo_barras)",
+    "CREATE INDEX IF NOT EXISTS ix_ventas_creado_en  ON ventas(creado_en)",
+    "CREATE INDEX IF NOT EXISTS ix_ventas_usuario_id ON ventas(usuario_id)",
+    "CREATE INDEX IF NOT EXISTS ix_ventas_estado     ON ventas(estado)",
+    "CREATE INDEX IF NOT EXISTS ix_ventas_eliminado  ON ventas(eliminado)",
+    "CREATE INDEX IF NOT EXISTS ix_ventas_facturada  ON ventas(facturada)",
+    "CREATE INDEX IF NOT EXISTS ix_items_venta_venta_id    ON items_venta(venta_id)",
+    "CREATE INDEX IF NOT EXISTS ix_items_venta_producto_id ON items_venta(producto_id)",
+    "CREATE INDEX IF NOT EXISTS ix_movimientos_stock_producto_id ON movimientos_stock(producto_id)",
+    "CREATE INDEX IF NOT EXISTS ix_movimientos_stock_referencia   ON movimientos_stock(referencia_id, referencia_tipo)",
+]
+
+
 def _migrate():
     """Add new columns to existing tables without dropping data."""
     # Create retiros_caja table if it doesn't exist yet
@@ -140,6 +157,16 @@ def _migrate():
             except Exception:
                 pass  # column already exists — skip
 
+    # Indices missing on DBs created before these were added to the models
+    # (create_all only adds indices for brand-new tables, never retrofits them).
+    with engine.connect() as conn:
+        for ddl in _INDEX_DDL:
+            try:
+                conn.execute(text(ddl))
+                conn.commit()
+            except Exception:
+                pass
+
     # Tables added after the initial schema — must exist in Turso too, not just local.
     # sync_service.py syncs rows assuming the table is already there; CREATE TABLE IF NOT
     # EXISTS here is what actually creates it in the cloud (desktop app never runs
@@ -197,6 +224,9 @@ def _migrate():
                     ] + [
                         {"type": "execute", "stmt": {"sql": f"ALTER TABLE {t} ADD COLUMN {c} {ct}", "args": []}}
                         for t, c, ct in new_cols
+                    ] + [
+                        {"type": "execute", "stmt": {"sql": ddl, "args": []}}
+                        for ddl in _INDEX_DDL
                     ] + [{"type": "close"}]
                 }
                 _req.post(url, headers=hdrs, json=payload, timeout=15)

@@ -209,6 +209,11 @@ class ItemVenta(Base):
     venta = relationship("Venta", back_populates="items")
     producto = relationship("Producto", back_populates="items_venta")
 
+    __table_args__ = (
+        Index("ix_items_venta_venta_id",    "venta_id"),
+        Index("ix_items_venta_producto_id", "producto_id"),
+    )
+
 
 class CfdiFacturaGlobal(Base):
     """Factura global mensual (CFDI 4.0) timbrada vía Facturama, concentra ventas del periodo"""
@@ -431,6 +436,11 @@ class MovimientoStock(Base):
 
     producto = relationship("Producto", back_populates="movimientos")
     usuario = relationship("Usuario", back_populates="movimientos")
+
+    __table_args__ = (
+        Index("ix_movimientos_stock_producto_id",  "producto_id"),
+        Index("ix_movimientos_stock_referencia",   "referencia_id", "referencia_tipo"),
+    )
 
 
 class AuditoriaLog(Base):

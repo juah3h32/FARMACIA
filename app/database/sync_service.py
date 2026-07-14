@@ -46,23 +46,50 @@ _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
                                "compras", "items_compra", "cortes_caja", "retiros_caja",
                                "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra"})
 
-# Watermark per table: last id synced to Turso (append-only tables only)
-# Persisted to disk so restarts don't re-send the entire history.
-def _load_watermarks() -> dict:
+# PUSH optimization for the tables that actually grow without bound (ventas history
+# never shrinks). Before this, sync_to_turso() did `SELECT * FROM {table}` and
+# re-upserted EVERY row on EVERY local write (mark_dirty fires per commit) — so
+# each new sale re-pushed the entire sales history again (O(n^2) growth, this is
+# what ran up the Turso row-read/write counters into the billions on a tiny DB).
+#
+# _TS_INCREMENTAL: rows mutate in place (stock, estado, facturada...), so push only
+# rows with actualizado_en > last-pushed timestamp. Safe only for tables already in
+# _NO_TURSO_DELETE (no delete-by-absence branch to break by seeing a partial set).
+_TS_INCREMENTAL = frozenset({
+    "productos", "ventas", "cfdi_facturas_globales", "cfdi_facturas_individuales",
+})
+
+# _PUSH_APPEND_ONLY: rows are immutable after insert (deletes are handled explicitly
+# elsewhere — see eliminar_venta), so a plain id-watermark is enough, same as the
+# non-full-sync tables. Still fully resynced on the PULL side (_FULL_SYNC) so a wiped
+# local DB gets it all back.
+_PUSH_APPEND_ONLY = frozenset({"items_venta"})
+
+# Watermark per table: last id synced to Turso (append-only tables), or last
+# actualizado_en synced (ts-incremental tables). Persisted to disk so restarts
+# don't re-send the entire history.
+def _load_watermarks() -> tuple[dict, dict]:
     try:
         if _WATERMARK_FILE.exists():
-            return json.loads(_WATERMARK_FILE.read_text(encoding="utf-8"))
+            data = json.loads(_WATERMARK_FILE.read_text(encoding="utf-8"))
+            if "ids" in data or "ts" in data:
+                return data.get("ids", {}), data.get("ts", {})
+            return data, {}  # legacy flat {table: id} format
     except Exception:
         pass
-    return {}
+    return {}, {}
 
 def _save_watermarks() -> None:
     try:
-        _WATERMARK_FILE.write_text(json.dumps(_watermarks), encoding="utf-8")
+        _WATERMARK_FILE.write_text(
+            json.dumps({"ids": _watermarks, "ts": _ts_watermarks}), encoding="utf-8"
+        )
     except Exception as e:
         print(f"[Sync] Could not persist watermarks: {e}")
 
-_watermarks: dict[str, int] = _load_watermarks()
+_watermarks: dict[str, int]
+_ts_watermarks: dict[str, str]
+_watermarks, _ts_watermarks = _load_watermarks()
 
 # RLock: reentrant so sync_to_turso and sync_from_turso can share one lock
 # without deadlocking when called sequentially from the same thread.
@@ -380,8 +407,13 @@ def import_from_turso() -> bool:
 def sync_to_turso() -> None:
     """
     Push local SQLite data to Turso via batched HTTP pipeline.
-    FULL_SYNC tables: upsert all rows + delete from Turso any IDs missing in local.
-    Append-only tables: only rows with id > last watermark.
+    TS_INCREMENTAL tables (productos, ventas, cfdi_*): only rows changed since the
+    last actualizado_en watermark — these grow forever, a full resend on every
+    write would be O(n^2) over the table's lifetime.
+    PUSH_APPEND_ONLY (items_venta) + other non-full tables: only rows with
+    id > last watermark.
+    Remaining FULL_SYNC tables (small/reference-ish): upsert all rows + delete
+    from Turso any IDs missing in local.
     """
     with _lock:
         lconn = _local_conn()
@@ -389,7 +421,52 @@ def sync_to_turso() -> None:
             synced = 0
             for table in _TABLE_ORDER:
                 try:
-                    if table in _FULL_SYNC:
+                    if table in _TS_INCREMENTAL:
+                        last_ts = _ts_watermarks.get(table, "")
+                        rows = lconn.execute(
+                            f"SELECT * FROM {table} WHERE actualizado_en > ? ORDER BY actualizado_en",
+                            (last_ts,),
+                        ).fetchall()
+
+                        if not rows:
+                            continue
+
+                        cols    = list(rows[0].keys())
+                        col_str = ", ".join(cols)
+                        ph_str  = ", ".join(["?" for _ in cols])
+                        ts_idx  = cols.index("actualizado_en")
+
+                        if table == "ventas":
+                            set_parts = [
+                                "eliminado = MAX(excluded.eliminado, ventas.eliminado)"
+                                if c == "eliminado"
+                                else f"{c} = excluded.{c}"
+                                for c in cols if c != "id"
+                            ]
+                            upsert = (
+                                f"INSERT INTO ventas ({col_str}) VALUES ({ph_str}) "
+                                f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
+                            )
+                        elif table in ("cfdi_facturas_globales", "cfdi_facturas_individuales"):
+                            set_parts = [
+                                f"{c} = CASE WHEN excluded.actualizado_en > {table}.actualizado_en "
+                                f"THEN excluded.{c} ELSE {table}.{c} END"
+                                for c in cols if c != "id"
+                            ]
+                            upsert = (
+                                f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
+                                f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
+                            )
+                        else:  # productos
+                            upsert = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+
+                        stmts = [{"sql": upsert, "args": [_py_to_turso(v) for v in tuple(row)]}
+                                  for row in rows]
+                        _turso_batch(stmts)
+                        _ts_watermarks[table] = max(row[ts_idx] for row in rows)
+                        synced += len(rows)
+
+                    elif table in _FULL_SYNC and table not in _PUSH_APPEND_ONLY:
                         rows = lconn.execute(f"SELECT * FROM {table}").fetchall()
                         stmts: list[dict] = []
 
@@ -731,6 +808,13 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
             # Returns True if event fired (dirty write), False if timed out (heartbeat)
             woke_by_write = _dirty.wait(timeout=interval)
             _dirty.clear()
+            if woke_by_write:
+                # One sale/edit = several commits (venta + items_venta + stock update
+                # + movimiento) → several mark_dirty() calls in a row. Without this,
+                # each one triggered its own sync_to_turso() pass. Coalesce the burst
+                # into a single push.
+                time.sleep(3)
+                _dirty.clear()
             try:
                 sync_to_turso()
             except Exception as e:
