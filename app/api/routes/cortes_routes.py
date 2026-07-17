@@ -13,6 +13,21 @@ from app.api.routes.auth_routes import get_current_api_user
 router = APIRouter()
 
 
+def _precio_lookup(db, venta_ids) -> dict:
+    """Batch {(venta_id, producto_id): precio_unitario} for a set of ventas —
+    one query, used to price MovimientoStock(tipo=devolucion) rows without
+    doing a per-row ItemVenta query (was the N+1 that made corte/retiro
+    screens slow as returns history grew)."""
+    if not venta_ids:
+        return {}
+    rows = (
+        db.query(ItemVenta.venta_id, ItemVenta.producto_id, ItemVenta.precio_unitario)
+        .filter(ItemVenta.venta_id.in_(venta_ids))
+        .all()
+    )
+    return {(vid, pid): precio for vid, pid, precio in rows}
+
+
 def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) -> float:
     """
     Monetary value of partial returns processed by usuario_id in [desde, hasta].
@@ -31,18 +46,14 @@ def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) ->
         )
         .all()
     )
+    if not dev_movs:
+        return 0.0
+    precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
     total = 0.0
     for mov in dev_movs:
-        orig = (
-            db.query(ItemVenta)
-            .filter(
-                ItemVenta.venta_id == mov.referencia_id,
-                ItemVenta.producto_id == mov.producto_id,
-            )
-            .first()
-        )
-        if orig:
-            total += orig.precio_unitario * mov.cantidad
+        precio = precios.get((mov.referencia_id, mov.producto_id))
+        if precio is not None:
+            total += precio * mov.cantidad
     return total
 
 
@@ -611,13 +622,12 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
             MovimientoStock.referencia_tipo == "devolucion",
         ).all()
         total_devoluciones = 0.0
-        for mov in dev_movs:
-            orig = db.query(ItemVenta).filter(
-                ItemVenta.venta_id == mov.referencia_id,
-                ItemVenta.producto_id == mov.producto_id,
-            ).first()
-            if orig:
-                total_devoluciones += orig.precio_unitario * mov.cantidad
+        if dev_movs:
+            precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
+            for mov in dev_movs:
+                precio = precios.get((mov.referencia_id, mov.producto_id))
+                if precio is not None:
+                    total_devoluciones += precio * mov.cantidad
 
         ventas_netas        = tv - total_devoluciones
         ganancia            = ventas_netas - total_costo
