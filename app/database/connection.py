@@ -201,6 +201,15 @@ def _migrate():
         "monto_iva REAL DEFAULT 0.0, monto_isr REAL DEFAULT 0.0, monto_total REAL DEFAULT 0.0, "
         "fecha_pago DATE, linea_captura VARCHAR(50), comprobante_url VARCHAR(500), notas TEXT, "
         "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME, actualizado_en DATETIME)",
+        # retiros_caja se creaba solo en la BD local (ver _migrate() más abajo) desde que
+        # se agregó esa función hace tiempo — nunca se agregó aquí, así que Turso nunca
+        # tuvo la tabla. Cada push de un retiro fallaba en silencio ("no such table:
+        # retiros_caja", solo impreso en consola, nunca visible en la UI): los retiros
+        # jamás llegaban a la nube, aunque el código de sync/borrado ya estaba correcto.
+        "CREATE TABLE IF NOT EXISTS retiros_caja ("
+        "id INTEGER PRIMARY KEY, corte_id INTEGER REFERENCES cortes_caja(id), "
+        "usuario_id INTEGER NOT NULL REFERENCES usuarios(id), monto REAL NOT NULL, "
+        "concepto TEXT, creado_en DATETIME, tipo VARCHAR(20) DEFAULT 'personal')",
         # Historial clínico, agenda, compras/inventario/gastos — antes nunca se creaban en
         # Turso, así que sync_service nunca podía empujar estas tablas (aunque se agreguen
         # a _TABLE_ORDER, sin el CREATE TABLE aquí el push falla porque la tabla no existe
