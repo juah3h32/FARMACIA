@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from datetime import date, timedelta
+import calendar
 
 from app.database.connection import get_db_session
 from app.database.models import Producto, Lote, Cita, EstadoCita
@@ -55,7 +56,28 @@ def alertas_pendientes(payload: dict = Depends(get_current_api_user)):
             .all()
         )
 
+        # Recordatorio de factura global RESICO: 2 días antes de que cierre el mes
+        # actual, avisar que hay que timbrarla apenas cierre (regla 2.7.1.21 RMF:
+        # 24h desde el cierre del periodo) — para no repetir el caso real de una
+        # factura timbrada 10 días tarde por no acordarse a tiempo.
+        ultimo_dia_mes = calendar.monthrange(hoy.year, hoy.month)[1]
+        fin_de_mes = date(hoy.year, hoy.month, ultimo_dia_mes)
+        dias_para_cierre = (fin_de_mes - hoy).days
+        declaracion_sat = None
+        if 0 <= dias_para_cierre <= 2:
+            declaracion_sat = {
+                "mes": hoy.month, "anio": hoy.year,
+                "dias_restantes": dias_para_cierre,
+                "mensaje": (
+                    "El mes cierra hoy — tímbrala en las próximas 24h."
+                    if dias_para_cierre == 0
+                    else f"Faltan {dias_para_cierre} día(s) para que cierre el mes — prepárate para "
+                         f"timbrar la factura global dentro de las 24h siguientes al cierre."
+                ),
+            }
+
         return {
+            "declaracion_sat": declaracion_sat,
             "stock_bajo": [
                 {"id": p.id, "nombre": p.nombre, "stock": p.stock, "stock_minimo": p.stock_minimo}
                 for p in stock_bajo
@@ -85,6 +107,7 @@ def alertas_pendientes(payload: dict = Depends(get_current_api_user)):
                 "stock_bajo": len(stock_bajo),
                 "vencimientos": len(lotes_alerta),
                 "citas_hoy": len(citas_hoy),
+                "declaracion_sat": 1 if declaracion_sat else 0,
             },
         }
     finally:

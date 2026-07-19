@@ -14537,6 +14537,22 @@ async function loadAlertas() {
   try {
     const data = await apiFetch('/alertas/pendientes');
     let html = '';
+    // Declaración RESICO / factura global próxima a vencer
+    if (data.declaracion_sat) {
+      const d = data.declaracion_sat;
+      html += `<div class="bg-white rounded-2xl border p-4" style="border-color:#C4B5FD">
+        <p class="text-xs font-black uppercase tracking-wider mb-3" style="color:#7C3AED">Declaración RESICO</p>
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl" style="background:#F5F3FF">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:#7C3AED">
+              <i data-lucide="file-clock" style="width:15px;height:15px;color:#fff"></i>
+            </div>
+            <p class="text-sm font-semibold" style="color:#0F172A">${d.mensaje}</p>
+          </div>
+          <button onclick="navigate('cfdi-global');closeQuickMenu()" class="text-xs px-2 py-1 rounded-lg font-semibold flex-shrink-0" style="background:#7C3AED;color:#fff;border:none;cursor:pointer">Ir</button>
+        </div>
+      </div>`;
+    }
     // Citas hoy
     if (data.citas_hoy?.length) {
       html += `<div class="bg-white rounded-2xl border p-4" style="border-color:#BAE8FF">
