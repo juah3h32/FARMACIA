@@ -546,7 +546,12 @@ def eliminar_retiro(retiro_id: int, bg: BackgroundTasks, payload: dict = Depends
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
-            from app.database.sync_service import sync_to_turso
+            from app.database.sync_service import sync_to_turso, delete_ids_from_turso
+            # retiros_caja está en _NO_TURSO_DELETE (sync normal nunca borra por
+            # ausencia, para no perder retiros de otra PC no sincronizada aún) —
+            # sin este delete explícito, el retiro borrado localmente reaparecía
+            # solo con el siguiente pull periódico de Turso.
+            bg.add_task(delete_ids_from_turso, "retiros_caja", [retiro_id])
             bg.add_task(sync_to_turso)
         return {"ok": True, "id": retiro_id}
     except HTTPException:

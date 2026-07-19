@@ -3,7 +3,7 @@ import sys
 import threading
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 import app.config as cfg
@@ -194,7 +194,7 @@ def factory_reset_endpoint(body: PurgarHistorialIn, payload: dict = Depends(get_
 
 
 @router.post("/normalizar-nombres")
-def normalizar_nombres(payload: dict = Depends(get_current_api_user)):
+def normalizar_nombres(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     """Uppercase nombre, nombre_generico and marca for all active products."""
     _require_admin(payload)
     from app.database.connection import get_db_session
@@ -220,7 +220,7 @@ def normalizar_nombres(payload: dict = Depends(get_current_api_user)):
         import app.config as _cfg
         if _cfg.TURSO_SYNC and updated > 0:
             from app.database.sync_service import sync_to_turso
-            sync_to_turso()
+            bg.add_task(sync_to_turso)
         return {"ok": True, "actualizados": updated, "total": len(prods)}
     except Exception as e:
         db.rollback()
@@ -325,7 +325,7 @@ def get_config(payload: dict = Depends(get_current_api_user)):
 
 
 @router.post("/config")
-def set_config(body: TurnoConfigIn, payload: dict = Depends(get_current_api_user)):
+def set_config(body: TurnoConfigIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
@@ -346,7 +346,7 @@ def set_config(body: TurnoConfigIn, payload: dict = Depends(get_current_api_user
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
-            sync_to_turso()
+            bg.add_task(sync_to_turso)
         return {"ok": True}
     except Exception as e:
         db.rollback()

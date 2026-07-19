@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from typing import Optional
@@ -1280,9 +1280,8 @@ def save_pdf_to_path(
 
 
 @router.delete("/cortes/fantasmas")
-def eliminar_cortes_fantasma(payload: dict = Depends(get_current_api_user)):
+def eliminar_cortes_fantasma(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     """Admin: permanently delete closed shifts with 0 ventas and $0 total."""
-    from fastapi import BackgroundTasks
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -1301,8 +1300,12 @@ def eliminar_cortes_fantasma(payload: dict = Depends(get_current_api_user)):
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
-            from app.database.sync_service import sync_to_turso
-            sync_to_turso()
+            from app.database.sync_service import sync_to_turso, delete_ids_from_turso
+            # cortes_caja está en _NO_TURSO_DELETE — igual que retiros_caja, el
+            # sync normal nunca borra por ausencia, así que sin este delete
+            # explícito el corte fantasma borrado reaparecía en el próximo pull.
+            bg.add_task(delete_ids_from_turso, "cortes_caja", ids)
+            bg.add_task(sync_to_turso)
         return {"ok": True, "eliminados": len(ids), "ids": ids}
     except Exception as e:
         db.rollback()
