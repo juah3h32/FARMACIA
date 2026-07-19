@@ -5,6 +5,7 @@ from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from datetime import datetime, date
 from pathlib import Path
+from sqlalchemy import func
 
 from app.database.connection import get_db_session
 from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta, PagoSat
@@ -232,6 +233,16 @@ def declaracion_mensual(
         tasa = _tasa_isr(ingreso_acumulado)
         isr_acumulado_anio = round(ingreso_acumulado * tasa, 2)
 
+        # RESICO acumula el ISR desde enero, así que el acumulado de julio YA incluye
+        # lo que se causó en junio (y meses previos). "Total a pagar" debe ser solo lo
+        # que falta cubrir de ESTE mes — el acumulado menos lo que ya se registró como
+        # pagado en pagos_sat de meses anteriores del mismo año (antes este dato no se
+        # tenía, ahora sí vía la tabla pagos_sat).
+        isr_pagado_meses_previos = db.query(func.sum(PagoSat.monto_isr)).filter(
+            PagoSat.anio == anio, PagoSat.mes < mes,
+        ).scalar() or 0.0
+        isr_mes_actual = round(max(0.0, isr_acumulado_anio - isr_pagado_meses_previos), 2)
+
         return {
             "mes": mes, "anio": anio,
             "ingresos": {
@@ -251,10 +262,11 @@ def declaracion_mensual(
                 "ingreso_acumulado_anio": round(ingreso_acumulado, 2),
                 "tasa_aplicable": tasa,
                 "isr_acumulado_estimado": isr_acumulado_anio,
-                "nota": "Este acumulado es SOLO de lo registrado en este sistema. El ISR real "
-                        "de este mes = ISR acumulado − lo ya pagado en meses previos del año, "
-                        "dato que este sistema no tiene. Verifica el importe exacto en tu Buzón "
-                        "Tributario o con tu contador antes de declarar.",
+                "isr_pagado_meses_previos": round(isr_pagado_meses_previos, 2),
+                "isr_mes_actual": isr_mes_actual,
+                "nota": "El acumulado y lo 'ya pagado en meses previos' son SOLO de lo "
+                        "registrado en este sistema (pagos_sat). Verifica el importe exacto en "
+                        "tu Buzón Tributario o con tu contador antes de declarar.",
             },
         }
     finally:

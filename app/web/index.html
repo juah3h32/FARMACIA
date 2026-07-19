@@ -13043,8 +13043,10 @@ async function loadDeclaracionMensual() {
     const ivaColor = d.iva_a_pagar >= 0 ? '#EF4444' : '#16A34A';
     const ivaLabel = d.iva_a_pagar >= 0 ? 'IVA a pagar' : 'Saldo a favor de IVA';
     // Total real a pagar al SAT este mes: IVA (solo si es a pagar — un saldo a
-    // favor de IVA no reduce el ISR, son impuestos distintos) + ISR estimado.
-    const totalPagarSat = Math.max(0, d.iva_a_pagar) + d.isr.isr_acumulado_estimado;
+    // favor de IVA no reduce el ISR, son impuestos distintos) + ISR de ESTE mes
+    // (isr_mes_actual ya resta lo pagado en meses previos del año — RESICO
+    // acumula el ISR desde enero, así que julio sin restar incluía lo de junio).
+    const totalPagarSat = Math.max(0, d.iva_a_pagar) + d.isr.isr_mes_actual;
     const mesSig = mes == 12 ? 1 : Number(mes) + 1;
     const anioSig = mes == 12 ? Number(anio) + 1 : Number(anio);
     const vence = new Date(anioSig, mesSig - 1, 17);
@@ -13070,12 +13072,12 @@ async function loadDeclaracionMensual() {
         <div class="rounded-xl p-3 text-center" style="background:#FEF2F2;border:1px solid #FECACA">
           <p class="text-[10px]" style="color:#64748B">Total a pagar en el SAT (este mes)</p>
           <p class="text-sm font-black" style="color:#EF4444">$${totalPagarSat.toFixed(2)}</p>
-          <p class="text-[10px]" style="color:#94A3B8">${ivaLabel} $${Math.abs(d.iva_a_pagar).toFixed(2)} + ISR $${d.isr.isr_acumulado_estimado.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">${ivaLabel} $${Math.abs(d.iva_a_pagar).toFixed(2)} + ISR de este mes $${d.isr.isr_mes_actual.toFixed(2)}</p>
         </div>
         <div class="rounded-xl p-3 text-center" style="background:#F0F9FF;border:1px solid #BAE6FD">
-          <p class="text-[10px]" style="color:#64748B">ISR estimado (tasa ${(d.isr.tasa_aplicable*100).toFixed(2)}%)</p>
-          <p class="text-sm font-black" style="color:#0284C7">$${d.isr.isr_acumulado_estimado.toFixed(2)}</p>
-          <p class="text-[10px]" style="color:#94A3B8">sobre acumulado del año</p>
+          <p class="text-[10px]" style="color:#64748B">ISR de este mes (tasa ${(d.isr.tasa_aplicable*100).toFixed(2)}%)</p>
+          <p class="text-sm font-black" style="color:#0284C7">$${d.isr.isr_mes_actual.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">acum. $${d.isr.isr_acumulado_estimado.toFixed(2)} − pagado antes $${d.isr.isr_pagado_meses_previos.toFixed(2)}</p>
         </div>
       </div>
       ${d.ingresos.num_ventas > 0 && d.ingresos.iva === 0 ? `
@@ -13083,7 +13085,7 @@ async function loadDeclaracionMensual() {
       ` : ''}
       <div class="p-2 rounded-xl mb-3" style="background:#F8FAFC;color:#64748B">${d.isr.nota}</div>
       <div id="pago-sat-box">Consultando estado de pago...</div>`;
-    _pagoSatCtx = { mes: Number(mes), anio: Number(anio), iva: d.iva_a_pagar, isr: d.isr.isr_acumulado_estimado };
+    _pagoSatCtx = { mes: Number(mes), anio: Number(anio), iva: d.iva_a_pagar, isr: d.isr.isr_mes_actual };
     _declaracionMensualData = d;
     renderPagoSat();
   } catch(e) { box.innerHTML = `<span style="color:#EF4444">${e.message}</span>`; }
