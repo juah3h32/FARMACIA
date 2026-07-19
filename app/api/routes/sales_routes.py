@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
@@ -182,6 +182,7 @@ class DevolucionIn(BaseModel):
 def registrar_devolucion(
     venta_id: int,
     body: DevolucionIn,
+    bg: BackgroundTasks,
     payload: dict = Depends(get_current_api_user),
 ):
     """
@@ -206,6 +207,7 @@ def registrar_devolucion(
         usuario_id = int(payload["sub"])
         total_devuelto = 0.0
         nota_parts = []
+        item_ids_modificados = []
 
         for dev in body.items:
             if dev.cantidad <= 0:
@@ -250,6 +252,7 @@ def registrar_devolucion(
             orig.cantidad = cant_nueva
             orig.subtotal = round((orig.subtotal or 0.0) * ratio_kept, 2)
             orig.descuento = round((orig.descuento or 0.0) * ratio_kept, 2)
+            item_ids_modificados.append(orig.id)
 
         # Recalcular totales de la venta sobre lo que realmente quedó (no lo original)
         venta.subtotal = round(sum(i.subtotal or 0.0 for i in venta.items), 2)
@@ -276,9 +279,14 @@ def registrar_devolucion(
 
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
-            from app.database.sync_service import sync_to_turso
-            import threading
-            threading.Thread(target=sync_to_turso, daemon=True).start()
+            from app.database.sync_service import sync_to_turso, upsert_ids_to_turso
+            # items_venta es _PUSH_APPEND_ONLY (solo push por id > watermark, se
+            # asume fila inmutable tras insertarse) — la devolución parcial acaba
+            # de mutar cantidad/subtotal de filas ya sincronizadas hace tiempo,
+            # así que sin este push explícito Turso se queda con la cantidad
+            # original para siempre.
+            bg.add_task(upsert_ids_to_turso, "items_venta", item_ids_modificados)
+            bg.add_task(sync_to_turso)
 
         return {
             "ok": True,

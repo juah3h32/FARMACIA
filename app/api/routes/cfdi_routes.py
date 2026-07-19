@@ -1,6 +1,6 @@
 import threading
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from datetime import datetime, date
@@ -685,7 +685,7 @@ def estatus_sat(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
 
 
 @router.delete("/{cfdi_id}")
-def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_factura_error(cfdi_id: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -704,7 +704,7 @@ def eliminar_factura_error(cfdi_id: int, payload: dict = Depends(get_current_api
             v.cfdi_global_id = None
         db.delete(r)
         db.commit()
-        _purgar_de_turso("cfdi_facturas_globales", [cfdi_id])
+        bg.add_task(_purgar_de_turso, "cfdi_facturas_globales", [cfdi_id])
         return {"ok": True}
     except HTTPException:
         raise
@@ -720,7 +720,7 @@ class EliminarLoteIn(BaseModel):
 
 
 @router.post("/eliminar-lote")
-def eliminar_facturas_error_lote(body: EliminarLoteIn, payload: dict = Depends(get_current_api_user)):
+def eliminar_facturas_error_lote(body: EliminarLoteIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     if not body.ids:
         raise HTTPException(status_code=400, detail="Sin ids para eliminar")
@@ -738,7 +738,7 @@ def eliminar_facturas_error_lote(body: EliminarLoteIn, payload: dict = Depends(g
                 v.cfdi_global_id = None
             db.delete(r)
         db.commit()
-        _purgar_de_turso("cfdi_facturas_globales", ids_borrados)
+        bg.add_task(_purgar_de_turso, "cfdi_facturas_globales", ids_borrados)
         return {"eliminados": len(ids_borrados), "omitidos": omitidos}
     except Exception as e:
         db.rollback()
@@ -1183,7 +1183,7 @@ def cancelar_factura_individual(cfdi_id: int, body: CancelarIn, payload: dict = 
 
 
 @router.delete("/individual/{cfdi_id}")
-def eliminar_factura_individual_error(cfdi_id: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_factura_individual_error(cfdi_id: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -1194,7 +1194,7 @@ def eliminar_factura_individual_error(cfdi_id: int, payload: dict = Depends(get_
             raise HTTPException(status_code=400, detail="Solo se pueden eliminar intentos con error")
         db.delete(r)
         db.commit()
-        _purgar_de_turso("cfdi_facturas_individuales", [cfdi_id])
+        bg.add_task(_purgar_de_turso, "cfdi_facturas_individuales", [cfdi_id])
         return {"ok": True}
     except HTTPException:
         raise
@@ -1206,7 +1206,7 @@ def eliminar_factura_individual_error(cfdi_id: int, payload: dict = Depends(get_
 
 
 @router.post("/individual/eliminar-lote")
-def eliminar_facturas_individuales_error_lote(body: EliminarLoteIn, payload: dict = Depends(get_current_api_user)):
+def eliminar_facturas_individuales_error_lote(body: EliminarLoteIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     if not body.ids:
         raise HTTPException(status_code=400, detail="Sin ids para eliminar")
@@ -1219,7 +1219,7 @@ def eliminar_facturas_individuales_error_lote(body: EliminarLoteIn, payload: dic
         for r in borrables:
             db.delete(r)
         db.commit()
-        _purgar_de_turso("cfdi_facturas_individuales", ids_borrados)
+        bg.add_task(_purgar_de_turso, "cfdi_facturas_individuales", ids_borrados)
         return {"eliminados": len(ids_borrados), "omitidos": omitidos}
     except Exception as e:
         db.rollback()

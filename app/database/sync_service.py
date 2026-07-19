@@ -555,6 +555,36 @@ def sync_to_turso() -> None:
             lconn.close()
 
 
+def upsert_ids_to_turso(table: str, ids: list[int]) -> None:
+    """
+    Explicit, immediate upsert of specific row ids to Turso.
+    For tables in _PUSH_APPEND_ONLY (id-watermark push, "rows are immutable
+    after insert"): if a row is mutated AFTER its id already crossed the
+    watermark, the periodic sync_to_turso() will never see it again — it only
+    looks at id > last_watermark. Used e.g. by registrar_devolucion (partial
+    return), which adjusts an existing items_venta row's cantidad/subtotal
+    long after that row was created/synced — without this, Turso keeps the
+    stale pre-return quantity forever.
+    """
+    if not ids:
+        return
+    with _lock:
+        lconn = _local_conn()
+        try:
+            ids_str = ", ".join(str(int(i)) for i in ids)
+            rows = lconn.execute(f"SELECT * FROM {table} WHERE id IN ({ids_str})").fetchall()
+        finally:
+            lconn.close()
+        if not rows:
+            return
+        cols    = list(rows[0].keys())
+        col_str = ", ".join(cols)
+        ph_str  = ", ".join(["?" for _ in cols])
+        sql     = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
+        stmts   = [{"sql": sql, "args": [_py_to_turso(v) for v in tuple(row)]} for row in rows]
+        _turso_batch(stmts)
+
+
 def delete_ids_from_turso(table: str, ids: list[int]) -> None:
     """
     Explicit, immediate delete of specific row ids in Turso.

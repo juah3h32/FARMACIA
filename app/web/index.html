@@ -7295,10 +7295,13 @@ async function saveProduct() {
     } else {
       toast('Producto creado con lote de vencimiento','success');
     }
-    if (_pmImageFile) await pmUploadImage(prodData.id);
+    // Producto (y lote) ya están guardados — no bloquear el cierre del modal
+    // esperando la subida a Cloudinary, que es una llamada externa y puede
+    // tardar o fallar sin que eso afecte el producto ya guardado localmente.
+    if (_pmImageFile) pmUploadImage(prodData.id);
   } else {
     toast('Producto actualizado','success');
-    if (_pmImageFile) await pmUploadImage(S.prodEditId);
+    if (_pmImageFile) pmUploadImage(S.prodEditId);
   }
 
   _clearDraft(_DRAFT.product);

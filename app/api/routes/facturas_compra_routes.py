@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import Response, RedirectResponse
 from typing import Optional
 from datetime import date, datetime
@@ -185,7 +185,7 @@ def descargar_pdf(fid: int, payload: dict = Depends(get_current_api_user)):
 
 
 @router.delete("/{fid}")
-def eliminar_factura_compra(fid: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_factura_compra(fid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -211,10 +211,12 @@ def eliminar_factura_compra(fid: int, payload: dict = Depends(get_current_api_us
         # ausencia (cada PC puede tener un subconjunto), así que sin esta purga explícita
         # el siguiente sync_from_turso() resucitaría el registro recién eliminado.
         if cfg.TURSO_SYNC:
-            try:
-                sync_service.delete_ids_from_turso("facturas_compra", [fid])
-            except Exception as e:
-                print(f"[FacturasCompra] No se pudo borrar factura {fid} en Turso: {e}")
+            def _purgar():
+                try:
+                    sync_service.delete_ids_from_turso("facturas_compra", [fid])
+                except Exception as e:
+                    print(f"[FacturasCompra] No se pudo borrar factura {fid} en Turso: {e}")
+            bg.add_task(_purgar)
         return {"ok": True}
     except HTTPException:
         raise
