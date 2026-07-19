@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import func
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta, PagoSat
+from app.database.models import Venta, EstadoVenta, CfdiFacturaGlobal, CfdiFacturaIndividual, Configuracion, FacturaCompra, ItemVenta, PagoSat, MetodoPago
 from app.api.routes.auth_routes import get_current_api_user
 from app.services import facturacom_service
 from app.database import sync_service
@@ -181,6 +181,40 @@ def _agregar_ventas_pendientes(db, mes: int, anio: int):
     iva = sum(v.iva or 0.0 for v in ventas)
     total = sum(v.total or 0.0 for v in ventas)
     return ventas, subtotal, iva, total
+
+
+# c_FormaPago (SAT): 01 Efectivo, 03 Transferencia electrónica de fondos,
+# 04 Tarjeta de crédito, 28 Tarjeta de débito. El modelo Venta.metodo_pago solo
+# tiene UN valor "tarjeta" — no captura crédito vs débito por venta, así que
+# hoy no se puede distinguir de verdad. Se usa 04 (crédito) como default. El
+# día que se agregue esa distinción (nuevo campo/valor en el POS o en el dato
+# que regresa la terminal), basta con mapear ese nuevo valor a "28" aquí —
+# no hace falta tocar nada más de esta función.
+# "mixto" no tiene una clave SAT limpia para un pago dividido en un solo
+# concepto — se trata como efectivo (fallback) ya que en la práctica rara vez
+# es la mayoría del periodo.
+_FORMA_PAGO_SAT = {
+    MetodoPago.efectivo: "01",
+    MetodoPago.transferencia: "03",
+    MetodoPago.tarjeta: "04",
+    MetodoPago.mixto: "01",
+}
+
+
+def _forma_pago_predominante(ventas: list) -> str:
+    """
+    Guía de llenado del CFDI Global (SAT): la Forma de Pago debe ser la clave
+    con la que se liquidó la MAYOR CANTIDAD (en monto) de las operaciones del
+    periodo — nunca "99" (Por definir), que la guía indica que no aplica para
+    este comprobante con MetodoPago=PUE.
+    """
+    totales_por_metodo: dict = {}
+    for v in ventas:
+        totales_por_metodo[v.metodo_pago] = totales_por_metodo.get(v.metodo_pago, 0.0) + (v.total or 0.0)
+    if not totales_por_metodo:
+        return "01"
+    metodo_predominante = max(totales_por_metodo, key=totales_por_metodo.get)
+    return _FORMA_PAGO_SAT.get(metodo_predominante, "01")
 
 
 @router.get("/declaracion-mensual")
@@ -502,6 +536,8 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
         if not ventas:
             raise HTTPException(status_code=400, detail="No hay ventas pendientes de facturar en este periodo")
 
+        forma_pago = _forma_pago_predominante(ventas)
+
         try:
             resultado = facturacom_service.crear_factura_global(
                 api_key=fconf["facturacom_api_key"], secret_key=fconf["facturacom_secret_key"],
@@ -509,6 +545,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
                 mes=body.mes, anio=body.anio,
                 subtotal=subtotal, iva=iva, total=total,
                 emisor_cp=fconf["emisor_cp"],
+                forma_pago=forma_pago,
             )
         except facturacom_service.FacturaComError as e:
             registro = CfdiFacturaGlobal(

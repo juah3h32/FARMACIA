@@ -105,7 +105,7 @@ def _get_or_create_receptor_publico_general(api_key: str, secret_key: str, sandb
 def crear_factura_global(
     *, api_key: str, secret_key: str, sandbox: bool,
     mes: int, anio: int, subtotal: float, iva: float, total: float,
-    emisor_cp: str,
+    emisor_cp: str, forma_pago: str = "01",
 ) -> dict:
     """Timbra un CFDI 4.0 de factura global mensual (receptor Público en General).
     Regresa dict con: facturacom_id, uuid, serie, folio, pdf_bytes, xml_bytes."""
@@ -124,11 +124,15 @@ def crear_factura_global(
     base_gravada = round(iva / 0.16, 2) if iva > 0 else 0.0
     base_exenta = round(subtotal - base_gravada, 2)
 
+    # ClaveUnidad "ACT" (Actividad) es la que recomienda la guía de llenado del
+    # CFDI Global del SAT — "E48" (Unidad de servicio) pasaba el timbrado (es
+    # clave válida del catálogo) pero no es la práctica documentada para este
+    # tipo de comprobante.
     conceptos = []
     if base_gravada > 0:
         conceptos.append({
-            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "E48",
-            "Unidad": "Unidad de servicio", "ValorUnitario": base_gravada,
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "Unidad": "Actividad", "ValorUnitario": base_gravada,
             "Descripcion": f"Venta de mercancías gravadas periodo {mes:02d}/{anio} (factura global)",
             "ObjetoImp": "02",
             "Impuestos": {"Traslados": [{
@@ -138,8 +142,8 @@ def crear_factura_global(
         })
     if base_exenta > 0 or not conceptos:
         conceptos.append({
-            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "E48",
-            "Unidad": "Unidad de servicio", "ValorUnitario": base_exenta,
+            "ClaveProdServ": "01010101", "Cantidad": 1, "ClaveUnidad": "ACT",
+            "Unidad": "Actividad", "ValorUnitario": base_exenta,
             "Descripcion": f"Venta de mercancías tasa 0% periodo {mes:02d}/{anio} (factura global)",
             "ObjetoImp": "02",
             "Impuestos": {"Traslados": [{
@@ -155,7 +159,7 @@ def crear_factura_global(
         "Conceptos": conceptos,
         "UsoCFDI": "S01",
         "Serie": serie_id,
-        "FormaPago": "99",
+        "FormaPago": forma_pago,
         "MetodoPago": "PUE",
         "Moneda": "MXN",
         "EnviarCorreo": False,
