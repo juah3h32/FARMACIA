@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
@@ -196,7 +196,7 @@ def agregar_registro(pid: int, body: RegistroIn, payload: dict = Depends(get_cur
 
 
 @router.delete("/registros/{rid}")
-def eliminar_registro(rid: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_registro(rid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -205,6 +205,11 @@ def eliminar_registro(rid: int, payload: dict = Depends(get_current_api_user)):
             raise HTTPException(status_code=404, detail="No encontrado")
         db.delete(r)
         db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso, delete_ids_from_turso
+            bg.add_task(delete_ids_from_turso, "registros_clinicos", [rid])
+            bg.add_task(sync_to_turso)
         return {"ok": True}
     except HTTPException:
         raise

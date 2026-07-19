@@ -201,6 +201,60 @@ def _migrate():
         "monto_iva REAL DEFAULT 0.0, monto_isr REAL DEFAULT 0.0, monto_total REAL DEFAULT 0.0, "
         "fecha_pago DATE, linea_captura VARCHAR(50), comprobante_url VARCHAR(500), notas TEXT, "
         "usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME, actualizado_en DATETIME)",
+        # Historial clínico, agenda, compras/inventario/gastos — antes nunca se creaban en
+        # Turso, así que sync_service nunca podía empujar estas tablas (aunque se agreguen
+        # a _TABLE_ORDER, sin el CREATE TABLE aquí el push falla porque la tabla no existe
+        # del lado de Turso). Sin esto cada PC vivía con su propio historial/citas/gastos
+        # aislado — nunca se veía lo mismo entre computadoras.
+        "CREATE TABLE IF NOT EXISTS pacientes ("
+        "id INTEGER PRIMARY KEY, nombre VARCHAR(200) NOT NULL, fecha_nacimiento DATE, "
+        "sexo VARCHAR(20), telefono VARCHAR(20), email VARCHAR(100), direccion TEXT, "
+        "alergias TEXT, antecedentes TEXT, cliente_id INTEGER REFERENCES clientes(id), "
+        "activo BOOLEAN DEFAULT 1, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS promociones ("
+        "id INTEGER PRIMARY KEY, nombre VARCHAR(200) NOT NULL, tipo VARCHAR(20) NOT NULL, "
+        "valor REAL DEFAULT 0.0, aplica_a VARCHAR(50) DEFAULT 'todos', aplica_id INTEGER, "
+        "fecha_inicio DATE, fecha_fin DATE, activo BOOLEAN DEFAULT 1, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS pagos_credito ("
+        "id INTEGER PRIMARY KEY, cliente_id INTEGER NOT NULL REFERENCES clientes(id), "
+        "monto REAL NOT NULL, usuario_id INTEGER REFERENCES usuarios(id), notas TEXT, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS recetas ("
+        "id INTEGER PRIMARY KEY, venta_id INTEGER REFERENCES ventas(id), medico_nombre VARCHAR(200), "
+        "cedula VARCHAR(50), num_receta VARCHAR(100), fecha_receta DATE, notas TEXT, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS registros_clinicos ("
+        "id INTEGER PRIMARY KEY, paciente_id INTEGER NOT NULL REFERENCES pacientes(id), fecha DATETIME, "
+        "presion_sistolica INTEGER, presion_diastolica INTEGER, pulso INTEGER, temperatura REAL, "
+        "peso REAL, talla REAL, glucosa REAL, saturacion_o2 REAL, motivo TEXT, diagnostico TEXT, "
+        "tratamiento TEXT, notas TEXT, usuario_id INTEGER REFERENCES usuarios(id), creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS citas ("
+        "id INTEGER PRIMARY KEY, paciente_id INTEGER REFERENCES pacientes(id), "
+        "usuario_id INTEGER REFERENCES usuarios(id), fecha_hora DATETIME NOT NULL, "
+        "tipo_servicio VARCHAR(100), estado VARCHAR(20) DEFAULT 'programada', "
+        "nombre_paciente VARCHAR(200), telefono VARCHAR(20), notas TEXT, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS ordenes_compra ("
+        "id INTEGER PRIMARY KEY, folio VARCHAR(20) UNIQUE, proveedor_id INTEGER REFERENCES proveedores(id), "
+        "proveedor_texto VARCHAR(200), usuario_id INTEGER REFERENCES usuarios(id), "
+        "estado VARCHAR(20) DEFAULT 'borrador', notas TEXT, total_estimado REAL DEFAULT 0.0, "
+        "creado_en DATETIME, enviada_en DATETIME, recibida_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS items_orden_compra ("
+        "id INTEGER PRIMARY KEY, orden_id INTEGER NOT NULL REFERENCES ordenes_compra(id), "
+        "producto_id INTEGER NOT NULL REFERENCES productos(id), cantidad INTEGER NOT NULL, "
+        "precio_unitario REAL DEFAULT 0.0, subtotal REAL DEFAULT 0.0)",
+        "CREATE TABLE IF NOT EXISTS sesiones_inventario ("
+        "id INTEGER PRIMARY KEY, usuario_id INTEGER REFERENCES usuarios(id), "
+        "estado VARCHAR(20) DEFAULT 'en_progreso', notas TEXT, creado_en DATETIME, finalizada_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS conteos_inventario ("
+        "id INTEGER PRIMARY KEY, sesion_id INTEGER NOT NULL REFERENCES sesiones_inventario(id), "
+        "producto_id INTEGER NOT NULL REFERENCES productos(id), cantidad_sistema INTEGER DEFAULT 0, "
+        "cantidad_contada INTEGER, diferencia INTEGER DEFAULT 0, ajustado BOOLEAN DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS gastos ("
+        "id INTEGER PRIMARY KEY, concepto VARCHAR(200) NOT NULL, monto REAL NOT NULL, "
+        "categoria VARCHAR(20) DEFAULT 'otros', usuario_id INTEGER REFERENCES usuarios(id), "
+        "fecha DATE NOT NULL, notas TEXT, comprobante_url VARCHAR(500), creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS historial_precios ("
+        "id INTEGER PRIMARY KEY, producto_id INTEGER NOT NULL REFERENCES productos(id), "
+        "precio_compra_anterior REAL, precio_compra_nuevo REAL, precio_venta_anterior REAL, "
+        "precio_venta_nuevo REAL, usuario_id INTEGER REFERENCES usuarios(id), notas TEXT, creado_en DATETIME)",
     ]
 
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).

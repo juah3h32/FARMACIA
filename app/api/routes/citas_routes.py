@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, date, timedelta
@@ -123,7 +123,7 @@ def cambiar_estado(cid: int, estado: str, payload: dict = Depends(get_current_ap
 
 
 @router.delete("/{cid}")
-def eliminar_cita(cid: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_cita(cid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
     try:
         c = db.query(Cita).filter(Cita.id == cid).first()
@@ -131,6 +131,13 @@ def eliminar_cita(cid: int, payload: dict = Depends(get_current_api_user)):
             raise HTTPException(404, "Cita no encontrada")
         db.delete(c)
         db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso, delete_ids_from_turso
+            # citas está en _NO_TURSO_DELETE (sync normal nunca borra por ausencia) —
+            # sin este delete explícito la cita borrada reaparecía en el próximo pull.
+            bg.add_task(delete_ids_from_turso, "citas", [cid])
+            bg.add_task(sync_to_turso)
         return {"ok": True}
     except HTTPException:
         raise

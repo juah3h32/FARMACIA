@@ -8771,7 +8771,7 @@ function renderRetirosCaja() {
       <td class="px-4 py-2.5 text-right font-bold" style="color:#DC2626">$${(r.monto||0).toFixed(2)}</td>
       <td class="px-4 py-2.5 text-center">${tipoBtn(r)}</td>
       <td class="px-4 py-2.5 text-center">
-        <button onclick="borrarRetiro(${r.id},'${(r.concepto||'Sin concepto').replace(/'/g,'\\\'')}',$${(r.monto||0).toFixed(2)})"
+        <button onclick="borrarRetiro(${r.id},'${(r.concepto||'Sin concepto').replace(/'/g,'\\\'')}','$${(r.monto||0).toFixed(2)}')"
           title="Eliminar retiro"
           style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
           <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg> Borrar

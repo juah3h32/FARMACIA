@@ -29,6 +29,14 @@ _TABLE_ORDER = [
     "productos", "lotes", "cfdi_facturas_globales", "ventas", "cfdi_facturas_individuales",
     "items_venta", "compras", "items_compra", "facturas_compra", "cortes_caja", "retiros_caja",
     "movimientos_stock", "auditoria_log", "pagos_sat",
+    # Historial clínico, agenda, compras/inventario/gastos — antes vivían solo en la BD
+    # local de cada PC, nunca sincronizaban (la tabla ni existía en Turso). Orden respeta
+    # FKs: pacientes/promociones/pagos_credito/recetas no dependen de nada nuevo aquí;
+    # registros_clinicos y citas dependen de pacientes; items_orden_compra depende de
+    # ordenes_compra; conteos_inventario depende de sesiones_inventario.
+    "pacientes", "promociones", "pagos_credito", "recetas", "registros_clinicos", "citas",
+    "ordenes_compra", "items_orden_compra", "sesiones_inventario", "conteos_inventario",
+    "gastos", "historial_precios",
 ]
 
 # Mutable tables — always full-replace sync (rows can be updated in-place)
@@ -38,13 +46,19 @@ _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
     "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra", "pagos_sat",
+    "pacientes", "promociones", "pagos_credito", "recetas", "registros_clinicos", "citas",
+    "ordenes_compra", "items_orden_compra", "sesiones_inventario", "conteos_inventario",
+    "gastos", "historial_precios",
 })
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
 # (each PC may have a subset; deletions happen via soft-delete / purge only)
 _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
                                "compras", "items_compra", "cortes_caja", "retiros_caja",
-                               "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra"})
+                               "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra",
+                               "pacientes", "promociones", "pagos_credito", "recetas",
+                               "registros_clinicos", "citas", "ordenes_compra", "items_orden_compra",
+                               "sesiones_inventario", "conteos_inventario", "gastos", "historial_precios"})
 
 # PUSH optimization for the tables that actually grow without bound (ventas history
 # never shrinks). Before this, sync_to_turso() did `SELECT * FROM {table}` and

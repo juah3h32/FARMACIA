@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
@@ -86,7 +86,7 @@ def crear_gasto(body: GastoIn, payload: dict = Depends(get_current_api_user)):
 
 
 @router.delete("/{gid}")
-def eliminar_gasto(gid: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_gasto(gid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
@@ -95,6 +95,11 @@ def eliminar_gasto(gid: int, payload: dict = Depends(get_current_api_user)):
             raise HTTPException(status_code=404, detail="No encontrado")
         db.delete(g)
         db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso, delete_ids_from_turso
+            bg.add_task(delete_ids_from_turso, "gastos", [gid])
+            bg.add_task(sync_to_turso)
         return {"ok": True}
     except HTTPException:
         raise
