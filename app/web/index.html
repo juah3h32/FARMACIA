@@ -6772,22 +6772,22 @@ async function processSale() {
   } else if (ticketWrap) {
     ticketWrap.classList.add('hidden');
   }
-  // Refresh product stock immediately after sale so next cart add sees correct stock
+  // Venta ya está en la BD local — mostrar éxito YA, sin esperar red.
+  openModal('modal-payment');
+  S.cart=[]; renderCart();
+  document.getElementById('cart-pagado').value='';
+  updateCambio();
+  // Refrescar stock de los productos vendidos, catálogo y dashboard en
+  // background — no bloquear el modal de "venta completada" en esto
+  // (antes se esperaba un GET por producto vendido antes de mostrar el modal).
   const soldIds = [...new Set(body.items.map(i=>i.producto_id))];
-  await Promise.all(soldIds.map(id =>
+  Promise.all(soldIds.map(id =>
     api(`/productos/${id}`).then(r=>r.ok ? r.json() : null).then(fresh=>{
       if (!fresh || !S.allProducts) return;
       const idx = S.allProducts.findIndex(p=>p.id===id);
       if (idx>=0) S.allProducts[idx] = fresh; else S.allProducts.push(fresh);
     })
-  ));
-  // Re-render grid with fresh stock BEFORE showing payment modal so no stale state
-  renderPosGrid(S.allProducts);
-
-  openModal('modal-payment');
-  S.cart=[]; renderCart();
-  document.getElementById('cart-pagado').value='';
-  updateCambio();
+  )).then(() => renderPosGrid(S.allProducts));
   // Full reload in background to also refresh customers / prune deleted products
   loadPOS();
   // Refresh dashboard stats silently after every sale
