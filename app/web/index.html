@@ -12932,6 +12932,9 @@ const CFDI_ESTADO_LABEL = { timbrada:'Timbrada', cancelada:'Cancelada', error:'E
 const CFDI_ESTADO_COLOR = { timbrada:'#16A34A', cancelada:'#94A3B8', error:'#EF4444' };
 const CFDI_ESTADO_ICON = { timbrada:'circle-check', cancelada:'ban', error:'circle-x' };
 const CFDI_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+// c_FormaPago (SAT) — solo las claves que este sistema puede generar en factura global
+// (ver _forma_pago_predominante en cfdi_routes.py).
+const FORMA_PAGO_LABEL = { '01':'Efectivo', '03':'Transferencia electrónica de fondos', '04':'Tarjeta de crédito', '28':'Tarjeta de débito' };
 let _cfdiHistorialRows = [];
 
 async function loadCfdiGlobal() {
@@ -13333,7 +13336,7 @@ async function abrirConfirmacionTimbrado() {
         </div>
         <div style="flex:1;min-width:180px">
           <p style="font-weight:700;color:#64748B;margin-bottom:2px">FORMA / MÉTODO DE PAGO</p>
-          <p style="color:#0F172A">99 — Por definir (venta agregada)</p>
+          <p style="color:#0F172A">${d.forma_pago} — ${FORMA_PAGO_LABEL[d.forma_pago] || 'Otra'} (mayoría de las ventas del periodo)</p>
           <p style="color:#0F172A">PUE — Pago en una sola exhibición</p>
         </div>
       </div>

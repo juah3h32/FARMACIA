@@ -448,6 +448,7 @@ def preview_factura_global(
             }
 
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, mes, anio)
+        forma_pago = _forma_pago_predominante(ventas)
 
         # Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24h
         # siguientes al cierre del periodo. Esto NO bloquea el timbrado (a veces
@@ -487,6 +488,7 @@ def preview_factura_global(
                 "descripcion": f"Venta de mercancías periodo {mes:02d}/{anio} (factura global)",
                 "clave_unidad": "ACT",
             },
+            "forma_pago": forma_pago,
             "sandbox": fconf["facturacom_sandbox"],
             "fuera_ventana_24h": fuera_ventana_24h,
             "datos_incompletos": faltantes,
