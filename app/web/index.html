@@ -13267,7 +13267,19 @@ async function abrirConfirmacionTimbrado() {
     const d = await apiFetch(`/cfdi/preview?mes=${mes}&anio=${anio}`);
 
     if (d.ya_facturado) {
-      body.innerHTML = `<p class="text-sm font-bold" style="color:#F59E0B">Este periodo ya tiene una factura global timbrada. Cancélala primero si necesitas corregirla.</p>`;
+      const fecha = d.timbrada_en ? new Date(d.timbrada_en).toLocaleDateString('es-MX') : '—';
+      body.innerHTML = `
+        <p class="text-sm font-bold mb-3" style="color:#F59E0B">Este periodo ya tiene una factura global timbrada. Cancélala primero si necesitas corregirla.</p>
+        <div style="border:1px solid #CBD5E1;border-radius:12px;padding:14px;background:#FAFBFF">
+          <p style="font-weight:800;font-size:12px;color:#0F172A;margin-bottom:8px">LO QUE SE TIMBRÓ EN ${CFDI_MESES[mes-1].toUpperCase()} ${anio}</p>
+          <div style="font-size:11px">
+            <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#64748B">Ventas concentradas</span><span style="font-weight:600;color:#0F172A">${d.num_ventas}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#64748B">Subtotal</span><span style="font-weight:600;color:#0F172A">$${d.subtotal.toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#64748B">IVA</span><span style="font-weight:600;color:#0F172A">$${d.iva.toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;padding-top:4px;margin-top:4px;border-top:1px solid #CBD5E1"><span style="font-weight:800;color:#0F172A">TOTAL (lo que pagarías/declararías de este mes)</span><span style="font-weight:900;font-size:1.05rem;color:#16A34A">$${d.total.toFixed(2)}</span></div>
+          </div>
+          <p style="font-size:10px;color:#94A3B8;margin-top:8px">Timbrada el ${fecha}${d.folio_fiscal ? ' — UUID: ' + d.folio_fiscal : ''}</p>
+        </div>`;
       return;
     }
     if (!d.num_ventas) {

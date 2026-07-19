@@ -342,15 +342,13 @@ def preview_factura_global(
     payload: dict = Depends(get_current_api_user),
 ):
     _require_admin(payload)
-    # Sincroniza con Turso antes de checar el estado del periodo — sin esto, la
-    # vista previa en una PC podía no enterarse de que el periodo ya se timbró
-    # en otra PC, dejando avanzar hasta la pantalla de confirmación con datos
-    # viejos (el timbrado real sí lo bloqueaba al final, pero de forma confusa).
-    if cfg.TURSO_SYNC:
-        try:
-            sync_service.sync_from_turso()
-        except Exception as e:
-            print(f"[CFDI] Pre-vista-previa: no se pudo sincronizar con Turso: {e}")
+    # Antes esta vista previa hacía un sync_from_turso() COMPLETO (las ~30 tablas)
+    # de forma síncrona en cada apertura — de ahí la lentitud reportada. La
+    # comprobación cross-PC real (autoritativa, la que de verdad importa porque
+    # es irreversible) ya vive en /timbrar-global, que sigue sincronizando antes
+    # de timbrar. Esta vista previa ahora lee solo lo local: en el peor caso, si
+    # otra PC timbró el periodo hace segundos, el usuario se entera al confirmar
+    # (ese endpoint sí lo bloquea), no aquí — pero la apertura es instantánea.
     db = get_db_session()
     try:
         fconf = _leer_config_facturacion(db)
@@ -381,6 +379,28 @@ def preview_factura_global(
                     ya_existe = None
             except facturacom_service.FacturaComError:
                 pass  # SAT/Factura.com no respondió — se mantiene el estado local tal cual
+
+        if ya_existe:
+            # Mes ya timbrado: antes se seguía de largo y recalculaba "ventas
+            # pendientes" del periodo — que da 0 porque esas ventas ya quedaron
+            # marcadas facturada=True, así que la vista previa mostraba $0.00 y
+            # 0 ventas como si el mes no tuviera nada, en vez de mostrar lo que
+            # REALMENTE se timbró. Ahora devuelve directo los totales ya
+            # guardados de esa factura — respuesta instantánea, sin tocar Turso
+            # ni recorrer ventas, para el caso más común (consultar un mes que
+            # ya se declaró).
+            return {
+                "mes": mes, "anio": anio,
+                "ya_facturado": True,
+                "num_ventas": ya_existe.num_ventas or 0,
+                "subtotal": round(ya_existe.subtotal or 0.0, 2),
+                "iva": round(ya_existe.iva or 0.0, 2),
+                "total": round(ya_existe.total or 0.0, 2),
+                "folio_fiscal": ya_existe.uuid_fiscal,
+                "timbrada_en": ya_existe.creado_en.isoformat() if ya_existe.creado_en else None,
+                "sandbox": fconf["facturacom_sandbox"],
+            }
+
         ventas, subtotal, iva, total = _agregar_ventas_pendientes(db, mes, anio)
 
         # Regla 2.7.1.21 RMF: la factura global debe timbrarse dentro de las 24h
