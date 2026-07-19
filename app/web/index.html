@@ -13042,6 +13042,9 @@ async function loadDeclaracionMensual() {
     const d = await apiFetch(`/cfdi/declaracion-mensual?mes=${mes}&anio=${anio}`);
     const ivaColor = d.iva_a_pagar >= 0 ? '#EF4444' : '#16A34A';
     const ivaLabel = d.iva_a_pagar >= 0 ? 'IVA a pagar' : 'Saldo a favor de IVA';
+    // Total real a pagar al SAT este mes: IVA (solo si es a pagar — un saldo a
+    // favor de IVA no reduce el ISR, son impuestos distintos) + ISR estimado.
+    const totalPagarSat = Math.max(0, d.iva_a_pagar) + d.isr.isr_acumulado_estimado;
     const mesSig = mes == 12 ? 1 : Number(mes) + 1;
     const anioSig = mes == 12 ? Number(anio) + 1 : Number(anio);
     const vence = new Date(anioSig, mesSig - 1, 17);
@@ -13065,9 +13068,9 @@ async function loadDeclaracionMensual() {
           <p class="text-[10px]" style="color:#94A3B8">IVA acreditable $${d.compras.iva.toFixed(2)}</p>
         </div>
         <div class="rounded-xl p-3 text-center" style="background:#FEF2F2;border:1px solid #FECACA">
-          <p class="text-[10px]" style="color:#64748B">${ivaLabel}</p>
-          <p class="text-sm font-black" style="color:${ivaColor}">$${Math.abs(d.iva_a_pagar).toFixed(2)}</p>
-          <p class="text-[10px]" style="color:#94A3B8">cobrado − acreditable</p>
+          <p class="text-[10px]" style="color:#64748B">Total a pagar en el SAT (este mes)</p>
+          <p class="text-sm font-black" style="color:#EF4444">$${totalPagarSat.toFixed(2)}</p>
+          <p class="text-[10px]" style="color:#94A3B8">${ivaLabel} $${Math.abs(d.iva_a_pagar).toFixed(2)} + ISR $${d.isr.isr_acumulado_estimado.toFixed(2)}</p>
         </div>
         <div class="rounded-xl p-3 text-center" style="background:#F0F9FF;border:1px solid #BAE6FD">
           <p class="text-[10px]" style="color:#64748B">ISR estimado (tasa ${(d.isr.tasa_aplicable*100).toFixed(2)}%)</p>
@@ -13075,6 +13078,9 @@ async function loadDeclaracionMensual() {
           <p class="text-[10px]" style="color:#94A3B8">sobre acumulado del año</p>
         </div>
       </div>
+      ${d.ingresos.num_ventas > 0 && d.ingresos.iva === 0 ? `
+      <div class="p-2 rounded-xl mb-3" style="background:#EFF6FF;color:#1E40AF">El "Total a pagar" de arriba es solo ISR — tu IVA cobrado es $0.00 porque tus ${d.ingresos.num_ventas} venta(s) de este mes fueron de productos marcados a tasa 0% (medicinas, que en México causan IVA a tasa 0% por ley, no exentas). Es correcto si vendes solo medicinas. Si además vendes algo gravado al 16% (perfumería, cuidado personal, etc.), revisa que esos productos tengan "Aplica IVA" activado en Inventario.</div>
+      ` : ''}
       <div class="p-2 rounded-xl mb-3" style="background:#F8FAFC;color:#64748B">${d.isr.nota}</div>
       <div id="pago-sat-box">Consultando estado de pago...</div>`;
     _pagoSatCtx = { mes: Number(mes), anio: Number(anio), iva: d.iva_a_pagar, isr: d.isr.isr_acumulado_estimado };

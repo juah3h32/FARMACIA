@@ -136,7 +136,10 @@ def eliminar_cita(cid: int, bg: BackgroundTasks, payload: dict = Depends(get_cur
             from app.database.sync_service import sync_to_turso, delete_ids_from_turso
             # citas está en _NO_TURSO_DELETE (sync normal nunca borra por ausencia) —
             # sin este delete explícito la cita borrada reaparecía en el próximo pull.
-            bg.add_task(delete_ids_from_turso, "citas", [cid])
+            # Síncrono (no bg.add_task): si la app cierra justo después de borrar
+            # (p.ej. para instalar una actualización), una tarea en background se
+            # pierde antes de llegar a Turso y el borrado "resucita" en el próximo pull.
+            delete_ids_from_turso("citas", [cid])
             bg.add_task(sync_to_turso)
         return {"ok": True}
     except HTTPException:

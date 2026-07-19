@@ -1304,7 +1304,10 @@ def eliminar_cortes_fantasma(bg: BackgroundTasks, payload: dict = Depends(get_cu
             # cortes_caja está en _NO_TURSO_DELETE — igual que retiros_caja, el
             # sync normal nunca borra por ausencia, así que sin este delete
             # explícito el corte fantasma borrado reaparecía en el próximo pull.
-            bg.add_task(delete_ids_from_turso, "cortes_caja", ids)
+            # Síncrono (no bg.add_task): si la app cierra justo después de borrar
+            # (p.ej. para instalar una actualización), una tarea en background se
+            # pierde antes de llegar a Turso y el corte "resucita" en el próximo pull.
+            delete_ids_from_turso("cortes_caja", ids)
             bg.add_task(sync_to_turso)
         return {"ok": True, "eliminados": len(ids), "ids": ids}
     except Exception as e:

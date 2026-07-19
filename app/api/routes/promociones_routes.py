@@ -129,7 +129,10 @@ def eliminar_promocion(pid: int, bg: BackgroundTasks, payload: dict = Depends(ge
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso, delete_ids_from_turso
-            bg.add_task(delete_ids_from_turso, "promociones", [pid])
+            # Síncrono: evita que el borrado se pierda si la app cierra justo
+            # después (p.ej. para instalar una actualización) antes de que una
+            # tarea en background alcance a llegar a Turso.
+            delete_ids_from_turso("promociones", [pid])
             bg.add_task(sync_to_turso)
         return {"ok": True}
     except HTTPException:

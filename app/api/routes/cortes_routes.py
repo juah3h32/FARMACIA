@@ -551,7 +551,10 @@ def eliminar_retiro(retiro_id: int, bg: BackgroundTasks, payload: dict = Depends
             # ausencia, para no perder retiros de otra PC no sincronizada aún) —
             # sin este delete explícito, el retiro borrado localmente reaparecía
             # solo con el siguiente pull periódico de Turso.
-            bg.add_task(delete_ids_from_turso, "retiros_caja", [retiro_id])
+            # Síncrono (no bg.add_task): si la app cierra justo después de borrar
+            # (p.ej. para instalar una actualización), una tarea en background se
+            # pierde antes de llegar a Turso y el retiro "resucita" en el próximo pull.
+            delete_ids_from_turso("retiros_caja", [retiro_id])
             bg.add_task(sync_to_turso)
         return {"ok": True, "id": retiro_id}
     except HTTPException:
