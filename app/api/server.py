@@ -229,7 +229,9 @@ def dev_stamp():
     return {"v": h, "dev": cfg.DEV_MODE}
 
 
-_WEB_DIR = cfg.BASE_DIR / "app" / "web"
+# En Vercel servimos la app cliente (farmacia-app, Expo web export), nunca la UI
+# de escritorio del POS (app/web) — esa solo tiene sentido dentro del pywebview local.
+_WEB_DIR = (cfg.BASE_DIR / "farmacia-app" / "dist") if cfg._ON_VERCEL else (cfg.BASE_DIR / "app" / "web")
 
 
 @app.get("/logo.png")

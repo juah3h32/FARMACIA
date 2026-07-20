@@ -1,7 +1,8 @@
+/dist/
 build/
 data/
-node_modules/
-farmacia-app/node_modules/
+/node_modules/
+/farmacia-app/node_modules/
 instalador/
 *.spec
 version_info.txt

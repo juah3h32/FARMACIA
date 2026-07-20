@@ -3,18 +3,12 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "farmacia-app/dist/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
     {
-      "src": "/(_expo/.*|assets/.*|favicon\\.ico|.*\\.(?:js|css|png|jpg|jpeg|svg|ico|json|ttf|woff2?|map))",
-      "dest": "/farmacia-app/dist/$1"
-    },
-    { "src": "/(.*)", "dest": "/farmacia-app/dist/index.html" }
+      "src": "/(.*)",
+      "dest": "/api/index.py"
+    }
   ]
 }

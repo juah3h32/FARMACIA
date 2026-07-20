@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // API - Farmacia Eben-Ezer
-// Base URL: variable de entorno EXPO_PUBLIC_API_URL en Vercel, o dominio prod.
+// Base URL: variable de entorno EXPO_PUBLIC_API_URL, o mismo origen (backend
+// y frontend viven en el mismo deploy de Vercel).
 // ─────────────────────────────────────────────────────────────────────────────
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "https://farmacia-iota-two.vercel.app";
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 
 const DEFAULT_TIMEOUT = 30000;
 
