@@ -518,8 +518,70 @@ def integrations_status(payload: dict = Depends(get_current_api_user)):
         {"key": k, "label": labels[k], **v} for k, v in results.items()
     ]
     any_down = any((not it["ok"]) and it["enabled"] for it in integrations)
+
+    # Guarda en el historial solo cuando el estado CAMBIA respecto al último
+    # registro — si no, cada chequeo (uno cada 2 min) llenaría la tabla de filas
+    # repetidas de "todo bien" sin aportar nada al historial.
+    try:
+        from app.database.connection import get_db_session
+        from app.database.models import IntegracionLog
+        db = get_db_session()
+        try:
+            for it in integrations:
+                if not it["enabled"]:
+                    continue
+                ultimo = (
+                    db.query(IntegracionLog)
+                    .filter(IntegracionLog.origen == it["key"])
+                    .order_by(IntegracionLog.id.desc())
+                    .first()
+                )
+                if ultimo is None or ultimo.ok != it["ok"]:
+                    db.add(IntegracionLog(origen=it["key"], ok=it["ok"], mensaje=it["message"]))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass  # el historial nunca debe romper el chequeo de estado en vivo
+
     return {
         "checked_at": datetime.now().isoformat(),
         "integrations": integrations,
         "any_down": any_down,
     }
+
+
+@router.get("/integrations-log")
+def integrations_log(limit: int = 100, payload: dict = Depends(get_current_api_user)):
+    """Historial de cambios de estado de integraciones — para ver qué falló y cuándo."""
+    _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import IntegracionLog
+    db = get_db_session()
+    try:
+        rows = (
+            db.query(IntegracionLog)
+            .order_by(IntegracionLog.id.desc())
+            .limit(min(limit, 500))
+            .all()
+        )
+        labels = {
+            "turso": "Turso (Base de datos)",
+            "facturacom": "Factura.com (CFDI)",
+            "openai": "OpenAI (Farmacito / IA)",
+        }
+        return {
+            "logs": [
+                {
+                    "id": r.id,
+                    "origen": r.origen,
+                    "label": labels.get(r.origen, r.origen),
+                    "ok": r.ok,
+                    "mensaje": r.mensaje,
+                    "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+                }
+                for r in rows
+            ]
+        }
+    finally:
+        db.close()

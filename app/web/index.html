@@ -636,6 +636,28 @@
   </div>
 </div>
 
+<!-- ═══════════ HISTORIAL INTEGRACIONES MODAL ═══════════ -->
+<div id="modal-integraciones-log" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-integraciones-log')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[560px] max-h-[80vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#F8FAFF">
+          <i data-lucide="history" style="width:18px;height:18px;color:#4A6FE0"></i>
+        </div>
+        <div>
+          <h2 class="font-bold" style="color:#0F172A">Historial de Integraciones</h2>
+          <p class="text-xs" style="color:#64748B">Turso, Factura.com, OpenAI — cuándo fallaron y cuándo se recuperaron</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modal-integraciones-log')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div id="integraciones-log-list" class="overflow-y-auto flex-1" style="padding:8px 0"></div>
+  </div>
+</div>
+
 <!-- ═══════════ ALERTAS CADUCIDAD MODAL ═══════════ -->
 <div id="modal-alertas-cad" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-alertas-cad')"></div>
@@ -1181,7 +1203,10 @@
               </button>
             </div>
             <div id="integraciones-list" style="max-height:340px;overflow-y:auto"></div>
-            <div id="integraciones-updated" style="padding:8px 16px;font-size:10px;color:#94A3B8;border-top:1px solid #F1F5F9"></div>
+            <div style="padding:8px 16px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between">
+              <span id="integraciones-updated" style="font-size:10px;color:#94A3B8"></span>
+              <button onclick="openIntegracionesLog()" style="background:none;border:none;cursor:pointer;color:#4A6FE0;font-size:11px;font-weight:700">Ver historial</button>
+            </div>
           </div>
         </div>
         <!-- Alerta caducidad bell -->
@@ -8151,6 +8176,41 @@ function _closeIntegracionesOnOutsideClick(e) {
   if (wrap && !wrap.contains(e.target)) {
     document.getElementById('integraciones-panel')?.classList.add('hidden');
     document.removeEventListener('click', _closeIntegracionesOnOutsideClick);
+  }
+}
+
+async function openIntegracionesLog() {
+  document.getElementById('integraciones-panel')?.classList.add('hidden');
+  openModal('modal-integraciones-log');
+  const list = document.getElementById('integraciones-log-list');
+  list.innerHTML = `<div style="padding:32px;text-align:center;color:#94A3B8;font-size:12px">Cargando...</div>`;
+  try {
+    const res = await api('/admin/integrations-log?limit=100');
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    if (!d.logs.length) {
+      list.innerHTML = `<div style="padding:32px;text-align:center;color:#94A3B8;font-size:12px">Sin eventos registrados todavía — buena señal.</div>`;
+      return;
+    }
+    list.innerHTML = d.logs.map(l => {
+      const color = l.ok ? '#16A34A' : '#EF4444';
+      const bg    = l.ok ? '#F0FDF4' : '#FEF2F2';
+      const fecha = l.creado_en ? new Date(l.creado_en).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+      return `
+      <div style="padding:10px 20px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #F8FAFC">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:5px;flex-shrink:0"></span>
+        <div style="min-width:0;flex:1">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;font-weight:700;color:#0F172A">${l.label}</span>
+            <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;background:${bg};color:${color}">${l.ok ? 'RECUPERADO' : 'FALLÓ'}</span>
+          </div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px">${l.mensaje || ''}</div>
+          <div style="font-size:10px;color:#94A3B8;margin-top:2px">${fecha}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="padding:32px;text-align:center;color:#EF4444;font-size:12px">No se pudo cargar el historial.</div>`;
   }
 }
 

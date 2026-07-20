@@ -470,6 +470,19 @@ class Configuracion(Base):
     actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
 
+class IntegracionLog(Base):
+    """Historial de estado de integraciones externas (Turso, Factura.com, OpenAI).
+    Solo se guarda una fila cuando el estado CAMBIA (ok->falla o falla->ok),
+    no en cada chequeo — así el historial queda legible en vez de spam."""
+    __tablename__ = "integraciones_log"
+
+    id        = Column(Integer, primary_key=True)
+    origen    = Column(String(30), nullable=False)   # turso | facturacom | openai
+    ok        = Column(Boolean, nullable=False)
+    mensaje   = Column(Text)
+    creado_en = Column(DateTime, default=_dt.now)
+
+
 class CategoriaWeb(Base):
     """Categorías del catálogo web/app — independientes del POS."""
     __tablename__ = "categorias_web"

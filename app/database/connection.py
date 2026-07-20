@@ -266,6 +266,9 @@ def _migrate():
         "id INTEGER PRIMARY KEY, producto_id INTEGER NOT NULL REFERENCES productos(id), "
         "precio_compra_anterior REAL, precio_compra_nuevo REAL, precio_venta_anterior REAL, "
         "precio_venta_nuevo REAL, usuario_id INTEGER REFERENCES usuarios(id), notas TEXT, creado_en DATETIME)",
+        "CREATE TABLE IF NOT EXISTS integraciones_log ("
+        "id INTEGER PRIMARY KEY, origen VARCHAR(30) NOT NULL, ok BOOLEAN NOT NULL, "
+        "mensaje TEXT, creado_en DATETIME)",
     ]
 
     # Turso cloud — always attempt every ALTER TABLE (ignore "column already exists" errors).
