@@ -41,7 +41,7 @@ if (Platform.OS !== "web") {
 // ─────────────────────────────────────────────────────────────────────────────
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
+export function AuthProvider({ children, storageKey = "@farmacia_user" }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
@@ -57,7 +57,7 @@ export function AuthProvider({ children }) {
 
   // ── Restaurar sesión guardada y refrescar rol desde el servidor ──────────
   useEffect(() => {
-    AsyncStorage.getItem("@farmacia_user")
+    AsyncStorage.getItem(storageKey)
       .then(async (stored) => {
         if (!stored) return;
         const cached = JSON.parse(stored);
@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
             if (res?.success && res?.data) {
               const refreshed = { ...cached, ...res.data, token: cached.token };
               setUser(refreshed);
-              await AsyncStorage.setItem("@farmacia_user", JSON.stringify(refreshed));
+              await AsyncStorage.setItem(storageKey, JSON.stringify(refreshed));
             }
           } catch {
             // Si falla el refresh, continuar con datos cacheados
@@ -145,7 +145,7 @@ export function AuthProvider({ children }) {
   const saveUser = async (u) => {
     setUser(u);
     setAuthError(null);
-    await AsyncStorage.setItem("@farmacia_user", JSON.stringify(u));
+    await AsyncStorage.setItem(storageKey, JSON.stringify(u));
   };
 
   // ── Login con email/contraseña ────────────────────────────────────────────
@@ -267,7 +267,7 @@ export function AuthProvider({ children }) {
     } catch {}
     setUser(null);
     setAuthError(null);
-    await AsyncStorage.removeItem("@farmacia_user");
+    await AsyncStorage.removeItem(storageKey);
   };
 
   const clearError = () => setAuthError(null);

@@ -112,6 +112,8 @@ class Producto(Base):
     unidad_pieza = Column(String(30), default="pieza")
     unidad_caja = Column(String(30), default="caja")
     piezas_sueltas = Column(Integer, default=0)
+    precio_tachado = Column(Float, nullable=True)  # precio "antes" para mostrar promo en la web
+    destacado = Column(Boolean, default=False)     # aparece en sección de destacados/promos de la web
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, default=_dt.now)
     actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)

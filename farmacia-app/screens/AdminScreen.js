@@ -131,17 +131,31 @@ function EditUserModal({ user, stores, onClose, onSave }) {
 // ─── MODAL EDITAR STOCK ───────────────────────────────────────────────────────
 function EditStockModal({ product, onClose, onSave }) {
   const { t } = useTheme();
-  const [stock, setStock]   = useState(String(product.stock));
-  const [active, setActive] = useState(!!product.active);
+  const [stock, setStock]     = useState(String(product.stock));
+  const [active, setActive]   = useState(!!product.active);
+  const [price, setPrice]     = useState(String(product.price ?? ""));
+  const [precioTachado, setPrecioTachado] = useState(
+    product.precio_tachado ? String(product.precio_tachado) : ""
+  );
+  const [destacado, setDestacado] = useState(!!product.destacado);
   const [saving, setSaving] = useState(false);
   const reserved = product.reserved ?? 0;
 
   const handleSave = async () => {
     const val = parseInt(stock);
     if (isNaN(val) || val < 0) return;
+    const priceVal = parseFloat(price);
+    if (isNaN(priceVal) || priceVal < 0) return;
+    const tachadoVal = precioTachado.trim() ? parseFloat(precioTachado) : 0;
     setSaving(true);
     // Si el stock es > 0 siempre activar; si es 0 respetar el toggle
-    const payload = { stock: val, active: val > 0 ? true : active };
+    const payload = {
+      stock: val,
+      active: val > 0 ? true : active,
+      price: priceVal,
+      precio_tachado: tachadoVal,
+      destacado,
+    };
     await onSave(product.id, payload);
     setSaving(false);
     onClose();
@@ -226,7 +240,42 @@ function EditStockModal({ product, onClose, onSave }) {
             </View>
           )}
 
-          <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
+          <Text style={[s.sectionLabel, { marginTop: 8 }]}>PRECIO DE VENTA</Text>
+          <TextInput
+            style={[s.priceInput, { borderColor: t.border, color: t.text, backgroundColor: t.input }]}
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={t.placeholder}
+          />
+
+          <Text style={[s.sectionLabel, { marginTop: 16 }]}>PROMOCIÓN — PRECIO TACHADO (opcional)</Text>
+          <TextInput
+            style={[s.priceInput, { borderColor: t.border, color: t.text, backgroundColor: t.input }]}
+            value={precioTachado}
+            onChangeText={setPrecioTachado}
+            keyboardType="decimal-pad"
+            placeholder="Vacío = sin promoción"
+            placeholderTextColor={t.placeholder}
+          />
+
+          <View style={[s.activeRow, { backgroundColor: t.cardAlt, marginTop: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.sectionLabel, { marginBottom: 2 }]}>DESTACADO EN LA WEB</Text>
+              <Text style={{ fontSize: 11, color: t.textMuted }}>
+                {destacado ? "Aparece en la sección de destacados/promos" : "No aparece en destacados"}
+              </Text>
+            </View>
+            <Switch
+              value={destacado}
+              onValueChange={setDestacado}
+              trackColor={{ false: "#ddd", true: GREEN + "88" }}
+              thumbColor={destacado ? GREEN : "#bbb"}
+            />
+          </View>
+
+          <TouchableOpacity style={[s.saveBtn, { marginTop: 16 }]} onPress={handleSave} disabled={saving}>
             {saving
               ? <ActivityIndicator color="#fff" size="small" />
               : <><Ionicons name="checkmark-circle" size={18} color="#fff" /><Text style={s.saveBtnText}>GUARDAR</Text></>
@@ -669,6 +718,10 @@ const s = StyleSheet.create({
   saveBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 
   // Stock modal
+  priceInput: {
+    fontSize: 16, fontWeight: "700", color: "#111", textAlign: "left",
+    borderWidth: 1.5, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+  },
   stockInputRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   stockStepBtn: {
     width: 44, height: 44, borderRadius: 12,

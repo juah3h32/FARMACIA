@@ -20,7 +20,7 @@ def _pub_product(p: Producto) -> dict:
         "categoria_id":    p.categoria_id,
         "categoria_nombre": p.categoria.nombre if p.categoria else None,
         "precio_venta":    p.precio_venta,
-        "precio_tachado":  None,
+        "precio_tachado":  p.precio_tachado,
         "aplica_iva":      p.aplica_iva,
         "stock":           p.stock,
         "requiere_receta": p.requiere_receta,
@@ -28,7 +28,7 @@ def _pub_product(p: Producto) -> dict:
         "concentracion":   p.concentracion,
         "contenido":       p.contenido,
         "imagen_url":      p.imagen_url,
-        "destacado":       False,
+        "destacado":       p.destacado,
     }
 
 

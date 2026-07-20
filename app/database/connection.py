@@ -145,6 +145,8 @@ def _migrate():
         ("cfdi_facturas_individuales", "actualizado_en", "TEXT"),
         ("cfdi_facturas_globales",     "sandbox", "BOOLEAN DEFAULT 0"),
         ("cfdi_facturas_individuales", "sandbox", "BOOLEAN DEFAULT 0"),
+        ("productos", "precio_tachado", "REAL"),
+        ("productos", "destacado",      "BOOLEAN DEFAULT 0"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []

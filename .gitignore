@@ -62,3 +62,6 @@ dbcheck.py
 test_print*.py
 test_print*.txt
 =1.36.0
+
+.vercel
+.env*

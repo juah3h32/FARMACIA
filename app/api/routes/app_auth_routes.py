@@ -88,12 +88,17 @@ def _token_response(cliente: ClienteApp) -> dict:
         "access_token": token,
         "token_type": "bearer",
         "data": {
-            "id":       cliente.id,
-            "nombre":   cliente.nombre,
-            "email":    cliente.email,
-            "telefono": cliente.telefono,
-            "foto_url": cliente.foto_url,
-            "rol":      rol,
+            "token": token,
+            "user": {
+                "id":       cliente.id,
+                "nombre":   cliente.nombre,
+                "name":     cliente.nombre,
+                "email":    cliente.email,
+                "telefono": cliente.telefono,
+                "foto_url": cliente.foto_url,
+                "rol":      rol,
+                "role":     rol,
+            },
         },
     }
 
@@ -207,10 +212,12 @@ def me(payload: dict = Depends(get_current_cliente_app)):
             "data": {
                 "id":       cliente.id,
                 "nombre":   cliente.nombre,
+                "name":     cliente.nombre,
                 "email":    cliente.email,
                 "telefono": cliente.telefono,
                 "foto_url": cliente.foto_url,
                 "rol":      getattr(cliente, "rol", "cliente_app") or "cliente_app",
+                "role":     getattr(cliente, "rol", "cliente_app") or "cliente_app",
             },
         }
     finally:

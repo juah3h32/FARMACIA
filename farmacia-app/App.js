@@ -31,7 +31,6 @@ import { getProducts, getUserOrders, registerCustomerPushToken } from "./service
 import { setupForegroundHandler, registerForPushNotifications } from "./services/notifications";
 import CartScreen from "./screens/CartScreen";
 import CheckoutScreen from "./screens/CheckoutScreen";
-import AdminScreen from "./screens/AdminScreen";
 import DeliveryScreen from "./screens/DeliveryScreen";
 import { DesktopNav, MobileHeader } from "./screens/HomeScreen";
 import HomeScreen from "./screens/HomeScreen";
@@ -1181,11 +1180,6 @@ function AppContent() {
     onSettingsPress: () => setSettingsDrawerOpen(true),
   };
 
-  // ── Admin: panel de administración ───────────────────────────────────────
-  if (user?.role === "admin") {
-    return <AdminScreen />;
-  }
-
   // ── Repartidor: interfaz propia ──────────────────────────────────────────
   if (user?.role === "delivery") {
     return <DeliveryScreen />;
@@ -1309,6 +1303,15 @@ function AppContent() {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
+  if (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    window.location.pathname.replace(/\/+$/, "") === "/admin"
+  ) {
+    const AdminApp = require("./AdminApp").default;
+    return <AdminApp />;
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
