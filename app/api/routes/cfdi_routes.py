@@ -82,8 +82,8 @@ def _leer_config_facturacion(db) -> dict:
     rows = db.query(Configuracion).filter(Configuracion.clave.in_(_FACT_KEYS)).all()
     d = {r.clave: r.valor for r in rows}
     return {
-        "facturacom_api_key":    d.get("facturacom_api_key", ""),
-        "facturacom_secret_key": d.get("facturacom_secret_key", ""),
+        "facturacom_api_key":    cfg.FACTURACOM_API_KEY    or d.get("facturacom_api_key", ""),
+        "facturacom_secret_key": cfg.FACTURACOM_SECRET_KEY or d.get("facturacom_secret_key", ""),
         "facturacom_sandbox":    d.get("facturacom_sandbox", "1") == "1",
         "emisor_razon_social":  d.get("emisor_razon_social") or cfg.PHARMACY_RAZON_SOCIAL_FISCAL,
         "emisor_rfc":           d.get("emisor_rfc") or cfg.PHARMACY_RFC,

@@ -168,6 +168,12 @@ MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key") or (
 )
 MP_DEVICE_ID    = _load_key("MP_DEVICE_ID",    "mp_device_id.key")
 
+# -- Facturación (Factura.com) -------------------------------------------------
+# Prioridad: env var (Vercel) > archivo local > BD (Configuracion, vía UI del POS).
+# Así timbrar no depende de que Turso esté disponible en el momento.
+FACTURACOM_API_KEY    = _load_key("FACTURACOM_API_KEY",    "facturacom_api.key")
+FACTURACOM_SECRET_KEY = _load_key("FACTURACOM_SECRET_KEY", "facturacom_secret.key")
+
 
 def _load_openai_key() -> str:
     key = _load_key("OPENAI_API_KEY", "openai.key")
