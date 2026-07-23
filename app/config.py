@@ -128,7 +128,14 @@ USE_TURSO  = _ON_VERCEL
 TURSO_SYNC = not _ON_VERCEL
 reload_setup()
 
-API_HOST = "127.0.0.1"
+# -- Catálogo público (exponer /api/public/* a la red/internet) --------------
+# Off por default: el POS solo escucha en 127.0.0.1 (nadie fuera de este
+# equipo puede pegarle). Se activa desde Configuración > Integraciones —
+# ahí mismo se explica que además hay que abrir el puerto en el router (o
+# usar un túnel) para que se vea desde fuera de la red local.
+CATALOGO_PUBLICO = _load_key("CATALOGO_PUBLICO", "catalogo_publico.key") == "1"
+
+API_HOST = os.getenv("FARMACIA_API_HOST") or ("0.0.0.0" if (CATALOGO_PUBLICO and not _ON_VERCEL) else "127.0.0.1")
 API_PORT = 8000
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 12

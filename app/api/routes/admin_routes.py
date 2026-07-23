@@ -498,21 +498,68 @@ def _check_openai() -> dict:
         return {"ok": False, "enabled": True, "message": f"Sin conexión con OpenAI: {msg[:150]}"}
 
 
+def _check_cloudinary() -> dict:
+    if not (cfg.CLOUDINARY_CLOUD_NAME and cfg.CLOUDINARY_API_KEY and cfg.CLOUDINARY_API_SECRET):
+        return {"ok": True, "enabled": False, "message": "Cloudinary no está configurado — las imágenes se guardan localmente."}
+    try:
+        import cloudinary
+        import cloudinary.api
+        cloudinary.config(
+            cloud_name=cfg.CLOUDINARY_CLOUD_NAME,
+            api_key=cfg.CLOUDINARY_API_KEY,
+            api_secret=cfg.CLOUDINARY_API_SECRET,
+            secure=True,
+        )
+        cloudinary.api.ping()
+        return {"ok": True, "enabled": True, "message": "Conectado."}
+    except Exception as e:
+        return {"ok": False, "enabled": True, "message": f"Sin conexión con Cloudinary: {str(e)[:150]}"}
+
+
+def _check_mp() -> dict:
+    from app.services.mercadopago_service import mp_point
+    if not mp_point.access_token:
+        return {"ok": True, "enabled": False, "message": "Mercado Pago no está configurado."}
+    try:
+        import requests as _req
+        r = _req.get(
+            "https://api.mercadopago.com/point/integration-api/devices",
+            headers={"Authorization": f"Bearer {mp_point.access_token}"},
+            timeout=6,
+        )
+        if r.status_code == 401:
+            return {"ok": False, "enabled": True, "message": "Token de Mercado Pago inválido."}
+        if r.status_code == 403:
+            return {"ok": False, "enabled": True, "message": "La cuenta no tiene acceso a la API de Point."}
+        r.raise_for_status()
+        return {"ok": True, "enabled": True, "message": "Conectado."}
+    except Exception as e:
+        return {"ok": False, "enabled": True, "message": f"Sin conexión con Mercado Pago: {str(e)[:150]}"}
+
+
 @router.get("/integrations-status")
 def integrations_status(payload: dict = Depends(get_current_api_user)):
-    """Prueba en vivo la conexión a Turso, Factura.com y OpenAI — usado por la
-    campana de notificaciones del header para avisar si alguna integración cayó."""
+    """Prueba en vivo la conexión a cada integración — usado por la campana de
+    notificaciones del header y por los badges de Configuración > Integraciones."""
     _require_admin(payload)
     from concurrent.futures import ThreadPoolExecutor
 
-    checks = {"turso": _check_turso, "facturacom": _check_facturacom, "openai": _check_openai}
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    checks = {
+        "turso": _check_turso,
+        "facturacom": _check_facturacom,
+        "openai": _check_openai,
+        "cloudinary": _check_cloudinary,
+        "mp": _check_mp,
+    }
+    with ThreadPoolExecutor(max_workers=5) as pool:
         results = dict(zip(checks.keys(), pool.map(lambda f: f(), checks.values())))
 
     labels = {
         "turso": "Turso (Base de datos)",
         "facturacom": "Factura.com (CFDI)",
         "openai": "OpenAI (Farmacito / IA)",
+        "cloudinary": "Cloudinary (Imágenes)",
+        "mp": "Mercado Pago (Terminal)",
     }
     integrations = [
         {"key": k, "label": labels[k], **v} for k, v in results.items()

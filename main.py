@@ -194,10 +194,17 @@ def main():
 
     init_db()
 
-    port = _find_free_port(cfg.API_PORT)
-    if not port:
-        print("[FarmaciaPOS] No se pudo encontrar puerto libre para la API")
-        sys.exit(1)
+    # Con catálogo público activo el puerto tiene que ser fijo (8000) — si
+    # cambiara en cada arranque, el port-forwarding del router dejaría de
+    # apuntar al puerto correcto. Sin catálogo público, puerto libre al azar
+    # como siempre (más simple, sin choques con otros programas).
+    if cfg.CATALOGO_PUBLICO:
+        port = cfg.API_PORT
+    else:
+        port = _find_free_port(cfg.API_PORT)
+        if not port:
+            print("[FarmaciaPOS] No se pudo encontrar puerto libre para la API")
+            sys.exit(1)
     cfg.API_PORT = port
 
     # Turso sync in background — never blocks startup

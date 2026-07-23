@@ -84,6 +84,50 @@ def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current
     }
 
 
+# ── Catálogo público (exponer /api/public/* a la red/internet) ───────────────
+# Por default el POS solo escucha en 127.0.0.1 — nada fuera de este equipo
+# puede pegarle. Al activarse: bind pasa a 0.0.0.0 y el puerto queda fijo
+# (ver app/config.py y main.py), pero seguir siendo visible desde internet
+# depende de que el comprador abra ese puerto en su router (o use un túnel).
+
+def _lan_ip() -> str:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+@router.get("/catalogo-publico")
+def get_catalogo_publico(payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    return {
+        "on_vercel": bool(cfg._ON_VERCEL),
+        "enabled": bool(cfg.CATALOGO_PUBLICO),
+        "lan_url": f"http://{_lan_ip()}:{cfg.API_PORT}/api/public/productos",
+    }
+
+
+class CatalogoPublicoIn(BaseModel):
+    enabled: bool
+
+
+@router.post("/catalogo-publico")
+def set_catalogo_publico(body: CatalogoPublicoIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if cfg._ON_VERCEL:
+        raise HTTPException(status_code=400, detail="En la versión web el catálogo ya es público por diseño.")
+    (cfg.DATA_DIR / "catalogo_publico.key").write_text("1" if body.enabled else "0", encoding="utf-8")
+    cfg.CATALOGO_PUBLICO = body.enabled
+    return {"ok": True, "restart_required": True}
+
+
 # ── Mercado Pago Point ────────────────────────────────────────────────────────
 
 class MpSaveIn(BaseModel):

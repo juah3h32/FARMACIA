@@ -970,6 +970,14 @@
   .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
   .nav-group-label { font-size:9px; font-weight:700; letter-spacing:.16em; color:rgba(148,163,184,.45); padding:0.55rem 0.5rem 0.2rem; }
 
+  /* ── Configuración: sidebar de categorías ────────────────── */
+  .settings-cat-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; color:#475569; background:transparent; border:none; cursor:pointer; text-align:left; transition:background .15s,color .15s; }
+  .settings-cat-btn:hover { background:#F8FAFF; color:#1d2140; }
+  .settings-cat-btn.active { background:#F3E8FF; color:#7C3AED; }
+  .settings-cat-btn.active i { color:#7C3AED !important; }
+  .settings-cat-btn i { color:#94A3B8; flex-shrink:0; }
+  .settings-cat-panel.hidden { display:none; }
+
   /* ── KPI cards v2 (carousel) ─────────────────────────── */
   .kpi-card2 { background:#fff;border-radius:16px;border:1px solid #E2E8F0;padding:14px 16px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.04); }
   .kpi-card2:hover { box-shadow:0 6px 20px rgba(0,0,0,.09);transform:translateY(-1px); }
@@ -2049,6 +2057,25 @@
           </div>
         </div>
 
+        <div class="flex gap-5 items-start">
+          <!-- ── Sidebar de categorías ─────────────────────────── -->
+          <div class="flex-shrink-0 w-56 bg-white rounded-2xl border p-2 flex flex-col gap-1" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05);position:sticky;top:0">
+            <button id="settings-catbtn-general" class="settings-cat-btn active" onclick="selectSettingsCat('general')">
+              <i data-lucide="sliders-horizontal" style="width:16px;height:16px"></i> General
+            </button>
+            <button id="settings-catbtn-integraciones" class="settings-cat-btn" onclick="selectSettingsCat('integraciones')">
+              <i data-lucide="plug-zap" style="width:16px;height:16px"></i> Integraciones
+            </button>
+            <button id="settings-catbtn-datos" class="settings-cat-btn" onclick="selectSettingsCat('datos')">
+              <i data-lucide="database-backup" style="width:16px;height:16px"></i> Datos
+            </button>
+          </div>
+
+          <!-- ── Contenido de la categoría seleccionada ────────── -->
+          <div class="flex-1 min-w-0 flex flex-col gap-5">
+
+        <div id="settings-cat-general" class="settings-cat-panel flex flex-col gap-5">
+
         <!-- ── Ajustes Rápidos del POS ─────────────────────────── -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#7C3AED,#16A34A)"></div>
@@ -2082,6 +2109,10 @@
             </button>
           </div>
         </div>
+
+        </div><!-- /settings-cat-general -->
+
+        <div id="settings-cat-datos" class="settings-cat-panel hidden flex flex-col gap-5">
 
         <!-- Respaldo y Restauración -->
         <div class="bg-white rounded-2xl overflow-hidden" style="border:1px solid #E2E8F0;box-shadow:0 2px 12px rgba(2,132,199,.08)">
@@ -2148,6 +2179,10 @@
             </div>
           </div>
         </div>
+
+        </div><!-- /settings-cat-datos -->
+
+        <div id="settings-cat-integraciones" class="settings-cat-panel hidden flex flex-col gap-5">
 
         <!-- ─── Integraciones ───────────────────────────────── -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
@@ -2234,7 +2269,7 @@
               <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94A3B8"></i>
             </button>
 
-            <button onclick="openIntegModal('api')" class="w-full flex items-center gap-3 px-6 py-3.5 text-left transition hover:bg-slate-50">
+            <button onclick="openIntegModal('api')" class="w-full flex items-center gap-3 px-6 py-3.5 text-left transition hover:bg-slate-50 border-b" style="border-color:#F1F5F9">
               <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F5F3FF">
                 <i data-lucide="key-round" style="width:16px;height:16px;color:#8B5CF6"></i>
               </div>
@@ -2244,8 +2279,25 @@
               </div>
               <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94A3B8"></i>
             </button>
+
+            <button onclick="openIntegModal('catalogo')" class="w-full flex items-center gap-3 px-6 py-3.5 text-left transition hover:bg-slate-50">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EFF6FF">
+                <i data-lucide="globe" style="width:16px;height:16px;color:#2563EB"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold" style="color:#0F172A">Catálogo Público</p>
+                <p class="text-[11px]" style="color:#94A3B8">Productos + foto para una página web externa</p>
+              </div>
+              <span id="integ-badge-catalogo" class="px-2.5 py-1 rounded-lg text-[10px] font-bold">—</span>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94A3B8"></i>
+            </button>
           </div>
         </div>
+
+        </div><!-- /settings-cat-integraciones -->
+
+          </div><!-- /settings content -->
+        </div><!-- /settings sidebar+content row -->
 
       </div>
 
@@ -2635,6 +2687,52 @@
               <div id="endpoints-list" class="rounded-xl border" style="border-color:#F1F5F9">
                 <p class="text-sm text-center py-8" style="color:#94A3B8">Haz clic en "Actualizar" para ver los endpoints.</p>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="modal-integ-catalogo" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-integ-catalogo')"></div>
+        <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[520px]">
+          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+            <div class="flex items-center gap-2">
+              <i data-lucide="globe" style="width:18px;height:18px;color:#2563EB"></i>
+              <h2 class="font-bold" style="color:#0F172A">Catálogo Público</h2>
+            </div>
+            <button onclick="closeModal('modal-integ-catalogo')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+              <i data-lucide="x" style="width:16px;height:16px"></i>
+            </button>
+          </div>
+          <div class="p-6 flex flex-col gap-4">
+            <div id="catalogo-vercel-note" class="hidden rounded-xl px-3 py-2.5 text-xs" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF">
+              En la versión web el catálogo ya es público por diseño — esto solo aplica al POS de escritorio.
+            </div>
+            <div id="catalogo-fields" class="flex flex-col gap-4">
+              <p class="text-xs" style="color:#64748B;line-height:1.6">
+                Expone <code class="px-1 rounded" style="background:#F1F5F9">/api/public/productos</code> (nombre, precio, stock y foto de cada producto) para que una página web tuya la consuma. Sin login — cualquiera con la URL ve el catálogo.
+              </p>
+              <div class="flex items-center gap-3">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="catalogo-activo" class="sr-only peer" onchange="guardarCatalogoPublico(this.checked)">
+                  <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-blue-600 transition-all after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                  <span class="ml-3 text-sm font-semibold" style="color:#0F172A">Activar catálogo público</span>
+                </label>
+              </div>
+              <div id="catalogo-url-box" class="hidden rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <p class="text-[10px] font-bold uppercase mb-1.5" style="color:#94A3B8">URL en tu red local</p>
+                <div class="flex items-center gap-2">
+                  <code id="catalogo-url" class="flex-1 text-xs px-2 py-1.5 rounded-lg overflow-x-auto" style="background:#fff;border:1px solid #E2E8F0;color:#1d2140;white-space:nowrap">—</code>
+                  <button onclick="copiarCatalogoUrl()" class="h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140">
+                    <i data-lucide="copy" style="width:12px;height:12px"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="rounded-xl p-3 text-xs" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;line-height:1.6">
+                <b>Para que se vea desde internet (no solo tu WiFi):</b><br>
+                abre el puerto <b id="catalogo-port">8000</b> en tu router hacia esta computadora, o usa un túnel (ej. Cloudflare Tunnel, ngrok) apuntando a esa URL. El puerto queda fijo mientras esto esté activo.
+              </div>
+              <p class="text-[11px]" style="color:#94A3B8">Requiere reiniciar el programa al activar/desactivar.</p>
             </div>
           </div>
         </div>
@@ -8326,6 +8424,7 @@ async function loadIntegracionesStatus(manual) {
     if (!res.ok) return;
     const d = await res.json();
     _integracionesData = d;
+    _applyLiveBadgesToSettings(d);
     if (dot) dot.classList.toggle('hidden', !d.any_down);
     if (list) {
       list.innerHTML = d.integrations.map(it => {
@@ -10173,6 +10272,8 @@ function initSettings() {
     loadAdminVentas();
     loadConexionesFacturacom();
     loadIntegracionesConfig();
+    loadCatalogoPublico();
+    loadIntegracionesStatus();
   }
   loadMpStatus();
   if (S.user?.rol === 'admin') loadConfigAlertas();
@@ -13507,6 +13608,41 @@ function _integBadge(el, ready) {
   }
 }
 
+// Badge "en vivo" — a diferencia de _integBadge (solo mira si hay una clave
+// guardada), este refleja si la conexión REAL funcionó ahora mismo (viene de
+// /admin/integrations-status, que sí le pega al servicio de verdad).
+function _integLiveBadge(el, status) {
+  if (!el) return;
+  if (status === 'ok') {
+    el.textContent = 'CONECTADO';
+    el.style.cssText = 'background:#DCFCE7;color:#15803D;padding:4px 10px;border-radius:8px;font-size:10px;font-weight:700';
+  } else if (status === 'error') {
+    el.textContent = 'ERROR';
+    el.style.cssText = 'background:#FEE2E2;color:#991B1B;padding:4px 10px;border-radius:8px;font-size:10px;font-weight:700';
+  } else {
+    el.textContent = 'SIN CONFIGURAR';
+    el.style.cssText = 'background:#F1F5F9;color:#94A3B8;padding:4px 10px;border-radius:8px;font-size:10px;font-weight:700';
+  }
+}
+
+const _INTEG_LIVE_BADGE_MAP = {
+  turso: 'integ-badge-turso',
+  openai: 'integ-badge-openai',
+  cloudinary: 'integ-badge-cloud',
+  facturacom: 'integ-badge-facturacion',
+};
+
+function _applyLiveBadgesToSettings(d) {
+  if (!d?.integrations) return;
+  for (const it of d.integrations) {
+    const elId = _INTEG_LIVE_BADGE_MAP[it.key];
+    if (!elId) continue;
+    const el = document.getElementById(elId);
+    if (!el) continue;
+    _integLiveBadge(el, !it.enabled ? 'off' : (it.ok ? 'ok' : 'error'));
+  }
+}
+
 const _INTEG_LOADERS = {
   facturacion: loadConexionesFacturacom,
   mp:          loadMpStatus,
@@ -13515,12 +13651,23 @@ const _INTEG_LOADERS = {
   cloud:       loadIntegracionesConfig,
   alertas:     loadConfigAlertas,
   api:         renderTokenHistory,
+  catalogo:    loadCatalogoPublico,
 };
 
 function openIntegModal(key) {
   const loader = _INTEG_LOADERS[key];
   if (loader) loader();
   openModal(`modal-integ-${key}`);
+}
+
+const _SETTINGS_CATS = ['general', 'integraciones', 'datos'];
+
+function selectSettingsCat(cat) {
+  _SETTINGS_CATS.forEach(c => {
+    document.getElementById(`settings-cat-${c}`)?.classList.toggle('hidden', c !== cat);
+    document.getElementById(`settings-catbtn-${c}`)?.classList.toggle('active', c === cat);
+  });
+  icons();
 }
 
 function _setIntegMode(prefix, onVercel, ready) {
@@ -13581,7 +13728,47 @@ async function guardarIntegraciones() {
     const res = await apiFetch('/config/integraciones', { method:'POST', body: JSON.stringify(body) });
     toast(res.restart_required ? 'Guardado — reinicia el programa para aplicar Turso' : 'Integraciones guardadas', 'success');
     loadIntegracionesConfig();
+    loadIntegracionesStatus(); // verifica la conexión real ahora mismo con la clave nueva
   } catch(e) { toast(e.message, 'error'); }
+}
+
+async function loadCatalogoPublico() {
+  try {
+    const d = await apiFetch('/config/catalogo-publico');
+    const note = document.getElementById('catalogo-vercel-note');
+    const fields = document.getElementById('catalogo-fields');
+    if (d.on_vercel) {
+      note.classList.remove('hidden');
+      fields.classList.add('hidden');
+      return;
+    }
+    note.classList.add('hidden');
+    fields.classList.remove('hidden');
+    document.getElementById('catalogo-activo').checked = d.enabled;
+    document.getElementById('catalogo-url-box').classList.toggle('hidden', !d.enabled);
+    document.getElementById('catalogo-url').textContent = d.lan_url || '—';
+    const port = (d.lan_url || '').match(/:(\d+)\//);
+    if (port) document.getElementById('catalogo-port').textContent = port[1];
+    _integBadge(document.getElementById('integ-badge-catalogo'), d.enabled);
+  } catch(e) {}
+}
+
+async function guardarCatalogoPublico(enabled) {
+  try {
+    const res = await apiFetch('/config/catalogo-publico', { method:'POST', body: JSON.stringify({ enabled }) });
+    toast(res.restart_required ? 'Guardado — reinicia el programa para aplicar' : 'Guardado', 'success');
+    loadCatalogoPublico();
+  } catch(e) {
+    toast(e.message, 'error');
+    document.getElementById('catalogo-activo').checked = !enabled;
+  }
+}
+
+function copiarCatalogoUrl() {
+  const url = document.getElementById('catalogo-url').textContent;
+  if (!url || url === '—') return;
+  navigator.clipboard?.writeText(url);
+  toast('URL copiada', 'success');
 }
 
 async function guardarConfigCfdi() {
@@ -13601,6 +13788,7 @@ async function guardarConfigCfdi() {
   try {
     await apiFetch('/config/facturacion', { method:'POST', body: JSON.stringify(body) });
     toast('Configuración de facturación guardada', 'success');
+    loadIntegracionesStatus();
   } catch(e) { toast(e.message, 'error'); }
 }
 
