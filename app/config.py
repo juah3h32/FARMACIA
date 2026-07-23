@@ -74,15 +74,8 @@ def _load_key(env_name: str, filename: str) -> str:
     return val
 
 # -- Turso (LibSQL) cloud DB --------------------------------------------------
-TURSO_DATABASE_URL = os.getenv(
-    "TURSO_DATABASE_URL",
-    "libsql://farmacia-juanpa.aws-us-east-1.turso.io",
-)
-TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key") or (
-    "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9"
-    ".eyJhIjoicnciLCJpYXQiOjE3NzkxNTUwOTQsImlkIjoiMDE5ZTNkZTctZjQwMS03NmViLWFkYjgtZTRkMzAxZGExMTdjIiwicmlkIjoiNDVkNDAzNjItNzg4Ni00MDViLWE0Y2QtNDUxMjY1YTgxMzQ0In0"
-    ".B3nY0-9gzbXkqNlj8MlzBjw44JP9OpVrG9QGrdx_tkB19QF8l7f5IgYoW3mLjOqUq4sTOVNQu78GEJMaVA0sDg"
-)
+TURSO_DATABASE_URL = _load_key("TURSO_DATABASE_URL", "turso_url.key")
+TURSO_AUTH_TOKEN = _load_key("TURSO_AUTH_TOKEN", "turso.key")
 
 # -- Modo de sincronización (elegido en el asistente de primer arranque) ------
 # "turso"   = SQLite local + sincroniza con la nube (multi-PC)
@@ -158,14 +151,12 @@ GITHUB_REPO = "juah3h32/FARMACIA"
 GITHUB_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
 GITHUB_TOKEN = ""
 
-CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key") or "dcutrbbyw"
-CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")    or "717952968559447"
-CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key") or "gufXKh1BIUTfsdwKNzz95or4SI4"
+CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key")
+CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")
+CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key")
 
 # -- Mercado Pago Point (terminal de pago ME30S) ------------------------------
-MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key") or (
-    "APP_USR-6410994072397818-062114-f98cacf3ef24f92ce1941c5545cc7e03-3486812391"
-)
+MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key")
 MP_DEVICE_ID    = _load_key("MP_DEVICE_ID",    "mp_device_id.key")
 
 # -- Facturación (Factura.com) -------------------------------------------------
@@ -175,14 +166,4 @@ FACTURACOM_API_KEY    = _load_key("FACTURACOM_API_KEY",    "facturacom_api.key")
 FACTURACOM_SECRET_KEY = _load_key("FACTURACOM_SECRET_KEY", "facturacom_secret.key")
 
 
-def _load_openai_key() -> str:
-    key = _load_key("OPENAI_API_KEY", "openai.key")
-    if not key:
-        key = (
-            "sk-proj-Yoq_JrjHgsJ9RuPMb2BrJHP83mVweP9-ZBR-ZcKx8DoYZEUoupZc1lcRE6LHP4Ch1aZ8NXfGA"
-            "CT3BlbkFJg8p-I6iOthjveaONV4Luj8UDfuH4Do-gu7YQqWJI-2BdHU_6rtUd4F2xeE28LgumO63vq4XDcA"
-        )
-    return key
-
-
-OPENAI_API_KEY = _load_openai_key()
+OPENAI_API_KEY = _load_key("OPENAI_API_KEY", "openai.key")

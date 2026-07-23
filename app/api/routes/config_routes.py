@@ -22,6 +22,68 @@ def desktop_keys(payload: dict = Depends(get_current_api_user)):
     }
 
 
+# ── Integraciones propias (Turso / OpenAI / Cloudinary) ──────────────────────
+# Cada instalación (comprador del programa) captura sus propias claves aquí.
+# En EXE/dev: se guardan como archivos en DATA_DIR (misma prioridad que env vars
+# en app/config.py: env var > archivo local > vacío). En Vercel: se configuran
+# como variables de entorno en el dashboard, esta pantalla no aplica ahí.
+
+_INTEGRACIONES_MAP = {
+    "turso_database_url":   ("TURSO_DATABASE_URL",   "turso_url.key",        False),
+    "turso_auth_token":     ("TURSO_AUTH_TOKEN",      "turso.key",            True),
+    "openai_api_key":       ("OPENAI_API_KEY",        "openai.key",           True),
+    "cloudinary_cloud_name": ("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key", False),
+    "cloudinary_api_key":   ("CLOUDINARY_API_KEY",    "cloudinary_api.key",   True),
+    "cloudinary_api_secret": ("CLOUDINARY_API_SECRET", "cloudinary_secret.key", True),
+}
+
+
+@router.get("/integraciones")
+def get_integraciones(payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    out = {"on_vercel": bool(cfg._ON_VERCEL)}
+    for field, (attr, _filename, is_secret) in _INTEGRACIONES_MAP.items():
+        val = getattr(cfg, attr, "") or ""
+        out[field] = _mask(val) if is_secret else val
+    return out
+
+
+class IntegracionesIn(BaseModel):
+    turso_database_url: str = ""
+    turso_auth_token: str = ""
+    openai_api_key: str = ""
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+
+
+@router.post("/integraciones")
+def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if cfg._ON_VERCEL:
+        raise HTTPException(
+            status_code=400,
+            detail="En la versión web estas claves se configuran como variables de "
+                   "entorno en el dashboard de Vercel, no desde aquí.",
+        )
+    data = body.dict()
+    changed_turso = False
+    for field, (attr, filename, is_secret) in _INTEGRACIONES_MAP.items():
+        val = data.get(field, "").strip()
+        if not val or (is_secret and val.startswith(_MASK_PREFIX)):
+            continue  # usuario no tocó el campo — conservar valor actual
+        (cfg.DATA_DIR / filename).write_text(val, encoding="utf-8")
+        setattr(cfg, attr, val)
+        if attr.startswith("TURSO_"):
+            changed_turso = True
+    return {
+        "ok": True,
+        "restart_required": changed_turso,  # el engine de Turso se arma al iniciar
+    }
+
+
 # ── Mercado Pago Point ────────────────────────────────────────────────────────
 
 class MpSaveIn(BaseModel):

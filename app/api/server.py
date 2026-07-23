@@ -259,6 +259,24 @@ async def serve_logo_sistema():
     raise HTTPException(status_code=404)
 
 
+_UPLOADS_DIR = cfg.DATA_DIR / "uploads"
+
+
+@app.get("/uploads/{subpath:path}")
+async def serve_uploaded_image(subpath: str):
+    """Sirve imágenes de producto/perfil guardadas localmente cuando Cloudinary
+    no está configurado (ver app/services/cloudinary_service.py)."""
+    from fastapi import HTTPException
+    file_path = (_UPLOADS_DIR / subpath).resolve()
+    try:
+        file_path.relative_to(_UPLOADS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=404)
+    if file_path.is_file():
+        return FileResponse(str(file_path))
+    raise HTTPException(status_code=404)
+
+
 @app.get("/")
 @app.get("/{path:path}")
 async def serve_spa(path: str = ""):
