@@ -1289,8 +1289,8 @@
           </button>
         </div>
 
-        <!-- KPI Carousel -->
-        <div style="flex-shrink:0">
+        <!-- KPI Carousel (admin only — cajero no ve cifras de ventas/inventario) -->
+        <div id="dash-kpi-carousel" style="flex-shrink:0">
           <!-- Slide label row -->
           <div class="flex items-center justify-between" style="margin-bottom:8px">
             <p id="kpi-slide-lbl" class="kpi-slide-lbl">Métricas de hoy</p>
@@ -1412,9 +1412,9 @@
         <div id="inv-kpi-bar" class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));flex-shrink:0"></div>
 
         <!-- Bottom row -->
-        <div class="grid gap-4 min-h-0" style="grid-template-columns:1fr 260px;flex:1;overflow:hidden">
-          <!-- Recent sales -->
-          <div class="bg-white rounded-2xl border flex flex-col min-h-0" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);overflow:hidden">
+        <div id="dash-bottom-row" class="grid gap-4 min-h-0" style="grid-template-columns:1fr 260px;flex:1;overflow:hidden">
+          <!-- Recent sales (admin only — cajero no ve ventas/lo vendido) -->
+          <div id="dash-recent-card" class="bg-white rounded-2xl border flex flex-col min-h-0" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);overflow:hidden">
             <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
               <div>
                 <h2 class="font-bold text-sm" style="color:#0F172A">Ventas recientes</h2>
@@ -1451,8 +1451,8 @@
               <div id="dash-quick-actions" class="flex flex-col gap-1.5"></div>
             </div>
 
-            <!-- Payment breakdown -->
-            <div class="bg-white rounded-2xl border p-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);flex-shrink:0">
+            <!-- Payment breakdown (admin only — cifras de dinero cobrado) -->
+            <div id="dash-pay-card" class="bg-white rounded-2xl border p-3" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03);flex-shrink:0">
               <p class="text-[9px] font-bold tracking-[.18em] uppercase mb-2" style="color:#94A3B8">Cobros de hoy</p>
               <div id="dash-pay-bars" class="flex flex-col gap-2">
                 <p class="text-xs text-center py-2" style="color:#94A3B8">Cargando...</p>
@@ -5388,7 +5388,7 @@ const NAV = [
   { type:'group', label:'PRINCIPAL' },
   { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',        admin:false },
   { key:'pos',       icon:'shopping-cart',    label:'Nueva Venta',      admin:false },
-  { key:'inventory', icon:'package',          label:'Inventario',       admin:false },
+  { key:'inventory', icon:'package',          label:'Inventario',       admin:true  },
   { type:'group', label:'PACIENTES' },
   { key:'customers', icon:'users',            label:'Clientes',         admin:false },
   { key:'historial', icon:'heart-pulse',      label:'Historial Clínico',admin:false },
@@ -6588,14 +6588,30 @@ async function loadDashboard() {
         btn2('users','Empleados',"navigate('employees')") +
         btn2('user-round','Clientes',"navigate('customers')");
     } else {
+      // Cajero: sin cifras de ventas/dinero — solo lo que necesita para vender.
       qa.innerHTML =
         btnPri('shopping-cart','Nueva Venta',"navigate('pos')") +
         btn2('clock','Mi Turno',"openTurnoPanel()",'#8B5CF6') +
-        btn2('package','Inventario',"navigate('inventory')") +
-        btn2('bar-chart-3','Mis Ventas',"navigate('reports')") +
         btn2('user-round','Clientes',"navigate('customers')");
     }
     icons();
+  }
+
+  // Panel de stats (KPIs de ventas/inventario, ventas recientes, cobros del día,
+  // comparativos) es solo para admin — el cajero no debe ver lo vendido/dinero.
+  const kpiCarouselEl = document.getElementById('dash-kpi-carousel');
+  if (kpiCarouselEl) kpiCarouselEl.style.display = isAdmin ? '' : 'none';
+  const recentCardEl = document.getElementById('dash-recent-card');
+  if (recentCardEl) recentCardEl.style.display = isAdmin ? '' : 'none';
+  const payCardEl = document.getElementById('dash-pay-card');
+  if (payCardEl) payCardEl.style.display = isAdmin ? '' : 'none';
+  const bottomRowEl = document.getElementById('dash-bottom-row');
+  if (bottomRowEl) bottomRowEl.style.gridTemplateColumns = isAdmin ? '1fr 260px' : '1fr';
+
+  if (!isAdmin) {
+    const b = document.getElementById('inv-kpi-bar'); if (b) b.innerHTML = '';
+    const compDiv = document.getElementById('dash-comparativo'); if (compDiv) compDiv.classList.add('hidden');
+    return;
   }
 
   _animNum('kpi-ventas',   d.ventas_hoy,   false);
@@ -6624,9 +6640,6 @@ async function loadDashboard() {
   if (_kpiAutoTimer) { clearInterval(_kpiAutoTimer); _kpiAutoTimer = null; }
   const dotsEl = document.getElementById('kpi-dots');
   if (dotsEl) dotsEl.style.display = isAdmin ? 'flex' : 'none';
-
-  // Inventory KPIs — admin only
-  if (!isAdmin) { const b=document.getElementById('inv-kpi-bar'); if(b) b.innerHTML=''; }
   try {
     const ir = isAdmin ? await api('/inventario/resumen-inventario') : null;
     if (ir && ir.ok) {
@@ -14892,7 +14905,7 @@ const QM_GROUPS = [
     items: [
       { key:'dashboard',    icon:'layout-dashboard', label:'Dashboard',          desc:'Estadísticas del día en tiempo real' },
       { key:'pos',          icon:'shopping-cart',    label:'Nueva Venta',        desc:'Punto de venta — escanea y cobra' },
-      { key:'inventory',    icon:'package',          label:'Inventario',         desc:'Productos, stock, lotes y vencimientos' },
+      { key:'inventory',    icon:'package',          label:'Inventario',         desc:'Productos, stock, lotes y vencimientos', admin:true },
       { key:'devoluciones', icon:'undo-2',           label:'Devoluciones',       desc:'Registrar devolución de productos vendidos' },
       { key:'alertas',      icon:'bell-ring',        label:'Centro de Alertas',  desc:'Stock bajo, vencimientos, citas del día' },
     ]
