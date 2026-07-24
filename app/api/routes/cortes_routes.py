@@ -297,6 +297,12 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
+        # Ventas de emergencia hechas DESPUÉS de este cierre (turno ya cerrado, sin
+        # abrir uno nuevo) quedarían huérfanas para siempre — se dispara la
+        # reconstrucción en background para que, apenas ocurran, ya tengan un corte
+        # que las cubra ese mismo día sin que nadie tenga que acordarse de darle al
+        # botón manual del panel admin.
+        bg.add_task(_reconstruir_historicos_run)
         esperado   = apertura + ef - total_retiros
         diferencia = body.monto_cierre - esperado
         return {
@@ -747,21 +753,98 @@ def auto_cerrar_diario(bg: BackgroundTasks, payload: dict = Depends(get_current_
         db.close()
 
 
-@router.post("/reconstruir-historicos")
-def reconstruir_historicos(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
-    """
-    Admin: for each (usuario, calendar-day) that has completed ventas but no covering
-    corte, synthesises a corte (08:00 open -> 21:00 close) with correct totals.
-    Also closes open phantom cortes (0 ventas).
-    Pulls latest ventas from Turso first (when TURSO_SYNC=True) so that sales made
-    on other PCs or via the web app are included in the reconstruction.
-    """
-    if payload.get("rol") != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores")
-    from datetime import date as _date
+def _reconstruir_historicos_core(db) -> dict:
+    """Cierra cortes fantasma y crea cortes sintéticos para ventas huérfanas —
+    ventas completadas que no caen dentro de la ventana horaria [abierto_en,
+    cerrado_en] de ningún corte (típicamente ventas de emergencia hechas después
+    de cerrar caja). Comparar por timestamp exacto (no solo por día calendario)
+    importa: una venta de emergencia cae en el mismo 'día' que el corte ya
+    cerrado, pero fuera de su ventana horaria — con un chequeo por día completo
+    esa venta se consideraba 'cubierta' y jamás se le creaba un corte, quedando
+    huérfana para siempre. Hace commit; no abre/cierra la sesión."""
     from collections import defaultdict
 
-    # Pull latest data from Turso so local SQLite has ALL ventas before reconstruction
+    # 1. Close open phantom cortes (0 completed ventas tied to them)
+    open_cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
+    phantoms_closed = 0
+    for c in open_cortes:
+        if not c.abierto_en:
+            _auto_cerrar_turno(db, c, "Cerrado — corte sin fecha de apertura")
+            phantoms_closed += 1
+            continue
+        count = db.query(Venta).filter(
+            Venta.usuario_id == c.usuario_id,
+            Venta.creado_en >= c.abierto_en,
+            Venta.estado == EstadoVenta.completada,
+            Venta.eliminado.is_not(True),
+        ).count()
+        if count == 0:
+            _auto_cerrar_turno(db, c, "Cerrado — corte fantasma sin ventas")
+            phantoms_closed += 1
+    db.flush()
+
+    # 2. Gather all completed ventas
+    all_ventas = (
+        db.query(Venta)
+        .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+        .all()
+    )
+
+    # 3. Gather existing cortes (including newly created/closed ones via flush)
+    all_cortes = db.query(CortesCaja).all()
+
+    def _venta_covered(v) -> bool:
+        for c in all_cortes:
+            if c.usuario_id != v.usuario_id or not c.abierto_en:
+                continue
+            cierre = c.cerrado_en or datetime.now()
+            if c.abierto_en <= v.creado_en <= cierre:
+                return True
+        return False
+
+    # 4. Group uncovered ventas by (usuario, día)
+    huerfanas_by_user_day: dict = defaultdict(list)
+    for v in all_ventas:
+        if v.creado_en and not _venta_covered(v):
+            huerfanas_by_user_day[(v.usuario_id, v.creado_en.date())].append(v)
+
+    # 5. Create a synthetic corte per (user, day) group spanning exactly those
+    # ventas' timestamps — así aparece ese mismo día sin solaparse con el corte
+    # normal ya cerrado.
+    created = 0
+    for (usuario_id, day), ventas in sorted(huerfanas_by_user_day.items()):
+        open_dt  = min(v.creado_en for v in ventas)
+        close_dt = max(v.creado_en for v in ventas)
+
+        ef, tj, tr, tv = _sumar_totales_ventas(ventas)
+        total_costo = _costo_ventas(db, [v.id for v in ventas])
+
+        new_c = CortesCaja(
+            usuario_id=usuario_id,
+            monto_apertura=0.0,
+            monto_cierre=ef,
+            abierto_en=open_dt,
+            cerrado_en=close_dt,
+            total_ventas=tv,
+            total_efectivo=ef,
+            total_tarjeta=tj,
+            total_transferencia=tr,
+            total_costo=total_costo,
+            num_ventas=len(ventas),
+            notas="Reconstruido automáticamente — venta(s) de emergencia fuera de turno",
+        )
+        db.add(new_c)
+        all_cortes.append(new_c)
+        created += 1
+
+    db.commit()
+    return {"cortes_creados": created, "cortes_phantom_cerrados": phantoms_closed}
+
+
+def _reconstruir_historicos_run() -> dict:
+    """Pull-run-push standalone: sin dependencias de request, para poder llamarse
+    desde un BackgroundTasks (auto-trigger al cerrar corte) o desde el endpoint
+    manual del panel admin."""
     import app.config as _cfg
     if _cfg.TURSO_SYNC:
         try:
@@ -772,90 +855,29 @@ def reconstruir_historicos(bg: BackgroundTasks, payload: dict = Depends(get_curr
 
     db = get_db_session()
     try:
-        # 1. Close open phantom cortes (0 completed ventas tied to them)
-        open_cortes = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).all()
-        phantoms_closed = 0
-        for c in open_cortes:
-            if not c.abierto_en:
-                _auto_cerrar_turno(db, c, "Cerrado — corte sin fecha de apertura")
-                phantoms_closed += 1
-                continue
-            count = db.query(Venta).filter(
-                Venta.usuario_id == c.usuario_id,
-                Venta.creado_en >= c.abierto_en,
-                Venta.estado == EstadoVenta.completada,
-                Venta.eliminado.is_not(True),
-            ).count()
-            if count == 0:
-                _auto_cerrar_turno(db, c, "Cerrado — corte fantasma sin ventas")
-                phantoms_closed += 1
-        db.flush()
-
-        # 2. Gather all completed ventas grouped by (usuario_id, date)
-        all_ventas = (
-            db.query(Venta)
-            .filter(Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
-            .all()
-        )
-        ventas_by_user_day: dict = defaultdict(list)
-        for v in all_ventas:
-            if v.creado_en:
-                ventas_by_user_day[(v.usuario_id, v.creado_en.date())].append(v)
-
-        # 3. Gather existing cortes (including newly created/closed ones via flush)
-        all_cortes = db.query(CortesCaja).all()
-
-        def _is_covered(usuario_id: int, day: _date) -> bool:
-            for c in all_cortes:
-                if c.usuario_id != usuario_id or not c.abierto_en:
-                    continue
-                open_day  = c.abierto_en.date()
-                close_day = c.cerrado_en.date() if c.cerrado_en else datetime.now().date()
-                if open_day <= day <= close_day:
-                    return True
-            return False
-
-        # 4. Create synthetic cortes for uncovered (user, day) pairs
-        created = 0
-        for (usuario_id, day), ventas in sorted(ventas_by_user_day.items()):
-            if _is_covered(usuario_id, day):
-                continue
-            open_dt  = datetime.combine(day, _time_type(8, 0, 0))
-            close_dt = datetime.combine(day, _time_type(21, 0, 0))
-
-            ef, tj, tr, tv = _sumar_totales_ventas(ventas)
-            total_costo = _costo_ventas(db, [v.id for v in ventas])
-
-            new_c = CortesCaja(
-                usuario_id=usuario_id,
-                monto_apertura=0.0,
-                monto_cierre=ef,
-                abierto_en=open_dt,
-                cerrado_en=close_dt,
-                total_ventas=tv,
-                total_efectivo=ef,
-                total_tarjeta=tj,
-                total_transferencia=tr,
-                total_costo=total_costo,
-                num_ventas=len(ventas),
-                notas="Reconstruido automáticamente",
-            )
-            db.add(new_c)
-            all_cortes.append(new_c)
-            created += 1
-
-        db.commit()
-        import app.config as _cfg
-        if _cfg.TURSO_SYNC:
-            from app.database.sync_service import sync_to_turso
-            bg.add_task(sync_to_turso)
-        return {
-            "ok": True,
-            "cortes_creados": created,
-            "cortes_phantom_cerrados": phantoms_closed,
-        }
-    except Exception as e:
+        result = _reconstruir_historicos_core(db)
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise
     finally:
         db.close()
+
+    if _cfg.TURSO_SYNC:
+        try:
+            from app.database.sync_service import sync_to_turso
+            sync_to_turso()
+        except Exception as _e:
+            print(f"[reconstruir] sync_to_turso warning: {_e}")
+
+    return {"ok": True, **result}
+
+
+@router.post("/reconstruir-historicos")
+def reconstruir_historicos(payload: dict = Depends(get_current_api_user)):
+    """Admin: dispara manualmente la reconstrucción (ver _reconstruir_historicos_core)."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    try:
+        return _reconstruir_historicos_run()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
