@@ -22,6 +22,11 @@ class EntradaStockIn(BaseModel):
     precio_compra: float = 0.0
 
 
+class EditarLoteIn(BaseModel):
+    numero_lote: Optional[str] = None
+    fecha_vencimiento: Optional[str] = None   # "DD/MM/YYYY", "MM/YYYY" or "YYYY-MM-DD"; "" clears it
+
+
 class BajaLoteIn(BaseModel):
     lote_id: int
     cantidad: int                 # partial or full write-off
@@ -203,6 +208,62 @@ def lotes_producto(producto_id: int, payload: dict = Depends(get_current_api_use
                 "estado":            estado,
             })
         return result
+    finally:
+        db.close()
+
+
+@router.put("/lote/{lote_id}")
+def editar_lote(lote_id: int, body: EditarLoteIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Corrige numero_lote/fecha_vencimiento de un lote ya registrado (p.ej. error de captura)."""
+    _require_admin(payload)
+    db = get_db_session()
+    try:
+        lote = db.query(Lote).filter(Lote.id == lote_id).first()
+        if not lote:
+            raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+        if body.numero_lote is not None:
+            lote.numero_lote = body.numero_lote.strip() or None
+
+        if body.fecha_vencimiento is not None:
+            if body.fecha_vencimiento.strip() == "":
+                lote.fecha_vencimiento = None
+            else:
+                import calendar as _cal
+                fecha_venc = None
+                for fmt in ("%m/%Y", "%d/%m/%Y", "%Y-%m-%d"):
+                    try:
+                        parsed = datetime.strptime(body.fecha_vencimiento, fmt)
+                        if fmt == "%m/%Y":
+                            last = _cal.monthrange(parsed.year, parsed.month)[1]
+                            fecha_venc = date(parsed.year, parsed.month, last)
+                        else:
+                            fecha_venc = parsed.date()
+                        break
+                    except ValueError:
+                        continue
+                if fecha_venc is None:
+                    raise HTTPException(status_code=400, detail="Formato de fecha inválido")
+                lote.fecha_vencimiento = fecha_venc
+
+        db.commit()
+
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+
+        return {
+            "ok": True,
+            "id": lote.id,
+            "numero_lote": lote.numero_lote,
+            "fecha_vencimiento": lote.fecha_vencimiento.isoformat() if lote.fecha_vencimiento else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

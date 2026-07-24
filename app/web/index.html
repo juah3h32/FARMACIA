@@ -581,6 +581,36 @@
   </div>
 </div>
 
+<!-- ═══════════ EDITAR LOTE MODAL ═══════════ -->
+<div id="modal-editar-lote" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-editar-lote')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[420px]">
+    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+      <div class="flex items-center gap-2">
+        <i data-lucide="pencil" style="width:18px;height:18px;color:#8B5CF6"></i>
+        <h2 class="font-bold" style="color:#0F172A">Corregir Lote</h2>
+      </div>
+      <button onclick="closeModal('modal-editar-lote')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="lbl">N° Lote</label>
+        <input id="edit-lote-numero" type="text" class="inp" placeholder="S/N">
+      </div>
+      <div>
+        <label class="lbl">Fecha de Vencimiento</label>
+        <input id="edit-lote-fecha" type="date" class="inp">
+      </div>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="closeModal('modal-editar-lote')" class="flex-1 h-10 rounded-xl border text-sm font-medium" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+      <button onclick="confirmarEditarLote()" class="flex-1 h-10 rounded-xl text-white font-semibold text-sm" style="background:#8B5CF6">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ AJUSTE FÍSICO MODAL ═══════════ -->
 <div id="modal-ajuste-fisico" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-ajuste-fisico')"></div>
@@ -8650,13 +8680,19 @@ async function _refreshLotesTable(id) {
                Dar de baja
              </button>`
           : '';
+        const editBtn = isAdmin
+          ? `<button onclick="openEditarLote(${l.id},'${(l.numero_lote||'').replace(/'/g,"\\'")}','${l.fecha_vencimiento||''}')"
+               class="h-6 px-2 rounded-lg text-[10px] font-semibold" style="background:#F5F3FF;color:#8B5CF6">
+               Corregir
+             </button>`
+          : '';
         return `<tr class="border-b" style="border-color:#F1F5F9;background:${bg}">
           <td class="px-5 py-2.5 font-mono text-xs" style="color:#374151">${l.numero_lote||'S/N'}</td>
           <td class="px-5 py-2.5 text-center text-xs" style="color:#374151">${fv}</td>
           <td class="px-5 py-2.5 text-right font-semibold">${l.cantidad}</td>
           <td class="px-5 py-2.5 text-right text-xs" style="color:#64748B">${dias}</td>
           <td class="px-5 py-2.5 text-center">${estadoBadge(l.estado)}</td>
-          <td class="px-5 py-2.5 text-center">${bajaBtn}</td>
+          <td class="px-5 py-2.5 text-center flex gap-1 justify-center">${editBtn}${bajaBtn}</td>
         </tr>`;
       }).join('')
     : '<tr><td colspan="6" class="text-center py-6" style="color:#94A3B8">Sin lotes registrados</td></tr>';
@@ -8695,6 +8731,34 @@ async function confirmarBajaLote() {
     loadInventory();
   } else {
     const e = await res.json(); toast(e.detail||'Error','error');
+  }
+}
+
+// ── Corregir lote (numero / fecha de vencimiento) ──────────────────────────
+let _editLoteId = null;
+
+function openEditarLote(loteId, numero, fechaVenc) {
+  _editLoteId = loteId;
+  document.getElementById('edit-lote-numero').value = numero || '';
+  document.getElementById('edit-lote-fecha').value = fechaVenc ? fechaVenc.split('T')[0] : '';
+  openModal('modal-editar-lote');
+}
+
+async function confirmarEditarLote() {
+  const numero_lote = document.getElementById('edit-lote-numero').value.trim();
+  const fecha_vencimiento = document.getElementById('edit-lote-fecha').value || '';
+
+  const res = await api(`/inventario/lote/${_editLoteId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ numero_lote, fecha_vencimiento }),
+  });
+  if (res.ok) {
+    toast('Lote actualizado', 'success');
+    closeModal('modal-editar-lote');
+    if (_lotesModalProdId) await _refreshLotesTable(_lotesModalProdId);
+    loadInventory();
+  } else {
+    const e = await res.json(); toast(e.detail || 'Error', 'error');
   }
 }
 
