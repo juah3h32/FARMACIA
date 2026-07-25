@@ -1,4 +1,6 @@
 /dist/
+!/farmacia-app/dist/
+!/farmacia-app/dist/**
 build/
 data/
 /node_modules/
