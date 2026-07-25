@@ -1,6 +1,4 @@
 /dist/
-!/farmacia-app/dist/
-!/farmacia-app/dist/**
 build/
 data/
 /node_modules/
@@ -16,3 +14,7 @@ debug_*.py
 test_*.py
 test_*.txt
 *.egg-info/
+
+# farmacia-app/dist es el build publicado — reincluir pese a reglas de arriba
+!/farmacia-app/dist/
+!/farmacia-app/dist/**
