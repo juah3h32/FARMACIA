@@ -5386,7 +5386,7 @@ const S = {
 
 const NAV = [
   { type:'group', label:'PRINCIPAL' },
-  { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',        admin:false },
+  { key:'dashboard', icon:'layout-dashboard', label:'Dashboard',        admin:true  },
   { key:'pos',       icon:'shopping-cart',    label:'Nueva Venta',      admin:false },
   { key:'inventory', icon:'package',          label:'Inventario',       admin:true  },
   { type:'group', label:'PACIENTES' },
@@ -6225,7 +6225,7 @@ function launchApp() {
   if (farmEl) farmEl.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
   updateUserCard();
   tickClock();
-  navigate('dashboard');
+  navigate(S.user?.rol === 'admin' ? 'dashboard' : 'pos');
   // Show turno button only for cajero/farmaceutico; admins use reports for oversight
   const turnoBtn = document.getElementById('turno-btn');
   if (turnoBtn) turnoBtn.style.display = (S.user?.rol === 'admin' || S.user?.rol === 'cajero_prueba') ? 'none' : '';
@@ -14903,7 +14903,7 @@ const QM_GROUPS = [
   {
     label: 'Principal', color: '#1d2140', bg: '#EEF2FF',
     items: [
-      { key:'dashboard',    icon:'layout-dashboard', label:'Dashboard',          desc:'Estadísticas del día en tiempo real' },
+      { key:'dashboard',    icon:'layout-dashboard', label:'Dashboard',          desc:'Estadísticas del día en tiempo real', admin:true },
       { key:'pos',          icon:'shopping-cart',    label:'Nueva Venta',        desc:'Punto de venta — escanea y cobra' },
       { key:'inventory',    icon:'package',          label:'Inventario',         desc:'Productos, stock, lotes y vencimientos', admin:true },
       { key:'devoluciones', icon:'undo-2',           label:'Devoluciones',       desc:'Registrar devolución de productos vendidos' },
