@@ -1,3 +1,4 @@
+import concurrent.futures
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
@@ -23,6 +24,27 @@ router = APIRouter()
 # real, no solo un registro local duplicado). El sync con Turso ya reduce la ventana
 # entre PCs distintas; este lock cierra la ventana dentro de la misma PC/proceso.
 _timbrado_lock = threading.Lock()
+
+
+def _sync_from_turso_bounded(timeout_seconds: float = 8.0) -> None:
+    """sync_from_turso() antes de timbrar es best-effort (reduce, no elimina, la
+    ventana de doble-timbrado entre PCs — el lock de arriba cubre lo que importa
+    dentro de este proceso) — nunca debe poder bloquear el timbrado indefinidamente.
+    Sin este tope, si Turso está lento/inalcanzable, sync_from_turso() recorre en
+    serie ~26 tablas con hasta 30s de timeout HTTP cada una (ver sync_service.py) —
+    hasta ~13 minutos de request colgado antes de siquiera intentar timbrar, que es
+    exactamente el síntoma de 'se queda cargando y no pasa nada' reportado."""
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = ex.submit(sync_service.sync_from_turso)
+        try:
+            future.result(timeout=timeout_seconds)
+        except concurrent.futures.TimeoutError:
+            print(f"[CFDI] Pre-timbrado: sync con Turso tardó más de {timeout_seconds}s, se continúa sin esperar")
+        except Exception as e:
+            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
+    finally:
+        ex.shutdown(wait=False)
 
 
 def _purgar_de_turso(tabla: str, ids: list[int]) -> None:
@@ -508,10 +530,7 @@ def timbrar_factura_global(body: TimbrarIn, payload: dict = Depends(get_current_
     # Igual que en individual: sincroniza con Turso antes de checar si el periodo ya
     # está timbrado, para achicar la ventana de doble-timbrado entre dos PCs.
     if cfg.TURSO_SYNC:
-        try:
-            sync_service.sync_from_turso()
-        except Exception as e:
-            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
+        _sync_from_turso_bounded()
     if not _timbrado_lock.acquire(timeout=30):
         raise HTTPException(status_code=409, detail="Ya hay un timbrado en proceso, intenta de nuevo en unos segundos")
     try:
@@ -983,10 +1002,7 @@ def timbrar_factura_individual(body: TimbrarIndividualIn, payload: dict = Depend
     # venta casi al mismo tiempo antes de que el sync periódico (cada 30s) alcance
     # a avisarle a esta PC que la otra ya la facturó.
     if cfg.TURSO_SYNC:
-        try:
-            sync_service.sync_from_turso()
-        except Exception as e:
-            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
+        _sync_from_turso_bounded()
     if not _timbrado_lock.acquire(timeout=30):
         raise HTTPException(status_code=409, detail="Ya hay un timbrado en proceso, intenta de nuevo en unos segundos")
     try:
