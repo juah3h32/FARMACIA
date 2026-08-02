@@ -10,6 +10,7 @@ a = Analysis(
     datas=[
         ('assets', 'assets'),
         ('app', 'app'),
+        ('Font Montserrat', 'Font Montserrat'),
     ],
     hiddenimports=[
         'customtkinter',

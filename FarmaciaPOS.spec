@@ -13,6 +13,7 @@ a = Analysis(
     datas=[
         ('app/web', 'app/web'),
         ('assets', 'assets'),
+        ('Font Montserrat', 'Font Montserrat'),
         (cap_json, 'escpos'),
     ],
     hiddenimports=[

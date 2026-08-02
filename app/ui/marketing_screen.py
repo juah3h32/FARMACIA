@@ -1348,18 +1348,43 @@ def _generar_imagen_promo_combo(productos: list, precio_paquete: float,
     draw.line([(DIV, rows_top), (DIV, rows_top + row_h * n)],
               fill=(210, 220, 245), width=1)
 
+    f_pdesc = _pil_font(FONT_REG, 16)
     for idx, p in enumerate(productos):
         row_top = rows_top + idx * row_h
 
-        # Nombre — centrado verticalmente en su fila, alineado a la izquierda
+        # Nombre + descripción propia del producto (si tiene) — el bloque
+        # completo se centra verticalmente en la fila, alineado a la izquierda
         lines, f_name = _fit_name(draw, p.nombre.upper(), FONT_BLACK,
                                    max_w=LXR - LX, base_size=36, min_size=20, max_lines=3)
-        line_h  = draw.textbbox((0, 0), "Ag", font=f_name, anchor="lt")[3]
-        block_h = line_h * len(lines)
+        name_line_h = draw.textbbox((0, 0), "Ag", font=f_name, anchor="lt")[3]
+
+        desc_lines: list[str] = []
+        if p.descripcion:
+            words = p.descripcion.split()
+            cur = ""
+            for w in words:
+                test = (cur + " " + w).strip() if cur else w
+                if draw.textlength(test, font=f_pdesc) <= (LXR - LX):
+                    cur = test
+                else:
+                    if cur:
+                        desc_lines.append(cur)
+                    cur = w
+            if cur:
+                desc_lines.append(cur)
+            desc_lines = desc_lines[:2]
+        desc_line_h = draw.textbbox((0, 0), "Ag", font=f_pdesc, anchor="lt")[3]
+
+        block_h = name_line_h * len(lines) + (8 + desc_line_h * len(desc_lines) if desc_lines else 0)
         ny = row_top + (row_h - block_h) // 2
         for line in lines:
             draw.text((LX, ny), line, font=f_name, fill=DARK, anchor="lt")
-            ny += line_h
+            ny += name_line_h
+        if desc_lines:
+            ny += 8
+            for dl in desc_lines:
+                draw.text((LX, ny), dl, font=f_pdesc, fill=GRAY, anchor="lt")
+                ny += desc_line_h
 
         # Foto — centrada en su fila del lado derecho
         prod_img = _fetch_cloudinary_image(p.imagen_url) if p.imagen_url else None
@@ -1376,9 +1401,12 @@ def _generar_imagen_promo_combo(productos: list, precio_paquete: float,
             except Exception:
                 pass
 
-        # "+" en la costura entre esta fila y la siguiente
+        # Línea completa que separa esta fila de la siguiente, con el "+"
+        # encima marcando la costura — deja bien claro dónde acaba un
+        # producto del combo y empieza el otro.
         if idx < n - 1:
             seam_y = row_top + row_h
+            draw.line([(LX, seam_y), (RXR, seam_y)], fill=(210, 220, 245), width=1)
             plus_r = 22
             draw.ellipse([DIV - plus_r, seam_y - plus_r, DIV + plus_r, seam_y + plus_r],
                          fill=BRAND, outline=WHITE, width=4)
