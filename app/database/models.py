@@ -668,6 +668,7 @@ class TipoPromocion(str, enum.Enum):
     monto_fijo = "monto_fijo"
     dos_x_uno = "dos_x_uno"
     tres_x_dos = "tres_x_dos"
+    combo = "combo"  # paquete de varios productos distintos a un precio fijo (ej. 2 medicinas x $150)
 
 
 class Promocion(Base):
@@ -682,6 +683,15 @@ class Promocion(Base):
     fecha_fin = Column(Date, nullable=True)
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, default=_dt.now)
+
+
+# Productos que forman parte de una promoción tipo "combo" (paquete de varios
+# productos distintos a un precio fijo). Una fila por producto incluido.
+class PromocionProducto(Base):
+    __tablename__ = "promociones_productos"
+    id = Column(Integer, primary_key=True)
+    promocion_id = Column(Integer, ForeignKey("promociones.id"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
 
 
 # ─── Órdenes de compra ─────────────────────────────────────────────────────────

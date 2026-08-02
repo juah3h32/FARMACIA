@@ -14828,13 +14828,17 @@ async function loadPromociones() {
     }
     list.innerHTML = data.map(p => {
       const activa = p.activa;
+      const esCombo = p.tipo === 'combo';
+      const detalle = esCombo
+        ? `Paquete de ${(p.productos||[]).map(pr=>pr.nombre).join(' + ')} por ${fmt(p.valor)}`
+        : `${tipoPromoLabel(p.tipo)} · ${p.fecha_inicio||''} → ${p.fecha_fin||'sin fecha fin'}`;
       return `<div class="bg-white rounded-2xl border p-4 flex items-center gap-4" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.05)">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${activa?'#FFF7ED':'#F8FAFF'};border:1px solid ${activa?'#FDE68A':'#E2E8F0'}">
-          <i data-lucide="tag" style="width:16px;height:16px;color:${activa?'#D97706':'#CBD5E1'}"></i>
+          <i data-lucide="${esCombo?'package':'tag'}" style="width:16px;height:16px;color:${activa?'#D97706':'#CBD5E1'}"></i>
         </div>
         <div class="flex-1 min-w-0">
           <p class="font-bold text-sm truncate" style="color:#0F172A">${p.nombre}</p>
-          <p class="text-xs mt-0.5" style="color:#64748B">${tipoPromoLabel(p.tipo)} · ${p.fecha_inicio||''} → ${p.fecha_fin||'sin fecha fin'}</p>
+          <p class="text-xs mt-0.5 truncate" style="color:#64748B">${detalle}</p>
         </div>
         <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold" style="background:${activa?'#DCFCE7':'#F1F5F9'};color:${activa?'#166534':'#64748B'}">${activa?'ACTIVA':'INACTIVA'}</span>
         ${S.user?.rol==='admin' ? `<div class="flex gap-1">
@@ -14852,7 +14856,7 @@ async function loadPromociones() {
 }
 
 function tipoPromoLabel(tipo) {
-  return { porcentaje:'Descuento %', monto_fijo:'Descuento fijo', dos_x_uno:'2x1', tres_x_dos:'3x2' }[tipo] || tipo;
+  return { porcentaje:'Descuento %', monto_fijo:'Descuento fijo', dos_x_uno:'2x1', tres_x_dos:'3x2', combo:'Paquete' }[tipo] || tipo;
 }
 
 async function togglePromocion(pid, activa) {
@@ -14871,25 +14875,94 @@ async function deletePromocion(pid) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-function openPromocionModal() {
+let _promoProds = [];
+let _promoComboItems = [];
+
+async function openPromocionModal() {
   document.getElementById('promo-nombre').value = '';
   document.getElementById('promo-tipo').value = 'porcentaje';
   document.getElementById('promo-valor').value = '';
   document.getElementById('promo-fecha-ini').value = '';
   document.getElementById('promo-fecha-fin').value = '';
+  document.getElementById('promo-combo-search').value = '';
+  document.getElementById('promo-combo-results').style.display = 'none';
+  _promoComboItems = [];
+  promoRenderComboChips();
+  promoTipoChanged();
   openModal('modal-promocion');
+  if (!_promoProds.length) {
+    try { _promoProds = await api('/productos/?solo_activos=true').then(r => r.json()); } catch(e) {}
+  }
+}
+
+function promoTipoChanged() {
+  const tipo = document.getElementById('promo-tipo').value;
+  const esCombo = tipo === 'combo';
+  document.getElementById('promo-combo-wrap').classList.toggle('hidden', !esCombo);
+  document.getElementById('promo-valor-lbl').textContent = esCombo ? 'Precio del paquete $' : 'Valor (% o $)';
+}
+
+function promoFiltrarCombo(term) {
+  const res = document.getElementById('promo-combo-results');
+  if (!term.trim()) { res.style.display = 'none'; return; }
+  const yaElegidos = new Set(_promoComboItems.map(p => p.id));
+  const matches = _promoProds.filter(p =>
+    !yaElegidos.has(p.id) && (
+      p.nombre.toLowerCase().includes(term.toLowerCase()) ||
+      (p.codigo_barras||'').includes(term)
+    )
+  ).slice(0, 12);
+  if (!matches.length) { res.style.display = 'none'; return; }
+  res.innerHTML = matches.map(p => `
+    <div onclick="promoAgregarComboProd(${p.id})"
+         class="px-3 py-2 text-xs cursor-pointer hover:bg-amber-50 flex justify-between items-center"
+         style="border-bottom:1px solid #F1F5F9">
+      <span class="font-medium">${p.nombre}</span>
+      <span class="font-semibold" style="color:#16A34A">${fmt(p.precio_venta)}</span>
+    </div>`).join('');
+  res.style.display = 'block';
+}
+
+function promoAgregarComboProd(id) {
+  const prod = _promoProds.find(p => p.id === id);
+  if (!prod || _promoComboItems.some(p => p.id === id)) return;
+  _promoComboItems.push(prod);
+  document.getElementById('promo-combo-search').value = '';
+  document.getElementById('promo-combo-results').style.display = 'none';
+  promoRenderComboChips();
+}
+
+function promoQuitarComboProd(id) {
+  _promoComboItems = _promoComboItems.filter(p => p.id !== id);
+  promoRenderComboChips();
+}
+
+function promoRenderComboChips() {
+  const wrap = document.getElementById('promo-combo-chips');
+  const suma = document.getElementById('promo-combo-suma');
+  wrap.innerHTML = _promoComboItems.map(p => `
+    <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-white text-xs" style="border:1px solid #FDE68A">
+      <span class="font-medium truncate">${p.nombre} <span style="color:#94A3B8">(${fmt(p.precio_venta)})</span></span>
+      <button onclick="promoQuitarComboProd(${p.id})" style="color:#EF4444"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+    </div>`).join('');
+  const total = _promoComboItems.reduce((s,p) => s + p.precio_venta, 0);
+  suma.textContent = _promoComboItems.length ? `Precio normal por separado: ${fmt(total)}` : '';
+  icons();
 }
 
 async function savePromocion() {
+  const tipo = document.getElementById('promo-tipo').value;
   const body = {
     nombre:       document.getElementById('promo-nombre').value.trim(),
-    tipo:         document.getElementById('promo-tipo').value,
+    tipo,
     valor:        parseFloat(document.getElementById('promo-valor').value||0),
     fecha_inicio: document.getElementById('promo-fecha-ini').value || null,
     fecha_fin:    document.getElementById('promo-fecha-fin').value || null,
     activo:       true,
+    producto_ids: tipo === 'combo' ? _promoComboItems.map(p => p.id) : [],
   };
   if (!body.nombre) { toast('Ingresa el nombre', 'warning'); return; }
+  if (tipo === 'combo' && body.producto_ids.length < 2) { toast('Elige al menos 2 productos para el paquete', 'warning'); return; }
   try {
     await apiFetch('/promociones', { method:'POST', body: JSON.stringify(body) });
     toast('Promoción creada', 'success');
@@ -15904,20 +15977,35 @@ async function exportarInventarioExcel() {
       <p class="font-bold text-sm" style="color:#0F172A">Nueva Promoción</p>
       <button onclick="closeModal('modal-promocion')" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8"><i data-lucide="x" style="width:15px;height:15px"></i></button>
     </div>
-    <div class="p-5 flex flex-col gap-3">
+    <div class="p-5 flex flex-col gap-3" style="max-height:75vh;overflow-y:auto">
       <div><label class="lbl">Nombre de la promoción</label><input id="promo-nombre" type="text" class="inp" placeholder="Ej: 20% en vitaminas"></div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="lbl">Tipo</label>
-          <select id="promo-tipo" class="inp">
+          <select id="promo-tipo" class="inp" onchange="promoTipoChanged()">
             <option value="porcentaje">Descuento %</option>
             <option value="monto_fijo">Monto fijo $</option>
             <option value="dos_x_uno">2x1</option>
             <option value="tres_x_dos">3x2</option>
+            <option value="combo">Paquete (varios productos)</option>
           </select>
         </div>
-        <div><label class="lbl">Valor (% o $)</label><input id="promo-valor" type="number" min="0" step="0.01" class="inp" placeholder="0"></div>
+        <div><label class="lbl" id="promo-valor-lbl">Valor (% o $)</label><input id="promo-valor" type="number" min="0" step="0.01" class="inp" placeholder="0"></div>
       </div>
+
+      <!-- ── Paquete: selector de varios productos ── -->
+      <div id="promo-combo-wrap" class="hidden flex flex-col gap-2 rounded-xl p-3" style="background:#FFFBEB;border:1px solid #FDE68A">
+        <label class="lbl" style="margin:0">Productos del paquete (mínimo 2)</label>
+        <div class="relative">
+          <input id="promo-combo-search" type="text" class="inp" placeholder="Buscar producto para agregar..."
+            oninput="promoFiltrarCombo(this.value)">
+          <div id="promo-combo-results" class="absolute left-0 right-0 mt-1 rounded-xl border bg-white overflow-hidden z-10"
+            style="display:none;border-color:#E2E8F0;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.1)"></div>
+        </div>
+        <div id="promo-combo-chips" class="flex flex-col gap-1.5"></div>
+        <p id="promo-combo-suma" class="text-xs" style="color:#92400E"></p>
+      </div>
+
       <div class="grid grid-cols-2 gap-3">
         <div><label class="lbl">Fecha inicio</label><input id="promo-fecha-ini" type="date" class="inp"></div>
         <div><label class="lbl">Fecha fin</label><input id="promo-fecha-fin" type="date" class="inp"></div>

@@ -464,8 +464,8 @@ def _check_facturacom() -> dict:
             Configuracion.clave.in_(["facturacom_api_key", "facturacom_secret_key", "facturacom_sandbox"])
         ).all()
         d = {r.clave: r.valor for r in rows}
-        api_key = d.get("facturacom_api_key", "")
-        secret_key = d.get("facturacom_secret_key", "")
+        api_key = cfg.FACTURACOM_API_KEY or d.get("facturacom_api_key", "")
+        secret_key = cfg.FACTURACOM_SECRET_KEY or d.get("facturacom_secret_key", "")
         sandbox = d.get("facturacom_sandbox", "1") == "1"
         if not api_key or not secret_key:
             return {"ok": True, "enabled": False, "message": "Factura.com no está configurado."}

@@ -34,7 +34,7 @@ _TABLE_ORDER = [
     # FKs: pacientes/promociones/pagos_credito/recetas no dependen de nada nuevo aquí;
     # registros_clinicos y citas dependen de pacientes; items_orden_compra depende de
     # ordenes_compra; conteos_inventario depende de sesiones_inventario.
-    "pacientes", "promociones", "pagos_credito", "recetas", "registros_clinicos", "citas",
+    "pacientes", "promociones", "promociones_productos", "pagos_credito", "recetas", "registros_clinicos", "citas",
     "ordenes_compra", "items_orden_compra", "sesiones_inventario", "conteos_inventario",
     "gastos", "historial_precios",
 ]
@@ -46,7 +46,7 @@ _FULL_SYNC = frozenset({
     "categorias", "proveedores", "usuarios", "clientes", "configuracion",
     "productos", "lotes", "cortes_caja", "retiros_caja", "ventas", "compras", "items_venta",
     "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra", "pagos_sat",
-    "pacientes", "promociones", "pagos_credito", "recetas", "registros_clinicos", "citas",
+    "pacientes", "promociones", "promociones_productos", "pagos_credito", "recetas", "registros_clinicos", "citas",
     "ordenes_compra", "items_orden_compra", "sesiones_inventario", "conteos_inventario",
     "gastos", "historial_precios",
 })
@@ -56,7 +56,7 @@ _FULL_SYNC = frozenset({
 _NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
                                "compras", "items_compra", "cortes_caja", "retiros_caja",
                                "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra",
-                               "pacientes", "promociones", "pagos_credito", "recetas",
+                               "pacientes", "promociones", "promociones_productos", "pagos_credito", "recetas",
                                "registros_clinicos", "citas", "ordenes_compra", "items_orden_compra",
                                "sesiones_inventario", "conteos_inventario", "gastos", "historial_precios"})
 
