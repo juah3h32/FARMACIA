@@ -61,7 +61,13 @@ check_*.py
 dbcheck.py
 test_print*.py
 test_print*.txt
-=1.36.0
+# pip crea un archivo literal "=X.Y.Z" cuando `pip install paquete >= 1.0.0` se
+# ejecuta sin comillas en PowerShell (el shell separa ">=" y lo interpreta como
+# redirección) — ya ha pasado más de una vez, de ahí el patrón genérico.
+=*.*.*
 
 .vercel
 .env*
+
+# Certificados fiscales (SAT) y contraseñas de prueba — nunca deben ir al repo.
+Certificados_Pruebas/

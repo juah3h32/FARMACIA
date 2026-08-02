@@ -437,6 +437,8 @@ async def restaurar_backup_upload(
 def _check_turso() -> dict:
     if not (cfg.USE_TURSO or cfg.TURSO_SYNC):
         return {"ok": True, "enabled": False, "message": "Sincronización con Turso desactivada (modo local)."}
+    if not cfg.TURSO_DATABASE_URL or not cfg.TURSO_AUTH_TOKEN:
+        return {"ok": False, "enabled": True, "message": "Faltan la URL o el token de Turso — captúralos en Configuración > Integraciones."}
     try:
         from app.database.sync_service import _turso_pipeline_url, _turso_headers
         import requests as _req

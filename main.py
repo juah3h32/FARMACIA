@@ -211,7 +211,13 @@ def main():
     if cfg.TURSO_SYNC:
         from app.database.sync_service import import_from_turso, start_background_sync
         threading.Thread(target=import_from_turso, daemon=True, name="TursoImport").start()
-        start_background_sync(interval=30)
+        # El latido hace un pull COMPLETO de las ~28 tablas cada vez, sin filtro
+        # incremental — a 30s eso es mucha lectura constante en Turso aunque no
+        # haya cambios (ni en esta PC ni en otras). Local ya es la fuente de
+        # verdad para esta PC; el pull solo existe para ver cambios de OTRAS PCs,
+        # así que no necesita ser tan frecuente. 180s sigue siendo rápido para
+        # una farmacia con una o dos cajas.
+        start_background_sync(interval=180)
 
     def _api_with_log():
         try:

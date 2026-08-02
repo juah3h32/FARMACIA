@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import json
 from app.api.routes.auth_routes import get_current_api_user
 import app.config as cfg
 
@@ -78,9 +79,30 @@ def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current
         setattr(cfg, attr, val)
         if attr.startswith("TURSO_"):
             changed_turso = True
+
+    # Si el equipo quedó en modo "local"/"offline" (elegido en el asistente de
+    # primer arranque, p. ej. porque en ese momento no se tenían las claves de
+    # Turso a la mano — el asistente promete "podrás activar la nube después
+    # desde Configuración") y ahora ya hay URL + token de Turso guardados, hay
+    # que pasar sync_mode a "turso" aquí mismo. Sin esto, TURSO_SYNC se quedaba
+    # en False para siempre sin importar cuántas veces se guardaran credenciales
+    # válidas — probar conexión nunca mostraba "Conectado", solo el mensaje de
+    # "Sincronización con Turso desactivada (modo local)".
+    switched_to_turso = False
+    if cfg.TURSO_DATABASE_URL and cfg.TURSO_AUTH_TOKEN and cfg.SYNC_MODE != "turso":
+        try:
+            cfg.SETUP_FILE.write_text(json.dumps({"sync_mode": "turso"}), encoding="utf-8")
+            cfg.reload_setup()
+            switched_to_turso = True
+        except Exception:
+            pass
+
     return {
         "ok": True,
-        "restart_required": changed_turso,  # el engine de Turso se arma al iniciar
+        # El engine/hilo de sync de Turso se arma al iniciar el programa —
+        # aunque la prueba de conexión ya funciona en caliente (ver reload_setup
+        # arriba), el push/pull en segundo plano necesita reiniciar para activarse.
+        "restart_required": changed_turso or switched_to_turso,
     }
 
 

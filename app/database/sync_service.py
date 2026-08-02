@@ -418,7 +418,7 @@ def import_from_turso() -> bool:
             lconn.close()
 
 
-def sync_to_turso() -> None:
+def sync_to_turso(only_incremental: bool = False) -> None:
     """
     Push local SQLite data to Turso via batched HTTP pipeline.
     TS_INCREMENTAL tables (productos, ventas, cfdi_*): only rows changed since the
@@ -428,6 +428,12 @@ def sync_to_turso() -> None:
     id > last watermark.
     Remaining FULL_SYNC tables (small/reference-ish): upsert all rows + delete
     from Turso any IDs missing in local.
+
+    only_incremental=True skips the FULL_SYNC branch entirely (no `SELECT *`
+    over tables like lotes/cortes_caja/compras/citas/gastos/historial_precios).
+    Used for the "push right after a write" call so that cobrar una venta no
+    tenga que releer y resubir tablas enteras que no cambiaron — esas tablas
+    igual se sincronizan completas en cada latido (ver start_background_sync).
     """
     with _lock:
         lconn = _local_conn()
@@ -481,6 +487,8 @@ def sync_to_turso() -> None:
                         synced += len(rows)
 
                     elif table in _FULL_SYNC and table not in _PUSH_APPEND_ONLY:
+                        if only_incremental:
+                            continue
                         rows = lconn.execute(f"SELECT * FROM {table}").fetchall()
                         stmts: list[dict] = []
 
@@ -825,6 +833,29 @@ def make_daily_backup() -> bool:
     return True
 
 
+_img_cache_running = threading.Event()
+
+
+def _sync_product_images_bg() -> None:
+    """Descarga en un hilo aparte (nunca bloquea el latido de sync) las fotos de
+    producto que están en Cloudinary pero de las que este equipo todavía no
+    tiene copia local — ver cloudinary_service.sync_product_images_locally.
+    _img_cache_running evita que se disparen varias pasadas encimadas si el
+    heartbeat vuelve a cumplirse mientras la anterior sigue bajando fotos."""
+    if _img_cache_running.is_set():
+        return
+    _img_cache_running.set()
+    try:
+        from app.services.cloudinary_service import sync_product_images_locally
+        n = sync_product_images_locally()
+        if n:
+            print(f"[Sync] {n} imagen(es) de producto descargadas para respaldo local")
+    except Exception as e:
+        print(f"[Sync] Error cacheando imágenes de producto: {e}")
+    finally:
+        _img_cache_running.clear()
+
+
 def start_background_sync(interval: int = 30) -> threading.Thread:
     """Daemon thread: daily backup + bidirectional sync every cycle.
 
@@ -847,6 +878,7 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
         except Exception as e:
             print(f"[Sync] Initial pull error: {e}")
         initial_sync_done.set()
+        threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
 
         while True:
             # Returns True if event fired (dirty write), False if timed out (heartbeat)
@@ -860,7 +892,13 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
                 time.sleep(3)
                 _dirty.clear()
             try:
-                sync_to_turso()
+                # Push disparado por una escritura: solo tablas incrementales
+                # (ventas, productos, movimientos_stock...) — nunca relee/resube
+                # tablas completas como lotes/cortes_caja/compras/citas/gastos en
+                # cada venta, eso ya volvía cada cobro más lento y gastaba lecturas
+                # de Turso sin necesidad a medida que esas tablas crecían. Esas
+                # tablas se sincronizan completas en el latido de abajo.
+                sync_to_turso(only_incremental=woke_by_write)
             except Exception as e:
                 print(f"[Sync] Push error: {e}")
             # Pull ONLY on heartbeat (timeout), NOT on every write.
@@ -869,6 +907,7 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
             if not woke_by_write:
                 try:
                     sync_from_turso()
+                    threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
                 except Exception as e:
                     print(f"[Sync] Pull error: {e}")
 

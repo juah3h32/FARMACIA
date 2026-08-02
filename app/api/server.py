@@ -262,6 +262,23 @@ async def serve_logo_sistema():
 _UPLOADS_DIR = cfg.DATA_DIR / "uploads"
 
 
+@app.get("/uploads/producto-local/{producto_id}")
+async def serve_producto_imagen_local(producto_id: int):
+    """Respaldo local de la foto de un producto — usado por el front cuando la
+    URL de Cloudinary (imagen_url) no carga por falta de internet/Cloudinary
+    caído. Se llena en segundo plano por sync_product_images_locally() (ver
+    app/database/sync_service.py y app/services/cloudinary_service.py).
+    Registrada ANTES del catch-all /uploads/{subpath:path} de abajo — si fuera
+    después, ese catch-all la interceptaría primero (Starlette resuelve rutas
+    en orden de registro) y esta nunca se alcanzaría."""
+    from fastapi import HTTPException
+    dest_dir = cfg.DATA_DIR / "uploads" / "imagenes" / "medicamentos"
+    matches = sorted(dest_dir.glob(f"producto_{producto_id}.*"))
+    if not matches:
+        raise HTTPException(status_code=404)
+    return FileResponse(str(matches[0]))
+
+
 @app.get("/uploads/{subpath:path}")
 async def serve_uploaded_image(subpath: str):
     """Sirve imágenes de producto/perfil guardadas localmente cuando Cloudinary

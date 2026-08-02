@@ -363,7 +363,11 @@ def _sync_bg(bg: BackgroundTasks):
     import app.config as _cfg
     if _cfg.TURSO_SYNC:
         from app.database.sync_service import sync_to_turso
-        bg.add_task(sync_to_turso)
+        # only_incremental=True: productos es TS_INCREMENTAL (push por
+        # actualizado_en), así que esto ya sincroniza el producto que se acaba
+        # de crear/editar sin releer/resubir tablas completas no relacionadas
+        # en cada alta o cambio de precio.
+        bg.add_task(sync_to_turso, only_incremental=True)
 
 
 @router.post("/", response_model=ProductoResponse)

@@ -1,4 +1,3 @@
-import concurrent.futures
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
@@ -29,22 +28,14 @@ _timbrado_lock = threading.Lock()
 def _sync_from_turso_bounded(timeout_seconds: float = 8.0) -> None:
     """sync_from_turso() antes de timbrar es best-effort (reduce, no elimina, la
     ventana de doble-timbrado entre PCs — el lock de arriba cubre lo que importa
-    dentro de este proceso) — nunca debe poder bloquear el timbrado indefinidamente.
-    Sin este tope, si Turso está lento/inalcanzable, sync_from_turso() recorre en
-    serie ~26 tablas con hasta 30s de timeout HTTP cada una (ver sync_service.py) —
-    hasta ~13 minutos de request colgado antes de siquiera intentar timbrar, que es
-    exactamente el síntoma de 'se queda cargando y no pasa nada' reportado."""
-    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    try:
-        future = ex.submit(sync_service.sync_from_turso)
-        try:
-            future.result(timeout=timeout_seconds)
-        except concurrent.futures.TimeoutError:
-            print(f"[CFDI] Pre-timbrado: sync con Turso tardó más de {timeout_seconds}s, se continúa sin esperar")
-        except Exception as e:
-            print(f"[CFDI] Pre-timbrado: no se pudo sincronizar con Turso: {e}")
-    finally:
-        ex.shutdown(wait=False)
+    dentro de este proceso) — nunca debe bloquear el timbrado.
+    Antes esto esperaba (con tope de 8s) a que terminara; local es la fuente de
+    verdad y el usuario pidió explícitamente que ningún proceso espere a la nube
+    para avanzar — ahora solo se dispara en background y el timbrado sigue de
+    inmediato con los datos locales (el lock de proceso + el sync periódico de
+    30s siguen cerrando la ventana de doble-timbrado, solo que sin bloquear)."""
+    threading.Thread(target=sync_service.sync_from_turso, daemon=True,
+                      name="CFDI-PreSync").start()
 
 
 def _purgar_de_turso(tabla: str, ids: list[int]) -> None:

@@ -372,7 +372,12 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
-            bg.add_task(sync_to_turso)
+            # only_incremental=True: al cobrar solo empuja lo que cambió (venta,
+            # items, stock) — no relee ni resube tablas completas como lotes o
+            # cortes_caja en cada venta (eso volvía cada cobro más lento a medida
+            # que esas tablas crecían). El hilo de sincronización en background
+            # ya sincroniza esas tablas completas en su latido periódico.
+            bg.add_task(sync_to_turso, only_incremental=True)
         return {"id": venta.id, "folio": folio, "total": total, "cambio": cambio, "ticket_texto": ticket_texto, "requiere_receta": requiere_receta}
     except HTTPException:
         raise

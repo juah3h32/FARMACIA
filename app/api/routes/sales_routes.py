@@ -286,7 +286,11 @@ def registrar_devolucion(
             # así que sin este push explícito Turso se queda con la cantidad
             # original para siempre.
             bg.add_task(upsert_ids_to_turso, "items_venta", item_ids_modificados)
-            bg.add_task(sync_to_turso)
+            # only_incremental=True: empuja lo que cambió (venta, productos,
+            # movimientos_stock) sin releer/resubir tablas completas como lotes
+            # o cortes_caja en cada devolución — esas se alcanzan a sincronizar
+            # completas en el latido periódico del hilo de fondo.
+            bg.add_task(sync_to_turso, only_incremental=True)
 
         return {
             "ok": True,

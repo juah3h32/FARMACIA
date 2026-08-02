@@ -6828,10 +6828,25 @@ function cloudinaryThumb(url, w=200, h=200) {
             .replace(/\/upload\/(v\d+\/)/, `/upload/w_${w},h_${h},c_fill,q_auto,f_webp/$1`);
 }
 
-function posProductThumb(imgUrl) {
+// Si la imagen viene de Cloudinary (http...) y falla al cargar (sin internet o
+// Cloudinary caído), intenta una sola vez con la copia local que el backend
+// va descargando en segundo plano (ver sync_product_images_locally en
+// app/services/cloudinary_service.py) antes de rendirse y mostrar el ícono.
+function _prodImgError(imgEl, prodId, iconSize) {
+  if (prodId && !imgEl.dataset.fallbackTried) {
+    imgEl.dataset.fallbackTried = '1';
+    imgEl.src = `/uploads/producto-local/${prodId}`;
+    return;
+  }
+  imgEl.style.display = 'none';
+  imgEl.parentElement.innerHTML = `<i data-lucide="pill" style="width:${iconSize}px;height:${iconSize}px;color:#94A3B8"></i>`;
+  icons();
+}
+
+function posProductThumb(imgUrl, prodId) {
   if (imgUrl) {
     const src = cloudinaryThumb(imgUrl);
-    return '<img src="' + src + '" alt="" loading="lazy" decoding="async" style="max-height:96px;width:auto;max-width:100%;object-fit:contain;padding:4px" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:28px;height:28px;color:#94A3B8&quot;></i>\'">';
+    return '<img src="' + src + '" alt="" loading="lazy" decoding="async" style="max-height:96px;width:auto;max-width:100%;object-fit:contain;padding:4px" onerror="_prodImgError(this,' + (prodId||'') + ',28)">';
   }
   return '<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>';
 }
@@ -6877,7 +6892,7 @@ function renderPosGrid(prods) {
     <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col cursor-pointer"
       style="border-color:#E2E8F0" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
       <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'64':'100'}px;background:#fff;border:1px solid #F1F5F9">
-        ${posProductThumb(p.imagen_url)}
+        ${posProductThumb(p.imagen_url, p.id)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
       <p class="text-[9px] truncate mb-auto" style="color:#94A3B8">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')||p.codigo_barras||''}</p>
@@ -6989,7 +7004,7 @@ function renderCart() {
       <div class="border rounded-xl p-2 transition-all flex gap-2" style="border-color:#E2E8F0">
         <div class="flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center" style="width:44px;height:44px;background:#F8FAFC;border:1px solid #F1F5F9">
           ${i.imagen_url
-            ? '<img src="'+cloudinaryThumb(i.imagen_url,80,80)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;padding:2px" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i data-lucide=&quot;pill&quot; style=&quot;width:18px;height:18px;color:#94A3B8&quot;></i>\'">'
+            ? '<img src="'+cloudinaryThumb(i.imagen_url,80,80)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:contain;padding:2px" onerror="_prodImgError(this,'+(i.id||'')+',18)">'
             : '<i data-lucide="pill" style="width:18px;height:18px;color:#94A3B8"></i>'}
         </div>
         <div class="flex-1 min-w-0">
