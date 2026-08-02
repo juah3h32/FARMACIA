@@ -1236,6 +1236,188 @@ def _layout_blanco(producto, precio_promo: float,
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  Layout Combo — mismo estilo que _layout_blanco, pero para 2+ productos a un
+#  precio de paquete (ej. "2 medicinas x $150") en vez de un producto con
+#  precio tachado/promo.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _generar_imagen_promo_combo(productos: list, precio_paquete: float,
+                                 texto_extra: str = "", dia_oferta: str = "",
+                                 descripcion_promo: str = "") -> Image.Image:
+    """Layout horizontal: por cada producto, una fila con su nombre a la
+    izquierda y su foto a la derecha, alineados a la misma altura (fila 1 =
+    producto 1, fila 2 = producto 2, ...), con un "+" en la costura entre
+    filas. Precio del paquete anclado abajo, ancho completo."""
+    W, H   = 1080, 1080
+    HEADER = 130
+    FOOTER = 72
+
+    NAVY  = (29,  33,  64)
+    BRAND = (60,  115, 185)
+    DARK  = (5,   15,  48)
+    WHITE = (255, 255, 255)
+    GRAY  = (80,  100, 140)
+    SILV  = (155, 175, 215)
+    RED   = (215, 42,  42)
+    GREEN = (15,  140, 55)
+
+    img  = Image.new("RGB", (W, H), WHITE)
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([(0, 0), (W, HEADER)], fill=NAVY)
+    _paste_logo(img, draw, 0, 0, W, HEADER, white=True)
+    draw.rectangle([(0, HEADER), (W, HEADER + 5)], fill=BRAND)
+
+    # ── Columnas ───────────────────────────────────────────────────────────────
+    CONTENT_Y = HEADER + 5
+    LX  = 48    # margen izquierdo de la columna de nombres
+    LXR = 530   # borde derecho de la columna de nombres
+    DIV = 545   # línea divisoria vertical
+    RX  = 555   # borde izquierdo de la columna de fotos
+    RXR = 1055  # borde derecho de la columna de fotos
+
+    cy = CONTENT_Y + 44
+
+    # ── Badge — siempre menciona "COMBO" ──────────────────────────────────────
+    f_badge    = _pil_font(FONT_BOLD, 16)
+    badge_text = (f"COMBO · {dia_oferta.strip().upper()}"
+                  if dia_oferta.strip() else f"COMBO DE {len(productos)} PRODUCTOS")
+    text_w = int(draw.textlength(badge_text, font=f_badge))
+    bh = 34
+    bw = text_w + 44
+    bx = (W - bw) // 2
+    r  = bh // 2
+    draw.ellipse([bx, cy, bx + bh, cy + bh], fill=RED)
+    draw.ellipse([bx + bw - bh, cy, bx + bw, cy + bh], fill=RED)
+    draw.rectangle([bx + r, cy, bx + bw - r, cy + bh], fill=RED)
+    draw.text((bx + bw // 2, cy + bh // 2), badge_text,
+              font=f_badge, fill=WHITE, anchor="mm")
+    cy += bh + 20
+
+    # ── Descripción breve del combo (opcional, centrada, ancho completo) ──────
+    if descripcion_promo:
+        f_desc = _pil_font(FONT_REG, 16)
+        desc_max = RXR - LX
+        words = descripcion_promo.split()
+        desc_lines, cur = [], ""
+        for w in words:
+            test = (cur + " " + w).strip() if cur else w
+            if draw.textlength(test, font=f_desc) <= desc_max:
+                cur = test
+            else:
+                if cur:
+                    desc_lines.append(cur)
+                cur = w
+        if cur:
+            desc_lines.append(cur)
+        for dl in desc_lines[:2]:
+            draw.text((W // 2, cy), dl, font=f_desc, fill=GRAY, anchor="mt")
+            bb = draw.textbbox((W // 2, cy), dl, font=f_desc, anchor="mt")
+            cy = bb[3] + 4
+        cy += 10
+
+    rows_top = cy + 14
+
+    # ── Bloque de precio del paquete — se mide primero para saber cuánta altura
+    #    les queda disponible a las filas de producto ────────────────────────
+    suma = sum(p.precio_venta for p in productos)
+    ahorro = suma - precio_paquete
+
+    f_tach   = _pil_font(FONT_SEMI, 32)
+    f_price  = _pil_font(FONT_BLACK, 86)
+    f_bold18 = _pil_font(FONT_BOLD, 18)
+    f_extra  = _pil_font(FONT_ITALIC, 18)
+
+    txt_t = f"Precio normal: ${suma:,.2f}"
+    txt_p = f"${precio_paquete:,.2f}"
+
+    tach_h  = draw.textbbox((0, 0), txt_t, font=f_tach, anchor="lt")[3]
+    price_h = draw.textbbox((0, 0), txt_p, font=f_price, anchor="lt")[3]
+    sav_h   = 40 if ahorro > 0.01 else 0
+    ext_h   = (26 if texto_extra else 0)
+    price_block_h = tach_h + 10 + price_h + 14 + sav_h + ext_h
+
+    price_start = H - FOOTER - 90 - price_block_h
+
+    # ── Filas de producto: nombre (izquierda) alineado con su foto (derecha) ──
+    RW = RXR - RX
+    n  = len(productos)
+    rows_bottom = price_start - 24
+    row_h = max(120, (rows_bottom - rows_top) // n)
+
+    draw.line([(DIV, rows_top), (DIV, rows_top + row_h * n)],
+              fill=(210, 220, 245), width=1)
+
+    for idx, p in enumerate(productos):
+        row_top = rows_top + idx * row_h
+
+        # Nombre — centrado verticalmente en su fila, alineado a la izquierda
+        lines, f_name = _fit_name(draw, p.nombre.upper(), FONT_BLACK,
+                                   max_w=LXR - LX, base_size=36, min_size=20, max_lines=3)
+        line_h  = draw.textbbox((0, 0), "Ag", font=f_name, anchor="lt")[3]
+        block_h = line_h * len(lines)
+        ny = row_top + (row_h - block_h) // 2
+        for line in lines:
+            draw.text((LX, ny), line, font=f_name, fill=DARK, anchor="lt")
+            ny += line_h
+
+        # Foto — centrada en su fila del lado derecho
+        prod_img = _fetch_cloudinary_image(p.imagen_url) if p.imagen_url else None
+        if prod_img is not None:
+            try:
+                pimg   = prod_img.convert("RGBA")
+                iw, ih = pimg.size
+                scale  = min(RW / iw, row_h / ih) * 0.86
+                nw, nh = int(iw * scale), int(ih * scale)
+                pfit   = pimg.resize((nw, nh), Image.LANCZOS)
+                px_img = RX + (RW - nw) // 2
+                py_img = row_top + (row_h - nh) // 2
+                img.paste(pfit.convert("RGB"), (px_img, py_img), pfit.split()[3])
+            except Exception:
+                pass
+
+        # "+" en la costura entre esta fila y la siguiente
+        if idx < n - 1:
+            seam_y = row_top + row_h
+            plus_r = 22
+            draw.ellipse([DIV - plus_r, seam_y - plus_r, DIV + plus_r, seam_y + plus_r],
+                         fill=BRAND, outline=WHITE, width=4)
+            draw.text((DIV, seam_y), "+", font=_pil_font(FONT_BLACK, 30), fill=WHITE, anchor="mm")
+
+    # ── Bloque de precio del paquete, centrado, ancho completo ────────────────
+    py = price_start
+    draw.text((W // 2, py), txt_t, font=f_tach, fill=SILV, anchor="mt")
+    bb = draw.textbbox((W // 2, py), txt_t, font=f_tach, anchor="mt")
+    if ahorro > 0.01:
+        mid_y = (bb[1] + bb[3]) // 2
+        draw.line([(bb[0] - 2, mid_y), (bb[2] + 2, mid_y)], fill=RED, width=3)
+    py = bb[3] + 10
+
+    draw.text((W // 2, py), txt_p, font=f_price, fill=DARK, anchor="mt")
+    bb = draw.textbbox((W // 2, py), txt_p, font=f_price, anchor="mt")
+    py = bb[3] + 14
+
+    if ahorro > 0.01:
+        sw = int(draw.textlength(f"¡AHORRAS ${ahorro:,.2f}!", font=f_bold18)) + 30
+        draw.rounded_rectangle([(W - sw) // 2, py, (W + sw) // 2, py + 36], radius=18, fill=GREEN)
+        draw.text((W // 2, py + 18), f"¡AHORRAS ${ahorro:,.2f}!",
+                  font=f_bold18, fill=WHITE, anchor="mm")
+        py += 44
+
+    if texto_extra:
+        draw.text((W // 2, py + 6), texto_extra, font=f_extra, fill=GRAY, anchor="mt")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    draw.rectangle([(0, H - FOOTER), (W, H)], fill=NAVY)
+    draw.rectangle([(0, H - FOOTER), (W, H - FOOTER + 5)], fill=BRAND)
+    draw.text((W // 2, H - FOOTER // 2 + 2),
+              f"Farmacia Eben-Ezer  ·  {cfg.PHARMACY_ADDRESS}",
+              font=_pil_font(FONT_BOLD, 22), fill=WHITE, anchor="mm")
+
+    return img
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  Generador PDF con ReportLab
 # ══════════════════════════════════════════════════════════════════════════════
 

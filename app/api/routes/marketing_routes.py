@@ -168,3 +168,54 @@ def generar_promo_image(
         )
     finally:
         db.close()
+
+
+class PromoImageComboIn(BaseModel):
+    producto_ids:      list[int]
+    precio_paquete:    float
+    texto_extra:       str = ""
+    dia_oferta:        str = ""
+    descripcion_promo: str = ""
+
+
+@router.post("/promo-image-combo")
+def generar_promo_image_combo(
+    body: PromoImageComboIn,
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    from app.ui.marketing_screen import _generar_imagen_promo_combo
+
+    if len(body.producto_ids) < 2:
+        raise HTTPException(status_code=400, detail="Elige al menos 2 productos para el paquete")
+
+    db = get_db_session()
+    try:
+        productos = db.query(Producto).filter(Producto.id.in_(body.producto_ids)).all()
+        if len(productos) != len(set(body.producto_ids)):
+            raise HTTPException(status_code=404, detail="Alguno de los productos no existe")
+        # conserva el orden en que el usuario los eligió
+        by_id = {p.id: p for p in productos}
+        productos_ordenados = [by_id[pid] for pid in dict.fromkeys(body.producto_ids)]
+
+        img = _generar_imagen_promo_combo(
+            productos=productos_ordenados,
+            precio_paquete=body.precio_paquete,
+            texto_extra=body.texto_extra,
+            dia_oferta=body.dia_oferta,
+            descripcion_promo=body.descripcion_promo,
+        )
+
+        buf = io.BytesIO()
+        img.save(buf, "PNG", optimize=True)
+        buf.seek(0)
+
+        return StreamingResponse(
+            buf,
+            media_type="image/png",
+            headers={"Content-Disposition": 'inline; filename="promo_combo.png"'},
+        )
+    finally:
+        db.close()
