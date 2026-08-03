@@ -5880,6 +5880,7 @@ async function completeMpSale() {
   document.getElementById('cart-pagado').value = '';
   updateCambio();
   loadPOS(); loadDashboard();
+  if (document.querySelector('[data-page="caja"].active')) loadCajaAdmin();
 }
 
 async function cancelMpPayment() {
@@ -6634,6 +6635,7 @@ function navigate(page) {
 let _dashInterval = null;
 let _invInterval  = null;
 let _posImgInterval = null;
+let _cajaInterval = null;
 let _kpiCurrent   = 0;
 let _kpiAutoTimer = null;
 
@@ -6672,6 +6674,11 @@ function loadPage(page) {
     clearInterval(_posImgInterval);
     _posImgInterval = null;
   }
+  // Stop caja auto-refresh when leaving
+  if (_cajaInterval && page !== 'caja') {
+    clearInterval(_cajaInterval);
+    _cajaInterval = null;
+  }
   if (page==='dashboard') {
     loadDashboard();
     // Auto-refresh every 30s while dashboard is active
@@ -6703,7 +6710,12 @@ function loadPage(page) {
   if (page==='employees')  loadEmployees();
   if (page==='suppliers')  loadSuppliers();
   if (page==='reports')    initReports();
-  if (page==='caja')       loadCajaAdmin();
+  if (page==='caja') {
+    loadCajaAdmin();
+    // Auto-refresh every 20s so una venta recién hecha (en esta u otra
+    // terminal) actualiza el capital de inversión/ganancia sin recargar
+    if (!_cajaInterval) _cajaInterval = setInterval(loadCajaAdmin, 20000);
+  }
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
   if (page==='marketing')  loadMarketing();
@@ -7386,6 +7398,9 @@ async function processSale() {
   loadPOS();
   // Refresh dashboard stats silently after every sale
   loadDashboard();
+  // If Control de Caja está abierto (misma terminal), refresca capital de
+  // inversión/ganancia al instante en vez de esperar al poll de 20s
+  if (document.querySelector('[data-page="caja"].active')) loadCajaAdmin();
 }
 
 // ══════════════════════════════════════════════════════════
