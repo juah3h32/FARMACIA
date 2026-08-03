@@ -2968,10 +2968,10 @@
           </div>
 
           <!-- Retiros período -->
-          <div class="bg-white rounded-2xl px-4 py-3 border flex-shrink-0" style="border-color:#E2E8F0;min-width:128px">
+          <div class="bg-white rounded-2xl px-4 py-3 border flex-shrink-0" style="border-color:#E2E8F0;min-width:150px" title="Costo recuperado en el período menos lo pagado a proveedores en el período — solo para comparar contra un cálculo manual de ese rango, no es tu saldo real disponible (ese siempre es el acumulado de la tarjeta azul de arriba)">
             <p class="text-xs font-semibold" style="color:#64748B">Retiros período</p>
             <p id="caja-stat-retiros-periodo" class="text-xl font-black mt-0.5" style="color:#EF4444">—</p>
-            <p class="text-xs" style="color:#94A3B8">Según filtro</p>
+            <p id="caja-stat-inversion-periodo" class="text-xs font-semibold" style="color:#1E40AF">—</p>
           </div>
 
         </div>
@@ -7513,7 +7513,7 @@ function renderInvTable(prods) {
     return `
     <tr class="hovrow border-b" style="border-color:#F1F5F9">
       <td class="px-3 py-2.5">
-        <p class="text-sm font-medium leading-tight" style="color:#0F172A">${p.nombre}</p>
+        <p class="text-sm font-medium leading-tight" style="color:#0F172A">${p.nombre}${!p.precio_compra?' <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style="background:#FEF3C7;color:#92400E" title="Precio de compra en $0 — sin costo registrado (regalado/muestra) o falta capturarlo">Regalado</span>':''}</p>
         ${p.nombre_generico?`<p class="text-[10px] leading-tight" style="color:#94A3B8">${p.nombre_generico}</p>`:''}
         ${(p.presentacion||p.concentracion||p.contenido)?`<p class="text-[10px] mt-0.5 leading-tight" style="color:#CBD5E1">${[p.presentacion,p.concentracion,p.contenido].filter(Boolean).join(' · ')}</p>`:''}
       </td>
@@ -9620,10 +9620,14 @@ async function loadCajaAdmin() {
     hastaEl.value = new Date().toISOString().slice(0, 10);
   }
 
+  const _gananciaQS = new URLSearchParams();
+  if (desdeEl?.value) _gananciaQS.set('desde', desdeEl.value);
+  if (hastaEl?.value) _gananciaQS.set('hasta', hastaEl.value);
+
   const [retRes, turnoRes, ganRes] = await Promise.all([
     api('/cortes/retiros?limite=1000'),
     api('/cortes/activo'),
-    api('/cortes/ganancia'),
+    api('/cortes/ganancia?' + _gananciaQS.toString()),
   ]);
 
   // Ganancia global (turno-independent) — populate stat cards first
@@ -9650,6 +9654,18 @@ async function loadCajaAdmin() {
         warnEl.classList.remove('hidden');
       } else {
         warnEl.classList.add('hidden');
+      }
+    }
+
+    const periodoEl = document.getElementById('caja-stat-inversion-periodo');
+    if (periodoEl) {
+      if (g.periodo) {
+        const ci = g.periodo.capital_inversion ?? 0;
+        periodoEl.textContent = `Inversión período: ${ci < 0 ? '-$'+Math.abs(ci).toFixed(2) : money(ci)}`;
+        periodoEl.style.color = ci < 0 ? '#DC2626' : '#1E40AF';
+      } else {
+        periodoEl.textContent = 'Según filtro';
+        periodoEl.style.color = '#94A3B8';
       }
     }
 

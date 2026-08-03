@@ -679,8 +679,19 @@ def editar_retiro(retiro_id: int, body: EditarRetiroIn, bg: BackgroundTasks, pay
 
 
 @router.get("/ganancia")
-def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
-    """All-time profit snapshot — turno-independent. Admin only."""
+def resumen_ganancia(
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    payload: dict = Depends(get_current_api_user),
+):
+    """All-time profit snapshot — turno-independent. Admin only.
+
+    Los totales devueltos (ganancia, capital_inversion, etc.) SIEMPRE son
+    acumulados desde el inicio — son los que realmente determinan cuánto se
+    puede retirar hoy, y no deben depender del filtro de fechas de la pantalla.
+    Si se mandan `desde`/`hasta`, se agrega además un bloque "periodo" con el
+    mismo desglose pero acotado a ese rango — solo para comparar/reconciliar
+    contra un cálculo manual del usuario, nunca como límite de retiro."""
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     db = get_db_session()
@@ -732,7 +743,7 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
         capital_inversion             = total_costo - retiros_inversion
         capital_inversion_disponible  = max(0.0, capital_inversion)
 
-        return {
+        result = {
             "num_ventas":          len(ventas),
             "total_ventas":        tv,
             "total_devoluciones":  round(total_devoluciones, 2),
@@ -747,6 +758,64 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
             "capital_inversion":             round(capital_inversion, 2),
             "capital_inversion_disponible":  round(capital_inversion_disponible, 2),
         }
+
+        if desde or hasta:
+            try:
+                d_ini = datetime.strptime(desde, "%Y-%m-%d") if desde else datetime.min
+                d_fin = (datetime.strptime(hasta, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+                         if hasta else datetime.now())
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Fecha inválida, usa YYYY-MM-DD")
+
+            ventas_p = [v for v in ventas if v.creado_en and d_ini <= v.creado_en <= d_fin]
+            tv_p  = sum(v.total for v in ventas_p)
+            iva_p = sum(v.iva or 0.0 for v in ventas_p)
+            vids_p = [v.id for v in ventas_p]
+            if vids_p:
+                cost_rows_p = (
+                    db.query(ItemVenta.cantidad, Producto.precio_compra)
+                    .join(Producto, ItemVenta.producto_id == Producto.id)
+                    .filter(ItemVenta.venta_id.in_(vids_p))
+                    .all()
+                )
+                total_costo_p = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows_p)
+            else:
+                total_costo_p = 0.0
+
+            dev_movs_p = [m for m in dev_movs if m.creado_en and d_ini <= m.creado_en <= d_fin]
+            total_dev_p = 0.0
+            if dev_movs_p:
+                precios_p = _precio_lookup(db, {m.referencia_id for m in dev_movs_p})
+                for mov in dev_movs_p:
+                    precio = precios_p.get((mov.referencia_id, mov.producto_id))
+                    if precio is not None:
+                        total_dev_p += precio * mov.cantidad
+
+            retiros_p = [r for r in all_retiros if r.creado_en and d_ini <= r.creado_en <= d_fin]
+            ret_personal_p  = sum(r.monto for r in retiros_p if (r.tipo or "personal") == "personal")
+            ret_inversion_p = sum(r.monto for r in retiros_p if (r.tipo or "personal") == "inversion")
+
+            ventas_netas_p = tv_p - total_dev_p
+            ganancia_p = (ventas_netas_p - iva_p) - total_costo_p
+
+            result["periodo"] = {
+                "desde":               desde,
+                "hasta":               hasta,
+                "num_ventas":          len(ventas_p),
+                "total_ventas":        round(tv_p, 2),
+                "total_devoluciones":  round(total_dev_p, 2),
+                "ventas_netas":        round(ventas_netas_p, 2),
+                "total_costo":         round(total_costo_p, 2),
+                "ganancia":            round(ganancia_p, 2),
+                "retiros_personales":  round(ret_personal_p, 2),
+                "retiros_inversion":   round(ret_inversion_p, 2),
+                # Costo recuperado en el período menos lo pagado a proveedores en
+                # el período — NO es un saldo acumulado, solo sirve para comparar
+                # contra un cálculo manual de ese mismo rango de fechas.
+                "capital_inversion":   round(total_costo_p - ret_inversion_p, 2),
+            }
+
+        return result
     finally:
         db.close()
 
