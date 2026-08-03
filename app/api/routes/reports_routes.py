@@ -44,6 +44,7 @@ def resumen(
             .all()
         )
         total = sum(v.total for v in ventas)
+        iva_total = sum(v.iva or 0.0 for v in ventas)
         num   = len(ventas)
 
         por_dia: dict[str, float] = {}
@@ -86,7 +87,8 @@ def resumen(
                 if precio is not None:
                     total_devoluciones += precio * mov.cantidad
         ventas_netas = total - total_devoluciones
-        ganancia = ventas_netas - total_costo
+        # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
+        ganancia = (ventas_netas - iva_total) - total_costo
 
         return {
             "total":               total,
@@ -1345,6 +1347,7 @@ def rentabilidad_cajero(
             if not ventas:
                 continue
             total_v = sum(v.total for v in ventas)
+            iva_v = sum(v.iva or 0.0 for v in ventas)
             vids = [v.id for v in ventas]
             cost_rows = (
                 db.query(ItemVenta.cantidad, Producto.precio_compra)
@@ -1353,15 +1356,40 @@ def rentabilidad_cajero(
                 .all()
             )
             total_c = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+
+            # Devoluciones parciales de este cajero en el período (mismo cálculo
+            # que /resumen — si no, la ganancia por cajero no coincide con la general)
+            dev_movs = db.query(MovimientoStock).filter(
+                MovimientoStock.tipo == TipoMovimiento.devolucion,
+                MovimientoStock.referencia_tipo == "devolucion",
+                MovimientoStock.usuario_id == u.id,
+                MovimientoStock.creado_en >= fi,
+                MovimientoStock.creado_en <= ff,
+            ).all()
+            total_dev = 0.0
+            if dev_movs:
+                vids_dev = {mov.referencia_id for mov in dev_movs}
+                precios_por_par = {
+                    (i.venta_id, i.producto_id): i.precio_unitario
+                    for i in db.query(ItemVenta).filter(ItemVenta.venta_id.in_(vids_dev)).all()
+                }
+                for mov in dev_movs:
+                    precio = precios_por_par.get((mov.referencia_id, mov.producto_id))
+                    if precio is not None:
+                        total_dev += precio * mov.cantidad
+
+            ventas_netas = total_v - total_dev
+            # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
+            ganancia = (ventas_netas - iva_v) - total_c
             result.append({
                 "cajero": u.nombre or u.username,
                 "rol": u.rol.value if u.rol else "",
                 "num_ventas": len(ventas),
                 "total_ventas": round(total_v, 2),
                 "total_costo": round(total_c, 2),
-                "ganancia": round(total_v - total_c, 2),
+                "ganancia": round(ganancia, 2),
                 "ticket_promedio": round(total_v / len(ventas), 2) if ventas else 0.0,
-                "margen_pct": round((total_v - total_c) / total_v * 100, 1) if total_v else 0.0,
+                "margen_pct": round(ganancia / total_v * 100, 1) if total_v else 0.0,
             })
         result.sort(key=lambda x: -x["total_ventas"])
         return result

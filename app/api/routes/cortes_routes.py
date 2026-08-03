@@ -457,6 +457,7 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
         tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
 
         # Parse optional backdated date
+        backdated = bool(body.fecha)
         if body.fecha:
             try:
                 from datetime import date as _date
@@ -481,13 +482,32 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
                 detail=f"Saldo insuficiente. Capital de inversión disponible: ${cap_inv:.2f}",
             )
 
-        # Intentar asociar al corte activo de cualquier cajero (si admin también tiene uno, o el primer abierto)
-        corte = (
-            db.query(CortesCaja)
-            .filter(CortesCaja.cerrado_en == None)
-            .order_by(CortesCaja.abierto_en.desc())
-            .first()
-        )
+        if backdated:
+            # Un retiro con fecha atrasada NO debe caer en el corte abierto HOY —
+            # antes se le asociaba al corte activo actual sin importar la fecha
+            # elegida, así que un retiro fechado "16-jul" terminaba restándose del
+            # esperado_caja de un corte abierto el 25-jul (9 días después), y el
+            # corte real del 16-jul nunca reflejaba esa salida de efectivo. Se
+            # busca el corte (de cualquier cajero) cuya ventana [abierto_en,
+            # cerrado_en] cubra esa fecha; si ninguno la cubre queda sin corte
+            # (igual que antes), pero ya no se le asigna uno incorrecto.
+            corte = (
+                db.query(CortesCaja)
+                .filter(CortesCaja.abierto_en <= creado_en)
+                .filter(
+                    (CortesCaja.cerrado_en == None) | (CortesCaja.cerrado_en >= creado_en)
+                )
+                .order_by(CortesCaja.abierto_en.desc())
+                .first()
+            )
+        else:
+            # Intentar asociar al corte activo de cualquier cajero (si admin también tiene uno, o el primer abierto)
+            corte = (
+                db.query(CortesCaja)
+                .filter(CortesCaja.cerrado_en == None)
+                .order_by(CortesCaja.abierto_en.desc())
+                .first()
+            )
         r = RetiroCaja(
             corte_id=corte.id if corte else None,
             usuario_id=usuario_id,
@@ -591,8 +611,16 @@ def eliminar_retiro(retiro_id: int, bg: BackgroundTasks, payload: dict = Depends
         r = db.query(RetiroCaja).filter(RetiroCaja.id == retiro_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="Retiro no encontrado")
+        monto_borrado, tipo_borrado, concepto_borrado = r.monto, r.tipo, r.concepto
         db.delete(r)
         db.commit()
+
+        from app.auth.auth_service import _registrar_auditoria
+        _registrar_auditoria(
+            int(payload["sub"]), "RETIRO_CAJA_BORRADO", "retiros_caja", retiro_id,
+            f"Monto:${monto_borrado:.2f} Tipo:{tipo_borrado} Concepto:{concepto_borrado or ''}"
+        )
+
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso, delete_ids_from_turso
@@ -626,8 +654,16 @@ def editar_retiro(retiro_id: int, body: EditarRetiroIn, bg: BackgroundTasks, pay
         r = db.query(RetiroCaja).filter(RetiroCaja.id == retiro_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="Retiro no encontrado")
+        tipo_anterior = r.tipo
         r.tipo = body.tipo
         db.commit()
+
+        from app.auth.auth_service import _registrar_auditoria
+        _registrar_auditoria(
+            int(payload["sub"]), "RETIRO_CAJA_TIPO_CAMBIADO", "retiros_caja", retiro_id,
+            f"Monto:${r.monto:.2f} Tipo:{tipo_anterior}->{body.tipo} Concepto:{r.concepto or ''}"
+        )
+
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
