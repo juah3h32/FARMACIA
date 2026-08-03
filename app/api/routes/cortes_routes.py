@@ -58,10 +58,17 @@ def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) ->
 
 
 def _calc_disponibles(db):
-    """Returns (ganancia_disponible, capital_inversion) from all-time data."""
-    tv = db.query(func.sum(Venta.total)).filter(
+    """Returns (ganancia_disponible, capital_inversion_disponible) from all-time
+    data. Debe usar la misma fórmula que /cortes/ganancia (ventas netas de
+    devoluciones, IVA excluido de la ganancia) — si no, el límite que valida un
+    retiro no coincide con lo que la pantalla de Control de Caja muestra."""
+    tv, iva_total = db.query(
+        func.sum(Venta.total), func.sum(Venta.iva)
+    ).filter(
         Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True)
-    ).scalar() or 0.0
+    ).first()
+    tv = tv or 0.0
+    iva_total = iva_total or 0.0
 
     total_costo = db.query(
         func.sum(ItemVenta.cantidad * func.coalesce(Producto.precio_compra, 0.0))
@@ -71,7 +78,21 @@ def _calc_disponibles(db):
         Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True)
     ).scalar() or 0.0
 
-    ganancia = tv - total_costo
+    dev_movs = db.query(MovimientoStock).filter(
+        MovimientoStock.tipo == TipoMovimiento.devolucion,
+        MovimientoStock.referencia_tipo == "devolucion",
+    ).all()
+    total_devoluciones = 0.0
+    if dev_movs:
+        precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
+        for mov in dev_movs:
+            precio = precios.get((mov.referencia_id, mov.producto_id))
+            if precio is not None:
+                total_devoluciones += precio * mov.cantidad
+
+    ventas_netas = tv - total_devoluciones
+    # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
+    ganancia = (ventas_netas - iva_total) - total_costo
 
     ret_personal = db.query(func.sum(RetiroCaja.monto)).filter(
         RetiroCaja.tipo == "personal"
@@ -194,11 +215,14 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
         ef, tj, tr, tv = _sumar_totales_ventas(ventas)
         total_retiros = sum(r.monto for r in retiros)
         total_costo = _costo_ventas(db, [v.id for v in ventas])
-        ganancia   = tv - total_costo
-        disponible = ganancia - total_retiros
+        iva_total = sum(v.iva or 0.0 for v in ventas)
 
         total_devoluciones = _calc_devoluciones(db, usuario_id, c.abierto_en, datetime.now())
         ventas_netas = tv - total_devoluciones
+
+        # El IVA cobrado no es ganancia y las devoluciones ya no son venta real
+        ganancia   = (ventas_netas - iva_total) - total_costo
+        disponible = ganancia - total_retiros
 
         return {
             "abierto":          True,
@@ -292,6 +316,15 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         num_ventas = c.num_ventas
         total_devoluciones = _calc_devoluciones(db, usuario_id, c.abierto_en, ahora)
         ventas_netas = tv - total_devoluciones
+        iva_total = db.query(func.sum(Venta.iva)).filter(
+            Venta.usuario_id == usuario_id,
+            Venta.creado_en >= c.abierto_en,
+            Venta.creado_en <= ahora,
+            Venta.estado == EstadoVenta.completada,
+            Venta.eliminado.is_not(True),
+        ).scalar() or 0.0
+        # El IVA cobrado no es ganancia y las devoluciones ya no son venta real
+        ganancia = (ventas_netas - iva_total) - total_costo
         db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
@@ -313,7 +346,7 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
             "tarjeta":            tj,
             "transferencia":      tr,
             "total_costo":        total_costo,
-            "ganancia":           tv - total_costo,
+            "ganancia":           ganancia,
             "monto_apertura":     apertura,
             "monto_cierre":       body.monto_cierre,
             "total_retiros":      total_retiros,
@@ -368,6 +401,16 @@ def historial_cajero(
             dif = (c.monto_cierre - esperado_caja) if c.monto_cierre is not None else None
             hasta = c.cerrado_en or datetime.now()
             total_dev = _calc_devoluciones(db, usuario_id, c.abierto_en, hasta) if c.abierto_en else 0.0
+            iva_c = 0.0
+            if c.abierto_en:
+                iva_c = db.query(func.sum(Venta.iva)).filter(
+                    Venta.usuario_id == usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= hasta,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).scalar() or 0.0
+            ventas_netas_c = tv - total_dev
             result.append({
                 "id":               c.id,
                 "abierto_en":       c.abierto_en.isoformat() if c.abierto_en else None,
@@ -379,7 +422,7 @@ def historial_cajero(
                 "total_tarjeta":    tj,
                 "total_transferencia": tr,
                 "total_costo":      tc,
-                "ganancia":         tv - tc,
+                "ganancia":         (ventas_netas_c - iva_c) - tc,
                 "monto_apertura":   ape,
                 "monto_cierre":     c.monto_cierre,
                 "total_retiros":    total_retiros_c,
@@ -387,7 +430,7 @@ def historial_cajero(
                 "diferencia":       dif,
                 "abierto":          c.cerrado_en is None,
                 "total_devoluciones": total_dev,
-                "ventas_netas":       tv - total_dev,
+                "ventas_netas":       ventas_netas_c,
             })
         return result
     finally:
@@ -612,6 +655,7 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
             .all()
         )
         tv = sum(v.total for v in ventas)
+        iva_total = sum(v.iva or 0.0 for v in ventas)
 
         venta_ids = [v.id for v in ventas]
         if venta_ids:
@@ -644,7 +688,8 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
                     total_devoluciones += precio * mov.cantidad
 
         ventas_netas        = tv - total_devoluciones
-        ganancia            = ventas_netas - total_costo
+        # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
+        ganancia            = (ventas_netas - iva_total) - total_costo
         ganancia_disponible = ganancia - retiros_personales
         # Puede ser negativo si se retiró más de lo que las ventas han recuperado
         # (sobregiro de inversión) — se reporta tal cual para no ocultarlo.
