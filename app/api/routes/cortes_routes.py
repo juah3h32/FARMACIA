@@ -238,7 +238,13 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             "ganancia":         ganancia,
             "total_retiros":    total_retiros,
             "disponible":       disponible,
-            "esperado_caja":    c.monto_apertura + ef - total_retiros,
+            # Los retiros siempre los hace el admin (los cajeros no pueden
+            # registrar retiros), nunca se descuentan del cuadre de UN turno —
+            # son un movimiento del cajón en general, no responsabilidad de
+            # ese cajero. Antes restarlos aquí producía "esperado" negativo
+            # cada vez que un pago a proveedor superaba las ventas del propio
+            # turno, aunque el dinero viniera acumulado de turnos anteriores.
+            "esperado_caja":    c.monto_apertura + ef,
             "notas":            c.notas or "",
             "total_devoluciones": total_devoluciones,
             "ventas_netas":       ventas_netas,
@@ -298,11 +304,6 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
 
         ahora = datetime.now()
         ef, tj, tr, tv, total_costo = _calcular_totales_corte(db, c, ahora)
-        # Cash physically withdrawn during the shift must come out of the
-        # expected drawer amount — the live "/activo" view already does this
-        # (esperado_caja = apertura + ef - total_retiros), but this endpoint
-        # was comparing against apertura+ef only, so any retiro during the
-        # shift showed up as a phantom "faltante" at close time.
         total_retiros = sum(
             r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
         )
@@ -336,7 +337,9 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         # que las cubra ese mismo día sin que nadie tenga que acordarse de darle al
         # botón manual del panel admin.
         bg.add_task(_reconstruir_historicos_run)
-        esperado   = apertura + ef - total_retiros
+        # Los retiros los hace el admin, nunca el cajero — no se descuentan del
+        # cuadre de un turno individual (ver mismo criterio en /activo).
+        esperado   = apertura + ef
         diferencia = body.monto_cierre - esperado
         return {
             "ok":                 True,
@@ -391,13 +394,12 @@ def historial_cajero(
             tv  = c.total_ventas         or 0.0
             tc  = c.total_costo          or 0.0
             ape = c.monto_apertura       or 0.0
-            # Same fix as /cerrar: withdrawals during the shift reduce what's
-            # actually expected in the drawer — omitting them here made the
-            # historial show a "diferencia" (faltante) that never existed.
             total_retiros_c = sum(
                 r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
             )
-            esperado_caja = ape + ef - total_retiros_c
+            # Los retiros los hace el admin, nunca el cajero — no se descuentan
+            # del cuadre de un turno individual (ver mismo criterio en /activo).
+            esperado_caja = ape + ef
             dif = (c.monto_cierre - esperado_caja) if c.monto_cierre is not None else None
             hasta = c.cerrado_en or datetime.now()
             total_dev = _calc_devoluciones(db, usuario_id, c.abierto_en, hasta) if c.abierto_en else 0.0
