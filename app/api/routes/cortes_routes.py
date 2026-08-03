@@ -646,7 +646,10 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
         ventas_netas        = tv - total_devoluciones
         ganancia            = ventas_netas - total_costo
         ganancia_disponible = ganancia - retiros_personales
-        capital_inversion   = max(0.0, total_costo - retiros_inversion)
+        # Puede ser negativo si se retiró más de lo que las ventas han recuperado
+        # (sobregiro de inversión) — se reporta tal cual para no ocultarlo.
+        capital_inversion             = total_costo - retiros_inversion
+        capital_inversion_disponible  = max(0.0, capital_inversion)
 
         return {
             "num_ventas":          len(ventas),
@@ -660,7 +663,8 @@ def resumen_ganancia(payload: dict = Depends(get_current_api_user)):
             "retiros_inversion":   retiros_inversion,
             "disponible":          round(ganancia_disponible, 2),
             "ganancia_disponible": round(ganancia_disponible, 2),
-            "capital_inversion":   capital_inversion,
+            "capital_inversion":             round(capital_inversion, 2),
+            "capital_inversion_disponible":  round(capital_inversion_disponible, 2),
         }
     finally:
         db.close()

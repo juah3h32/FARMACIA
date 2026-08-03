@@ -2932,7 +2932,7 @@
         <div class="flex gap-3 flex-shrink-0">
 
           <!-- DISPONIBLE — ganancia personal -->
-          <div class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-color:#86EFAC;min-width:0">
+          <div id="caja-card-personal" onclick="toggleCajaTipoFiltro('personal')" class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1 cursor-pointer transition-all" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-color:#86EFAC;min-width:0" title="Clic para ver solo retiros de ganancia personal">
             <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#16A34A">
               <i data-lucide="banknote" style="width:17px;height:17px;color:#fff"></i>
             </div>
@@ -2946,7 +2946,7 @@
           </div>
 
           <!-- INVERSIÓN — capital para proveedores -->
-          <div class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#93C5FD;min-width:0">
+          <div id="caja-card-inversion" onclick="toggleCajaTipoFiltro('inversion')" class="rounded-2xl px-4 py-3 border-2 flex items-center gap-3 flex-1 cursor-pointer transition-all" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-color:#93C5FD;min-width:0" title="Clic para ver solo retiros de inversión/proveedores">
             <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#1d2140">
               <i data-lucide="landmark" style="width:17px;height:17px;color:#fff"></i>
             </div>
@@ -2956,6 +2956,7 @@
               <p class="text-xs truncate" style="color:#93C5FD">
                 <span id="caja-stat-costo-rec" style="color:#1d2140;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
               </p>
+              <p id="caja-stat-inversion-warn" class="text-xs font-semibold mt-0.5 hidden" style="color:#DC2626"></p>
             </div>
           </div>
 
@@ -3054,6 +3055,10 @@
                 <p class="font-bold text-sm" style="color:#0F172A">Historial de Retiros</p>
                 <p id="caja-retiros-count" class="text-xs" style="color:#94A3B8">—</p>
               </div>
+              <button id="caja-tipo-filtro-chip" onclick="toggleCajaTipoFiltro(null)" class="hidden items-center gap-1.5 h-7 pl-3 pr-2 rounded-full text-xs font-semibold flex-shrink-0" style="border:none;cursor:pointer">
+                <span id="caja-tipo-filtro-label"></span>
+                <i data-lucide="x" style="width:12px;height:12px"></i>
+              </button>
               <div class="flex items-center gap-2 ml-auto">
                 <input id="caja-desde" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151" oninput="loadCajaAdmin()">
                 <span class="text-xs" style="color:#94A3B8">–</span>
@@ -9614,13 +9619,29 @@ async function loadCajaAdmin() {
     set('caja-stat-disponible', money(g.ganancia_disponible ?? g.disponible));
     set('caja-stat-ef',         money(g.ganancia));
     set('caja-stat-ret-turno',  money(g.retiros_personales ?? g.total_retiros));
-    set('caja-stat-inversion',  money(g.capital_inversion ?? 0));
     set('caja-stat-costo-rec',  money(g.total_costo ?? 0));
     set('caja-stat-ret-inv',    money(g.retiros_inversion ?? 0));
-    // Store limits for real-time form validation
+
+    const capInv = g.capital_inversion ?? 0;
+    const inversionEl = document.getElementById('caja-stat-inversion');
+    const warnEl = document.getElementById('caja-stat-inversion-warn');
+    if (inversionEl) {
+      inversionEl.textContent = (capInv < 0 ? '-$' + Math.abs(capInv).toFixed(2) : money(capInv));
+      inversionEl.style.color = capInv < 0 ? '#DC2626' : '#1d2140';
+    }
+    if (warnEl) {
+      if (capInv < 0) {
+        warnEl.textContent = `⚠ Retiraste ${money(Math.abs(capInv))} más de lo recuperado`;
+        warnEl.classList.remove('hidden');
+      } else {
+        warnEl.classList.add('hidden');
+      }
+    }
+
+    // Store limits for real-time form validation (never negative — can't withdraw below zero)
     window._cajaLimites = {
       personal:  g.ganancia_disponible ?? g.disponible ?? 0,
-      inversion: g.capital_inversion ?? 0,
+      inversion: g.capital_inversion_disponible ?? Math.max(0, capInv),
     };
     _updateRetiroMontoHint();
   }
@@ -9676,6 +9697,38 @@ function _updateCajaStats() {
   document.getElementById('caja-stat-retiros-periodo').textContent = money(totalPer);
 }
 
+let _cajaTipoFiltro = null; // null | 'personal' | 'inversion' — set by clicking the stat cards
+
+function toggleCajaTipoFiltro(tipo) {
+  _cajaTipoFiltro = (_cajaTipoFiltro === tipo) ? null : tipo;
+
+  const personalCard  = document.getElementById('caja-card-personal');
+  const inversionCard  = document.getElementById('caja-card-inversion');
+  if (personalCard)  personalCard.style.boxShadow  = _cajaTipoFiltro === 'personal'  ? '0 0 0 3px #16A34A' : '';
+  if (inversionCard) inversionCard.style.boxShadow = _cajaTipoFiltro === 'inversion' ? '0 0 0 3px #1d2140' : '';
+
+  const chip  = document.getElementById('caja-tipo-filtro-chip');
+  const label = document.getElementById('caja-tipo-filtro-label');
+  if (chip && label) {
+    if (_cajaTipoFiltro) {
+      chip.classList.remove('hidden');
+      chip.classList.add('flex');
+      if (_cajaTipoFiltro === 'personal') {
+        chip.style.background = '#DCFCE7'; chip.style.color = '#166534';
+        label.textContent = 'Solo ganancia personal';
+      } else {
+        chip.style.background = '#DBEAFE'; chip.style.color = '#1E40AF';
+        label.textContent = 'Solo inversión / proveedores';
+      }
+    } else {
+      chip.classList.add('hidden');
+      chip.classList.remove('flex');
+    }
+  }
+
+  renderRetirosCaja();
+}
+
 function renderRetirosCaja() {
   const q     = (document.getElementById('caja-retiros-buscar')?.value||'').toLowerCase();
   const desde = document.getElementById('caja-desde')?.value  || '';
@@ -9686,6 +9739,7 @@ function renderRetirosCaja() {
     if (desde && d < desde) return false;
     if (hasta && d > hasta) return false;
     if (q && !(r.concepto||'').toLowerCase().includes(q) && !(r.usuario||'').toLowerCase().includes(q)) return false;
+    if (_cajaTipoFiltro && (r.tipo || 'personal') !== _cajaTipoFiltro) return false;
     return true;
   });
 
