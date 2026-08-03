@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from app.api.routes.auth_routes import get_current_api_user
@@ -212,3 +212,90 @@ def chat_asistente(body: ChatIn, payload: dict = Depends(get_current_api_user)):
         raise HTTPException(status_code=502, detail=f"Error OpenAI: {msg[:200]}")
     finally:
         db.close()
+
+
+# ── Mejorar calidad de imagen (IA generativa, gpt-image-1) ──────────────────
+# ADVERTENCIA que el admin ya vio y aceptó al elegir esta opción: a diferencia
+# de "Quitar fondo" (segmentación, no re-dibuja nada), esto SÍ es un modelo
+# generativo — puede alterar sutilmente el texto/código de barras de la
+# etiqueta. Por eso el resultado SIEMPRE se regresa como vista previa (no se
+# sube a Cloudinary ni se guarda solo) — el front lo muestra para que el
+# admin decida si lo acepta o se queda con el original, igual que
+# "Quitar fondo" pero con este paso de revisión más explícito por el riesgo.
+_MEJORAR_IMAGEN_PROMPT = """Restore this blurry product photograph into a hyper-realistic 4K photograph with the visual character of an ultra-high-end medium-format or flagship full-frame camera system and a world-class prime lens.
+
+Desired visual qualities: extremely high resolving power, precision optics, true-to-life material and surface texture, refined dynamic range, subtle tonal rolloff, realistic micro-contrast, premium lens sharpness, natural depth rendition, clean subject-background separation, lifelike high-end photographic detail.
+
+This is a medicine/pharmacy product package (box, bottle, blister, or tube). Preserve the product EXACTLY as in the source: shape, proportions, colors, packaging design and layout. All printed text, numbers, dosage information, and barcodes must remain PIXEL-FAITHFUL to the source — do not alter, redraw, reflow, invent, or reinterpret any text, numbers, or barcode. If any text is illegible in the source, keep it exactly as blurry/illegible rather than inventing plausible-looking text.
+
+Recover fine detail in: packaging print sharpness, label edges, material reflections and texture, box/bottle/blister contours.
+
+Avoid: hallucinated details, altering any text/numbers/barcodes, fake symmetry, over-retouching, oversharpening halos, artificial HDR, cinematic stylization, fantasy detail, added objects, or changing the product in any way.
+
+Make the final image look as if captured with an extremely expensive professional camera and premium glass under ideal focus, while remaining fully natural and 100% faithful to the source — especially all label text and barcodes."""
+
+
+@router.post("/mejorar-imagen")
+async def mejorar_imagen(
+    file: UploadFile = File(None),
+    imagen_url: str = Form(None),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Botón opcional "Mejorar calidad" del editor de producto. Usa IA
+    generativa (gpt-image-1) — el resultado SIEMPRE se regresa como vista
+    previa (base64), nunca se guarda solo, porque a diferencia de remove.bg
+    esto sí puede alterar detalle fino como el texto de la etiqueta."""
+    import app.config as cfg
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if not cfg.OPENAI_API_KEY:
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY no configurada. Agrégala en Configuración > Integraciones.")
+
+    if file is not None:
+        raw = await file.read()
+    elif imagen_url:
+        import requests
+        try:
+            r = requests.get(imagen_url, timeout=15)
+            r.raise_for_status()
+            raw = r.content
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"No se pudo descargar la imagen actual: {e}")
+    else:
+        raise HTTPException(status_code=400, detail="Falta la imagen (archivo o imagen_url)")
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Paquete 'openai' no instalado en el servidor.")
+
+    import io
+    client = OpenAI(api_key=cfg.OPENAI_API_KEY)
+    try:
+        img_file = io.BytesIO(raw)
+        img_file.name = "producto.png"
+        response = client.images.edit(
+            model="gpt-image-1",
+            image=img_file,
+            prompt=_MEJORAR_IMAGEN_PROMPT,
+            size="1024x1024",
+        )
+    except Exception as e:
+        msg = str(e)
+        if "429" in msg or "quota" in msg.lower() or "billing" in msg.lower():
+            raise HTTPException(status_code=402, detail="Sin créditos en OpenAI. Agrega saldo en platform.openai.com/billing")
+        if "verify" in msg.lower() or "organization" in msg.lower():
+            raise HTTPException(status_code=403, detail="Tu cuenta de OpenAI necesita verificación de organización para usar gpt-image-1 (platform.openai.com/settings/organization/general)")
+        raise HTTPException(status_code=502, detail=f"Error OpenAI: {msg[:200]}")
+
+    b64 = response.data[0].b64_json
+    if not b64:
+        raise HTTPException(status_code=502, detail="OpenAI no regresó una imagen")
+
+    import base64
+    processed_raw = base64.b64decode(b64)
+    from app.services.cloudinary_service import _standardize_image_bytes, _STANDARD_SIZE
+    standardized = _standardize_image_bytes(processed_raw, _STANDARD_SIZE["medicamentos"])
+    final_bytes = standardized if standardized is not None else processed_raw
+    final_b64 = base64.b64encode(final_bytes).decode()
+    return {"imagen_base64": f"data:image/jpeg;base64,{final_b64}"}

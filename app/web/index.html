@@ -2307,6 +2307,18 @@
               <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94A3B8"></i>
             </button>
 
+            <button onclick="openIntegModal('removebg')" class="w-full flex items-center gap-3 px-6 py-3.5 text-left transition hover:bg-slate-50 border-b" style="border-color:#F1F5F9">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0F9FF">
+                <i data-lucide="eraser" style="width:16px;height:16px;color:#0EA5E9"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold" style="color:#0F172A">remove.bg</p>
+                <p class="text-[11px]" style="color:#94A3B8">Quitar fondo de fotos de producto</p>
+              </div>
+              <span id="integ-badge-removebg" class="px-2.5 py-1 rounded-lg text-[10px] font-bold">—</span>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94A3B8"></i>
+            </button>
+
             <button onclick="openIntegModal('alertas')" class="w-full flex items-center gap-3 px-6 py-3.5 text-left transition hover:bg-slate-50 border-b" style="border-color:#F1F5F9">
               <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#E8FFF0">
                 <i data-lucide="bell" style="width:16px;height:16px;color:#25D366"></i>
@@ -2580,6 +2592,49 @@
               <div>
                 <label class="lbl">API Secret</label>
                 <input id="int-cloud-secret" type="password" class="inp" placeholder="Tu API Secret">
+              </div>
+              <button onclick="guardarIntegraciones()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 w-fit transition hover:opacity-90" style="background:#7C3AED">
+                <i data-lucide="save" style="width:13px;height:13px"></i> Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="modal-integ-removebg" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-integ-removebg')"></div>
+        <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[440px]">
+          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color:#E2E8F0">
+            <div class="flex items-center gap-2">
+              <i data-lucide="eraser" style="width:18px;height:18px;color:#0EA5E9"></i>
+              <h2 class="font-bold" style="color:#0F172A">remove.bg</h2>
+            </div>
+            <button onclick="closeModal('modal-integ-removebg')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+              <i data-lucide="x" style="width:16px;height:16px"></i>
+            </button>
+          </div>
+          <div class="px-6 pt-4 flex items-center gap-3">
+            <button id="btn-test-removebg" onclick="probarConexionIntegracion('removebg','btn-test-removebg','test-result-removebg')"
+              class="h-9 px-4 rounded-xl font-bold text-xs flex items-center gap-2 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+              <i data-lucide="zap" style="width:13px;height:13px"></i> Probar conexión
+            </button>
+            <span id="test-result-removebg" class="text-xs font-semibold"></span>
+          </div>
+          <div class="p-6 flex flex-col gap-3">
+            <p class="text-[11px]" style="color:#94A3B8">Habilita el botón "Quitar fondo" al editar la foto de un producto. Consigue tu API key gratis en <span style="color:#0EA5E9">remove.bg/api</span>.</p>
+            <div id="int-removebg-vercel" class="hidden"></div>
+            <div id="int-removebg-fields" class="flex flex-col gap-3">
+              <div>
+                <label class="lbl">API Key</label>
+                <input id="int-removebg-key" type="password" class="inp" placeholder="Tu API Key de remove.bg">
+              </div>
+              <div class="rounded-xl p-3" style="background:#F8FAFF;border:1px solid #E2E8F0">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="int-removebg-auto" class="sr-only peer">
+                  <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-blue-600 transition-all after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                  <span class="ml-3 text-xs font-semibold" style="color:#0F172A">Quitar fondo automáticamente al subir una foto</span>
+                </label>
+                <p class="text-[10px] mt-1.5" style="color:#94A3B8">Apagado: eliges tú cuándo usar "Quitar fondo" en cada foto. Encendido: se aplica solo en cuanto eliges la imagen — actívalo solo si TODAS las fotos que subes necesitan que les quiten el fondo (si ya subes fotos preparadas, mejor déjalo apagado).</p>
               </div>
               <button onclick="guardarIntegraciones()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 w-fit transition hover:opacity-90" style="background:#7C3AED">
                 <i data-lucide="save" style="width:13px;height:13px"></i> Guardar
@@ -4925,6 +4980,26 @@
               <p id="pm-img-status" class="text-xs flex-1" style="color:#94A3B8;min-height:14px"></p>
               <button type="button" id="pm-btn-quitar-img" onclick="pmClearImage()" class="hidden text-xs font-semibold flex items-center gap-1" style="color:#EF4444"><i data-lucide="x" style="width:11px;height:11px"></i> quitar</button>
             </div>
+            <!-- Opcional — NO se aplica solo a cada foto, algunas ya llegan
+                 preparadas. Solo para fotos con fondo gris/feo que hay que limpiar. -->
+            <button type="button" id="pm-btn-quitar-fondo" onclick="pmQuitarFondo()" class="hidden mt-1.5 w-full h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition hover:opacity-80" style="background:#F0F9FF;color:#0EA5E9;border:1px solid #BAE6FD">
+              <i id="pm-quitar-fondo-icon" data-lucide="eraser" style="width:12px;height:12px"></i>
+              <span id="pm-quitar-fondo-txt">Quitar fondo</span>
+            </button>
+            <!-- Opcional — IA generativa (gpt-image-1). A diferencia de "Quitar
+                 fondo" esto SÍ puede alterar texto de la etiqueta, por eso
+                 nunca se aplica solo y siempre pide confirmación antes de usarse. -->
+            <button type="button" id="pm-btn-mejorar" onclick="pmMejorarCalidad()" class="hidden mt-1.5 w-full h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition hover:opacity-80" style="background:#FEF9C3;color:#92400E;border:1px solid #FDE68A">
+              <i id="pm-mejorar-icon" data-lucide="sparkles" style="width:12px;height:12px"></i>
+              <span id="pm-mejorar-txt">Mejorar calidad (IA)</span>
+            </button>
+            <div id="pm-mejora-confirm" class="hidden mt-1.5 rounded-lg p-2 flex flex-col gap-1.5" style="background:#FEFCE8;border:1px solid #FDE68A">
+              <p class="text-[10px] leading-snug" style="color:#92400E">Vista previa mejorada con IA — revisa que el texto de la etiqueta se vea igual antes de usarla.</p>
+              <div class="flex gap-1.5">
+                <button type="button" onclick="pmAceptarMejora()" class="flex-1 h-7 rounded-md text-[11px] font-bold text-white transition hover:opacity-90" style="background:#16A34A">Usar esta versión</button>
+                <button type="button" onclick="pmDescartarMejora()" class="flex-1 h-7 rounded-md text-[11px] font-bold transition hover:opacity-80" style="background:#F1F5F9;color:#64748B">Descartar</button>
+              </div>
+            </div>
             <input id="pm-img-input" type="file" accept="image/*" class="hidden" onchange="pmHandleImageSelect(event)">
           </div>
 
@@ -6321,6 +6396,7 @@ function launchApp() {
     setInterval(loadIntegracionesStatus, 2 * 60 * 1000); // cada 2 min — avisa pronto si cae Turso/Factura.com/OpenAI
     loadImgSyncStatus();
     setInterval(loadImgSyncStatus, 5 * 1000); // cada 5s — se ve "en vivo" mientras baja fotos
+    loadIntegracionesConfig(); // solo para precargar _removebgAuto antes de abrir el editor de producto
   }
   loadTurnoStatus();
   // Refresca el botón de turno periódicamente — el turno puede haberse cerrado
@@ -7799,6 +7875,9 @@ async function saveProduct() {
 }
 
 // ── Product image helpers ─────────────────────────────────────────────────
+let _removebgAuto = false; // cache de Config > Integraciones > remove.bg — ver launchApp() y loadIntegracionesConfig()
+let _pmMejoraPendiente = null;       // data URL del resultado de IA sin aceptar todavía
+let _pmPreviewAntesDeMejora = null;  // src del preview antes de mostrar el resultado de IA, para poder descartar
 let _pmImageFile = null;
 let _pmImageUrl  = '';
 
@@ -7833,6 +7912,11 @@ function pmHandleImageSelect(e) {
     img.classList.remove('hidden');
     document.getElementById('pm-img-placeholder').classList.add('hidden');
     document.getElementById('pm-btn-quitar-img').classList.remove('hidden');
+    document.getElementById('pm-btn-quitar-fondo').classList.remove('hidden');
+    document.getElementById('pm-btn-mejorar').classList.remove('hidden');
+    // "Quitar fondo automáticamente" activo en Config > Integraciones > remove.bg
+    // — se dispara solo, sin que el usuario tenga que apretar el botón cada vez.
+    if (_removebgAuto) pmQuitarFondo();
   };
   reader.readAsDataURL(file);
   const st = document.getElementById('pm-img-status');
@@ -7850,6 +7934,13 @@ function pmClearImage() {
   if (ph) ph.classList.remove('hidden');
   const btn = document.getElementById('pm-btn-quitar-img');
   if (btn) btn.classList.add('hidden');
+  const btnBg = document.getElementById('pm-btn-quitar-fondo');
+  if (btnBg) btnBg.classList.add('hidden');
+  const btnMej = document.getElementById('pm-btn-mejorar');
+  if (btnMej) btnMej.classList.add('hidden');
+  document.getElementById('pm-mejora-confirm')?.classList.add('hidden');
+  _pmMejoraPendiente = null;
+  _pmPreviewAntesDeMejora = null;
   const st = document.getElementById('pm-img-status');
   if (st) { st.textContent=''; st.style.color='#94A3B8'; }
 }
@@ -7863,9 +7954,131 @@ function pmLoadImagePreview(url) {
   img.classList.remove('hidden');
   document.getElementById('pm-img-placeholder').classList.add('hidden');
   document.getElementById('pm-btn-quitar-img').classList.remove('hidden');
+  document.getElementById('pm-btn-quitar-fondo').classList.remove('hidden');
+  document.getElementById('pm-btn-mejorar').classList.remove('hidden');
   const st = document.getElementById('pm-img-status');
   st.textContent = 'Imagen actual desde Cloudinary';
   st.style.color = '#16A34A';
+}
+
+// Opcional — el usuario decide cuándo usarlo (no se aplica solo a cada foto,
+// algunas ya llegan preparadas). Manda la imagen actual (archivo recién
+// elegido, o la ya guardada en Cloudinary) a remove.bg vía el backend, y
+// reemplaza el preview por el resultado sobre fondo blanco. El resultado
+// queda como archivo pendiente — se sube a Cloudinary hasta guardar el
+// producto, igual que una foto elegida a mano.
+async function pmQuitarFondo() {
+  if (!_pmImageFile && !_pmImageUrl) return;
+  const btn  = document.getElementById('pm-btn-quitar-fondo');
+  const icon = document.getElementById('pm-quitar-fondo-icon');
+  const txt  = document.getElementById('pm-quitar-fondo-txt');
+  const st   = document.getElementById('pm-img-status');
+  btn.disabled = true;
+  icon.setAttribute('data-lucide', 'loader-2');
+  icon.classList.add('animate-spin');
+  icons();
+  txt.textContent = 'Quitando fondo...';
+  st.textContent = 'Esto puede tardar unos segundos...';
+  st.style.color = '#0EA5E9';
+  try {
+    const formData = new FormData();
+    if (_pmImageFile) formData.append('file', _pmImageFile);
+    else formData.append('imagen_url', _pmImageUrl);
+    const res = await fetch('/api/productos/quitar-fondo', {
+      method: 'POST',
+      headers: S.token ? { Authorization: `Bearer ${S.token}` } : {},
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.detail || 'No se pudo quitar el fondo');
+    const blob = await (await fetch(data.imagen_base64)).blob();
+    _pmImageFile = new File([blob], 'producto_sin_fondo.jpg', { type: 'image/jpeg' });
+    _pmImageUrl = '';
+    document.getElementById('pm-img-preview').src = data.imagen_base64;
+    st.textContent = 'Fondo quitado — se subirá al guardar';
+    st.style.color = '#16A34A';
+  } catch (e) {
+    st.textContent = e.message || 'No se pudo quitar el fondo';
+    st.style.color = '#EF4444';
+    toast(e.message || 'No se pudo quitar el fondo', 'error');
+  } finally {
+    btn.disabled = false;
+    icon.setAttribute('data-lucide', 'eraser');
+    icon.classList.remove('animate-spin');
+    icons();
+    txt.textContent = 'Quitar fondo';
+  }
+}
+
+// Opcional — IA generativa (gpt-image-1). A diferencia de pmQuitarFondo, esto
+// SÍ puede alterar detalle fino (texto de etiqueta, código de barras), así
+// que el resultado NUNCA se aplica solo: se muestra como vista previa y el
+// admin decide con "Usar esta versión" o "Descartar" (ver pmAceptarMejora /
+// pmDescartarMejora) antes de que cuente como la imagen a subir.
+async function pmMejorarCalidad() {
+  if (!_pmImageFile && !_pmImageUrl) return;
+  const btn  = document.getElementById('pm-btn-mejorar');
+  const icon = document.getElementById('pm-mejorar-icon');
+  const txt  = document.getElementById('pm-mejorar-txt');
+  const st   = document.getElementById('pm-img-status');
+  btn.disabled = true;
+  icon.setAttribute('data-lucide', 'loader-2');
+  icon.classList.add('animate-spin');
+  icons();
+  txt.textContent = 'Mejorando con IA...';
+  st.textContent = 'Esto puede tardar hasta medio minuto...';
+  st.style.color = '#92400E';
+  try {
+    const formData = new FormData();
+    if (_pmImageFile) formData.append('file', _pmImageFile);
+    else formData.append('imagen_url', _pmImageUrl);
+    const res = await fetch('/api/ai/mejorar-imagen', {
+      method: 'POST',
+      headers: S.token ? { Authorization: `Bearer ${S.token}` } : {},
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.detail || 'No se pudo mejorar la imagen');
+    _pmPreviewAntesDeMejora = document.getElementById('pm-img-preview').src;
+    _pmMejoraPendiente = data.imagen_base64;
+    document.getElementById('pm-img-preview').src = data.imagen_base64;
+    document.getElementById('pm-mejora-confirm').classList.remove('hidden');
+    st.textContent = 'Revisa el resultado y decide abajo';
+    st.style.color = '#92400E';
+  } catch (e) {
+    st.textContent = e.message || 'No se pudo mejorar la imagen';
+    st.style.color = '#EF4444';
+    toast(e.message || 'No se pudo mejorar la imagen', 'error');
+  } finally {
+    btn.disabled = false;
+    icon.setAttribute('data-lucide', 'sparkles');
+    icon.classList.remove('animate-spin');
+    icons();
+    txt.textContent = 'Mejorar calidad (IA)';
+  }
+}
+
+async function pmAceptarMejora() {
+  if (!_pmMejoraPendiente) return;
+  const blob = await (await fetch(_pmMejoraPendiente)).blob();
+  _pmImageFile = new File([blob], 'producto_mejorado.jpg', { type: 'image/jpeg' });
+  _pmImageUrl = '';
+  document.getElementById('pm-mejora-confirm').classList.add('hidden');
+  _pmMejoraPendiente = null;
+  _pmPreviewAntesDeMejora = null;
+  const st = document.getElementById('pm-img-status');
+  st.textContent = 'Calidad mejorada — se subirá al guardar';
+  st.style.color = '#16A34A';
+}
+
+function pmDescartarMejora() {
+  if (_pmPreviewAntesDeMejora) document.getElementById('pm-img-preview').src = _pmPreviewAntesDeMejora;
+  document.getElementById('pm-mejora-confirm').classList.add('hidden');
+  _pmMejoraPendiente = null;
+  _pmPreviewAntesDeMejora = null;
+  const st = document.getElementById('pm-img-status');
+  st.textContent = 'Se descartó — se mantiene la imagen original';
+  st.style.color = '#94A3B8';
 }
 
 async function pmGenerarDescripcion() {
@@ -14003,6 +14216,7 @@ const _INTEG_LIVE_BADGE_MAP = {
   turso: 'integ-badge-turso',
   openai: 'integ-badge-openai',
   cloudinary: 'integ-badge-cloud',
+  removebg: 'integ-badge-removebg',
   facturacom: 'integ-badge-facturacion',
 };
 
@@ -14031,6 +14245,7 @@ const _INTEG_LOADERS = {
   turso:       loadIntegracionesConfig,
   openai:      loadIntegracionesConfig,
   cloud:       loadIntegracionesConfig,
+  removebg:    loadIntegracionesConfig,
   alertas:     loadConfigAlertas,
   api:         renderTokenHistory,
   catalogo:    loadCatalogoPublico,
@@ -14041,7 +14256,7 @@ function openIntegModal(key) {
   if (loader) loader();
   openModal(`modal-integ-${key}`);
   const statusKey = { facturacion: 'facturacom', cloud: 'cloudinary' }[key] || key;
-  if (['facturacom', 'mp', 'turso', 'openai', 'cloudinary'].includes(statusKey)) {
+  if (['facturacom', 'mp', 'turso', 'openai', 'cloudinary', 'removebg'].includes(statusKey)) {
     probarConexionIntegracion(statusKey, `btn-test-${statusKey}`, `test-result-${statusKey}`);
   }
 }
@@ -14121,6 +14336,7 @@ async function loadIntegracionesConfig() {
       'int-openai-key':   d.openai_api_key,
       'int-cloud-key':    d.cloudinary_api_key,
       'int-cloud-secret': d.cloudinary_api_secret,
+      'int-removebg-key': d.removebg_api_key,
     };
     for (const [id, masked] of Object.entries(secretFields)) {
       const el = document.getElementById(id);
@@ -14130,12 +14346,17 @@ async function loadIntegracionesConfig() {
     const tursoReady = !!(d.turso_database_url && d.turso_auth_token);
     const openaiReady = !!d.openai_api_key;
     const cloudReady = !!(d.cloudinary_cloud_name && d.cloudinary_api_key && d.cloudinary_api_secret);
+    const removebgReady = !!d.removebg_api_key;
     _integBadge(document.getElementById('integ-badge-turso'),  tursoReady);
     _integBadge(document.getElementById('integ-badge-openai'), openaiReady);
     _integBadge(document.getElementById('integ-badge-cloud'),  cloudReady);
+    _integBadge(document.getElementById('integ-badge-removebg'), removebgReady);
     _setIntegMode('turso',  d.on_vercel, tursoReady);
     _setIntegMode('openai', d.on_vercel, openaiReady);
     _setIntegMode('cloud',  d.on_vercel, cloudReady);
+    _setIntegMode('removebg', d.on_vercel, removebgReady);
+    document.getElementById('int-removebg-auto').checked = !!d.removebg_auto;
+    _removebgAuto = !!d.removebg_auto; // cache global — lo usa pmHandleImageSelect sin tener que volver a pedirlo
     icons();
   } catch(e) {}
 }
@@ -14148,6 +14369,8 @@ async function guardarIntegraciones() {
     cloudinary_cloud_name: document.getElementById('int-cloud-name').value.trim(),
     cloudinary_api_key:    document.getElementById('int-cloud-key').value.trim(),
     cloudinary_api_secret: document.getElementById('int-cloud-secret').value.trim(),
+    removebg_api_key:      document.getElementById('int-removebg-key').value.trim(),
+    removebg_auto:         document.getElementById('int-removebg-auto').checked,
   };
   try {
     const res = await apiFetch('/config/integraciones', { method:'POST', body: JSON.stringify(body) });

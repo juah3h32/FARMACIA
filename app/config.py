@@ -162,6 +162,14 @@ CLOUDINARY_CLOUD_NAME = _load_key("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key
 CLOUDINARY_API_KEY    = _load_key("CLOUDINARY_API_KEY",    "cloudinary_api.key")
 CLOUDINARY_API_SECRET = _load_key("CLOUDINARY_API_SECRET", "cloudinary_secret.key")
 
+# -- remove.bg (quitar fondo de fotos de producto, bajo demanda) --------------
+REMOVEBG_API_KEY = _load_key("REMOVEBG_API_KEY", "removebg.key")
+# Si está activo, subir una foto de producto le quita el fondo automáticamente
+# (sin tener que apretar "Quitar fondo" a mano cada vez) — apagado por default
+# porque no toda foto que se sube ya necesita este tratamiento (algunas llegan
+# preparadas de fábrica).
+REMOVEBG_AUTO = _load_key("REMOVEBG_AUTO", "removebg_auto.key") == "1"
+
 # -- Mercado Pago Point (terminal de pago ME30S) ------------------------------
 MP_ACCESS_TOKEN = _load_key("MP_ACCESS_TOKEN", "mp_access_token.key")
 MP_DEVICE_ID    = _load_key("MP_DEVICE_ID",    "mp_device_id.key")

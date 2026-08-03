@@ -28,32 +28,36 @@ _LOCAL_SUBDIR = {
 }
 
 # Todas las fotos guardadas en disco (subida directa sin Cloudinary, o respaldo
-# descargado de Cloudinary) se recortan/escalan a este cuadrado — así se ven
-# todas del mismo tamaño en el catálogo sin importar la foto original que
-# suba cada quien (mismo criterio de recorte centrado que ya usa el generador
-# de imágenes de Marketing, ver _rounded_crop en app/ui/marketing_screen.py).
+# descargado de Cloudinary) se adaptan a este cuadrado — así se ven todas del
+# mismo tamaño en el catálogo sin importar la foto original que suba cada
+# quien, y sobre fondo blanco parejo (ver _fit_white_square).
 _STANDARD_SIZE = {"medicamentos": 800, "perfiles": 300}
 
 
-def _center_crop_square(img: Image.Image, size: int) -> Image.Image:
+def _fit_white_square(img: Image.Image, size: int) -> Image.Image:
+    """Escala la imagen completa (sin recortar nada del producto) para que
+    quepa dentro de un cuadrado size×size sobre fondo blanco, centrada.
+    Antes se recortaba al centro para forzar 1:1 — en una foto no cuadrada
+    eso podía cortar un borde del producto, muy notorio justo en las fotos
+    que ya vienen sin fondo (remove.bg), donde perder un pedazo se ve peor
+    que en una con fondo normal. Además deja TODAS las fotos —tengan o no
+    fondo removido— sobre el mismo fondo blanco parejo."""
     img = img.convert("RGB")
-    w, h = img.size
-    if w != h:
-        side = min(w, h)
-        left = (w - side) // 2
-        top = (h - side) // 2
-        img = img.crop((left, top, left + side, top + side))
-    return img.resize((size, size), Image.LANCZOS)
+    img.thumbnail((size, size), Image.LANCZOS)
+    canvas = Image.new("RGB", (size, size), (255, 255, 255))
+    offset = ((size - img.width) // 2, (size - img.height) // 2)
+    canvas.paste(img, offset)
+    return canvas
 
 
 def _standardize_image_bytes(raw: bytes, size: int) -> bytes | None:
-    """Recorta al centro (cuadrado) y escala los bytes de una imagen a
-    `size`×`size`, devueltos ya codificados como JPEG. None si `raw` no es una
-    imagen válida (PIL no pudo abrirla) — el llamador debe guardar el
-    original tal cual en ese caso, en vez de perder el archivo."""
+    """Adapta los bytes de una imagen a un cuadrado de `size`×`size` sobre
+    fondo blanco (ver _fit_white_square), devueltos ya codificados como JPEG.
+    None si `raw` no es una imagen válida (PIL no pudo abrirla) — el llamador
+    debe guardar el original tal cual en ese caso, en vez de perder el archivo."""
     try:
         img = Image.open(io.BytesIO(raw))
-        img = _center_crop_square(img, size)
+        img = _fit_white_square(img, size)
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=88)
         return out.getvalue()
@@ -199,10 +203,12 @@ def upload_product_image(file_path: str, product_id) -> str:
             public_id=filename,
             overwrite=True,
             resource_type="image",
-            # Recorte al mismo tamaño cuadrado que _save_local aplica localmente
-            # — así la copia maestra en Cloudinary ya viene consistente, sin
-            # depender de que cloudinaryThumb() la recorte al vuelo en el front.
-            transformation=[{"width": size, "height": size, "crop": "fill", "gravity": "auto"}],
+            # "pad" en vez de "fill": encoge la foto completa para que quepa en
+            # el cuadrado y rellena con blanco alrededor, sin recortar nada del
+            # producto (mismo criterio que _fit_white_square para la copia
+            # local) — así la copia maestra en Cloudinary ya viene consistente,
+            # sin depender de que cloudinaryThumb() la recorte al vuelo en el front.
+            transformation=[{"width": size, "height": size, "crop": "pad", "background": "white"}],
         )
         url = result["secure_url"]
         # Guardar también una copia local del respaldo — así esta misma PC no

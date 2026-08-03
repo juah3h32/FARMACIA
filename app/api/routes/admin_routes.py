@@ -546,6 +546,21 @@ def _check_cloudinary() -> dict:
         return {"ok": False, "enabled": True, "message": f"Sin conexión con Cloudinary: {str(e)[:150]}"}
 
 
+def _check_removebg() -> dict:
+    if not cfg.REMOVEBG_API_KEY:
+        return {"ok": True, "enabled": False, "message": "remove.bg no está configurado — el botón \"Quitar fondo\" no aparecerá."}
+    try:
+        from app.services.removebg_service import check_account
+        info = check_account()
+        free = info.get("free_credits")
+        msg = "Conectado."
+        if free is not None:
+            msg += f" Créditos gratis restantes: {free}."
+        return {"ok": True, "enabled": True, "message": msg}
+    except Exception as e:
+        return {"ok": False, "enabled": True, "message": f"Sin conexión con remove.bg: {str(e)[:150]}"}
+
+
 def _check_mp() -> dict:
     from app.services.mercadopago_service import mp_point
     if not mp_point.access_token:
@@ -579,6 +594,7 @@ def integrations_status(payload: dict = Depends(get_current_api_user)):
         "facturacom": _check_facturacom,
         "openai": _check_openai,
         "cloudinary": _check_cloudinary,
+        "removebg": _check_removebg,
         "mp": _check_mp,
     }
     with ThreadPoolExecutor(max_workers=5) as pool:
@@ -589,6 +605,7 @@ def integrations_status(payload: dict = Depends(get_current_api_user)):
         "facturacom": "Factura.com (CFDI)",
         "openai": "OpenAI (Farmacito / IA)",
         "cloudinary": "Cloudinary (Imágenes)",
+        "removebg": "remove.bg (Quitar fondo)",
         "mp": "Mercado Pago (Terminal)",
     }
     integrations = [

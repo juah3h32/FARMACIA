@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, UploadFile, File, Form
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 import os, tempfile
@@ -568,6 +568,43 @@ async def subir_imagen_producto(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+@router.post("/quitar-fondo")
+async def quitar_fondo_producto(
+    file: UploadFile = File(None),
+    imagen_url: str = Form(None),
+    payload: dict = Depends(get_current_api_user),
+):
+    """Botón opcional "Quitar fondo" del editor de producto — NO se aplica
+    automáticamente a cada subida (algunas fotos ya llegan preparadas). Manda
+    la imagen a remove.bg y regresa el resultado sobre fondo blanco como
+    base64; no toca Cloudinary ni la BD — el front la usa como si el usuario
+    hubiera elegido esa imagen, y se sube al guardar el producto igual que
+    cualquier otra foto."""
+    _require_admin(payload)
+    if file is not None:
+        raw = await file.read()
+    elif imagen_url:
+        import requests
+        try:
+            r = requests.get(imagen_url, timeout=15)
+            r.raise_for_status()
+            raw = r.content
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"No se pudo descargar la imagen actual: {e}")
+    else:
+        raise HTTPException(status_code=400, detail="Falta la imagen (archivo o imagen_url)")
+
+    from app.services.removebg_service import quitar_fondo_bytes
+    try:
+        processed = quitar_fondo_bytes(raw)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    import base64
+    b64 = base64.b64encode(processed).decode()
+    return {"imagen_base64": f"data:image/jpeg;base64,{b64}"}
 
 
 @router.get("/{prod_id}/historial-precio")

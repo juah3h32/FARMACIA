@@ -36,6 +36,7 @@ _INTEGRACIONES_MAP = {
     "cloudinary_cloud_name": ("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key", False),
     "cloudinary_api_key":   ("CLOUDINARY_API_KEY",    "cloudinary_api.key",   True),
     "cloudinary_api_secret": ("CLOUDINARY_API_SECRET", "cloudinary_secret.key", True),
+    "removebg_api_key":     ("REMOVEBG_API_KEY",      "removebg.key",         True),
 }
 
 
@@ -47,6 +48,7 @@ def get_integraciones(payload: dict = Depends(get_current_api_user)):
     for field, (attr, _filename, is_secret) in _INTEGRACIONES_MAP.items():
         val = getattr(cfg, attr, "") or ""
         out[field] = _mask(val) if is_secret else val
+    out["removebg_auto"] = bool(cfg.REMOVEBG_AUTO)
     return out
 
 
@@ -57,6 +59,8 @@ class IntegracionesIn(BaseModel):
     cloudinary_cloud_name: str = ""
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
+    removebg_api_key: str = ""
+    removebg_auto: bool = False
 
 
 @router.post("/integraciones")
@@ -79,6 +83,12 @@ def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current
         setattr(cfg, attr, val)
         if attr.startswith("TURSO_"):
             changed_turso = True
+
+    # Booleano — a diferencia de las claves de arriba, siempre tiene un valor
+    # definido (no hay "el usuario no tocó el campo" para un checkbox), así
+    # que se persiste directo en cada guardado, no solo cuando cambia.
+    (cfg.DATA_DIR / "removebg_auto.key").write_text("1" if body.removebg_auto else "0", encoding="utf-8")
+    cfg.REMOVEBG_AUTO = body.removebg_auto
 
     # Si el equipo quedó en modo "local"/"offline" (elegido en el asistente de
     # primer arranque, p. ej. porque en ese momento no se tenían las claves de
