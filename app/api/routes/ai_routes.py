@@ -251,12 +251,13 @@ async def mejorar_imagen(
     if not cfg.OPENAI_API_KEY:
         raise HTTPException(status_code=400, detail="OPENAI_API_KEY no configurada. Agrégala en Configuración > Integraciones.")
 
+    import asyncio
     if file is not None:
         raw = await file.read()
     elif imagen_url:
         import requests
         try:
-            r = requests.get(imagen_url, timeout=15)
+            r = await asyncio.to_thread(requests.get, imagen_url, timeout=15)
             r.raise_for_status()
             raw = r.content
         except Exception as e:
@@ -274,7 +275,12 @@ async def mejorar_imagen(
     try:
         img_file = io.BytesIO(raw)
         img_file.name = "producto.png"
-        response = client.images.edit(
+        # to_thread: client.images.edit es una llamada HTTP bloqueante que
+        # puede tardar 10-30s — sin esto bloqueaba el único hilo del event
+        # loop y toda la app se sentía congelada mientras generaba la imagen,
+        # no solo este botón.
+        response = await asyncio.to_thread(
+            client.images.edit,
             model="gpt-image-1",
             image=img_file,
             prompt=_MEJORAR_IMAGEN_PROMPT,

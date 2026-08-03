@@ -14,13 +14,16 @@ def quitar_fondo_bytes(raw: bytes) -> bytes:
     así una foto "arreglada" se ve igual de consistente que las demás."""
     if not cfg.REMOVEBG_API_KEY:
         raise RuntimeError("remove.bg no está configurado — agrega la API key en Configuración > Integraciones")
-    resp = requests.post(
-        "https://api.remove.bg/v1.0/removebg",
-        files={"image_file": raw},
-        data={"size": "auto", "bg_color": "FFFFFF", "format": "jpg"},
-        headers={"X-Api-Key": cfg.REMOVEBG_API_KEY},
-        timeout=30,
-    )
+    try:
+        resp = requests.post(
+            "https://api.remove.bg/v1.0/removebg",
+            files={"image_file": raw},
+            data={"size": "auto", "bg_color": "FFFFFF", "format": "jpg"},
+            headers={"X-Api-Key": cfg.REMOVEBG_API_KEY},
+            timeout=30,
+        )
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Sin conexión con remove.bg: {e}")
     if resp.status_code != 200:
         detail = resp.text[:200]
         try:

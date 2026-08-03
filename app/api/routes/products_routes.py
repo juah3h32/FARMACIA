@@ -583,12 +583,13 @@ async def quitar_fondo_producto(
     hubiera elegido esa imagen, y se sube al guardar el producto igual que
     cualquier otra foto."""
     _require_admin(payload)
+    import asyncio
     if file is not None:
         raw = await file.read()
     elif imagen_url:
         import requests
         try:
-            r = requests.get(imagen_url, timeout=15)
+            r = await asyncio.to_thread(requests.get, imagen_url, timeout=15)
             r.raise_for_status()
             raw = r.content
         except Exception as e:
@@ -598,8 +599,17 @@ async def quitar_fondo_producto(
 
     from app.services.removebg_service import quitar_fondo_bytes
     try:
-        processed = quitar_fondo_bytes(raw)
-    except RuntimeError as e:
+        # to_thread: quitar_fondo_bytes le pega a remove.bg con una llamada HTTP
+        # bloqueante que puede tardar varios segundos — sin esto se bloqueaba el
+        # único hilo del event loop de FastAPI y toda la app (incluidos los
+        # pollers del propio front, como el header) se sentía congelada
+        # mientras tanto, no solo este botón.
+        processed = await asyncio.to_thread(quitar_fondo_bytes, raw)
+    except Exception as e:
+        # Antes solo se capturaba RuntimeError — un error de red real (timeout,
+        # sin conexión) no es RuntimeError y se colaba sin convertirse en una
+        # respuesta clara, lo que del lado del front se veía como "se quedó
+        # cargando" hasta que algo más lo interrumpiera.
         raise HTTPException(status_code=502, detail=str(e))
 
     import base64

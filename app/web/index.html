@@ -2484,6 +2484,23 @@
         </div>
       </div>
 
+      <!-- Visor de imagen en grande — usado por "Mejorar calidad (IA)" para ver
+           el resultado a tamaño legible (la miniatura de 195px no alcanza para
+           juzgar si el texto de la etiqueta quedó bien) y comparar antes/después. -->
+      <div id="modal-img-zoom" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div class="absolute inset-0" style="background:rgba(15,23,42,.9)" onclick="closeModal('modal-img-zoom')"></div>
+        <div class="modal-pane relative flex flex-col items-center gap-3" style="max-width:92vw;max-height:92vh">
+          <img id="img-zoom-src" src="" style="max-width:90vw;max-height:78vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#fff">
+          <div id="img-zoom-toggle" class="hidden gap-2">
+            <button type="button" onclick="_imgZoomShow('before')" id="img-zoom-btn-before" class="h-8 px-4 rounded-lg text-xs font-bold transition">Antes</button>
+            <button type="button" onclick="_imgZoomShow('after')" id="img-zoom-btn-after" class="h-8 px-4 rounded-lg text-xs font-bold transition">Después</button>
+          </div>
+          <button type="button" onclick="closeModal('modal-img-zoom')" class="absolute -top-3 -right-3 w-9 h-9 rounded-full flex items-center justify-center transition hover:opacity-90" style="background:#fff;color:#0F172A;box-shadow:0 4px 12px rgba(0,0,0,.3)">
+            <i data-lucide="x" style="width:18px;height:18px"></i>
+          </button>
+        </div>
+      </div>
+
       <div id="modal-integ-turso" class="fixed inset-0 z-50 hidden items-center justify-center">
         <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-integ-turso')"></div>
         <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[480px]">
@@ -4980,6 +4997,12 @@
               <p id="pm-img-status" class="text-xs flex-1" style="color:#94A3B8;min-height:14px"></p>
               <button type="button" id="pm-btn-quitar-img" onclick="pmClearImage()" class="hidden text-xs font-semibold flex items-center gap-1" style="color:#EF4444"><i data-lucide="x" style="width:11px;height:11px"></i> quitar</button>
             </div>
+            <!-- Barra de progreso (estimada — remove.bg/OpenAI no reportan avance
+                 real) + segundos transcurridos, para "Quitar fondo"/"Mejorar
+                 calidad" mientras procesan. Oculta el resto del tiempo. -->
+            <div id="pm-img-progress-wrap" class="hidden h-1 rounded-full overflow-hidden mt-0.5" style="background:#F1F5F9">
+              <div id="pm-img-progress-fill" class="h-full rounded-full" style="width:0%;background:#0EA5E9;transition:width .3s linear"></div>
+            </div>
             <!-- Opcional — NO se aplica solo a cada foto, algunas ya llegan
                  preparadas. Solo para fotos con fondo gris/feo que hay que limpiar. -->
             <button type="button" id="pm-btn-quitar-fondo" onclick="pmQuitarFondo()" class="hidden mt-1.5 w-full h-8 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition hover:opacity-80" style="background:#F0F9FF;color:#0EA5E9;border:1px solid #BAE6FD">
@@ -4995,6 +5018,7 @@
             </button>
             <div id="pm-mejora-confirm" class="hidden mt-1.5 rounded-lg p-2 flex flex-col gap-1.5" style="background:#FEFCE8;border:1px solid #FDE68A">
               <p class="text-[10px] leading-snug" style="color:#92400E">Vista previa mejorada con IA — revisa que el texto de la etiqueta se vea igual antes de usarla.</p>
+              <button type="button" onclick="verImagenGrande(_pmMejoraPendiente, _pmPreviewAntesDeMejora)" class="text-[10px] font-bold underline text-left" style="color:#92400E">Ver en grande (antes / después)</button>
               <div class="flex gap-1.5">
                 <button type="button" onclick="pmAceptarMejora()" class="flex-1 h-7 rounded-md text-[11px] font-bold text-white transition hover:opacity-90" style="background:#16A34A">Usar esta versión</button>
                 <button type="button" onclick="pmDescartarMejora()" class="flex-1 h-7 rounded-md text-[11px] font-bold transition hover:opacity-80" style="background:#F1F5F9;color:#64748B">Descartar</button>
@@ -7939,6 +7963,7 @@ function pmClearImage() {
   const btnMej = document.getElementById('pm-btn-mejorar');
   if (btnMej) btnMej.classList.add('hidden');
   document.getElementById('pm-mejora-confirm')?.classList.add('hidden');
+  document.getElementById('pm-img-progress-wrap')?.classList.add('hidden');
   _pmMejoraPendiente = null;
   _pmPreviewAntesDeMejora = null;
   const st = document.getElementById('pm-img-status');
@@ -7961,6 +7986,51 @@ function pmLoadImagePreview(url) {
   st.style.color = '#16A34A';
 }
 
+// fetch con límite de tiempo — sin esto, si el backend (o remove.bg/OpenAI)
+// se queda pegado, el botón podía quedarse en "Quitando fondo.../Mejorando..."
+// para siempre porque el fetch original nunca resuelve. Con AbortController el
+// finally SIEMPRE corre a más tardar a los `timeoutMs`, pase lo que pase del
+// lado del servidor.
+async function _fetchConLimite(url, opts, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Tardó demasiado — intenta de nuevo');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Barra de progreso "estimada" — remove.bg/OpenAI no mandan avance real (no es
+// una subida por partes, es una sola llamada), así que esto se acerca a 90%
+// a lo largo de `estimatedMs` (según cuánto tarda normalmente cada cosa) y se
+// queda ahí si se pasa del estimado, en vez de mentir diciendo 100% antes de
+// tiempo. Actualiza también los segundos transcurridos en el texto de estado,
+// para que se vea que sigue viva aunque tarde más de lo normal.
+function _iniciarProgreso(statusEl, mensajeBase, estimatedMs, color) {
+  const fill = document.getElementById('pm-img-progress-fill');
+  const wrap = document.getElementById('pm-img-progress-wrap');
+  wrap?.classList.remove('hidden');
+  if (fill) { fill.style.width = '0%'; fill.style.background = color || '#0EA5E9'; }
+  const start = Date.now();
+  const timer = setInterval(() => {
+    const elapsedMs = Date.now() - start;
+    const pct = Math.min(90, (elapsedMs / estimatedMs) * 90);
+    if (fill) fill.style.width = pct.toFixed(0) + '%';
+    if (statusEl) statusEl.textContent = `${mensajeBase} (${Math.floor(elapsedMs / 1000)}s)`;
+  }, 500);
+  return {
+    stop(ok) {
+      clearInterval(timer);
+      if (fill) fill.style.width = ok ? '100%' : fill.style.width;
+      setTimeout(() => wrap?.classList.add('hidden'), ok ? 400 : 0);
+    },
+  };
+}
+
 // Opcional — el usuario decide cuándo usarlo (no se aplica solo a cada foto,
 // algunas ya llegan preparadas). Manda la imagen actual (archivo recién
 // elegido, o la ya guardada en Cloudinary) a remove.bg vía el backend, y
@@ -7978,26 +8048,28 @@ async function pmQuitarFondo() {
   icon.classList.add('animate-spin');
   icons();
   txt.textContent = 'Quitando fondo...';
-  st.textContent = 'Esto puede tardar unos segundos...';
   st.style.color = '#0EA5E9';
+  const progreso = _iniciarProgreso(st, 'Quitando fondo...', 8000, '#0EA5E9'); // remove.bg suele tardar 3-8s
   try {
     const formData = new FormData();
     if (_pmImageFile) formData.append('file', _pmImageFile);
     else formData.append('imagen_url', _pmImageUrl);
-    const res = await fetch('/api/productos/quitar-fondo', {
+    const res = await _fetchConLimite('/api/productos/quitar-fondo', {
       method: 'POST',
       headers: S.token ? { Authorization: `Bearer ${S.token}` } : {},
       body: formData,
-    });
+    }, 45000);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.detail || 'No se pudo quitar el fondo');
     const blob = await (await fetch(data.imagen_base64)).blob();
     _pmImageFile = new File([blob], 'producto_sin_fondo.jpg', { type: 'image/jpeg' });
     _pmImageUrl = '';
     document.getElementById('pm-img-preview').src = data.imagen_base64;
+    progreso.stop(true);
     st.textContent = 'Fondo quitado — se subirá al guardar';
     st.style.color = '#16A34A';
   } catch (e) {
+    progreso.stop(false);
     st.textContent = e.message || 'No se pudo quitar el fondo';
     st.style.color = '#EF4444';
     toast(e.message || 'No se pudo quitar el fondo', 'error');
@@ -8026,26 +8098,31 @@ async function pmMejorarCalidad() {
   icon.classList.add('animate-spin');
   icons();
   txt.textContent = 'Mejorando con IA...';
-  st.textContent = 'Esto puede tardar hasta medio minuto...';
   st.style.color = '#92400E';
+  const progreso = _iniciarProgreso(st, 'Mejorando con IA...', 30000, '#D97706'); // gpt-image-1 suele tardar 10-30s
   try {
     const formData = new FormData();
     if (_pmImageFile) formData.append('file', _pmImageFile);
     else formData.append('imagen_url', _pmImageUrl);
-    const res = await fetch('/api/ai/mejorar-imagen', {
+    const res = await _fetchConLimite('/api/ai/mejorar-imagen', {
       method: 'POST',
       headers: S.token ? { Authorization: `Bearer ${S.token}` } : {},
       body: formData,
-    });
+    }, 90000);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.detail || 'No se pudo mejorar la imagen');
     _pmPreviewAntesDeMejora = document.getElementById('pm-img-preview').src;
     _pmMejoraPendiente = data.imagen_base64;
     document.getElementById('pm-img-preview').src = data.imagen_base64;
     document.getElementById('pm-mejora-confirm').classList.remove('hidden');
+    progreso.stop(true);
     st.textContent = 'Revisa el resultado y decide abajo';
     st.style.color = '#92400E';
+    // Muestra el resultado en grande de una vez — la miniatura de 195px no
+    // alcanza para juzgar si el texto de la etiqueta quedó bien.
+    verImagenGrande(_pmMejoraPendiente, _pmPreviewAntesDeMejora);
   } catch (e) {
+    progreso.stop(false);
     st.textContent = e.message || 'No se pudo mejorar la imagen';
     st.style.color = '#EF4444';
     toast(e.message || 'No se pudo mejorar la imagen', 'error');
@@ -8079,6 +8156,30 @@ function pmDescartarMejora() {
   const st = document.getElementById('pm-img-status');
   st.textContent = 'Se descartó — se mantiene la imagen original';
   st.style.color = '#94A3B8';
+}
+
+// Visor en grande — afterSrc es obligatorio, beforeSrc es opcional (si viene,
+// muestra los botones Antes/Después para comparar; si no, solo la imagen).
+let _imgZoomBefore = '';
+let _imgZoomAfter  = '';
+function verImagenGrande(afterSrc, beforeSrc) {
+  if (!afterSrc) return;
+  _imgZoomAfter  = afterSrc;
+  _imgZoomBefore = beforeSrc || '';
+  document.getElementById('img-zoom-toggle').classList.toggle('hidden', !_imgZoomBefore);
+  _imgZoomShow('after');
+  openModal('modal-img-zoom');
+}
+
+function _imgZoomShow(which) {
+  const src = which === 'before' ? _imgZoomBefore : _imgZoomAfter;
+  document.getElementById('img-zoom-src').src = src || '';
+  const beforeBtn = document.getElementById('img-zoom-btn-before');
+  const afterBtn  = document.getElementById('img-zoom-btn-after');
+  const activeStyle   = 'background:#fff;color:#0F172A';
+  const inactiveStyle = 'background:rgba(255,255,255,.15);color:#fff';
+  if (beforeBtn) beforeBtn.style.cssText = (which === 'before' ? activeStyle : inactiveStyle);
+  if (afterBtn)  afterBtn.style.cssText  = (which === 'after'  ? activeStyle : inactiveStyle);
 }
 
 async function pmGenerarDescripcion() {
