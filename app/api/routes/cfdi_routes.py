@@ -26,16 +26,22 @@ _timbrado_lock = threading.Lock()
 
 
 def _sync_from_turso_bounded(timeout_seconds: float = 8.0) -> None:
-    """sync_from_turso() antes de timbrar es best-effort (reduce, no elimina, la
-    ventana de doble-timbrado entre PCs — el lock de arriba cubre lo que importa
-    dentro de este proceso) — nunca debe bloquear el timbrado.
-    Antes esto esperaba (con tope de 8s) a que terminara; local es la fuente de
-    verdad y el usuario pidió explícitamente que ningún proceso espere a la nube
-    para avanzar — ahora solo se dispara en background y el timbrado sigue de
-    inmediato con los datos locales (el lock de proceso + el sync periódico de
-    30s siguen cerrando la ventana de doble-timbrado, solo que sin bloquear)."""
-    threading.Thread(target=sync_service.sync_from_turso, daemon=True,
-                      name="CFDI-PreSync").start()
+    """Antes de timbrar (global o individual), trae el estado más reciente de
+    Turso y ESPERA (con tope de timeout_seconds) a que termine — es la única
+    forma de que la comprobación "¿ya está timbrado este periodo/venta?" que
+    corre justo después vea lo que otra PC haya timbrado, aunque haya sido
+    hace días. Se probó disparar esto en background sin esperar (para no
+    bloquear el timbrado), pero eso deja la comprobación corriendo contra
+    datos locales obsoletos: así se generaron dos facturas globales de junio
+    "timbrada" simultáneamente desde dos PCs distintas — la segunda nunca vio
+    la primera porque el pull todavía no terminaba cuando ya se había
+    decidido que el periodo estaba libre. Duplicar un CFDI ante el SAT es
+    mucho más caro que estos ~8s de espera, así que aquí sí se bloquea
+    (con tope, para no colgarse si Turso está lento/offline)."""
+    thread = threading.Thread(target=sync_service.sync_from_turso, daemon=True,
+                               name="CFDI-PreSync")
+    thread.start()
+    thread.join(timeout=timeout_seconds)
 
 
 def _purgar_de_turso(tabla: str, ids: list[int]) -> None:

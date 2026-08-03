@@ -113,6 +113,14 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             for p in db.query(Producto).filter(Producto.id.in_(product_ids)).all()
         }
 
+        # Guard: reject a sale with zero items — sin esto, una venta con
+        # items=[] se registra igual con subtotal/total en $0 y sin ningún
+        # producto asociado, quedando huérfana de items_venta (misma huella
+        # que el incidente de "servidor reiniciado" del 13-jun: 20 ventas
+        # históricas sin costo, inflando la ganancia reportada).
+        if not body.items:
+            raise HTTPException(status_code=400, detail="La venta debe tener al menos un producto")
+
         # Guard: reject non-positive quantities — without this, a negative
         # cantidad would slip through the stock check below (stock is never
         # "insufficient" against a negative number), then INCREASE stock and
