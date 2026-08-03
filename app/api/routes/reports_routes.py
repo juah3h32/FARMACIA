@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload, selectinload
 import io, csv, os, tempfile
 
 from app.database.connection import get_db_session
-from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, CortesCaja, Lote, MovimientoStock, TipoMovimiento
+from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, CortesCaja, Lote, MovimientoStock, TipoMovimiento, MetodoPago
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -199,6 +199,39 @@ def cortes_caja(
                 )
             )
         cortes = q.order_by(CortesCaja.abierto_en.desc()).all()
+
+        # Los turnos guardan su propio total_ventas/num_ventas al cerrarse, pero
+        # si dos turnos del mismo cajero llegan a solaparse en el tiempo (turnos
+        # reconstruidos automáticamente que no deberían coexistir con el turno
+        # real de ese día), la MISMA venta queda contada en los totales guardados
+        # de ambos — sumar esos totales por turno infla el resultado. El resumen
+        # se calcula aparte, directo sobre Venta (sin duplicados por definición),
+        # para que las tarjetas de arriba siempre cuadren con la pestaña "Ventas".
+        ventas_rango = (
+            db.query(Venta)
+            .filter(
+                Venta.estado == EstadoVenta.completada,
+                Venta.eliminado.is_not(True),
+                Venta.creado_en >= fi,
+                Venta.creado_en <= ff,
+            )
+            .all()
+        )
+        resumen_real = {
+            "num_ventas":     len(ventas_rango),
+            "total_ventas":   round(sum(v.total for v in ventas_rango), 2),
+            "total_efectivo": round(sum(v.total for v in ventas_rango if v.metodo_pago == MetodoPago.efectivo), 2),
+            "total_tarjeta":  round(sum(v.total for v in ventas_rango if v.metodo_pago == MetodoPago.tarjeta), 2),
+            "total_transferencia": round(sum(v.total for v in ventas_rango if v.metodo_pago == MetodoPago.transferencia), 2),
+        }
+
+        def _solapa(a: CortesCaja, b: CortesCaja) -> bool:
+            if a.id == b.id or a.usuario_id != b.usuario_id:
+                return False
+            a_fin = a.cerrado_en or datetime.now()
+            b_fin = b.cerrado_en or datetime.now()
+            return a.abierto_en <= b_fin and b.abierto_en <= a_fin
+
         result = []
         for c in cortes:
             dur_min = None
@@ -208,6 +241,10 @@ def cortes_caja(
             ape = c.monto_apertura or 0.0
             esperado = ape + ef
             dif = (c.monto_cierre - esperado) if c.monto_cierre is not None else None
+            # Turno duplicado/reconstruido cuya ventana se traslapa con otro del
+            # mismo cajero — sus ventas probablemente ya están contadas en el otro,
+            # así que sumar el total_ventas de ambos infla el resumen del período.
+            solapado = any(_solapa(c, otro) for otro in cortes)
             result.append({
                 "id":               c.id,
                 "cajero":           c.usuario.nombre if c.usuario else "",
@@ -225,8 +262,9 @@ def cortes_caja(
                 "diferencia":       dif,
                 "notas":            c.notas or "",
                 "abierto":          c.cerrado_en is None,
+                "solapado":         solapado,
             })
-        return result
+        return {"cortes": result, "resumen_real": resumen_real}
     finally:
         db.close()
 

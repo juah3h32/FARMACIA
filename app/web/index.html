@@ -1954,6 +1954,7 @@
                 </label>
               </div>
             </div>
+            <p id="cc-solape-warn" class="hidden text-xs font-semibold px-5 py-2" style="background:#FFFBEB;color:#92400E;border-bottom:1px solid #FDE68A"></p>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
               <table class="w-full text-xs">
                 <thead class="sticky top-0" style="background:#F8FAFF">
@@ -8644,20 +8645,33 @@ async function loadCortes() {
   const mostrarVacios = document.getElementById('cc-mostrar-vacios')?.checked ? 'false' : 'true';
   const res = await api(`/reportes/cortes?fecha_inicio=${desde}&fecha_fin=${hasta}&ocultar_vacios=${mostrarVacios}`);
   if (!res.ok) { toast('Error cargando cortes','error'); return; }
-  const cortes = await res.json();
+  const data = await res.json();
+  const cortes = data.cortes || [];
+  const real   = data.resumen_real || {};
 
-  // Summary cards
-  const totV  = cortes.reduce((s,c)=>s+c.total_ventas,0);
-  const totEf = cortes.reduce((s,c)=>s+c.total_efectivo,0);
-  const totTj = cortes.reduce((s,c)=>s+c.total_tarjeta+c.total_transferencia,0);
-  const totDif= cortes.filter(c=>!c.abierto&&c.diferencia!=null).reduce((s,c)=>s+c.diferencia,0);
+  // Summary cards — usan resumen_real (calculado directo sobre ventas, sin
+  // duplicados) en vez de sumar el total_ventas guardado de cada turno, porque
+  // turnos que se solapan en el tiempo (mismo cajero) pueden tener la misma
+  // venta contada en ambos y eso infla la suma por turno.
+  const totDif = cortes.filter(c=>!c.abierto&&c.diferencia!=null).reduce((s,c)=>s+c.diferencia,0);
   document.getElementById('cc-turnos').textContent = cortes.length;
-  document.getElementById('cc-total').textContent  = fmt(totV);
-  document.getElementById('cc-ef').textContent     = fmt(totEf);
-  document.getElementById('cc-tj').textContent     = fmt(totTj);
+  document.getElementById('cc-total').textContent  = fmt(real.total_ventas||0);
+  document.getElementById('cc-ef').textContent     = fmt(real.total_efectivo||0);
+  document.getElementById('cc-tj').textContent     = fmt((real.total_tarjeta||0)+(real.total_transferencia||0));
   const difEl = document.getElementById('cc-dif');
   difEl.textContent = (totDif>=0?'+':'')+fmt(totDif);
   difEl.style.color = Math.abs(totDif)<0.01?'#16A34A':'#EF4444';
+
+  const solapados = cortes.filter(c=>c.solapado).length;
+  const warnEl = document.getElementById('cc-solape-warn');
+  if (warnEl) {
+    if (solapados > 0) {
+      warnEl.textContent = `⚠ ${solapados} turno(s) duplicado(s)/solapado(s) en este período — marcados en la tabla. Las tarjetas de arriba ya los corrigen; la suma manual de la columna "Total" sí los duplicaría.`;
+      warnEl.classList.remove('hidden');
+    } else {
+      warnEl.classList.add('hidden');
+    }
+  }
 
   // Table
   const fmtDT = s => s ? s.replace('T',' ').slice(0,16) : '—';
@@ -8667,14 +8681,17 @@ async function loadCortes() {
         const dif = c.diferencia;
         const difStr = dif==null ? '—' : (dif>=0?'+':'')+fmt(dif);
         const difColor= dif==null?'#64748B':Math.abs(dif)<0.01?'#16A34A':'#EF4444';
-        const bg = c.abierto ? '#FFFBEB' : (dif!=null&&Math.abs(dif)>0.01?'#FEF2F2':'#fff');
+        const bg = c.solapado ? '#FEF3C7' : (c.abierto ? '#FFFBEB' : (dif!=null&&Math.abs(dif)>0.01?'#FEF2F2':'#fff'));
         const estado = c.abierto
           ? '<span style="color:#D97706;font-weight:600">Abierto</span>'
           : (dif!=null&&Math.abs(dif)>0.01
             ? '<span style="color:#EF4444;font-weight:600">Descuadre</span>'
             : '<span style="color:#16A34A;font-weight:600">Cuadrado</span>');
+        const solapeBadge = c.solapado
+          ? ' <span title="Este turno se traslapa en el tiempo con otro del mismo cajero — sus ventas probablemente ya están contadas ahí también" style="background:#D97706;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px">Solapado</span>'
+          : '';
         return `<tr class="hovrow border-b cursor-pointer" style="border-color:#F1F5F9;background:${bg}" onclick='showCorteDetalle(${JSON.stringify(c)})'>
-          <td class="px-4 py-2 font-medium" style="color:#0F172A">${c.cajero}</td>
+          <td class="px-4 py-2 font-medium" style="color:#0F172A">${c.cajero}${solapeBadge}</td>
           <td class="px-4 py-2" style="color:#374151">${fmtDT(c.abierto_en)}</td>
           <td class="px-4 py-2" style="color:#374151">${fmtDT(c.cerrado_en)}</td>
           <td class="px-4 py-2 text-center" style="color:#64748B">${fmtDur(c.duracion_min)}</td>
