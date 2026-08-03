@@ -1247,6 +1247,26 @@
             </div>
           </div>
         </div>
+        <!-- Sincronización de fotos de producto (solo admin) — spinner mientras
+             baja fotos de Cloudinary en segundo plano, o aviso si faltan por
+             bajar. Oculto por defecto; se muestra/oculta en JS según haga falta. -->
+        <div id="img-sync-wrap" class="relative hidden">
+          <button id="btn-img-sync" onclick="toggleImgSyncPanel()"
+                  class="relative h-8 w-8 rounded-xl flex items-center justify-center transition-all hover:bg-slate-100"
+                  title="Sincronizando fotos de productos..." style="border:1px solid #E2E8F0">
+            <i id="img-sync-icon" data-lucide="loader-2" class="animate-spin" style="width:15px;height:15px;color:#4A6FE0"></i>
+            <span id="img-sync-badge"
+                  class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black text-white flex items-center justify-center hidden"
+                  style="background:#F59E0B"></span>
+          </button>
+          <div id="img-sync-panel" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;width:260px;background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.18);border:1px solid #E2E8F0;z-index:200;padding:14px 16px">
+            <div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:4px">Fotos de productos</div>
+            <div id="img-sync-text" style="font-size:11px;color:#64748B;line-height:1.5">—</div>
+            <button onclick="triggerImgSyncNow()" style="margin-top:10px;width:100%;background:#EEF1F9;color:#1d2140;border:none;border-radius:10px;padding:7px 0;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+              <i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Actualizar ahora
+            </button>
+          </div>
+        </div>
         <!-- Alerta caducidad bell -->
         <button id="btn-alertas-cad" onclick="openAlertasCaducidad()"
                 class="relative h-8 w-8 rounded-xl flex items-center justify-center transition-all hover:bg-slate-100"
@@ -6299,6 +6319,8 @@ function launchApp() {
   if (S.user?.rol === 'admin') {
     loadIntegracionesStatus();
     setInterval(loadIntegracionesStatus, 2 * 60 * 1000); // cada 2 min — avisa pronto si cae Turso/Factura.com/OpenAI
+    loadImgSyncStatus();
+    setInterval(loadImgSyncStatus, 5 * 1000); // cada 5s — se ve "en vivo" mientras baja fotos
   }
   loadTurnoStatus();
   // Refresca el botón de turno periódicamente — el turno puede haberse cerrado
@@ -6506,6 +6528,7 @@ function navigate(page) {
 
 let _dashInterval = null;
 let _invInterval  = null;
+let _posImgInterval = null;
 let _kpiCurrent   = 0;
 let _kpiAutoTimer = null;
 
@@ -6539,6 +6562,11 @@ function loadPage(page) {
     clearInterval(_invInterval);
     _invInterval = null;
   }
+  // Stop POS image-refresh watcher when leaving
+  if (_posImgInterval && page !== 'pos') {
+    clearInterval(_posImgInterval);
+    _posImgInterval = null;
+  }
   if (page==='dashboard') {
     loadDashboard();
     // Auto-refresh every 30s while dashboard is active
@@ -6546,7 +6574,14 @@ function loadPage(page) {
       _dashInterval = setInterval(loadDashboard, 30000);
     }
   }
-  if (page==='pos')        loadPOS();
+  if (page==='pos') {
+    loadPOS();
+    // Revisa cada 15s si alguna foto de producto cambió (subida en otra PC) y
+    // la refresca sin recargar toda la cuadrícula — ver _check_new_product_images
+    // en app/database/sync_service.py, que es lo que realmente trae la foto
+    // nueva del lado del backend cada ~12s.
+    if (!_posImgInterval) _posImgInterval = setInterval(_refreshPosImages, 15000);
+  }
   if (page==='inventory') {
     // Trigger Turso pull in background so next refresh has fresh data
     api('/inventario/pull-nube', {method:'POST'}).catch(()=>{});
@@ -6890,8 +6925,8 @@ function renderPosGrid(prods) {
       </div>` : '';
     return `
     <div class="bg-white rounded-xl border p-2.5 text-left hover:border-blue-400 hover:shadow-md transition-all flex flex-col cursor-pointer"
-      style="border-color:#E2E8F0" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
-      <div onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'64':'100'}px;background:#fff;border:1px solid #F1F5F9">
+      style="border-color:#E2E8F0" data-pid="${p.id}" onclick="${p.venta_fraccionada?'':('addToCart('+p.id+')')}">
+      <div data-thumb onclick="${p.venta_fraccionada?'addToCart('+p.id+',false)':''}" class="w-full rounded-xl flex items-center justify-center mb-2 flex-shrink-0 overflow-hidden ${p.venta_fraccionada?'cursor-pointer':''}" style="height:${p.venta_fraccionada?'64':'100'}px;background:#fff;border:1px solid #F1F5F9">
         ${posProductThumb(p.imagen_url, p.id)}
       </div>
       <p class="text-xs font-bold leading-tight line-clamp-2 mb-1" style="color:#0F172A">${p.nombre}</p>
@@ -6904,6 +6939,31 @@ function renderPosGrid(prods) {
     </div>`;
   }).join('');
   icons();
+}
+
+// Trae imagen_url fresco (local, sin costo — no le pega a Turso, solo a la BD
+// de esta PC) y solo repinta la miniatura de los productos cuya foto cambió,
+// sin re-renderizar toda la cuadrícula (evita perder el scroll/estado). El
+// backend ya trajo esa foto nueva de Turso solo unos segundos antes (ver
+// _check_new_product_images en app/database/sync_service.py).
+async function _refreshPosImages() {
+  try {
+    const res = await api('/productos/');
+    if (!res.ok) return;
+    const fresh = await res.json();
+    const freshById = new Map(fresh.map(p => [p.id, p]));
+    let changed = false;
+    for (const p of S.allProducts) {
+      const f = freshById.get(p.id);
+      if (f && f.imagen_url !== p.imagen_url) {
+        p.imagen_url = f.imagen_url;
+        changed = true;
+        const thumb = document.querySelector(`#pos-grid [data-pid="${p.id}"] [data-thumb]`);
+        if (thumb) thumb.innerHTML = posProductThumb(p.imagen_url, p.id);
+      }
+    }
+    if (changed) icons();
+  } catch (e) { /* silencioso — no interrumpir el POS por un fallo de red */ }
 }
 
 function posSearch(q) {
@@ -8582,6 +8642,76 @@ function _closeIntegracionesOnOutsideClick(e) {
     document.getElementById('integraciones-panel')?.classList.add('hidden');
     document.removeEventListener('click', _closeIntegracionesOnOutsideClick);
   }
+}
+
+// ── Sincronización de fotos de producto (spinner del header, solo admin) ────
+// Refleja app/database/sync_service.py:get_image_sync_state() — si está
+// bajando fotos de Cloudinary ahora mismo (respaldo local para funcionar sin
+// conexión) o si quedan pendientes por bajar.
+async function loadImgSyncStatus() {
+  const wrap = document.getElementById('img-sync-wrap');
+  if (!wrap) return;
+  try {
+    const d = await apiFetch('/admin/image-sync-status');
+    _renderImgSyncStatus(d);
+  } catch (e) { /* silencioso — no interrumpir el flujo por un fallo de red */ }
+}
+
+function _renderImgSyncStatus(d) {
+  const wrap  = document.getElementById('img-sync-wrap');
+  const icon  = document.getElementById('img-sync-icon');
+  const badge = document.getElementById('img-sync-badge');
+  const text  = document.getElementById('img-sync-text');
+  const btn   = document.getElementById('btn-img-sync');
+  if (!wrap) return;
+
+  if (!d.enabled || (!d.running && !d.pending)) {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+
+  if (d.running) {
+    icon.classList.add('animate-spin');
+    icon.style.color = '#4A6FE0';
+    badge.classList.add('hidden');
+    const progreso = d.total ? ` (${d.done}/${d.total})` : '';
+    btn.title = 'Sincronizando fotos de productos...' + progreso;
+    text.textContent = `Descargando fotos de productos${progreso}... esto pasa automáticamente cuando hay fotos nuevas de otras PCs.`;
+  } else {
+    icon.classList.remove('animate-spin');
+    icon.style.color = '#F59E0B';
+    badge.textContent = d.pending > 99 ? '99+' : String(d.pending);
+    badge.classList.remove('hidden');
+    btn.title = `${d.pending} foto(s) de producto pendientes de descargar`;
+    text.textContent = `Faltan ${d.pending} foto(s) de producto por descargar para tenerlas también localmente. Se bajan solas en segundo plano — o dale a "Actualizar ahora".`;
+  }
+}
+
+function toggleImgSyncPanel() {
+  const panel = document.getElementById('img-sync-panel');
+  if (!panel) return;
+  const opening = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (opening) {
+    document.addEventListener('click', _closeImgSyncOnOutsideClick);
+  }
+}
+
+function _closeImgSyncOnOutsideClick(e) {
+  const wrap = document.getElementById('img-sync-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('img-sync-panel')?.classList.add('hidden');
+    document.removeEventListener('click', _closeImgSyncOnOutsideClick);
+  }
+}
+
+async function triggerImgSyncNow() {
+  try {
+    await apiFetch('/admin/sync-now', { method: 'POST' });
+    toast('Sincronizando ahora...', 'success');
+    loadImgSyncStatus();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function openIntegracionesLog() {

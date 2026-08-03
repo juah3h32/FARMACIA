@@ -835,6 +835,24 @@ def make_daily_backup() -> bool:
 
 _img_cache_running = threading.Event()
 
+# Estado consultado por /admin/image-sync-status para mostrar el spinner de
+# "sincronizando fotos" en el header (solo admin, ver app/web/index.html) —
+# así se ve si está bajando fotos ahora mismo, cuántas van, y cuándo terminó
+# la última pasada, en vez de que la descarga en segundo plano sea invisible.
+_image_sync_state_lock = threading.Lock()
+_image_sync_state = {
+    "running": False,
+    "done": 0,
+    "total": 0,
+    "last_downloaded": 0,
+    "last_run_at": None,
+}
+
+
+def get_image_sync_state() -> dict:
+    with _image_sync_state_lock:
+        return dict(_image_sync_state)
+
 
 def _sync_product_images_bg() -> None:
     """Descarga en un hilo aparte (nunca bloquea el latido de sync) las fotos de
@@ -845,15 +863,118 @@ def _sync_product_images_bg() -> None:
     if _img_cache_running.is_set():
         return
     _img_cache_running.set()
+    with _image_sync_state_lock:
+        _image_sync_state.update(running=True, done=0, total=0)
     try:
         from app.services.cloudinary_service import sync_product_images_locally
-        n = sync_product_images_locally()
+
+        def _progress(done, total):
+            with _image_sync_state_lock:
+                _image_sync_state.update(done=done, total=total)
+
+        n = sync_product_images_locally(progress_cb=_progress)
         if n:
             print(f"[Sync] {n} imagen(es) de producto descargadas para respaldo local")
+        with _image_sync_state_lock:
+            _image_sync_state["last_downloaded"] = n
+            _image_sync_state["last_run_at"] = datetime.now().isoformat()
     except Exception as e:
         print(f"[Sync] Error cacheando imágenes de producto: {e}")
     finally:
         _img_cache_running.clear()
+        with _image_sync_state_lock:
+            _image_sync_state["running"] = False
+
+
+def sync_now() -> None:
+    """Fuerza un pull de Turso + descarga de imágenes pendientes de inmediato,
+    sin esperar al latido — usado por el botón "Actualizar ahora" del admin
+    (ver /admin/sync-now) para no depender de los ~180s del heartbeat."""
+    def _run():
+        try:
+            sync_from_turso()
+        except Exception as e:
+            print(f"[Sync] sync_now pull error: {e}")
+        _sync_product_images_bg()
+
+    threading.Thread(target=_run, daemon=True, name="ManualSync").start()
+
+
+# Watermark propio (no confundir con el de _TS_INCREMENTAL, que es para el PUSH
+# local→Turso) para el chequeo rápido de fotos nuevas: solo lee filas de
+# productos cuyo actualizado_en avanzó desde la última vez, en vez de releer
+# la tabla completa como hace sync_from_turso(). Así se puede correr cada
+# pocos segundos sin multiplicar el costo de lecturas en Turso.
+_IMG_WATERMARK_KEY = "_productos_imagen_pull"
+
+
+def _check_new_product_images() -> int:
+    """Pull barato: solo productos cuyo actualizado_en avanzó desde la última
+    pasada (por eso puede correr cada ~12s sin pesar en Turso, a diferencia
+    del latido de 180s que relee tablas completas). Detecta fotos subidas en
+    otras PCs, actualiza imagen_url en la BD local y dispara la descarga de
+    esa foto al instante. Devuelve cuántos productos cambiaron."""
+    if not (cfg.TURSO_DATABASE_URL and cfg.TURSO_AUTH_TOKEN):
+        return 0
+    last = _ts_watermarks.get(_IMG_WATERMARK_KEY, "1970-01-01 00:00:00")
+    try:
+        from app.database.turso_http import connect as turso_connect
+        tconn = turso_connect(cfg.TURSO_DATABASE_URL, cfg.TURSO_AUTH_TOKEN)
+        cur = tconn.cursor()
+        cur.execute(
+            "SELECT id, imagen_url, actualizado_en FROM productos "
+            "WHERE actualizado_en > ? ORDER BY actualizado_en",
+            (last,),
+        )
+        rows = cur.fetchall()
+    except Exception as e:
+        print(f"[Sync] Chequeo rápido de fotos falló (se reintenta en el próximo ciclo): {e}")
+        return 0
+    if not rows:
+        return 0
+
+    with _lock:
+        lconn = _local_conn()
+        try:
+            for pid, url, ts in rows:
+                # Mismo criterio last-writer-wins que sync_from_turso: solo pisa
+                # imagen_url local si el cambio de Turso es más nuevo — así una
+                # edición hecha en ESTA pc (todavía sin llegar a Turso) no se
+                # pierde si el pull corre justo en medio.
+                lconn.execute(
+                    "UPDATE productos SET imagen_url = ?, actualizado_en = ? "
+                    "WHERE id = ? AND (actualizado_en IS NULL OR actualizado_en < ?)",
+                    (url, ts, pid, ts),
+                )
+            lconn.commit()
+        finally:
+            lconn.close()
+
+    _ts_watermarks[_IMG_WATERMARK_KEY] = rows[-1][2]
+    _save_watermarks()
+    threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
+    return len(rows)
+
+
+def start_image_watch(interval: int = 12) -> threading.Thread:
+    """Hilo aparte del latido principal (start_background_sync) — solo vigila
+    fotos de producto nuevas/cambiadas en Turso cada `interval` segundos, con
+    una consulta barata (ver _check_new_product_images). Así "se ve la foto en
+    las demás PCs" en segundos en vez de esperar el latido pesado de 180s,
+    sin necesidad de infraestructura nueva (WebSockets/Redis) ni costo extra
+    de Turso — se decidió así explícitamente en vez de un canal en tiempo real."""
+    def _loop():
+        time.sleep(15)  # dejar que termine el sync inicial primero
+        while True:
+            try:
+                _check_new_product_images()
+            except Exception as e:
+                print(f"[Sync] Error en chequeo rápido de fotos: {e}")
+            time.sleep(interval)
+
+    t = threading.Thread(target=_loop, daemon=True, name="ImgWatch")
+    t.start()
+    return t
 
 
 def start_background_sync(interval: int = 30) -> threading.Thread:

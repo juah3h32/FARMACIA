@@ -1,9 +1,10 @@
 from pathlib import Path
+import io
 import json
-import shutil
 import cloudinary
 import cloudinary.uploader
 import requests
+from PIL import Image
 import app.config as cfg
 
 
@@ -26,6 +27,39 @@ _LOCAL_SUBDIR = {
     "perfiles":      Path("imagenes") / "perfiles",
 }
 
+# Todas las fotos guardadas en disco (subida directa sin Cloudinary, o respaldo
+# descargado de Cloudinary) se recortan/escalan a este cuadrado — así se ven
+# todas del mismo tamaño en el catálogo sin importar la foto original que
+# suba cada quien (mismo criterio de recorte centrado que ya usa el generador
+# de imágenes de Marketing, ver _rounded_crop en app/ui/marketing_screen.py).
+_STANDARD_SIZE = {"medicamentos": 800, "perfiles": 300}
+
+
+def _center_crop_square(img: Image.Image, size: int) -> Image.Image:
+    img = img.convert("RGB")
+    w, h = img.size
+    if w != h:
+        side = min(w, h)
+        left = (w - side) // 2
+        top = (h - side) // 2
+        img = img.crop((left, top, left + side, top + side))
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _standardize_image_bytes(raw: bytes, size: int) -> bytes | None:
+    """Recorta al centro (cuadrado) y escala los bytes de una imagen a
+    `size`×`size`, devueltos ya codificados como JPEG. None si `raw` no es una
+    imagen válida (PIL no pudo abrirla) — el llamador debe guardar el
+    original tal cual en ese caso, en vez de perder el archivo."""
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img = _center_crop_square(img, size)
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=88)
+        return out.getvalue()
+    except Exception:
+        return None
+
 
 def _save_local(file_path: str, kind: str, filename: str) -> str:
     """Sin Cloudinary (no configurado, o sin conexión al subir) la imagen se
@@ -35,8 +69,10 @@ def _save_local(file_path: str, kind: str, filename: str) -> str:
     dest_dir.mkdir(parents=True, exist_ok=True)
     for old in dest_dir.glob(f"{filename}.*"):
         old.unlink(missing_ok=True)
-    ext = Path(file_path).suffix or ".jpg"
-    shutil.copyfile(file_path, dest_dir / f"{filename}{ext}")
+    raw = Path(file_path).read_bytes()
+    data = _standardize_image_bytes(raw, _STANDARD_SIZE[kind])
+    ext = ".jpg" if data is not None else (Path(file_path).suffix or ".jpg")
+    (dest_dir / f"{filename}{ext}").write_bytes(data if data is not None else raw)
     return f"/uploads/{_LOCAL_SUBDIR[kind].as_posix()}/{filename}{ext}"
 
 
@@ -79,7 +115,8 @@ def _save_manifest(manifest: dict) -> None:
 def cache_remote_image(url: str, kind: str, filename: str) -> bool:
     """Descarga una imagen ya alojada en Cloudinary (u otra URL http) y la
     guarda como respaldo local, con el mismo nombre/carpeta que usa la subida
-    normal cuando Cloudinary no está disponible."""
+    normal cuando Cloudinary no está disponible. Se recorta/escala igual que
+    _save_local para que el respaldo local se vea consistente con el resto."""
     try:
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
@@ -89,18 +126,16 @@ def cache_remote_image(url: str, kind: str, filename: str) -> bool:
     dest_dir.mkdir(parents=True, exist_ok=True)
     for old in dest_dir.glob(f"{filename}.*"):
         old.unlink(missing_ok=True)
-    ext = Path(url.split("?")[0]).suffix or ".jpg"
-    (dest_dir / f"{filename}{ext}").write_bytes(resp.content)
+    data = _standardize_image_bytes(resp.content, _STANDARD_SIZE[kind])
+    ext = ".jpg" if data is not None else (Path(url.split("?")[0]).suffix or ".jpg")
+    (dest_dir / f"{filename}{ext}").write_bytes(data if data is not None else resp.content)
     return True
 
 
-def sync_product_images_locally() -> int:
-    """Recorre los productos con foto en Cloudinary y descarga a este equipo
-    las que todavía no tiene guardadas localmente (o cuya URL cambió desde la
-    última descarga, p. ej. porque se reemplazó la foto en otra PC). Pensado
-    para llamarse en segundo plano después de cada sync con Turso — así el
-    catálogo sigue mostrando fotos aunque después se pierda la conexión con
-    Cloudinary. Devuelve cuántas imágenes se descargaron."""
+def _pending_image_pairs() -> list[tuple[int, str]]:
+    """Productos con foto en Cloudinary cuya URL todavía no coincide con lo
+    último descargado localmente — usado tanto para descargar como para
+    reportar cuántas faltan (ver /admin/image-sync-status)."""
     from app.database.connection import get_db_session
     from app.database.models import Producto
 
@@ -113,18 +148,41 @@ def sync_product_images_locally() -> int:
         db.close()
 
     manifest = _load_manifest()
-    downloaded = 0
+    pending = []
     for pid, url in productos:
         if not url or not url.startswith("http"):
             continue  # ya es una ruta local (/uploads/...), no hay nada que bajar
+        if manifest.get(f"producto_{pid}") != url:
+            pending.append((pid, url))
+    return pending
+
+
+def count_pending_images() -> int:
+    return len(_pending_image_pairs())
+
+
+def sync_product_images_locally(progress_cb=None) -> int:
+    """Descarga a este equipo las fotos de producto que están en Cloudinary
+    pero de las que todavía no tiene copia local (o cuya URL cambió desde la
+    última descarga, p. ej. porque se reemplazó la foto en otra PC). Pensado
+    para llamarse en segundo plano después de cada sync con Turso — así el
+    catálogo sigue mostrando fotos aunque después se pierda la conexión con
+    Cloudinary. `progress_cb(done, total)` es opcional, para reportar avance
+    en vivo (ver /admin/image-sync-status). Devuelve cuántas se descargaron."""
+    pending = _pending_image_pairs()
+    manifest = _load_manifest()
+    downloaded = 0
+    for i, (pid, url) in enumerate(pending):
         filename = f"producto_{pid}"
-        if manifest.get(filename) == url:
-            continue  # ya se tiene copia local de esta misma versión de la foto
         if cache_remote_image(url, "medicamentos", filename):
             manifest[filename] = url
             downloaded += 1
-    if downloaded:
-        _save_manifest(manifest)
+            _save_manifest(manifest)  # guardar tras cada foto — si se interrumpe, no repite las ya bajadas
+        if progress_cb:
+            try:
+                progress_cb(i + 1, len(pending))
+            except Exception:
+                pass
     return downloaded
 
 
@@ -134,12 +192,17 @@ def upload_product_image(file_path: str, product_id) -> str:
         return _save_local(file_path, "medicamentos", filename)
     _configure()
     try:
+        size = _STANDARD_SIZE["medicamentos"]
         result = cloudinary.uploader.upload(
             file_path,
             folder="FARMACIA/PRODUCTOS",
             public_id=filename,
             overwrite=True,
             resource_type="image",
+            # Recorte al mismo tamaño cuadrado que _save_local aplica localmente
+            # — así la copia maestra en Cloudinary ya viene consistente, sin
+            # depender de que cloudinaryThumb() la recorte al vuelo en el front.
+            transformation=[{"width": size, "height": size, "crop": "fill", "gravity": "auto"}],
         )
         url = result["secure_url"]
         # Guardar también una copia local del respaldo — así esta misma PC no

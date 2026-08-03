@@ -247,6 +247,34 @@ def db_sync(payload: dict = Depends(get_current_api_user)):
     return {"ok": True, "stats": stats}
 
 
+@router.get("/image-sync-status")
+def image_sync_status(payload: dict = Depends(get_current_api_user)):
+    """Estado del respaldo local de fotos de producto — usado por el spinner
+    del header (solo admin) para mostrar si se están bajando fotos de
+    Cloudinary ahora mismo o si faltan por bajar."""
+    _require_admin(payload)
+    if not cfg.TURSO_SYNC:
+        return {"enabled": False, "running": False, "pending": 0}
+    from app.database.sync_service import get_image_sync_state
+    from app.services.cloudinary_service import count_pending_images
+    state = get_image_sync_state()
+    state["enabled"] = True
+    state["pending"] = 0 if state["running"] else count_pending_images()
+    return state
+
+
+@router.post("/sync-now")
+def sync_now(payload: dict = Depends(get_current_api_user)):
+    """Fuerza sync con Turso + descarga de fotos pendientes ya mismo, sin
+    esperar el latido de fondo (~180s)."""
+    _require_admin(payload)
+    if not cfg.TURSO_SYNC:
+        raise HTTPException(status_code=400, detail="Sincronización con Turso desactivada (modo local)")
+    from app.database.sync_service import sync_now as _sync_now
+    _sync_now()
+    return {"ok": True}
+
+
 @router.get("/turso-diagnostico")
 def turso_diagnostico(payload: dict = Depends(get_current_api_user)):
     """Compare local SQLite row counts vs Turso for key tables."""

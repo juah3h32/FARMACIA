@@ -209,7 +209,7 @@ def main():
 
     # Turso sync in background — never blocks startup
     if cfg.TURSO_SYNC:
-        from app.database.sync_service import import_from_turso, start_background_sync
+        from app.database.sync_service import import_from_turso, start_background_sync, start_image_watch
         threading.Thread(target=import_from_turso, daemon=True, name="TursoImport").start()
         # El latido hace un pull COMPLETO de las ~28 tablas cada vez, sin filtro
         # incremental — a 30s eso es mucha lectura constante en Turso aunque no
@@ -218,6 +218,10 @@ def main():
         # así que no necesita ser tan frecuente. 180s sigue siendo rápido para
         # una farmacia con una o dos cajas.
         start_background_sync(interval=180)
+        # Hilo aparte, mucho más frecuente (12s) pero barato — solo para fotos de
+        # producto nuevas/cambiadas, así se ven en las demás PCs en segundos sin
+        # esperar el latido de 180s (ver start_image_watch en sync_service.py).
+        start_image_watch(interval=12)
 
     def _api_with_log():
         try:
