@@ -480,6 +480,10 @@
       <span class="text-xs" style="color:#94A3B8">–</span>
       <input id="modal-vc-hasta" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
       <span id="modal-vc-count" class="text-xs ml-auto" style="color:#94A3B8"></span>
+      <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none" style="color:#374151" title="Si tu inventario físico ya está correcto tal cual, desmárcalo para que borrar estas ventas no le vuelva a sumar unidades al stock">
+        <input type="checkbox" id="modal-vc-restaurar-stock" checked style="accent-color:#1d2140">
+        Restaurar stock al eliminar
+      </label>
       <button id="modal-vc-bulk-del-btn" onclick="ventasCajeroModalBulkDelete()" class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 border" style="border-color:#FECACA;color:#EF4444;background:#FEF2F2">
         <i data-lucide="trash-2" style="width:13px;height:13px"></i>
         <span id="modal-vc-bulk-del-label">Eliminar seleccionadas</span>
@@ -8549,16 +8553,17 @@ async function loadVentasCajeroModal() {
 }
 
 function ventasCajeroModalDelete(id, folio) {
+  const restaurar = document.getElementById('modal-vc-restaurar-stock')?.checked !== false;
   openConfirmDel(
     `¿Eliminar venta ${folio}?`,
-    'Se eliminará de todas las bases de datos (local y nube) para siempre y se restaurará el stock. Esta acción no se puede deshacer.',
+    `Se eliminará de todas las bases de datos (local y nube) para siempre${restaurar ? ' y se restaurará el stock' : ' (sin tocar el stock, según la casilla marcada)'}. Esta acción no se puede deshacer.`,
     async () => {
-      const res = await api(`/ventas/${id}`, { method: 'DELETE' });
+      const res = await api(`/ventas/${id}?restaurar_stock=${restaurar}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json().catch(()=>({detail:'Error desconocido'}));
         toast(err.detail || 'Error al eliminar', 'error'); return;
       }
-      toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
+      toast(`Venta ${folio} eliminada${restaurar ? ' · stock restaurado' : ''}`, 'success');
       loadVentasCajeroModal();
       if (_repActiveTab === 'ventas') loadReports();
     }
@@ -8592,10 +8597,11 @@ async function ventasCajeroModalBulkDelete() {
   const checkboxes = document.querySelectorAll('.modal-vc-chk:checked');
   const ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id));
   if (!ids.length) return;
+  const restaurar = document.getElementById('modal-vc-restaurar-stock')?.checked !== false;
   const cajeroNombre = document.getElementById('modal-vc-cajero')?.selectedOptions?.[0]?.textContent || 'este cajero';
   openConfirmDel(
     `¿Eliminar ${ids.length} venta${ids.length>1?'s':''} de ${cajeroNombre}?`,
-    `Se eliminarán ${ids.length} ventas permanentemente de todas las bases de datos (local y nube). El stock se restaurará. Esta acción no se puede deshacer.`,
+    `Se eliminarán ${ids.length} ventas permanentemente de todas las bases de datos (local y nube)${restaurar ? '. El stock se restaurará' : ' (sin tocar el stock, según la casilla marcada)'}. Esta acción no se puede deshacer.`,
     async () => {
       const btn = document.getElementById('modal-vc-bulk-del-btn');
       if (btn) btn.disabled = true;
@@ -8603,11 +8609,11 @@ async function ventasCajeroModalBulkDelete() {
       // El backend limita a 200 por lote — se manda en tandas por si son mas.
       for (let i = 0; i < ids.length; i += 200) {
         const tanda = ids.slice(i, i + 200);
-        const res = await api('/ventas/eliminar-lote', { method: 'POST', body: JSON.stringify({ ids: tanda }) });
+        const res = await api('/ventas/eliminar-lote', { method: 'POST', body: JSON.stringify({ ids: tanda, restaurar_stock: restaurar }) });
         if (res.ok) { const data = await res.json(); deleted += data.deleted || 0; }
       }
       if (btn) btn.disabled = false;
-      toast(`${deleted} venta${deleted!==1?'s':''} eliminada${deleted!==1?'s':''} · stock restaurado`, deleted ? 'success' : 'error');
+      toast(`${deleted} venta${deleted!==1?'s':''} eliminada${deleted!==1?'s':''}${restaurar ? ' · stock restaurado' : ''}`, deleted ? 'success' : 'error');
       loadVentasCajeroModal();
       if (_repActiveTab === 'ventas') loadReports();
     }
