@@ -8520,6 +8520,7 @@ async function loadVentasCajeroModal() {
   const res = await api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500&usuario_id=${cajeroId}`);
   if (!res.ok) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#EF4444">Error al cargar</td></tr>'; return; }
   const ventas = await res.json();
+  window._modalVCVentas = ventas; // cache local — los items ya vienen en la respuesta, no hace falta re-pedirlos para la vista previa
   if (countEl) countEl.textContent = `${ventas.length} venta${ventas.length!==1?'s':''}`;
   if (totalEl) totalEl.textContent = fmt(ventas.reduce((s,v)=>s+(v.total||0),0));
   if (!ventas.length) {
@@ -8531,25 +8532,64 @@ async function loadVentasCajeroModal() {
   tbody.innerHTML = ventas.map(v => {
     const estadoBg    = v.estado==='completada' ? '#F0FDF4' : '#FEF2F2';
     const estadoColor = v.estado==='completada' ? '#16A34A' : '#EF4444';
-    return `<tr class="hovrow border-b" style="border-color:#F1F5F9">
-      <td class="px-3 py-2">
+    return `<tr class="hovrow border-b cursor-pointer" style="border-color:#F1F5F9" onclick="ventasCajeroModalToggleDetalle(event,${v.id})">
+      <td class="px-3 py-2" onclick="event.stopPropagation()">
         <input type="checkbox" class="modal-vc-chk w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#1d2140"
                data-id="${v.id}" data-folio="${(v.folio||v.id).toString().replace(/"/g,'&quot;')}" onchange="ventasCajeroModalUpdateBulk()">
       </td>
-      <td class="px-4 py-2 font-medium" style="color:#0F172A">${v.folio||v.id}</td>
+      <td class="px-4 py-2 font-medium" style="color:#0F172A">
+        <i data-lucide="chevron-right" id="modal-vc-chevron-${v.id}" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;color:#94A3B8;transition:transform .15s"></i>${v.folio||v.id}
+      </td>
       <td class="px-4 py-2" style="color:#374151">${fmtDT(v.creado_en)}</td>
       <td class="px-4 py-2 text-right font-semibold" style="color:#1d2140">${fmt(v.total)}</td>
       <td class="px-4 py-2" style="color:#64748B">${pagoIcon[v.metodo_pago]||v.metodo_pago}</td>
       <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${estadoBg};color:${estadoColor}">${v.estado}</span></td>
-      <td class="px-4 py-2 text-center">
+      <td class="px-4 py-2 text-center" onclick="event.stopPropagation()">
         <button onclick="ventasCajeroModalDelete(${v.id},'${(v.folio||v.id).toString().replace(/'/g,"\\'")}')"
                 class="h-6 px-2 rounded text-[10px] font-semibold border" style="border-color:#FECACA;color:#EF4444;background:#FEF2F2">
           <i data-lucide="trash-2" style="width:10px;height:10px;display:inline;vertical-align:middle;margin-right:2px"></i>Eliminar
         </button>
       </td>
+    </tr>
+    <tr id="modal-vc-detalle-${v.id}" class="hidden" style="background:#F8FAFF">
+      <td colspan="7" class="px-4 py-0"></td>
     </tr>`;
   }).join('');
   icons();
+}
+
+function ventasCajeroModalToggleDetalle(ev, ventaId) {
+  if (ev.target.closest('button,input')) return; // no interferir con checkbox/eliminar
+  const row = document.getElementById(`modal-vc-detalle-${ventaId}`);
+  const chevron = document.getElementById(`modal-vc-chevron-${ventaId}`);
+  if (!row) return;
+  const abrir = row.classList.contains('hidden');
+  row.classList.toggle('hidden', !abrir);
+  if (chevron) chevron.style.transform = abrir ? 'rotate(90deg)' : '';
+  if (!abrir) return;
+  const venta = (window._modalVCVentas || []).find(v => v.id === ventaId);
+  const items = venta?.items || [];
+  const cell = row.querySelector('td');
+  cell.innerHTML = items.length
+    ? `<div class="py-2">
+        <table class="w-full text-[11px]">
+          <thead><tr style="color:#94A3B8">
+            <th class="text-left font-semibold py-1">Producto</th>
+            <th class="text-right font-semibold py-1">Cant.</th>
+            <th class="text-right font-semibold py-1">Precio unit.</th>
+            <th class="text-right font-semibold py-1">Subtotal</th>
+          </tr></thead>
+          <tbody>${items.map(i => `
+            <tr style="border-top:1px solid #E2E8F0">
+              <td class="py-1.5" style="color:#0F172A">${i.nombre}${[i.presentacion,i.concentracion].filter(Boolean).length ? ` <span style="color:#94A3B8">(${[i.presentacion,i.concentracion].filter(Boolean).join(' · ')})</span>` : ''}</td>
+              <td class="py-1.5 text-right" style="color:#374151">${i.cantidad}</td>
+              <td class="py-1.5 text-right" style="color:#374151">${fmt(i.precio_unitario)}</td>
+              <td class="py-1.5 text-right font-semibold" style="color:#1d2140">${fmt(i.subtotal)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`
+    : `<p class="py-2 text-[11px]" style="color:#94A3B8">Esta venta no tiene productos asociados (venta huérfana — sin costo, sin stock que restaurar).</p>`;
 }
 
 function ventasCajeroModalDelete(id, folio) {
