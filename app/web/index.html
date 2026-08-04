@@ -475,6 +475,7 @@
       <select id="modal-vc-cajero" onchange="loadVentasCajeroModal()" class="h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151;min-width:200px">
         <option value="">Selecciona un cajero…</option>
       </select>
+      <span id="modal-vc-total" class="text-sm font-black" style="color:#16A34A"></span>
       <input id="modal-vc-desde" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
       <span class="text-xs" style="color:#94A3B8">–</span>
       <input id="modal-vc-hasta" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
@@ -8496,12 +8497,14 @@ async function loadVentasCajeroModal() {
   const cajeroId = document.getElementById('modal-vc-cajero')?.value;
   const tbody = document.getElementById('modal-vc-tbody');
   const countEl = document.getElementById('modal-vc-count');
+  const totalEl = document.getElementById('modal-vc-total');
   document.getElementById('modal-vc-bulk-del-btn')?.classList.add('hidden');
   const chkAll = document.getElementById('modal-vc-chk-all');
   if (chkAll) chkAll.checked = false;
   if (!cajeroId) {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>';
     if (countEl) countEl.textContent = '';
+    if (totalEl) totalEl.textContent = '';
     return;
   }
   const desde = document.getElementById('modal-vc-desde')?.value || '';
@@ -8511,6 +8514,7 @@ async function loadVentasCajeroModal() {
   if (!res.ok) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#EF4444">Error al cargar</td></tr>'; return; }
   const ventas = await res.json();
   if (countEl) countEl.textContent = `${ventas.length} venta${ventas.length!==1?'s':''}`;
+  if (totalEl) totalEl.textContent = fmt(ventas.reduce((s,v)=>s+(v.total||0),0));
   if (!ventas.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Sin ventas en el período</td></tr>';
     return;
