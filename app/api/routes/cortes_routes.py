@@ -459,7 +459,6 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
         tipo = body.tipo if body.tipo in ("personal", "inversion") else "personal"
 
         # Parse optional backdated date
-        backdated = bool(body.fecha)
         if body.fecha:
             try:
                 from datetime import date as _date
@@ -484,34 +483,14 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
                 detail=f"Saldo insuficiente. Capital de inversión disponible: ${cap_inv:.2f}",
             )
 
-        if backdated:
-            # Un retiro con fecha atrasada NO debe caer en el corte abierto HOY —
-            # antes se le asociaba al corte activo actual sin importar la fecha
-            # elegida, así que un retiro fechado "16-jul" terminaba restándose del
-            # esperado_caja de un corte abierto el 25-jul (9 días después), y el
-            # corte real del 16-jul nunca reflejaba esa salida de efectivo. Se
-            # busca el corte (de cualquier cajero) cuya ventana [abierto_en,
-            # cerrado_en] cubra esa fecha; si ninguno la cubre queda sin corte
-            # (igual que antes), pero ya no se le asigna uno incorrecto.
-            corte = (
-                db.query(CortesCaja)
-                .filter(CortesCaja.abierto_en <= creado_en)
-                .filter(
-                    (CortesCaja.cerrado_en == None) | (CortesCaja.cerrado_en >= creado_en)
-                )
-                .order_by(CortesCaja.abierto_en.desc())
-                .first()
-            )
-        else:
-            # Intentar asociar al corte activo de cualquier cajero (si admin también tiene uno, o el primer abierto)
-            corte = (
-                db.query(CortesCaja)
-                .filter(CortesCaja.cerrado_en == None)
-                .order_by(CortesCaja.abierto_en.desc())
-                .first()
-            )
+        # Un retiro es un movimiento del admin (solo el admin puede registrarlo),
+        # nunca del turno de un cajero — no se asocia a ningún corte_id. Antes se
+        # ligaba al corte abierto de turno (o al corte cuya ventana cubriera la
+        # fecha, si era retroactivo), lo que hacía que un pago a proveedor apareciera
+        # como si fuera responsabilidad del cajero que tenía el turno abierto en
+        # ese momento — un cajero jamás retira dinero, así que nunca le pertenece.
         r = RetiroCaja(
-            corte_id=corte.id if corte else None,
+            corte_id=None,
             usuario_id=usuario_id,
             monto=body.monto,
             concepto=body.concepto,
