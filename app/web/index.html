@@ -2929,6 +2929,16 @@
           </div>
         </div>
 
+        <!-- Aviso: ventas facturadas y dinero retirado son cifras independientes —
+             no tienen por qué coincidir (confusión común: "si sumo lo que retiré
+             no me da lo mismo que lo que facturé ese mes"). -->
+        <div class="flex items-center gap-2 px-3 py-2 rounded-xl flex-shrink-0" style="background:#EFF6FF;border:1px solid #BFDBFE">
+          <i data-lucide="info" style="width:14px;height:14px;color:#1E40AF;flex-shrink:0"></i>
+          <p class="text-xs" style="color:#1E40AF">
+            <b>Ventas facturadas</b> (lo que vendiste) y <b>dinero retirado</b> (lo que sacaste de caja) son cifras independientes — no tienen por qué coincidir.
+          </p>
+        </div>
+
         <!-- Stats row (compact, single height) -->
         <div class="flex gap-3 flex-shrink-0">
 
@@ -2973,6 +2983,14 @@
             <p class="text-xs font-semibold" style="color:#64748B">Retiros período</p>
             <p id="caja-stat-retiros-periodo" class="text-xl font-black mt-0.5" style="color:#EF4444">—</p>
             <p id="caja-stat-inversion-periodo" class="text-xs font-semibold" style="color:#1E40AF">—</p>
+          </div>
+
+          <!-- Ventas período — al lado de "Retiros período" a propósito, para
+               comparar de un vistazo sin confundirlas: son cifras independientes. -->
+          <div class="bg-white rounded-2xl px-4 py-3 border flex-shrink-0" style="border-color:#E2E8F0;min-width:150px" title="Total de ventas (facturado) en el rango de fechas seleccionado — cifra independiente de los retiros">
+            <p class="text-xs font-semibold" style="color:#64748B">Ventas período</p>
+            <p id="caja-stat-ventas-periodo" class="text-xl font-black mt-0.5" style="color:#16A34A">—</p>
+            <p id="caja-stat-ventas-periodo-n" class="text-xs" style="color:#94A3B8">— ventas</p>
           </div>
 
         </div>
@@ -9689,6 +9707,18 @@ async function loadCajaAdmin() {
       } else {
         periodoEl.textContent = 'Según filtro';
         periodoEl.style.color = '#94A3B8';
+      }
+    }
+    const ventasPeriodoEl = document.getElementById('caja-stat-ventas-periodo');
+    const ventasPeriodoNEl = document.getElementById('caja-stat-ventas-periodo-n');
+    if (ventasPeriodoEl && ventasPeriodoNEl) {
+      if (g.periodo) {
+        ventasPeriodoEl.textContent = money(g.periodo.total_ventas ?? 0);
+        const n = g.periodo.num_ventas ?? 0;
+        ventasPeriodoNEl.textContent = `${n} venta${n !== 1 ? 's' : ''}`;
+      } else {
+        ventasPeriodoEl.textContent = '—';
+        ventasPeriodoNEl.textContent = 'Según filtro';
       }
     }
 
