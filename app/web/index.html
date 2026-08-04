@@ -456,6 +456,50 @@
   </div>
 </div>
 
+<!-- ═══════════ VENTAS POR CAJERO MODAL (admin) ═══════════ -->
+<div id="modal-ventas-cajero" class="fixed inset-0 z-50 hidden items-center justify-center">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-ventas-cajero')"></div>
+  <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[820px] max-w-[92vw] max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b flex-shrink-0" style="border-color:#F1F5F9">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+          <i data-lucide="user-search" style="width:16px;height:16px;color:#1d2140"></i>
+        </div>
+        <span class="font-bold text-sm" style="color:#0F172A">Buscar ventas por cajero</span>
+      </div>
+      <button onclick="closeModal('modal-ventas-cajero')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="px-6 pt-4 pb-3 flex items-center gap-2 flex-wrap flex-shrink-0 border-b" style="border-color:#F1F5F9">
+      <select id="modal-vc-cajero" onchange="loadVentasCajeroModal()" class="h-9 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151;min-width:200px">
+        <option value="">Selecciona un cajero…</option>
+      </select>
+      <input id="modal-vc-desde" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
+      <span class="text-xs" style="color:#94A3B8">–</span>
+      <input id="modal-vc-hasta" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
+      <span id="modal-vc-count" class="text-xs ml-auto" style="color:#94A3B8"></span>
+    </div>
+    <div class="overflow-y-auto flex-1 min-h-[200px]">
+      <table class="w-full text-xs">
+        <thead class="sticky top-0" style="background:#F8FAFF;z-index:1">
+          <tr>
+            <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Folio</th>
+            <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Fecha</th>
+            <th class="text-right px-4 py-2 font-semibold" style="color:#64748B">Total</th>
+            <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Pago</th>
+            <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Estado</th>
+            <th class="text-center px-4 py-2 font-semibold" style="color:#64748B">Acción</th>
+          </tr>
+        </thead>
+        <tbody id="modal-vc-tbody">
+          <tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ RESUMEN CIERRE MODAL ═══════════ -->
 <div id="modal-cierre-resumen" class="fixed inset-0 z-50 hidden items-center justify-center">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)"></div>
@@ -1882,9 +1926,9 @@
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
               <span class="text-xs px-2 py-0.5 rounded-full" style="background:#F1F5F9;color:#64748B" id="rep-count-badge">—</span>
-              <select id="rep-cajero-filtro" onchange="loadReports()" class="h-8 px-2 rounded-lg text-xs border rep-admin-col hidden" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151;max-width:160px">
-                <option value="">Todos los cajeros</option>
-              </select>
+              <button id="rep-buscar-cajero-btn" onclick="openVentasCajeroModal()" class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+                <i data-lucide="user-search" style="width:13px;height:13px"></i> Buscar por cajero
+              </button>
               <div class="ml-auto flex items-center gap-2">
                 <button id="rep-bulk-del-btn" onclick="repBulkDelete()"
                         class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 border"
@@ -8398,17 +8442,11 @@ async function initReports() {
     const btn = document.getElementById(`rep-tab-${t}`);
     if (btn) btn.style.display = isAdmin ? '' : 'none';
   });
-  const cajeroSel = document.getElementById('rep-cajero-filtro');
-  if (cajeroSel) {
-    cajeroSel.classList.toggle('hidden', !isAdmin);
-    if (isAdmin && cajeroSel.options.length <= 1) {
-      const res = await api('/empleados/');
-      if (res.ok) {
-        const empleados = await res.json();
-        cajeroSel.innerHTML = '<option value="">Todos los cajeros</option>' +
-          empleados.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
-      }
-    }
+  const buscarCajeroBtn = document.getElementById('rep-buscar-cajero-btn');
+  if (buscarCajeroBtn) buscarCajeroBtn.classList.toggle('hidden', !isAdmin);
+  if (isAdmin && !S._empleadosCache) {
+    const res = await api('/empleados/');
+    if (res.ok) S._empleadosCache = await res.json();
   }
   repTab('ventas');
   loadReports();
@@ -8430,9 +8468,79 @@ function repPeriodo(d) {
   loadReports();
 }
 
-function _repCajeroFiltroQS() {
-  const v = document.getElementById('rep-cajero-filtro')?.value;
-  return v ? `&usuario_id=${v}` : '';
+async function openVentasCajeroModal() {
+  const sel = document.getElementById('modal-vc-cajero');
+  if (sel && sel.options.length <= 1 && S._empleadosCache) {
+    sel.innerHTML = '<option value="">Selecciona un cajero…</option>' +
+      S._empleadosCache.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+  }
+  const desdeEl = document.getElementById('modal-vc-desde');
+  const hastaEl = document.getElementById('modal-vc-hasta');
+  if (hastaEl && !hastaEl.value) hastaEl.value = new Date().toISOString().slice(0,10);
+  if (desdeEl && !desdeEl.value) {
+    const d = new Date(); d.setDate(d.getDate() - 90);
+    desdeEl.value = d.toISOString().slice(0,10);
+  }
+  openModal('modal-ventas-cajero');
+}
+
+async function loadVentasCajeroModal() {
+  const cajeroId = document.getElementById('modal-vc-cajero')?.value;
+  const tbody = document.getElementById('modal-vc-tbody');
+  const countEl = document.getElementById('modal-vc-count');
+  if (!cajeroId) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  const desde = document.getElementById('modal-vc-desde')?.value || '';
+  const hasta = document.getElementById('modal-vc-hasta')?.value || '';
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Cargando…</td></tr>';
+  const res = await api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500&usuario_id=${cajeroId}`);
+  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#EF4444">Error al cargar</td></tr>'; return; }
+  const ventas = await res.json();
+  if (countEl) countEl.textContent = `${ventas.length} venta${ventas.length!==1?'s':''}`;
+  if (!ventas.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Sin ventas en el período</td></tr>';
+    return;
+  }
+  const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
+  const pagoIcon = { efectivo:'Efect.', tarjeta:'Tarjeta', transferencia:'Transfer.', mixto:'Mixto' };
+  tbody.innerHTML = ventas.map(v => {
+    const estadoBg    = v.estado==='completada' ? '#F0FDF4' : '#FEF2F2';
+    const estadoColor = v.estado==='completada' ? '#16A34A' : '#EF4444';
+    return `<tr class="hovrow border-b" style="border-color:#F1F5F9">
+      <td class="px-4 py-2 font-medium" style="color:#0F172A">${v.folio||v.id}</td>
+      <td class="px-4 py-2" style="color:#374151">${fmtDT(v.creado_en)}</td>
+      <td class="px-4 py-2 text-right font-semibold" style="color:#1d2140">${fmt(v.total)}</td>
+      <td class="px-4 py-2" style="color:#64748B">${pagoIcon[v.metodo_pago]||v.metodo_pago}</td>
+      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-medium" style="background:${estadoBg};color:${estadoColor}">${v.estado}</span></td>
+      <td class="px-4 py-2 text-center">
+        <button onclick="ventasCajeroModalDelete(${v.id},'${(v.folio||v.id).toString().replace(/'/g,"\\'")}')"
+                class="h-6 px-2 rounded text-[10px] font-semibold border" style="border-color:#FECACA;color:#EF4444;background:#FEF2F2">
+          <i data-lucide="trash-2" style="width:10px;height:10px;display:inline;vertical-align:middle;margin-right:2px"></i>Eliminar
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+  icons();
+}
+
+function ventasCajeroModalDelete(id, folio) {
+  openConfirmDel(
+    `¿Eliminar venta ${folio}?`,
+    'Se eliminará de todas las bases de datos y se restaurará el stock. Esta acción no se puede deshacer.',
+    async () => {
+      const res = await api(`/ventas/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Error desconocido'}));
+        toast(err.detail || 'Error al eliminar', 'error'); return;
+      }
+      toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
+      loadVentasCajeroModal();
+      if (_repActiveTab === 'ventas') loadReports();
+    }
+  );
 }
 
 // ── Reports tab switching ─────────────────────────────────────────────────
@@ -8464,7 +8572,7 @@ async function loadReports() {
   const [rRes, topRes, ventasRes] = await Promise.all([
     api(`/reportes/resumen?fecha_inicio=${desde}&fecha_fin=${hasta}`),
     api(`/reportes/top-productos?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=10`),
-    api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500${_repCajeroFiltroQS()}`),
+    api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500`),
   ]);
 
   if (rRes.ok) {
