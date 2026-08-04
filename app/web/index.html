@@ -1882,6 +1882,9 @@
               <i data-lucide="list" style="width:15px;height:15px;color:#64748B"></i>
               <span class="font-semibold text-sm" style="color:#0F172A">Detalle de ventas</span>
               <span class="text-xs px-2 py-0.5 rounded-full" style="background:#F1F5F9;color:#64748B" id="rep-count-badge">—</span>
+              <select id="rep-cajero-filtro" onchange="loadReports()" class="h-8 px-2 rounded-lg text-xs border rep-admin-col hidden" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151;max-width:160px">
+                <option value="">Todos los cajeros</option>
+              </select>
               <div class="ml-auto flex items-center gap-2">
                 <button id="rep-bulk-del-btn" onclick="repBulkDelete()"
                         class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 border"
@@ -8385,7 +8388,7 @@ function deleteCust(id) {
 // ══════════════════════════════════════════════════════════
 // REPORTS
 // ══════════════════════════════════════════════════════════
-function initReports() {
+async function initReports() {
   const hoy=new Date(); const y=hoy.getFullYear(),m=hoy.getMonth();
   document.getElementById('rep-hasta').value=hoy.toISOString().split('T')[0];
   document.getElementById('rep-desde').value=new Date(y,m,1).toISOString().split('T')[0];
@@ -8395,6 +8398,18 @@ function initReports() {
     const btn = document.getElementById(`rep-tab-${t}`);
     if (btn) btn.style.display = isAdmin ? '' : 'none';
   });
+  const cajeroSel = document.getElementById('rep-cajero-filtro');
+  if (cajeroSel) {
+    cajeroSel.classList.toggle('hidden', !isAdmin);
+    if (isAdmin && cajeroSel.options.length <= 1) {
+      const res = await api('/empleados/');
+      if (res.ok) {
+        const empleados = await res.json();
+        cajeroSel.innerHTML = '<option value="">Todos los cajeros</option>' +
+          empleados.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+      }
+    }
+  }
   repTab('ventas');
   loadReports();
   if (isAdmin) loadVencimientos('todos');
@@ -8413,6 +8428,11 @@ function repPeriodo(d) {
   document.getElementById('rep-desde').value=desde.toISOString().split('T')[0];
   document.getElementById('rep-hasta').value=hasta.toISOString().split('T')[0];
   loadReports();
+}
+
+function _repCajeroFiltroQS() {
+  const v = document.getElementById('rep-cajero-filtro')?.value;
+  return v ? `&usuario_id=${v}` : '';
 }
 
 // ── Reports tab switching ─────────────────────────────────────────────────
@@ -8444,7 +8464,7 @@ async function loadReports() {
   const [rRes, topRes, ventasRes] = await Promise.all([
     api(`/reportes/resumen?fecha_inicio=${desde}&fecha_fin=${hasta}`),
     api(`/reportes/top-productos?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=10`),
-    api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500`),
+    api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500${_repCajeroFiltroQS()}`),
   ]);
 
   if (rRes.ok) {
