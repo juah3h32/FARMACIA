@@ -263,11 +263,16 @@ def _purge_tables(tables: list[str]) -> None:
             print(f"[Purge] Turso error: {e}")
 
 
-def eliminar_venta(venta_id: int) -> dict:
+def eliminar_venta(venta_id: int, restaurar_stock: bool = True) -> dict:
     """
-    Soft-delete a single sale: restore stock, delete movements+items locally and
-    in Turso, mark eliminado=1 in both. Safe even when the product no longer exists.
+    Soft-delete a single sale: delete movements+items locally and in Turso,
+    mark eliminado=1 in both. Safe even when the product no longer exists.
     Returns {"ok": True, "folio": "..."}.
+
+    restaurar_stock=False: no le suma nada de vuelta al stock del producto —
+    para limpiar ventas de prueba/mal capturadas cuyo inventario físico el
+    usuario ya sabe que está correcto tal cual, y restaurar volvería a
+    inflarlo con unidades que en realidad nunca salieron de verdad.
     """
     from app.database.connection import get_db_session
     from app.database.models import Venta, ItemVenta, MovimientoStock, Producto
@@ -291,13 +296,13 @@ def eliminar_venta(venta_id: int) -> dict:
         restored = False
         for mov in movements:
             prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
-            if prod and mov.cantidad and mov.cantidad > 0:
+            if restaurar_stock and prod and mov.cantidad and mov.cantidad > 0:
                 prod.stock += mov.cantidad
                 restored = True
             db.delete(mov)
 
         # 2. Fallback: restore from items when no movements exist
-        if not restored:
+        if restaurar_stock and not restored:
             items = db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).all()
             for item in items:
                 prod = db.query(Producto).filter(Producto.id == item.producto_id).first()

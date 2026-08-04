@@ -8454,7 +8454,10 @@ async function initReports() {
   const buscarCajeroBtn = document.getElementById('rep-buscar-cajero-btn');
   if (buscarCajeroBtn) buscarCajeroBtn.classList.toggle('hidden', !isAdmin);
   if (isAdmin && !S._empleadosCache) {
-    const res = await api('/empleados/');
+    // incluir_inactivos=true — un cajero desactivado (ej. "Cajero Prueba" tras
+    // limpiar sus ventas) debe seguir apareciendo aquí para poder encontrar y
+    // borrar ventas que se le hayan quedado o que se generen después.
+    const res = await api('/empleados/?incluir_inactivos=true');
     if (res.ok) S._empleadosCache = await res.json();
   }
   repTab('ventas');
@@ -8479,9 +8482,9 @@ function repPeriodo(d) {
 
 async function openVentasCajeroModal() {
   const sel = document.getElementById('modal-vc-cajero');
-  if (sel && sel.options.length <= 1 && S._empleadosCache) {
+  if (sel && S._empleadosCache) {
     sel.innerHTML = '<option value="">Selecciona un cajero…</option>' +
-      S._empleadosCache.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+      S._empleadosCache.map(e => `<option value="${e.id}">${e.nombre}${e.activo===false?' (inactivo)':''}</option>`).join('');
   }
   const desdeEl = document.getElementById('modal-vc-desde');
   const hastaEl = document.getElementById('modal-vc-hasta');

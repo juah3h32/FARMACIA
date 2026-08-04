@@ -158,12 +158,16 @@ def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
 
 
 @router.delete("/{venta_id}")
-def eliminar_venta_endpoint(venta_id: int, payload: dict = Depends(get_current_api_user)):
+def eliminar_venta_endpoint(
+    venta_id: int,
+    restaurar_stock: bool = Query(True),
+    payload: dict = Depends(get_current_api_user),
+):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar ventas")
     try:
         from app.database.sync_service import eliminar_venta
-        result = eliminar_venta(venta_id)
+        result = eliminar_venta(venta_id, restaurar_stock=restaurar_stock)
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -312,7 +316,8 @@ def registrar_devolucion(
 
 @router.post("/eliminar-lote")
 def eliminar_ventas_lote(
-    ids: List[int] = Body(..., embed=True),
+    ids: List[int] = Body(...),
+    restaurar_stock: bool = Body(True),
     payload: dict = Depends(get_current_api_user),
 ):
     if payload.get("rol") != "admin":
@@ -326,7 +331,7 @@ def eliminar_ventas_lote(
         deleted, folios = 0, []
         for venta_id in ids:
             try:
-                result = eliminar_venta(venta_id)
+                result = eliminar_venta(venta_id, restaurar_stock=restaurar_stock)
                 folios.append(result["folio"])
                 deleted += 1
             except ValueError:

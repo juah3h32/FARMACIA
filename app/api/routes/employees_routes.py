@@ -26,14 +26,18 @@ def _require_admin(payload: dict):
 
 
 @router.get("/")
-def listar_empleados(payload: dict = Depends(get_current_api_user)):
+def listar_empleados(incluir_inactivos: bool = False, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
     db = get_db_session()
     try:
-        rows = db.query(Usuario).filter(Usuario.activo == True).order_by(Usuario.nombre).all()
+        q = db.query(Usuario)
+        if not incluir_inactivos:
+            q = q.filter(Usuario.activo == True)
+        rows = q.order_by(Usuario.nombre).all()
         return [
             {"id": u.id, "username": u.username, "nombre": u.nombre,
-             "rol": u.rol.value, "telefono": u.telefono, "email": u.email, "foto_url": u.foto_url}
+             "rol": u.rol.value, "telefono": u.telefono, "email": u.email,
+             "foto_url": u.foto_url, "activo": u.activo}
             for u in rows
         ]
     finally:
