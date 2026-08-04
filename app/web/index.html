@@ -479,11 +479,19 @@
       <span class="text-xs" style="color:#94A3B8">–</span>
       <input id="modal-vc-hasta" type="date" class="h-9 px-2 rounded-xl text-xs border" style="border-color:#E2E8F0" onchange="loadVentasCajeroModal()">
       <span id="modal-vc-count" class="text-xs ml-auto" style="color:#94A3B8"></span>
+      <button id="modal-vc-bulk-del-btn" onclick="ventasCajeroModalBulkDelete()" class="hidden h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 border" style="border-color:#FECACA;color:#EF4444;background:#FEF2F2">
+        <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+        <span id="modal-vc-bulk-del-label">Eliminar seleccionadas</span>
+      </button>
     </div>
     <div class="overflow-y-auto flex-1 min-h-[200px]">
       <table class="w-full text-xs">
         <thead class="sticky top-0" style="background:#F8FAFF;z-index:1">
           <tr>
+            <th class="px-3 py-2 w-8">
+              <input type="checkbox" id="modal-vc-chk-all" onchange="ventasCajeroModalToggleAll(this.checked)"
+                     class="w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#1d2140">
+            </th>
             <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Folio</th>
             <th class="text-left px-4 py-2 font-semibold" style="color:#64748B">Fecha</th>
             <th class="text-right px-4 py-2 font-semibold" style="color:#64748B">Total</th>
@@ -493,7 +501,7 @@
           </tr>
         </thead>
         <tbody id="modal-vc-tbody">
-          <tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>
+          <tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>
         </tbody>
       </table>
     </div>
@@ -8488,20 +8496,23 @@ async function loadVentasCajeroModal() {
   const cajeroId = document.getElementById('modal-vc-cajero')?.value;
   const tbody = document.getElementById('modal-vc-tbody');
   const countEl = document.getElementById('modal-vc-count');
+  document.getElementById('modal-vc-bulk-del-btn')?.classList.add('hidden');
+  const chkAll = document.getElementById('modal-vc-chk-all');
+  if (chkAll) chkAll.checked = false;
   if (!cajeroId) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Selecciona un cajero para ver sus ventas</td></tr>';
     if (countEl) countEl.textContent = '';
     return;
   }
   const desde = document.getElementById('modal-vc-desde')?.value || '';
   const hasta = document.getElementById('modal-vc-hasta')?.value || '';
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Cargando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Cargando…</td></tr>';
   const res = await api(`/ventas/?fecha_inicio=${desde}&fecha_fin=${hasta}&limite=500&usuario_id=${cajeroId}`);
-  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#EF4444">Error al cargar</td></tr>'; return; }
+  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#EF4444">Error al cargar</td></tr>'; return; }
   const ventas = await res.json();
   if (countEl) countEl.textContent = `${ventas.length} venta${ventas.length!==1?'s':''}`;
   if (!ventas.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-xs" style="color:#94A3B8">Sin ventas en el período</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-10 text-xs" style="color:#94A3B8">Sin ventas en el período</td></tr>';
     return;
   }
   const fmtDT = s => s ? new Date(s).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'}) : '—';
@@ -8510,6 +8521,10 @@ async function loadVentasCajeroModal() {
     const estadoBg    = v.estado==='completada' ? '#F0FDF4' : '#FEF2F2';
     const estadoColor = v.estado==='completada' ? '#16A34A' : '#EF4444';
     return `<tr class="hovrow border-b" style="border-color:#F1F5F9">
+      <td class="px-3 py-2">
+        <input type="checkbox" class="modal-vc-chk w-3.5 h-3.5 cursor-pointer rounded" style="accent-color:#1d2140"
+               data-id="${v.id}" data-folio="${(v.folio||v.id).toString().replace(/"/g,'&quot;')}" onchange="ventasCajeroModalUpdateBulk()">
+      </td>
       <td class="px-4 py-2 font-medium" style="color:#0F172A">${v.folio||v.id}</td>
       <td class="px-4 py-2" style="color:#374151">${fmtDT(v.creado_en)}</td>
       <td class="px-4 py-2 text-right font-semibold" style="color:#1d2140">${fmt(v.total)}</td>
@@ -8529,7 +8544,7 @@ async function loadVentasCajeroModal() {
 function ventasCajeroModalDelete(id, folio) {
   openConfirmDel(
     `¿Eliminar venta ${folio}?`,
-    'Se eliminará de todas las bases de datos y se restaurará el stock. Esta acción no se puede deshacer.',
+    'Se eliminará de todas las bases de datos (local y nube) para siempre y se restaurará el stock. Esta acción no se puede deshacer.',
     async () => {
       const res = await api(`/ventas/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -8537,6 +8552,55 @@ function ventasCajeroModalDelete(id, folio) {
         toast(err.detail || 'Error al eliminar', 'error'); return;
       }
       toast(`Venta ${folio} eliminada · stock restaurado`, 'success');
+      loadVentasCajeroModal();
+      if (_repActiveTab === 'ventas') loadReports();
+    }
+  );
+}
+
+function ventasCajeroModalToggleAll(checked) {
+  document.querySelectorAll('.modal-vc-chk').forEach(c => c.checked = checked);
+  ventasCajeroModalUpdateBulk();
+}
+
+function ventasCajeroModalUpdateBulk() {
+  const selected = document.querySelectorAll('.modal-vc-chk:checked');
+  const total = document.querySelectorAll('.modal-vc-chk').length;
+  const btn = document.getElementById('modal-vc-bulk-del-btn');
+  const lbl = document.getElementById('modal-vc-bulk-del-label');
+  const chkAll = document.getElementById('modal-vc-chk-all');
+  if (selected.length > 0) {
+    btn.classList.remove('hidden');
+    lbl.textContent = `Eliminar ${selected.length} seleccionada${selected.length>1?'s':''}`;
+  } else {
+    btn.classList.add('hidden');
+  }
+  if (chkAll) {
+    chkAll.checked = total > 0 && selected.length === total;
+    chkAll.indeterminate = selected.length > 0 && selected.length < total;
+  }
+}
+
+async function ventasCajeroModalBulkDelete() {
+  const checkboxes = document.querySelectorAll('.modal-vc-chk:checked');
+  const ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id));
+  if (!ids.length) return;
+  const cajeroNombre = document.getElementById('modal-vc-cajero')?.selectedOptions?.[0]?.textContent || 'este cajero';
+  openConfirmDel(
+    `¿Eliminar ${ids.length} venta${ids.length>1?'s':''} de ${cajeroNombre}?`,
+    `Se eliminarán ${ids.length} ventas permanentemente de todas las bases de datos (local y nube). El stock se restaurará. Esta acción no se puede deshacer.`,
+    async () => {
+      const btn = document.getElementById('modal-vc-bulk-del-btn');
+      if (btn) btn.disabled = true;
+      let deleted = 0;
+      // El backend limita a 200 por lote — se manda en tandas por si son mas.
+      for (let i = 0; i < ids.length; i += 200) {
+        const tanda = ids.slice(i, i + 200);
+        const res = await api('/ventas/eliminar-lote', { method: 'POST', body: JSON.stringify({ ids: tanda }) });
+        if (res.ok) { const data = await res.json(); deleted += data.deleted || 0; }
+      }
+      if (btn) btn.disabled = false;
+      toast(`${deleted} venta${deleted!==1?'s':''} eliminada${deleted!==1?'s':''} · stock restaurado`, deleted ? 'success' : 'error');
       loadVentasCajeroModal();
       if (_repActiveTab === 'ventas') loadReports();
     }
