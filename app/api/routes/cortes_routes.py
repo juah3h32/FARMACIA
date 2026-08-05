@@ -122,6 +122,24 @@ def _get_corte_activo(db, usuario_id: int) -> Optional[CortesCaja]:
     )
 
 
+def _get_corte_cerrado_hoy(db, usuario_id: int) -> Optional[CortesCaja]:
+    """Último turno de HOY ya cerrado para este cajero (si existe). Permite
+    ofrecer reabrirlo cuando llega una venta tardía (ej. después del cierre de
+    las 21:00) para que quede dentro del MISMO turno en vez de una venta huérfana
+    o un corte sintético aparte."""
+    inicio_hoy = datetime.combine(datetime.now().date(), _time_type.min)
+    return (
+        db.query(CortesCaja)
+        .filter(
+            CortesCaja.usuario_id == usuario_id,
+            CortesCaja.cerrado_en != None,
+            CortesCaja.abierto_en >= inicio_hoy,
+        )
+        .order_by(CortesCaja.cerrado_en.desc())
+        .first()
+    )
+
+
 def _sumar_totales_ventas(ventas: list) -> tuple[float, float, float, float]:
     """Suma efectivo/tarjeta/transferencia/total de una lista de Venta ya cargada
     (sin query) — helper puro, reutilizado por _calcular_totales_corte y por
@@ -199,7 +217,14 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
     try:
         c = _get_corte_activo(db, usuario_id)
         if not c:
-            return {"abierto": False}
+            cerrado_hoy = _get_corte_cerrado_hoy(db, usuario_id)
+            return {
+                "abierto": False,
+                "cerrado_hoy": (
+                    {"id": cerrado_hoy.id, "cerrado_en": cerrado_hoy.cerrado_en.isoformat()}
+                    if cerrado_hoy else None
+                ),
+            }
         # Calculate running totals from ventas since opening
         ventas = (
             db.query(Venta)
@@ -284,6 +309,37 @@ def abrir_corte(body: AbrirCorteIn, bg: BackgroundTasks, payload: dict = Depends
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
         return {"ok": True, "id": c.id, "abierto_en": c.abierto_en.isoformat() if c.abierto_en else None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/reabrir")
+def reabrir_corte(bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Reabre el turno de HOY de este cajero ya cerrado (ej. cierre automático
+    de las 21:00) para que una venta tardía quede dentro del MISMO turno en vez
+    de crear uno nuevo o quedar huérfana. Limpia cerrado_en/monto_cierre — se
+    recalculan solos con _calcular_totales_corte al volver a cerrarlo."""
+    usuario_id = int(payload["sub"])
+    db = get_db_session()
+    try:
+        if _get_corte_activo(db, usuario_id):
+            raise HTTPException(status_code=400, detail="Ya tienes un turno abierto")
+        c = _get_corte_cerrado_hoy(db, usuario_id)
+        if not c:
+            raise HTTPException(status_code=404, detail="No hay un turno de hoy para reabrir")
+        c.cerrado_en = None
+        c.monto_cierre = None
+        db.commit()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, "id": c.id}
     except HTTPException:
         raise
     except Exception as e:

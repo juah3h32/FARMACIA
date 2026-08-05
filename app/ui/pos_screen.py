@@ -47,10 +47,11 @@ def _style_tree():
 
 
 class PosScreen(ctk.CTkFrame):
-    def __init__(self, parent, user, on_unknown_barcode=None):
+    def __init__(self, parent, user, on_unknown_barcode=None, on_venta_completada=None):
         super().__init__(parent, corner_radius=0, fg_color=CONT)
         self.user = user
         self.on_unknown_barcode = on_unknown_barcode
+        self.on_venta_completada = on_venta_completada
         self.cart: list[dict] = []
         self.descuento_total = 0.0
         self.cliente_seleccionado = None
@@ -718,6 +719,10 @@ class PosScreen(ctk.CTkFrame):
         finally:
             _db_corte.close()
         if not _corte_activo:
+            cerrado_hoy = self._buscar_corte_cerrado_hoy()
+            if cerrado_hoy:
+                self._dlg_turno_cerrado_hoy(cerrado_hoy, on_open=self._cobrar)
+                return
             if messagebox.askyesno("Caja cerrada",
                                     "No hay turno abierto.\n¿Deseas abrir la caja ahora para registrar la venta?"):
                 self._abrir_corte_caja(on_open=self._cobrar)
@@ -803,6 +808,11 @@ class PosScreen(ctk.CTkFrame):
                     ))
 
             db.commit()
+            if self.on_venta_completada:
+                try:
+                    self.on_venta_completada()
+                except Exception:
+                    pass
 
             printed = printer_service.print_receipt({
                 "folio": folio, "cajero": self.user.nombre,
@@ -955,6 +965,11 @@ class PosScreen(ctk.CTkFrame):
                     ))
 
             db.commit()
+            if self.on_venta_completada:
+                try:
+                    self.on_venta_completada()
+                except Exception:
+                    pass
 
             printer_service.print_receipt({
                 "folio": folio, "cajero": self.user.nombre,
@@ -992,13 +1007,128 @@ class PosScreen(ctk.CTkFrame):
                 CortesCaja.cerrado_en == None,
             ).first()
             if not abierto:
-                self._abrir_corte_caja()
+                self._ofrecer_reapertura_o_abrir()
             elif abierto.abierto_en and abierto.abierto_en.date() < date.today():
                 # Corte de día anterior sin cerrar — cierre automático silencioso
                 self._auto_cerrar_corte_anterior(abierto, db)
-                self._abrir_corte_caja()
+                self._ofrecer_reapertura_o_abrir()
         finally:
             db.close()
+
+    def _buscar_corte_cerrado_hoy(self):
+        """Último turno de HOY ya cerrado para este cajero (si existe). Se usa para
+        que una venta tardía (ej. después de las 21:00) quede dentro del MISMO turno
+        en vez de crear uno nuevo o quedar huérfana."""
+        from datetime import time as _time
+        hoy = datetime.now().date()
+        inicio_hoy = datetime.combine(hoy, _time.min)
+        db = get_db_session()
+        try:
+            return (
+                db.query(CortesCaja)
+                .filter(
+                    CortesCaja.usuario_id == self.user.id,
+                    CortesCaja.cerrado_en != None,
+                    CortesCaja.abierto_en >= inicio_hoy,
+                )
+                .order_by(CortesCaja.cerrado_en.desc())
+                .first()
+            )
+        finally:
+            db.close()
+
+    def _reabrir_corte(self, corte_id: int, on_open=None):
+        """Reabre un turno ya cerrado (limpia cerrado_en/monto_cierre — se
+        recalculan solos al volver a cerrarlo) para que una venta tardía caiga
+        en el mismo turno del día en vez de generar uno aparte."""
+        db = get_db_session()
+        try:
+            corte = db.query(CortesCaja).filter(CortesCaja.id == corte_id).first()
+            if corte:
+                corte.cerrado_en = None
+                corte.monto_cierre = None
+                db.commit()
+        finally:
+            db.close()
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            import threading
+            from app.database.sync_service import sync_to_turso
+            threading.Thread(target=sync_to_turso, daemon=True).start()
+        if on_open:
+            self.after(50, on_open)
+
+    def _ofrecer_reapertura_o_abrir(self, on_open=None):
+        """Si el turno de hoy ya se cerró, ofrece reabrirlo (misma caja, mismo
+        turno); si nunca se abrió uno hoy, muestra la apertura normal."""
+        cerrado_hoy = self._buscar_corte_cerrado_hoy()
+        if cerrado_hoy:
+            self._dlg_turno_cerrado_hoy(cerrado_hoy, on_open=on_open)
+            return
+        self._abrir_corte_caja(on_open=on_open)
+
+    def _dlg_turno_cerrado_hoy(self, cerrado_hoy, on_open=None):
+        """Card centrada (no messagebox del sistema) — el turno de hoy de este
+        cajero ya se cerró; ofrece reabrirlo para que una venta tardía (ej.
+        después de las 21:00) quede dentro del MISMO turno."""
+        if getattr(self, "_dlg_turno_cerrado_open", False):
+            return
+        self._dlg_turno_cerrado_open = True
+        hora_cierre = cerrado_hoy.cerrado_en.strftime("%H:%M")
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Turno cerrado")
+        dlg.geometry("420x280")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - 420) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - 280) // 2
+        dlg.geometry(f"420x280+{x}+{y}")
+
+        def _cerrar_dlg():
+            self._dlg_turno_cerrado_open = False
+            try:
+                dlg.grab_release()
+            except Exception:
+                pass
+            dlg.destroy()
+
+        dlg.protocol("WM_DELETE_WINDOW", _cerrar_dlg)
+
+        ctk.CTkLabel(dlg, text="🔒", font=ctk.CTkFont(size=32)).pack(pady=(26, 4))
+        ctk.CTkLabel(
+            dlg, text="Turno cerrado",
+            font=ctk.CTkFont(size=16, weight="bold"), text_color="#D97706",
+        ).pack()
+        ctk.CTkLabel(
+            dlg,
+            text=(f"Tu turno de hoy ya se cerró a las {hora_cierre}.\n\n"
+                  "¿Deseas reabrirlo para registrar esta venta?\n"
+                  "Quedará dentro del mismo turno de hoy."),
+            font=ctk.CTkFont(size=12), text_color=MUTED,
+            justify="center", wraplength=360,
+        ).pack(pady=(8, 20), padx=24)
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=(0, 10))
+
+        def _reabrir():
+            _cerrar_dlg()
+            self._reabrir_corte(cerrado_hoy.id, on_open=on_open)
+
+        ctk.CTkButton(
+            btn_frame, text="Reabrir turno y cobrar", width=220, height=42, corner_radius=10,
+            fg_color=GREEN, hover_color=GREEN_D, font=ctk.CTkFont(size=13, weight="bold"),
+            command=_reabrir,
+        ).pack(side="left", padx=8)
+
+        ctk.CTkButton(
+            btn_frame, text="Cancelar", width=110, height=42, corner_radius=10,
+            fg_color="transparent", border_width=1, border_color=BORDER,
+            text_color=MUTED, hover_color=SURF,
+            command=_cerrar_dlg,
+        ).pack(side="left", padx=8)
 
     def _auto_cerrar_corte_anterior(self, corte, db):
         """Cierra un corte de un día previo sin interacción del usuario."""
@@ -1665,4 +1795,4 @@ class PosScreen(ctk.CTkFrame):
         finally:
             db.close()
         if not abierto:
-            self._abrir_corte_caja()
+            self._ofrecer_reapertura_o_abrir()

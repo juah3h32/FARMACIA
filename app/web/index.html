@@ -7317,11 +7317,83 @@ function updateCambio() {
   document.getElementById('cart-cambio').textContent=fmt(Math.max(0,pag-total));
 }
 
+function _showTurnoCerradoModal(cerradoHoy) {
+  document.getElementById('_modal-turno-cerrado-hoy')?.remove();
+  const hora = cerradoHoy.cerrado_en
+    ? new Date(cerradoHoy.cerrado_en).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })
+    : '—';
+
+  const overlay = document.createElement('div');
+  overlay.id = '_modal-turno-cerrado-hoy';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="height:4px;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div>
+      <div style="padding:28px 28px 0;text-align:center">
+        <div style="width:56px;height:56px;border-radius:18px;background:#FFFBEB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <i data-lucide="lock" style="width:26px;height:26px;color:#D97706"></i>
+        </div>
+        <p style="font-size:18px;font-weight:900;color:#0F172A;margin:0 0 8px">Turno cerrado</p>
+        <p style="font-size:13px;color:#64748B;margin:0 0 4px;line-height:1.5">
+          Tu turno de hoy ya se cerró a las <b style="color:#0F172A">${hora}</b>.
+        </p>
+        <p style="font-size:13px;color:#64748B;margin:0;line-height:1.5">
+          ¿Deseas reabrirlo para registrar esta venta?<br>Quedará dentro del mismo turno de hoy.
+        </p>
+      </div>
+      <div style="padding:20px 28px 28px;display:flex;flex-direction:column;gap:10px;margin-top:16px">
+        <button id="_btn-reabrir-turno"
+          style="width:100%;height:44px;border-radius:14px;background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px">
+          <i data-lucide="play" style="width:16px;height:16px"></i>
+          Reabrir turno y cobrar
+        </button>
+        <button id="_btn-cancelar-reabrir-turno"
+          style="width:100%;height:40px;border-radius:14px;background:#F1F5F9;color:#64748B;border:1px solid #E2E8F0;cursor:pointer;font-size:13px;font-weight:600">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  icons();
+
+  document.getElementById('_btn-reabrir-turno').onclick = async () => {
+    overlay.remove();
+    try {
+      const r = await api('/cortes/reabrir', { method:'POST' });
+      if (!r.ok) {
+        const e = await r.json().catch(()=>({}));
+        toast(e.detail || 'No se pudo reabrir el turno', 'error');
+        return;
+      }
+      toast('Turno reabierto — procesando venta...', 'success');
+      processSale();
+    } catch(e) {
+      toast('Error de conexión al reabrir el turno', 'error');
+    }
+  };
+  document.getElementById('_btn-cancelar-reabrir-turno').onclick = () => overlay.remove();
+}
+
 let _saleInProgress = false;
 async function processSale() {
   if (_saleInProgress) return;
   if (S.user?.rol === 'admin') { toast('El administrador no puede realizar ventas. Inicia sesión como cajero.','error'); return; }
   if (!S.cart.length) { toast('El carrito está vacío','warning'); return; }
+
+  // Turno de hoy ya cerrado (ej. cierre automático 21:00) → ofrecer reabrirlo
+  // para que esta venta quede dentro del MISMO turno, en vez de una venta
+  // huérfana o un corte aparte.
+  try {
+    const trRes = await api('/cortes/activo');
+    if (trRes.ok) {
+      const trData = await trRes.json();
+      if (!trData.abierto && trData.cerrado_hoy) {
+        _showTurnoCerradoModal(trData.cerrado_hoy);
+        return;
+      }
+    }
+  } catch(e) {}
+
   const metodo=document.getElementById('cart-metodo').value;
   const total=S.cart.reduce((s,i)=>s+i.precio_venta*i.cantidad*(i.aplica_iva?1.16:1),0);
 

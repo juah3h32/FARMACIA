@@ -508,7 +508,16 @@ class MainWindow(ctk.CTkToplevel):
         self._load_stats()
         if self.user.rol == RolUsuario.admin:
             self._load_live_corte()
-        self.after(30000, self._auto_refresh_tick)
+        self.after(10000, self._auto_refresh_tick)
+
+    def _refrescar_dashboard_ahora(self):
+        """Refresca stats + barra de turno en vivo de inmediato (llamado justo
+        al completar una venta) en vez de esperar al siguiente tick de 10s —
+        así el dashboard del admin refleja la venta al momento, no con retraso."""
+        self._stats_last_refresh = datetime.now().timestamp()
+        self._load_stats()
+        if self.user.rol == RolUsuario.admin:
+            self._load_live_corte()
 
     # ── Stats loader (runs in background thread) ──────────────────────────────
 
@@ -612,7 +621,8 @@ class MainWindow(ctk.CTkToplevel):
         p = self.content
         if key == "pos":
             from app.ui.pos_screen import PosScreen
-            return PosScreen(p, self.user, on_unknown_barcode=self._handle_global_scan)
+            return PosScreen(p, self.user, on_unknown_barcode=self._handle_global_scan,
+                              on_venta_completada=self._refrescar_dashboard_ahora)
         elif key == "inventory":
             from app.ui.inventory_screen import InventoryScreen
             return InventoryScreen(p, self.user)
@@ -1094,11 +1104,14 @@ class MainWindow(ctk.CTkToplevel):
         from app.database.models import CortesCaja
         db = get_db_session()
         try:
-            abierto = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).first()
+            abierto = db.query(CortesCaja).filter(
+                CortesCaja.cerrado_en == None,
+                CortesCaja.usuario_id == self.user.id,
+            ).first()
         finally:
             db.close()
         if abierto:
-            self._do_auto_close_cortes(notas="[Cierre al cerrar sesión]")
+            self._do_auto_close_cortes(usuario_id=self.user.id, notas="[Cierre al cerrar sesión]")
         logout()
         self.destroy()
         if self.on_logout:
@@ -1132,13 +1145,17 @@ class MainWindow(ctk.CTkToplevel):
             print(f"[AutoCierre] {e}")
         self.after(60000, self._check_auto_close_tick)
 
-    def _do_auto_close_cortes(self, before_dt=None, monto_cierre=None, notas="[Cierre automático]"):
-        """Close all open cortes (optionally only those opened before before_dt)."""
+    def _do_auto_close_cortes(self, before_dt=None, monto_cierre=None, notas="[Cierre automático]", usuario_id=None):
+        """Close open cortes (optionally only those opened before before_dt, and/or only
+        the given usuario_id's turno — usado por logout/cerrar-app para no tocar el
+        turno de OTRO cajero que siga trabajando en otra sesión el mismo día)."""
         from app.database.connection import get_db_session
         from app.database.models import CortesCaja, Venta, EstadoVenta, MetodoPago, ItemVenta, Producto
         db = get_db_session()
         try:
             q = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None)
+            if usuario_id is not None:
+                q = q.filter(CortesCaja.usuario_id == usuario_id)
             cortes = q.all()
             for c in cortes:
                 if before_dt and c.abierto_en and c.abierto_en > before_dt:
@@ -1203,7 +1220,10 @@ class MainWindow(ctk.CTkToplevel):
         from app.database.models import CortesCaja
         db = get_db_session()
         try:
-            abierto = db.query(CortesCaja).filter(CortesCaja.cerrado_en == None).first()
+            abierto = db.query(CortesCaja).filter(
+                CortesCaja.cerrado_en == None,
+                CortesCaja.usuario_id == self.user.id,
+            ).first()
         finally:
             db.close()
 
@@ -1237,7 +1257,7 @@ class MainWindow(ctk.CTkToplevel):
 
         def _cerrar_y_salir():
             dlg.destroy()
-            self._do_auto_close_cortes(notas="[Cierre al salir]")
+            self._do_auto_close_cortes(usuario_id=self.user.id, notas="[Cierre al salir]")
             self.after(300, self._exit_app)
 
         def _salir_sin_cerrar():
