@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFi
 from pydantic import BaseModel
 from typing import Optional
 import os, tempfile
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from app.database.connection import get_db_session
-from app.database.models import Usuario, RolUsuario
+from app.database.models import Usuario, RolUsuario, Venta
 from app.api.routes.auth_routes import get_current_api_user
 from app.auth.auth_service import hash_password
 
@@ -33,6 +34,12 @@ def listar_empleados(incluir_inactivos: bool = False, payload: dict = Depends(ge
         q = db.query(Usuario)
         if not incluir_inactivos:
             q = q.filter(Usuario.activo == True)
+        else:
+            # Un inactivo solo debe aparecer aqui si tiene ventas registradas
+            # (para poder localizarlas/borrarlas) — cuentas de prueba dadas de
+            # baja sin ninguna venta eran puro ruido en el selector.
+            tiene_ventas = db.query(Venta.id).filter(Venta.usuario_id == Usuario.id).exists()
+            q = q.filter(or_(Usuario.activo == True, tiene_ventas))
         rows = q.order_by(Usuario.nombre).all()
         return [
             {"id": u.id, "username": u.username, "nombre": u.nombre,
