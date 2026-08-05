@@ -3045,14 +3045,6 @@
             <p id="caja-stat-inversion-periodo" class="text-xs font-semibold" style="color:#1E40AF">—</p>
           </div>
 
-          <!-- Ventas período — al lado de "Retiros período" a propósito, para
-               comparar de un vistazo sin confundirlas: son cifras independientes. -->
-          <div class="bg-white rounded-2xl px-4 py-3 border flex-shrink-0" style="border-color:#E2E8F0;min-width:150px" title="Total de ventas (facturado) en el rango de fechas seleccionado — cifra independiente de los retiros">
-            <p class="text-xs font-semibold" style="color:#64748B">Ventas período</p>
-            <p id="caja-stat-ventas-periodo" class="text-xl font-black mt-0.5" style="color:#16A34A">—</p>
-            <p id="caja-stat-ventas-periodo-n" class="text-xs" style="color:#94A3B8">— ventas</p>
-          </div>
-
         </div>
 
         <!-- Main 2-col layout — fills remaining height -->
@@ -9952,18 +9944,6 @@ async function loadCajaAdmin() {
       } else {
         periodoEl.textContent = 'Según filtro';
         periodoEl.style.color = '#94A3B8';
-      }
-    }
-    const ventasPeriodoEl = document.getElementById('caja-stat-ventas-periodo');
-    const ventasPeriodoNEl = document.getElementById('caja-stat-ventas-periodo-n');
-    if (ventasPeriodoEl && ventasPeriodoNEl) {
-      if (g.periodo) {
-        ventasPeriodoEl.textContent = money(g.periodo.total_ventas ?? 0);
-        const n = g.periodo.num_ventas ?? 0;
-        ventasPeriodoNEl.textContent = `${n} venta${n !== 1 ? 's' : ''}`;
-      } else {
-        ventasPeriodoEl.textContent = '—';
-        ventasPeriodoNEl.textContent = 'Según filtro';
       }
     }
 
