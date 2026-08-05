@@ -93,12 +93,17 @@ async def _scheduler_cierre_automatico():
     if stale:
         _logger.info(f"Startup: closed {stale} stale shift(s) from previous days")
 
-    # If server starts after 21:00 today, mark today's EOD as done so we don't re-close
+    # If server starts after 21:00 today, mark today's EOD as done so the
+    # exact-minute tick below doesn't also try to fire it — pero NO forzamos
+    # el cierre aquí: si el cajero venía trabajando y el programa se cerró
+    # (crash) justo después de las 9pm, al reabrir perdía su turno abierto
+    # de golpe sin aviso. El turno de hoy que sigue abierto se queda así
+    # hasta que de verdad sea "ayer" (lo cierra _run_cierre_cortes_viejos en
+    # el siguiente arranque, con fecha/hora 21:00 correcta) o hasta que el
+    # proceso siga corriendo y alcance el tick de las 21:00 en vivo.
     _now = datetime.now()
     if _now.hour >= 21:
         _eod_done_on.add(_now.date())
-        # But still close any open shifts right now
-        _run_cierre_todos_hoy("Cierre automático — servidor iniciado después de 21:00")
 
     while True:
         await asyncio.sleep(60)
