@@ -725,6 +725,8 @@ function CookieBanner() {
     marketing:   false,
   });
   const mounted = useRef(false);
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 640;
 
   useEffect(() => {
     mounted.current = true;
@@ -794,7 +796,7 @@ function CookieBanner() {
     <>
       {/* ── Banner principal ────────────────────────────────────────────── */}
       <View style={ckStyles.banner} pointerEvents="box-none">
-        <View style={ckStyles.bannerInner}>
+        <View style={[ckStyles.bannerInner, isNarrow && ckStyles.bannerInnerNarrow]}>
           <View style={ckStyles.bannerLeft}>
             <View style={ckStyles.cookieIcon}>
               <Text style={{ fontSize: 22 }}>🍪</Text>
@@ -806,7 +808,7 @@ function CookieBanner() {
               </Text>
             </View>
           </View>
-          <View style={ckStyles.bannerBtns}>
+          <View style={[ckStyles.bannerBtns, isNarrow && ckStyles.bannerBtnsNarrow]}>
             <TouchableOpacity style={ckStyles.configBtn} onPress={() => setDetailOpen(true)}>
               <Text style={ckStyles.configBtnText}>Configurar</Text>
             </TouchableOpacity>
@@ -919,6 +921,10 @@ const ckStyles = StyleSheet.create({
     alignItems: Platform.OS === "web" ? "center" : "stretch",
     gap: 14,
   },
+  bannerInnerNarrow: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
   bannerLeft: { flex: 1, flexDirection: "row", alignItems: "flex-start", gap: 12 },
   cookieIcon: {
     width: 42, height: 42, borderRadius: 12,
@@ -932,6 +938,9 @@ const ckStyles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
+  },
+  bannerBtnsNarrow: {
+    justifyContent: "flex-end",
   },
   configBtn: {
     paddingHorizontal: 14, paddingVertical: 9,
