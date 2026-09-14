@@ -246,6 +246,7 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         for idx, item in enumerate(body.items):
             precio    = precios_validos[idx]
             descuento = descuentos_validos[idx]
+            prod = products[item.producto_id]
             db.add(ItemVenta(
                 venta_id=venta.id,
                 producto_id=item.producto_id,
@@ -253,8 +254,11 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 precio_unitario=precio,
                 descuento=descuento,
                 subtotal=(precio * item.cantidad) - descuento,
+                # Congelado al momento de vender — Control de Caja debe usar
+                # SIEMPRE este valor, nunca Producto.precio_compra en vivo
+                # (ver costo_unitario en models.py).
+                costo_unitario=prod.precio_compra or 0.0,
             ))
-            prod = products[item.producto_id]
             stock_ant = prod.stock
             import math as _math
 

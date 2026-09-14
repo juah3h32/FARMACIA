@@ -6,7 +6,7 @@ from sqlalchemy import func
 from app.database.connection import get_db_session
 from app.database.models import (
     CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago,
-    ItemVenta, Producto, MovimientoStock, TipoMovimiento,
+    ItemVenta, MovimientoStock, TipoMovimiento, FacturaCompra,
 )
 from app.api.routes.auth_routes import get_current_api_user
 
@@ -71,8 +71,8 @@ def _calc_disponibles(db):
     iva_total = iva_total or 0.0
 
     total_costo = db.query(
-        func.sum(ItemVenta.cantidad * func.coalesce(Producto.precio_compra, 0.0))
-    ).join(Producto, ItemVenta.producto_id == Producto.id).join(
+        func.sum(ItemVenta.cantidad * func.coalesce(ItemVenta.costo_unitario, 0.0))
+    ).join(
         Venta, ItemVenta.venta_id == Venta.id
     ).filter(
         Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True)
@@ -156,16 +156,18 @@ def _sumar_totales_ventas(ventas: list) -> tuple[float, float, float, float]:
 
 
 def _costo_ventas(db, venta_ids: list) -> float:
-    """Costo de mercancía vendida (join ItemVenta → Producto.precio_compra)."""
+    """Costo de mercancía vendida — usa el costo CONGELADO en cada
+    items_venta.costo_unitario (fijado al vender), nunca Producto.precio_compra
+    en vivo: si no, editar el costo de un producto corre la ganancia/inversión
+    de ventas ya cerradas."""
     if not venta_ids:
         return 0.0
     cost_rows = (
-        db.query(ItemVenta.cantidad, Producto.precio_compra)
-        .join(Producto, ItemVenta.producto_id == Producto.id)
+        db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
         .filter(ItemVenta.venta_id.in_(venta_ids))
         .all()
     )
-    return sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+    return sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
 
 
 def _calcular_totales_corte(db, c: CortesCaja, hasta: datetime):
@@ -604,11 +606,15 @@ def listar_retiros(
     corte_id: Optional[int] = None,
     fecha_inicio: Optional[str] = None,
     fecha_fin: Optional[str] = None,
+    tipo: Optional[str] = None,   # 'personal' | 'inversion' — auditoría por tipo
     payload: dict = Depends(get_current_api_user),
 ):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    limite = min(max(1, limite), 500)
+    # Tope alto (no 500) — el admin necesita poder auditar TODO el historial de
+    # retiros de todas las cajas/PCs contra el efectivo físico, sin que un
+    # límite bajo le recorte silenciosamente resultados de rangos de fecha viejos.
+    limite = min(max(1, limite), 5000)
     db = get_db_session()
     try:
         q = db.query(RetiroCaja)
@@ -618,6 +624,8 @@ def listar_retiros(
             q = q.filter(RetiroCaja.creado_en >= datetime.fromisoformat(fecha_inicio))
         if fecha_fin:
             q = q.filter(RetiroCaja.creado_en <= datetime.fromisoformat(fecha_fin + "T23:59:59"))
+        if tipo in ("personal", "inversion"):
+            q = q.filter(RetiroCaja.tipo == tipo)
         retiros = q.order_by(RetiroCaja.creado_en.desc()).limit(limite).all()
         return [
             {
@@ -636,7 +644,8 @@ def listar_retiros(
 
 
 class EditarRetiroIn(BaseModel):
-    tipo: str   # 'personal' | 'inversion'
+    tipo: Optional[str] = None       # 'personal' | 'inversion'
+    concepto: Optional[str] = None   # texto libre — para corregir un retiro al que se le olvidó anotar el motivo
 
 
 @router.delete("/retiro/{retiro_id}")
@@ -682,30 +691,41 @@ def eliminar_retiro(retiro_id: int, bg: BackgroundTasks, payload: dict = Depends
 
 @router.patch("/retiro/{retiro_id}")
 def editar_retiro(retiro_id: int, body: EditarRetiroIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Edita tipo y/o concepto de un retiro ya registrado — el concepto es la
+    ÚNICA forma de saber después para qué fue esa salida de dinero (ganancia
+    real vs. capital de inversión), así que debe poder corregirse si se le
+    olvidó anotar al momento."""
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    if body.tipo not in ("personal", "inversion"):
+    if body.tipo is not None and body.tipo not in ("personal", "inversion"):
         raise HTTPException(status_code=400, detail="tipo debe ser 'personal' o 'inversion'")
+    if body.tipo is None and body.concepto is None:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
     db = get_db_session()
     try:
         r = db.query(RetiroCaja).filter(RetiroCaja.id == retiro_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="Retiro no encontrado")
         tipo_anterior = r.tipo
-        r.tipo = body.tipo
+        concepto_anterior = r.concepto
+        if body.tipo is not None:
+            r.tipo = body.tipo
+        if body.concepto is not None:
+            r.concepto = body.concepto.strip() or None
         db.commit()
 
         from app.auth.auth_service import _registrar_auditoria
         _registrar_auditoria(
-            int(payload["sub"]), "RETIRO_CAJA_TIPO_CAMBIADO", "retiros_caja", retiro_id,
-            f"Monto:${r.monto:.2f} Tipo:{tipo_anterior}->{body.tipo} Concepto:{r.concepto or ''}"
+            int(payload["sub"]), "RETIRO_CAJA_EDITADO", "retiros_caja", retiro_id,
+            f"Monto:${r.monto:.2f} Tipo:{tipo_anterior}->{r.tipo} "
+            f"Concepto:'{concepto_anterior or ''}'->'{r.concepto or ''}'"
         )
 
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso
             bg.add_task(sync_to_turso)
-        return {"ok": True, "id": r.id, "tipo": r.tipo}
+        return {"ok": True, "id": r.id, "tipo": r.tipo, "concepto": r.concepto or ""}
     except HTTPException:
         raise
     except Exception as e:
@@ -742,21 +762,22 @@ def resumen_ganancia(
         iva_total = sum(v.iva or 0.0 for v in ventas)
 
         venta_ids = [v.id for v in ventas]
-        if venta_ids:
-            cost_rows = (
-                db.query(ItemVenta.cantidad, Producto.precio_compra)
-                .join(Producto, ItemVenta.producto_id == Producto.id)
-                .filter(ItemVenta.venta_id.in_(venta_ids))
-                .all()
-            )
-            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
-        else:
-            total_costo = 0.0
+        total_costo = _costo_ventas(db, venta_ids)
 
         all_retiros = db.query(RetiroCaja).all()
         retiros_personales = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "personal")
         retiros_inversion  = sum(r.monto for r in all_retiros if (r.tipo or "personal") == "inversion")
         total_retiros      = retiros_personales + retiros_inversion
+
+        # Facturas de proveedores — solo INFORMATIVO/reconciliación, NUNCA se resta
+        # automáticamente de capital_inversion_disponible: una factura registrada
+        # aquí puede estar pagada en efectivo de caja, por transferencia o a
+        # crédito a 30 días, y no hay forma de saber cuál sin que el usuario lo
+        # registre explícito. La única salida que SÍ mueve el saldo real de caja
+        # es un RetiroCaja(tipo='inversion') — así sabes exactamente cuánto
+        # efectivo salió del cajón para pagarle a un proveedor.
+        all_facturas = db.query(FacturaCompra).all()
+        total_facturas_proveedores = sum(f.total or 0.0 for f in all_facturas)
 
         # Subtract all-time partial returns
         dev_movs = db.query(MovimientoStock).filter(
@@ -794,6 +815,8 @@ def resumen_ganancia(
             "ganancia_disponible": round(ganancia_disponible, 2),
             "capital_inversion":             round(capital_inversion, 2),
             "capital_inversion_disponible":  round(capital_inversion_disponible, 2),
+            # Informativo — ver comentario arriba de total_facturas_proveedores.
+            "total_facturas_proveedores":    round(total_facturas_proveedores, 2),
         }
 
         if desde or hasta:
@@ -808,16 +831,7 @@ def resumen_ganancia(
             tv_p  = sum(v.total for v in ventas_p)
             iva_p = sum(v.iva or 0.0 for v in ventas_p)
             vids_p = [v.id for v in ventas_p]
-            if vids_p:
-                cost_rows_p = (
-                    db.query(ItemVenta.cantidad, Producto.precio_compra)
-                    .join(Producto, ItemVenta.producto_id == Producto.id)
-                    .filter(ItemVenta.venta_id.in_(vids_p))
-                    .all()
-                )
-                total_costo_p = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows_p)
-            else:
-                total_costo_p = 0.0
+            total_costo_p = _costo_ventas(db, vids_p)
 
             dev_movs_p = [m for m in dev_movs if m.creado_en and d_ini <= m.creado_en <= d_fin]
             total_dev_p = 0.0
@@ -831,6 +845,11 @@ def resumen_ganancia(
             retiros_p = [r for r in all_retiros if r.creado_en and d_ini <= r.creado_en <= d_fin]
             ret_personal_p  = sum(r.monto for r in retiros_p if (r.tipo or "personal") == "personal")
             ret_inversion_p = sum(r.monto for r in retiros_p if (r.tipo or "personal") == "inversion")
+
+            d_ini_date = d_ini.date()
+            d_fin_date = d_fin.date()
+            facturas_p = [f for f in all_facturas if f.fecha_factura and d_ini_date <= f.fecha_factura <= d_fin_date]
+            total_facturas_p = sum(f.total or 0.0 for f in facturas_p)
 
             ventas_netas_p = tv_p - total_dev_p
             ganancia_p = (ventas_netas_p - iva_p) - total_costo_p
@@ -850,6 +869,8 @@ def resumen_ganancia(
                 # el período — NO es un saldo acumulado, solo sirve para comparar
                 # contra un cálculo manual de ese mismo rango de fechas.
                 "capital_inversion":   round(total_costo_p - ret_inversion_p, 2),
+                # Informativo — ver comentario junto a total_facturas_proveedores arriba.
+                "total_facturas_proveedores": round(total_facturas_p, 2),
             }
 
         return result

@@ -790,12 +790,11 @@ class SettingsScreen(ctk.CTkFrame):
                 venta_ids = [v.id for v in ventas]
                 if venta_ids:
                     cost_rows = (
-                        db.query(ItemVenta.cantidad, Producto.precio_compra)
-                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                         .filter(ItemVenta.venta_id.in_(venta_ids))
                         .all()
                     )
-                    total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                    total_costo = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
                 else:
                     total_costo = 0.0
                 c.cerrado_en          = ahora
@@ -857,12 +856,11 @@ class SettingsScreen(ctk.CTkFrame):
                 venta_ids = [v.id for v in ventas]
                 if venta_ids:
                     cost_rows = (
-                        db.query(ItemVenta.cantidad, Producto.precio_compra)
-                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                         .filter(ItemVenta.venta_id.in_(venta_ids))
                         .all()
                     )
-                    total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                    total_costo = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
                 else:
                     total_costo = 0.0
                 c.total_ventas        = tv

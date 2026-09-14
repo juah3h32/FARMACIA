@@ -207,6 +207,12 @@ class ItemVenta(Base):
     precio_unitario = Column(Float, nullable=False)
     descuento = Column(Float, default=0.0)
     subtotal = Column(Float, nullable=False)
+    # Costo de compra del producto AL MOMENTO de esta venta — se congela aquí
+    # porque Producto.precio_compra cambia con el tiempo (nuevas compras,
+    # correcciones de inventario). Sin esto, la ganancia/inversión de ventas
+    # ya cerradas se recalculaba con el costo ACTUAL cada vez que alguien
+    # editaba el costo de un producto, corriendo el Control de Caja histórico.
+    costo_unitario = Column(Float, default=0.0)
 
     venta = relationship("Venta", back_populates="items")
     producto = relationship("Producto", back_populates="items_venta")

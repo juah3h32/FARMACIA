@@ -147,6 +147,7 @@ def _migrate():
         ("cfdi_facturas_individuales", "sandbox", "BOOLEAN DEFAULT 0"),
         ("productos", "precio_tachado", "REAL"),
         ("productos", "destacado",      "BOOLEAN DEFAULT 0"),
+        ("items_venta", "costo_unitario", "REAL DEFAULT 0.0"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
@@ -316,6 +317,7 @@ def init_db():
     _actualizar_info_farmacia_v2()
     _recalcular_cortes_v1()
     _recalcular_cortes_v2()
+    _backfill_costo_unitario_v1()
 
 
 def _actualizar_info_farmacia_v2():
@@ -546,3 +548,74 @@ def _recalcular_cortes_v2():
             c.monto_cierre = (c.monto_apertura or 0.0) + (c.total_efectivo or 0.0)
         db.add(Configuracion(clave="recalculo_cortes_v2", valor="1"))
         print(f"[Migration] recalculo_cortes_v2: normalizados {len(closed)} monto_cierre")
+
+
+def _backfill_costo_unitario_v1():
+    """
+    One-time: congela en cada items_venta el costo de compra del producto en
+    ese momento (columna nueva costo_unitario). Antes, la ganancia y el
+    capital invertido del Control de Caja se calculaban en cada consulta
+    haciendo JOIN contra Producto.precio_compra ACTUAL — así que editar el
+    costo de un producto (o hacer un ajuste de inventario que lo cambiara)
+    recalculaba silenciosamente las ventas de meses atrás, corriendo cortes
+    ya cerrados. De aquí en adelante costo_unitario se fija al vender
+    (ver pos_routes.py) y ya no se vuelve a tocar.
+
+    Para ventas históricas no hay costo real guardado, así que se usa el
+    precio_compra actual del producto como mejor aproximación disponible —
+    es exactamente el mismo número que el Control de Caja ya mostraba para
+    esas ventas, solo que ahora queda congelado en vez de recalcularse.
+    """
+    with get_db() as db:
+        if db.query(Configuracion).filter(Configuracion.clave == "backfill_costo_unitario_v1").first():
+            return
+        from app.database.models import ItemVenta, Producto as _Prod, CortesCaja, Venta, EstadoVenta
+
+        rows = (
+            db.query(ItemVenta, _Prod.precio_compra)
+            .join(_Prod, ItemVenta.producto_id == _Prod.id)
+            .filter(ItemVenta.costo_unitario.is_(None) | (ItemVenta.costo_unitario == 0.0))
+            .all()
+        )
+        for item, precio_compra in rows:
+            item.costo_unitario = precio_compra or 0.0
+        db.flush()
+
+        # CortesCaja.total_costo es una columna GUARDADA — se fijó en el pasado
+        # con el precio_compra de ESE momento (ver _calcular_totales_corte).
+        # Si el costo de un producto cambió de ahí a hoy (el bug que estamos
+        # arreglando, o una corrección legítima de precio), ese total_costo
+        # guardado quedó desfasado del que ahora calcula /cortes/ganancia en
+        # vivo con costo_unitario ya congelado. Se recalcula aquí una sola vez
+        # para que el detalle de cada corte histórico cuadre con el resumen
+        # general desde el momento de actualizar — de aquí en adelante ambos
+        # usan el mismo costo_unitario congelado, así que no vuelven a divergir.
+        cortes_actualizados = 0
+        cortes = db.query(CortesCaja).filter(CortesCaja.abierto_en.isnot(None)).all()
+        for c in cortes:
+            hasta = c.cerrado_en or datetime.now()
+            venta_ids = [
+                v.id for v in db.query(Venta.id).filter(
+                    Venta.usuario_id == c.usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= hasta,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+            ]
+            if not venta_ids:
+                nuevo_costo = 0.0
+            else:
+                cost_rows = (
+                    db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
+                    .filter(ItemVenta.venta_id.in_(venta_ids))
+                    .all()
+                )
+                nuevo_costo = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
+            if c.total_costo is None or abs((c.total_costo or 0.0) - nuevo_costo) > 0.005:
+                c.total_costo = nuevo_costo
+                cortes_actualizados += 1
+
+        db.add(Configuracion(clave="backfill_costo_unitario_v1", valor="1"))
+        print(f"[Migration] backfill_costo_unitario_v1: {len(rows)} items_venta congelados, "
+              f"{cortes_actualizados} cortes con total_costo recalculado")

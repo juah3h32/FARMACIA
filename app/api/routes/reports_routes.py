@@ -55,16 +55,16 @@ def resumen(
         mejor_dia   = max(por_dia, key=por_dia.get) if por_dia else None
         mejor_monto = por_dia[mejor_dia] if mejor_dia else 0.0
 
-        # Cost of goods sold for period
+        # Cost of goods sold for period — costo CONGELADO al vender
+        # (ItemVenta.costo_unitario), nunca Producto.precio_compra en vivo.
         venta_ids = [v.id for v in ventas]
         if venta_ids:
             cost_rows = (
-                db.query(ItemVenta.cantidad, Producto.precio_compra)
-                .join(Producto, ItemVenta.producto_id == Producto.id)
+                db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                 .filter(ItemVenta.venta_id.in_(venta_ids))
                 .all()
             )
-            total_costo = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            total_costo = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
         else:
             total_costo = 0.0
         # Partial devoluciones in period (full returns excluded via estado=devolucion filter)
@@ -1388,12 +1388,11 @@ def rentabilidad_cajero(
             iva_v = sum(v.iva or 0.0 for v in ventas)
             vids = [v.id for v in ventas]
             cost_rows = (
-                db.query(ItemVenta.cantidad, Producto.precio_compra)
-                .join(Producto, ItemVenta.producto_id == Producto.id)
+                db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                 .filter(ItemVenta.venta_id.in_(vids))
                 .all()
             )
-            total_c = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+            total_c = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
 
             # Devoluciones parciales de este cajero en el período (mismo cálculo
             # que /resumen — si no, la ganancia por cajero no coincide con la general)

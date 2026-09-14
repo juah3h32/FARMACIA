@@ -3028,6 +3028,7 @@
                 <span id="caja-stat-costo-rec" style="color:#1d2140;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
               </p>
               <p id="caja-stat-inversion-warn" class="text-xs font-semibold mt-0.5 hidden" style="color:#DC2626"></p>
+              <p id="caja-stat-facturas-proveedor" class="text-xs mt-0.5" style="color:#64748B" title="Total de facturas de proveedor registradas (Facturas de Compra) — solo informativo, para comparar contra lo que ya retiraste como 'inversión'. NO se resta sola de tu saldo: una factura puede estar pagada en efectivo, transferencia o a crédito, así que la única forma de que un pago a proveedor reduzca tu capital disponible es registrarlo como un retiro tipo Inversión.">—</p>
             </div>
           </div>
 
@@ -3131,9 +3132,10 @@
                 <i data-lucide="x" style="width:12px;height:12px"></i>
               </button>
               <div class="flex items-center gap-2 ml-auto">
-                <input id="caja-desde" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151" oninput="loadCajaAdmin()">
+                <input id="caja-desde" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151" oninput="_cajaVerTodoRetiros=false;loadCajaAdmin()">
                 <span class="text-xs" style="color:#94A3B8">–</span>
-                <input id="caja-hasta" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151" oninput="loadCajaAdmin()">
+                <input id="caja-hasta" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;color:#374151" oninput="_cajaVerTodoRetiros=false;loadCajaAdmin()">
+                <button onclick="verTodoElHistorialRetiros()" title="Quita el filtro de fecha y trae TODOS los retiros registrados, de todas las cajas/PCs" class="h-8 px-3 rounded-lg text-xs font-semibold border" style="border-color:#E2E8F0;background:#fff;color:#374151;cursor:pointer">Ver todo</button>
                 <input id="caja-retiros-buscar" type="text" placeholder="Buscar..." class="h-8 px-3 rounded-lg text-xs border" style="border-color:#E2E8F0;background:#F8FAFF;width:120px" oninput="renderRetirosCaja()">
               </div>
             </div>
@@ -9958,24 +9960,48 @@ async function forzarSyncCaja() {
   }
 }
 
-async function loadCajaAdmin() {
-  // Default date range: last 90 days (wide enough to catch retiros from other PCs)
+let _cajaVerTodoRetiros = false;  // true = el usuario pidió ver TODO el historial, sin límite de fecha
+
+function verTodoElHistorialRetiros() {
+  _cajaVerTodoRetiros = true;
   const desdeEl = document.getElementById('caja-desde');
   const hastaEl = document.getElementById('caja-hasta');
-  if (desdeEl && !desdeEl.value) {
-    const d = new Date(); d.setDate(d.getDate() - 90);
-    desdeEl.value = d.toISOString().slice(0, 10);
-  }
-  if (hastaEl && !hastaEl.value) {
-    hastaEl.value = new Date().toISOString().slice(0, 10);
+  if (desdeEl) desdeEl.value = '';
+  if (hastaEl) hastaEl.value = '';
+  loadCajaAdmin();
+}
+
+async function loadCajaAdmin() {
+  // Default date range: last 90 days (wide enough to catch retiros from otras PCs)
+  // — salvo que el usuario haya pedido explícitamente "ver todo el historial".
+  const desdeEl = document.getElementById('caja-desde');
+  const hastaEl = document.getElementById('caja-hasta');
+  if (!_cajaVerTodoRetiros) {
+    if (desdeEl && !desdeEl.value) {
+      const d = new Date(); d.setDate(d.getDate() - 90);
+      desdeEl.value = d.toISOString().slice(0, 10);
+    }
+    if (hastaEl && !hastaEl.value) {
+      hastaEl.value = new Date().toISOString().slice(0, 10);
+    }
   }
 
   const _gananciaQS = new URLSearchParams();
   if (desdeEl?.value) _gananciaQS.set('desde', desdeEl.value);
   if (hastaEl?.value) _gananciaQS.set('hasta', hastaEl.value);
 
+  // Los retiros usan el MISMO rango de fecha que la ganancia — antes solo se
+  // pedían los 500 más recientes (tope del servidor) y se filtraba por fecha
+  // solo en el navegador, así que un rango viejo (auditoría de "todo el
+  // tiempo") podía quedarse sin datos aunque sí existieran en la base. Ahora
+  // el filtro de fecha se manda al servidor para que traiga TODO lo que cae
+  // en el rango, no solo lo más reciente.
+  const _retirosQS = new URLSearchParams({ limite: '5000' });
+  if (desdeEl?.value) _retirosQS.set('fecha_inicio', desdeEl.value);
+  if (hastaEl?.value) _retirosQS.set('fecha_fin', hastaEl.value);
+
   const [retRes, turnoRes, ganRes] = await Promise.all([
-    api('/cortes/retiros?limite=1000'),
+    api('/cortes/retiros?' + _retirosQS.toString()),
     api('/cortes/activo'),
     api('/cortes/ganancia?' + _gananciaQS.toString()),
   ]);
@@ -10005,6 +10031,10 @@ async function loadCajaAdmin() {
       } else {
         warnEl.classList.add('hidden');
       }
+    }
+    const facturasEl = document.getElementById('caja-stat-facturas-proveedor');
+    if (facturasEl) {
+      facturasEl.textContent = `Facturas de proveedor registradas: ${money(g.total_facturas_proveedores ?? 0)} (informativo)`;
     }
 
     const periodoEl = document.getElementById('caja-stat-inversion-periodo');
@@ -10144,7 +10174,13 @@ function renderRetirosCaja() {
   tbody.innerHTML = lista.map(r => `
     <tr class="border-b hovrow" style="border-color:#F8FAFF">
       <td class="px-4 py-2.5" style="color:#374151;white-space:nowrap">${fmtDT(r.creado_en)}</td>
-      <td class="px-4 py-2.5" style="color:#0F172A">${r.concepto || '<span style="color:#94A3B8">Sin concepto</span>'}</td>
+      <td class="px-4 py-2.5" style="color:#0F172A">
+        ${r.concepto || '<span style="color:#94A3B8">Sin concepto</span>'}
+        <button onclick="editarConceptoRetiro(${r.id},'${(r.concepto||'').replace(/'/g,'\\\'')}')"
+          title="Editar concepto" style="background:none;border:none;cursor:pointer;color:#94A3B8;vertical-align:middle;padding:0 2px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        </button>
+      </td>
       <td class="px-4 py-2.5" style="color:#64748B">${r.usuario || '—'}</td>
       <td class="px-4 py-2.5 text-right font-bold" style="color:#DC2626">$${(r.monto||0).toFixed(2)}</td>
       <td class="px-4 py-2.5 text-center">${tipoBtn(r)}</td>
@@ -10182,6 +10218,23 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
   if (!res.ok) { toast('Error al cambiar tipo','error'); return; }
   const label = nuevoTipo === 'inversion' ? 'Inversión' : 'Personal';
   toast(`Retiro cambiado a ${label}`,'success');
+  loadCajaAdmin();
+}
+
+async function editarConceptoRetiro(id, conceptoActual) {
+  const nuevo = prompt('Concepto del retiro (para qué fue este dinero):', conceptoActual || '');
+  if (nuevo === null) return;              // canceló
+  if (nuevo.trim() === (conceptoActual || '').trim()) return;  // sin cambios
+  const res = await api(`/cortes/retiro/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ concepto: nuevo.trim() }),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    toast(e.detail || 'Error al editar concepto','error');
+    return;
+  }
+  toast('Concepto actualizado','success');
   loadCajaAdmin();
 }
 

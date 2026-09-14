@@ -466,12 +466,11 @@ class ReportsScreen(ctk.CTkFrame):
                 vids = [v.id for v in vq]
                 if vids:
                     cost_rows = (
-                        db.query(ItemVenta.cantidad, Producto.precio_compra)
-                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                         .filter(ItemVenta.venta_id.in_(vids))
                         .all()
                     )
-                    tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                    tc = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
                 else:
                     tc = 0.0
                 c.cerrado_en          = ahora
@@ -645,12 +644,11 @@ class ReportsScreen(ctk.CTkFrame):
                 vids = [v.id for v in ventas_obj]
                 if vids:
                     cost_rows = (
-                        _db.query(ItemVenta.cantidad, Producto.precio_compra)
-                        .join(Producto, ItemVenta.producto_id == Producto.id)
+                        _db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                         .filter(ItemVenta.venta_id.in_(vids))
                         .all()
                     )
-                    tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in cost_rows)
+                    tc = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
                 else:
                     tc = 0.0
 
@@ -890,12 +888,11 @@ class ReportsScreen(ctk.CTkFrame):
                     _vids = [v.id for v in _vq]
                     if _vids:
                         _cost = (
-                            _db.query(ItemVenta.cantidad, Producto.precio_compra)
-                            .join(Producto, ItemVenta.producto_id == Producto.id)
+                            _db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
                             .filter(ItemVenta.venta_id.in_(_vids))
                             .all()
                         )
-                        _tc = sum(r.cantidad * (r.precio_compra or 0.0) for r in _cost)
+                        _tc = sum(r.cantidad * (r.costo_unitario or 0.0) for r in _cost)
                     else:
                         _tc = 0.0
                     _c.cerrado_en          = ahora
