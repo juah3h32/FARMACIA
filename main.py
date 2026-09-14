@@ -305,9 +305,15 @@ def main():
 
     def _boot():
         try:
+            # Instalar WebView2 en SEGUNDO PLANO, sin bloquear el arranque — la
+            # descarga/instalación puede tardar hasta ~2 min o quedar esperando
+            # un permiso de Windows (UAC) que en equipos viejos no siempre se ve
+            # a primera vista, y eso dejaba el programa entero atorado en el
+            # splash sin abrir nunca. Si no alcanza a quedar lista para esta
+            # sesión, pywebview simplemente usa el motor viejo (igual que antes
+            # de este parche) y ya quedará instalada para el siguiente arranque.
             if not _webview2_installed():
-                splash.set_status("Preparando componente de Windows (primera vez)...")
-                _install_webview2()
+                threading.Thread(target=_install_webview2, daemon=True, name="WebView2Install").start()
 
             splash.set_status("Preparando base de datos y usuarios...")
             init_db()
