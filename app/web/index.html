@@ -10176,7 +10176,7 @@ function renderRetirosCaja() {
       <td class="px-4 py-2.5" style="color:#374151;white-space:nowrap">${fmtDT(r.creado_en)}</td>
       <td class="px-4 py-2.5" style="color:#0F172A">
         ${r.concepto || '<span style="color:#94A3B8">Sin concepto</span>'}
-        <button onclick="editarConceptoRetiro(${r.id},'${(r.concepto||'').replace(/'/g,'\\\'')}')"
+        <button onclick="editarConceptoRetiro(${r.id})"
           title="Editar concepto" style="background:none;border:none;cursor:pointer;color:#94A3B8;vertical-align:middle;padding:0 2px">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
         </button>
@@ -10221,21 +10221,84 @@ async function cambiarTipoRetiro(id, nuevoTipo) {
   loadCajaAdmin();
 }
 
-async function editarConceptoRetiro(id, conceptoActual) {
-  const nuevo = prompt('Concepto del retiro (para qué fue este dinero):', conceptoActual || '');
-  if (nuevo === null) return;              // canceló
-  if (nuevo.trim() === (conceptoActual || '').trim()) return;  // sin cambios
-  const res = await api(`/cortes/retiro/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ concepto: nuevo.trim() }),
-  });
-  if (!res.ok) {
-    const e = await res.json().catch(()=>({}));
-    toast(e.detail || 'Error al editar concepto','error');
-    return;
-  }
-  toast('Concepto actualizado','success');
-  loadCajaAdmin();
+function editarConceptoRetiro(id) {
+  const r = _cajaRetiros.find(x => x.id === id);
+  if (!r) return;
+  const conceptoActual = r.concepto || '';
+
+  document.getElementById('_modal-editar-concepto')?.remove();
+
+  const fmt$ = n => '$' + parseFloat(n||0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const fecha = r.creado_en ? new Date(r.creado_en).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}) : '—';
+
+  const overlay = document.createElement('div');
+  overlay.id = '_modal-editar-concepto';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="height:4px;background:linear-gradient(90deg,#6366F1,#8B5CF6)"></div>
+      <div style="padding:28px 28px 0">
+        <div style="width:56px;height:56px;border-radius:18px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+          <i data-lucide="pencil-line" style="width:26px;height:26px;color:#6366F1"></i>
+        </div>
+        <p style="font-size:18px;font-weight:900;color:#0F172A;margin:0 0 4px">Editar concepto</p>
+        <p style="font-size:13px;color:#64748B;margin:0 0 18px;line-height:1.5">
+          Retiro de <b style="color:#DC2626">${fmt$(r.monto)}</b> · ${fecha}
+        </p>
+        <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:6px">
+          ¿Para qué fue este dinero?
+        </label>
+        <input id="_input-editar-concepto" type="text" value="${conceptoActual.replace(/"/g,'&quot;')}"
+          placeholder="Ej. Pago a proveedor, gasto personal..."
+          style="width:100%;height:44px;padding:0 14px;border-radius:12px;border:1px solid #E2E8F0;font-size:13px;color:#0F172A;box-sizing:border-box">
+        <p id="_err-editar-concepto" style="font-size:11px;color:#DC2626;margin:6px 0 0;min-height:14px"></p>
+      </div>
+      <div style="padding:16px 28px 28px;display:flex;flex-direction:column;gap:10px">
+        <button id="_btn-guardar-concepto"
+          style="width:100%;height:44px;border-radius:14px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px">
+          <i data-lucide="check" style="width:16px;height:16px"></i>
+          Guardar cambio
+        </button>
+        <button id="_btn-cancelar-concepto"
+          style="width:100%;height:40px;border-radius:14px;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;cursor:pointer;font-size:13px;font-weight:600">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  const input  = document.getElementById('_input-editar-concepto');
+  const errEl  = document.getElementById('_err-editar-concepto');
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+
+  const cerrar = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
+  document.getElementById('_btn-cancelar-concepto').onclick = cerrar;
+
+  const guardar = async () => {
+    const nuevo = input.value.trim();
+    if (nuevo === conceptoActual.trim()) { cerrar(); return; }
+    const btn = document.getElementById('_btn-guardar-concepto');
+    btn.disabled = true; btn.style.opacity = '.6';
+    const res = await api(`/cortes/retiro/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ concepto: nuevo }),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      errEl.textContent = e.detail || 'Error al editar concepto';
+      btn.disabled = false; btn.style.opacity = '1';
+      return;
+    }
+    cerrar();
+    toast('Concepto actualizado','success');
+    loadCajaAdmin();
+  };
+  document.getElementById('_btn-guardar-concepto').onclick = guardar;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') guardar(); });
 }
 
 async function borrarRetiro(id, concepto, montoStr) {
