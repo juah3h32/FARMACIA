@@ -303,13 +303,60 @@ def main():
     # arranques) debe abrir directo, igual que siempre lo hizo antes de que
     # se agregara esta pantalla — sin ventana intermedia de por medio.
     instalacion_nueva = cfg.NEEDS_FIRST_RUN_SETUP
+    # Si falta WebView2, pywebview cae en silencio al motor viejo de Internet
+    # Explorer: la ventana SI abre, pero se ve sin estilos (como si no tuviera
+    # diseño) y con menus/modales apilados. Mostrar la pantalla de carga
+    # también en este caso — así hay progreso visible mientras se instala en
+    # vez de abrir de inmediato con el motor roto. El límite de 60s en
+    # _boot_and_launch sigue de respaldo por si la instalación tarda de más.
+    falta_webview2 = not _webview2_installed()
     if instalacion_nueva:
-        _run_first_time_setup_wizard()
+        # El .exe compilado corre con console=False (sin ventana de consola) -
+        # si el asistente falla por cualquier motivo (ej. un equipo viejo con
+        # problemas para dibujar la interfaz), antes eso tumbaba el programa
+        # entero SIN NINGUN aviso visible, ni siquiera un traceback en algun
+        # lado. Mejor seguir sin el asistente (queda "turso" como modo por
+        # defecto, ver app/config.py) que desaparecer sin explicacion.
+        try:
+            _run_first_time_setup_wizard()
+        except Exception as e:
+            _log_error(f"Asistente de primer arranque falló: {e}\n" + traceback.format_exc())
 
-    _boot_and_launch(mostrar_splash=instalacion_nueva)
+    mostrar_splash = instalacion_nueva or falta_webview2
+    try:
+        _boot_and_launch(mostrar_splash=mostrar_splash, esperar_webview2=falta_webview2)
+    except Exception as e:
+        _log_error(f"Boot con splash falló: {e}\n" + traceback.format_exc())
+        # Si la pantalla de carga (tkinter/customtkinter) fue lo que fallo, no
+        # tiene sentido tirar todo el programa por eso — reintentar sin ella
+        # antes de rendirse. El arranque en si (BD, servidor local) no depende
+        # de que la ventana de carga exista.
+        if mostrar_splash:
+            try:
+                _boot_and_launch(mostrar_splash=False, esperar_webview2=False)
+                return
+            except Exception as e2:
+                e = e2
+
+        # Ultimo respaldo real: si CUALQUIER COSA truena antes de llegar a
+        # abrir una ventana, mostrar un mensaje nativo de Windows en vez de
+        # que el programa desaparezca sin ningun rastro (console=False no deja
+        # ver ni un traceback). El log queda para poder diagnosticar despues.
+        _log_error(f"Fallo fatal antes de abrir la ventana principal: {e}\n" + traceback.format_exc())
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "Farmacia Eben-Ezer no pudo abrir. Se guardó el detalle del error en "
+                f"{cfg.DATA_DIR / 'error.log'} — comparte ese archivo con soporte.",
+                "Farmacia Eben-Ezer — POS",
+                0x10,  # MB_ICONERROR
+            )
+        except Exception:
+            pass
 
 
-def _boot_and_launch(mostrar_splash: bool) -> None:
+def _boot_and_launch(mostrar_splash: bool, esperar_webview2: bool = False) -> None:
     splash = _BootSplash() if mostrar_splash else None
     boot_result = {"port": None, "done": False}
 
@@ -319,15 +366,21 @@ def _boot_and_launch(mostrar_splash: bool) -> None:
 
     def _boot():
         try:
-            # Instalar WebView2 en SEGUNDO PLANO, sin bloquear el arranque — la
-            # descarga/instalación puede tardar hasta ~2 min o quedar esperando
-            # un permiso de Windows (UAC) que en equipos viejos no siempre se ve
-            # a primera vista, y eso dejaba el programa entero atorado sin abrir
-            # nunca. Si no alcanza a quedar lista para esta sesión, pywebview
-            # simplemente usa el motor viejo (igual que siempre) y ya quedará
-            # instalada para el siguiente arranque.
+            # Instalar WebView2 en un hilo aparte — nunca debe colgar el
+            # arranque indefinidamente (descarga/UAC puede tardar hasta ~2
+            # min). Cuando SÍ hay pantalla de carga visible por falta de
+            # WebView2 (esperar_webview2=True), vale la pena esperar un rato
+            # acotado a que termine: si no, pywebview cae en silencio al motor
+            # viejo de Internet Explorer y la ventana abre sin estilos/diseño.
+            # El watchdog de 60s de más abajo sigue siendo el límite real si
+            # la descarga es muy lenta — mejor abrir con el motor viejo que
+            # quedarse pegado.
             if not _webview2_installed():
-                threading.Thread(target=_install_webview2, daemon=True, name="WebView2Install").start()
+                hilo_webview2 = threading.Thread(target=_install_webview2, daemon=True, name="WebView2Install")
+                hilo_webview2.start()
+                if esperar_webview2:
+                    _status("Preparando componente de Windows (primera vez)...")
+                    hilo_webview2.join(timeout=40)
 
             _status("Preparando base de datos y usuarios...")
             init_db()
