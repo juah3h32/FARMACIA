@@ -11503,6 +11503,12 @@ async function eliminarVentaAdmin(id, folio) {
       if (!r.ok) return;
       const d = await r.json();
       if (lastStamp && d.v !== lastStamp) {
+        // No recargar a media escritura (ej. usuario/contraseña en el login) —
+        // solo dejar lastStamp desactualizado para que el siguiente tick lo
+        // reintente en cuanto el campo deje de estar enfocado con texto.
+        const tag = document.activeElement?.tagName;
+        const escribiendo = (tag === 'INPUT' || tag === 'TEXTAREA') && document.activeElement.value;
+        if (escribiendo) return;
         lastStamp = d.v;
         window.location.reload();
       } else {
