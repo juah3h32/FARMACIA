@@ -297,25 +297,39 @@ class _BootSplash:
 
 
 def main():
-    if cfg.NEEDS_FIRST_RUN_SETUP:
+    # La pantalla de carga solo tiene sentido en una instalacion NUEVA (elegir
+    # modo de trabajo + preparar la base de datos por primera vez, que sí
+    # tarda). En una instalacion ya existente (la inmensa mayoria de los
+    # arranques) debe abrir directo, igual que siempre lo hizo antes de que
+    # se agregara esta pantalla — sin ventana intermedia de por medio.
+    instalacion_nueva = cfg.NEEDS_FIRST_RUN_SETUP
+    if instalacion_nueva:
         _run_first_time_setup_wizard()
 
-    splash = _BootSplash()
-    boot_result = {"port": None, "ok": False, "done": False}
+    _boot_and_launch(mostrar_splash=instalacion_nueva)
+
+
+def _boot_and_launch(mostrar_splash: bool) -> None:
+    splash = _BootSplash() if mostrar_splash else None
+    boot_result = {"port": None, "done": False}
+
+    def _status(texto: str) -> None:
+        if splash:
+            splash.set_status(texto)
 
     def _boot():
         try:
             # Instalar WebView2 en SEGUNDO PLANO, sin bloquear el arranque — la
             # descarga/instalación puede tardar hasta ~2 min o quedar esperando
             # un permiso de Windows (UAC) que en equipos viejos no siempre se ve
-            # a primera vista, y eso dejaba el programa entero atorado en el
-            # splash sin abrir nunca. Si no alcanza a quedar lista para esta
-            # sesión, pywebview simplemente usa el motor viejo (igual que antes
-            # de este parche) y ya quedará instalada para el siguiente arranque.
+            # a primera vista, y eso dejaba el programa entero atorado sin abrir
+            # nunca. Si no alcanza a quedar lista para esta sesión, pywebview
+            # simplemente usa el motor viejo (igual que siempre) y ya quedará
+            # instalada para el siguiente arranque.
             if not _webview2_installed():
                 threading.Thread(target=_install_webview2, daemon=True, name="WebView2Install").start()
 
-            splash.set_status("Preparando base de datos y usuarios...")
+            _status("Preparando base de datos y usuarios...")
             init_db()
 
             # Con catálogo público activo el puerto tiene que ser fijo (8000) — si
@@ -332,7 +346,7 @@ def main():
             cfg.API_PORT = port
 
             if cfg.TURSO_SYNC:
-                splash.set_status("Sincronizando con la nube...")
+                _status("Sincronizando con la nube...")
                 from app.database.sync_service import import_from_turso, start_background_sync, start_image_watch
                 sync_done = threading.Event()
 
@@ -356,7 +370,7 @@ def main():
                 # esperar el latido de 180s (ver start_image_watch en sync_service.py).
                 start_image_watch(interval=12)
 
-            splash.set_status("Iniciando servidor local...")
+            _status("Iniciando servidor local...")
 
             def _api_with_log():
                 try:
@@ -374,33 +388,42 @@ def main():
                 from app.services.mercadopago_service import mp_point
                 mp_point.configure(cfg.MP_ACCESS_TOKEN, cfg.MP_DEVICE_ID or "")
 
-            splash.set_status("Cargando pantalla principal...")
+            _status("Cargando pantalla principal...")
             _wait_for_api(port)
 
             boot_result["port"] = port
-            boot_result["ok"] = True
         except Exception as e:
             _log_error(f"Boot crash: {e}\n" + traceback.format_exc())
         finally:
             boot_result["done"] = True
-            splash.close()
+            if splash:
+                splash.close()
 
     def _watchdog():
         # Ultimo respaldo: si algo en _boot() se cuelga de verdad (BD bloqueada
         # por otro proceso, red que nunca corta la conexion, etc.) el hilo de
-        # arriba se queda atorado para siempre y splash.close() nunca se llama
-        # - el programa se ve "abierto" pero nunca muestra el login. Mejor
-        # forzar que abra en modo reducido (CustomTkinter, sin esperar la API)
-        # que dejarlo pegado en la pantalla de carga sin explicacion.
+        # arriba se queda atorado para siempre y nunca marca boot_result["done"]
+        # - sin esto el programa se queda "abierto" pero nunca muestra el login.
+        # Mejor forzar que abra en modo reducido (CustomTkinter, sin esperar la
+        # API) que dejarlo pegado sin explicacion.
         time.sleep(60)
         if not boot_result["done"]:
             _log_error("Boot watchdog: el arranque no termino en 60s, forzando apertura")
             boot_result["done"] = True
-            splash.close()
+            if splash:
+                splash.close()
 
     threading.Thread(target=_boot, daemon=True, name="Boot").start()
     threading.Thread(target=_watchdog, daemon=True, name="BootWatchdog").start()
-    splash.run()
+
+    if splash:
+        splash.run()  # bloquea hasta que _boot() (o el watchdog) llame a splash.close()
+    else:
+        # Instalacion existente: sin ventana de carga, abrir directo como
+        # siempre - solo esperar (sin mostrar nada) a que termine el arranque
+        # o a que el watchdog fuerce la apertura en modo reducido.
+        while not boot_result["done"]:
+            time.sleep(0.1)
 
     _start_ui(boot_result["port"])
 
