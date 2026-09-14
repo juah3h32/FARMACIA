@@ -188,58 +188,203 @@ def _run_first_time_setup_wizard() -> None:
     root.mainloop()
 
 
+_WEBVIEW2_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+
+
+def _webview2_installed() -> bool:
+    """En Windows, pywebview necesita el runtime WebView2 (Edge Chromium) para
+    dibujar la interfaz. Si falta — como en Windows 10 LTSC, que no trae Edge
+    preinstalado — pywebview cae en silencio al motor viejo de Internet
+    Explorer: no lanza error, pero la interfaz se ve sin estilos y con
+    modales que deberían estar ocultos aparecen todos apilados."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import winreg
+    except ImportError:
+        return True
+    candidatos = [
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+        (winreg.HKEY_CURRENT_USER, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+    ]
+    for hive, path in candidatos:
+        try:
+            winreg.OpenKey(hive, path)
+            return True
+        except OSError:
+            continue
+    return False
+
+
+def _install_webview2() -> bool:
+    """Descarga e instala en silencio el runtime oficial de WebView2 (~2MB,
+    bootstrapper de Microsoft). Requiere internet la primera vez únicamente."""
+    import urllib.request
+    import subprocess
+    import tempfile
+    import os
+
+    url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+    dest = os.path.join(tempfile.gettempdir(), "MicrosoftEdgeWebView2Setup.exe")
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp, open(dest, "wb") as f:
+            f.write(resp.read())
+        subprocess.run([dest, "/silent", "/install"], check=True, timeout=120)
+        return True
+    except Exception as e:
+        _log_error(f"No se pudo instalar WebView2 automáticamente: {e}")
+        return False
+
+
+class _BootSplash:
+    """Pantalla nativa con spinner mostrada mientras arranca todo (BD, usuarios
+    por defecto, componentes de Windows, servidor local) — así nunca hay un
+    tramo en blanco donde parezca que el programa no abrió o está roto."""
+
+    def __init__(self):
+        import customtkinter as ctk
+        import tkinter as tk
+
+        ctk.set_appearance_mode("Light")
+        ctk.set_default_color_theme("blue")
+
+        self.root = ctk.CTk()
+        self.root.title("Farmacia Eben-Ezer")
+        self.root.geometry("420x300")
+        self.root.resizable(False, False)
+        self.root.configure(fg_color="#1d2140")
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.root.after(10, lambda: self.root.eval("tk::PlaceWindow . center"))
+        self.root.attributes("-topmost", True)
+
+        self._canvas = tk.Canvas(self.root, width=64, height=64, bg="#1d2140", highlightthickness=0)
+        self._canvas.pack(pady=(64, 16))
+        self._angle = 0
+        self._arc = self._canvas.create_arc(4, 4, 60, 60, start=0, extent=110,
+                                             style="arc", outline="#4A6FE0", width=5)
+        self._spinning = True
+        self._spin()
+
+        ctk.CTkLabel(self.root, text="Farmacia Eben-Ezer", font=ctk.CTkFont(size=16, weight="bold"),
+                     text_color="white").pack()
+        self.status_label = ctk.CTkLabel(self.root, text="Iniciando...", font=ctk.CTkFont(size=12),
+                                          text_color="#B9BDD6")
+        self.status_label.pack(pady=(6, 0))
+
+    def _spin(self):
+        if not self._spinning:
+            return
+        self._angle = (self._angle + 12) % 360
+        self._canvas.itemconfig(self._arc, start=self._angle)
+        self.root.after(30, self._spin)
+
+    def set_status(self, text: str) -> None:
+        try:
+            self.root.after(0, lambda: self.status_label.configure(text=text))
+        except Exception:
+            pass
+
+    def close(self) -> None:
+        self._spinning = False
+        try:
+            self.root.after(0, self.root.destroy)
+        except Exception:
+            pass
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
 def main():
     if cfg.NEEDS_FIRST_RUN_SETUP:
         _run_first_time_setup_wizard()
 
-    init_db()
+    splash = _BootSplash()
+    boot_result = {"port": None, "ok": False}
 
-    # Con catálogo público activo el puerto tiene que ser fijo (8000) — si
-    # cambiara en cada arranque, el port-forwarding del router dejaría de
-    # apuntar al puerto correcto. Sin catálogo público, puerto libre al azar
-    # como siempre (más simple, sin choques con otros programas).
-    if cfg.CATALOGO_PUBLICO:
-        port = cfg.API_PORT
-    else:
-        port = _find_free_port(cfg.API_PORT)
-        if not port:
-            print("[FarmaciaPOS] No se pudo encontrar puerto libre para la API")
-            sys.exit(1)
-    cfg.API_PORT = port
-
-    # Turso sync in background — never blocks startup
-    if cfg.TURSO_SYNC:
-        from app.database.sync_service import import_from_turso, start_background_sync, start_image_watch
-        threading.Thread(target=import_from_turso, daemon=True, name="TursoImport").start()
-        # El latido hace un pull COMPLETO de las ~28 tablas cada vez, sin filtro
-        # incremental — a 30s eso es mucha lectura constante en Turso aunque no
-        # haya cambios (ni en esta PC ni en otras). Local ya es la fuente de
-        # verdad para esta PC; el pull solo existe para ver cambios de OTRAS PCs,
-        # así que no necesita ser tan frecuente. 180s sigue siendo rápido para
-        # una farmacia con una o dos cajas.
-        start_background_sync(interval=180)
-        # Hilo aparte, mucho más frecuente (12s) pero barato — solo para fotos de
-        # producto nuevas/cambiadas, así se ven en las demás PCs en segundos sin
-        # esperar el latido de 180s (ver start_image_watch en sync_service.py).
-        start_image_watch(interval=12)
-
-    def _api_with_log():
+    def _boot():
         try:
-            start_api_server()
+            if not _webview2_installed():
+                splash.set_status("Preparando componente de Windows (primera vez)...")
+                _install_webview2()
+
+            splash.set_status("Preparando base de datos y usuarios...")
+            init_db()
+
+            # Con catálogo público activo el puerto tiene que ser fijo (8000) — si
+            # cambiara en cada arranque, el port-forwarding del router dejaría de
+            # apuntar al puerto correcto. Sin catálogo público, puerto libre al azar
+            # como siempre (más simple, sin choques con otros programas).
+            if cfg.CATALOGO_PUBLICO:
+                port = cfg.API_PORT
+            else:
+                port = _find_free_port(cfg.API_PORT)
+                if not port:
+                    _log_error("No se pudo encontrar puerto libre para la API")
+                    return
+            cfg.API_PORT = port
+
+            if cfg.TURSO_SYNC:
+                splash.set_status("Sincronizando con la nube...")
+                from app.database.sync_service import import_from_turso, start_background_sync, start_image_watch
+                sync_done = threading.Event()
+
+                def _import_and_signal():
+                    try:
+                        import_from_turso()
+                    finally:
+                        sync_done.set()
+
+                threading.Thread(target=_import_and_signal, daemon=True, name="TursoImport").start()
+                sync_done.wait(timeout=8)  # no colgar el arranque si la red está lenta
+                # El latido hace un pull COMPLETO de las ~28 tablas cada vez, sin filtro
+                # incremental — a 30s eso es mucha lectura constante en Turso aunque no
+                # haya cambios (ni en esta PC ni en otras). Local ya es la fuente de
+                # verdad para esta PC; el pull solo existe para ver cambios de OTRAS PCs,
+                # así que no necesita ser tan frecuente. 180s sigue siendo rápido para
+                # una farmacia con una o dos cajas.
+                start_background_sync(interval=180)
+                # Hilo aparte, mucho más frecuente (12s) pero barato — solo para fotos de
+                # producto nuevas/cambiadas, así se ven en las demás PCs en segundos sin
+                # esperar el latido de 180s (ver start_image_watch en sync_service.py).
+                start_image_watch(interval=12)
+
+            splash.set_status("Iniciando servidor local...")
+
+            def _api_with_log():
+                try:
+                    start_api_server()
+                except Exception as e:
+                    _log_error(f"API thread crash: {e}\n" + traceback.format_exc())
+
+            threading.Thread(target=_api_with_log, daemon=True, name="APIServer").start()
+
+            from app.services import updater_service
+            updater_service.start_background_check()
+
+            # Cargar configuración Mercado Pago Point (token siempre; device_id opcional hasta que se detecte)
+            if cfg.MP_ACCESS_TOKEN:
+                from app.services.mercadopago_service import mp_point
+                mp_point.configure(cfg.MP_ACCESS_TOKEN, cfg.MP_DEVICE_ID or "")
+
+            splash.set_status("Cargando pantalla principal...")
+            _wait_for_api(port)
+
+            boot_result["port"] = port
+            boot_result["ok"] = True
         except Exception as e:
-            _log_error(f"API thread crash: {e}\n" + traceback.format_exc())
+            _log_error(f"Boot crash: {e}\n" + traceback.format_exc())
+        finally:
+            splash.close()
 
-    threading.Thread(target=_api_with_log, daemon=True, name="APIServer").start()
+    threading.Thread(target=_boot, daemon=True, name="Boot").start()
+    splash.run()
 
-    from app.services import updater_service
-    updater_service.start_background_check()
-
-    # Cargar configuración Mercado Pago Point (token siempre; device_id opcional hasta que se detecte)
-    if cfg.MP_ACCESS_TOKEN:
-        from app.services.mercadopago_service import mp_point
-        mp_point.configure(cfg.MP_ACCESS_TOKEN, cfg.MP_DEVICE_ID or "")
-
-    _start_ui(port)
+    if boot_result["ok"]:
+        _start_ui(boot_result["port"])
+    else:
+        sys.exit(1)
 
 
 class _PyWebViewApi:
