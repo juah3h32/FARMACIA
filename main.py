@@ -533,8 +533,7 @@ class _PyWebViewApi:
 
 def _start_ui(port) -> None:
     # port es None cuando el arranque nunca llego a levantar el servidor local
-    # (se colgo antes, o el watchdog de main() lo corto) - en ese caso ni
-    # siquiera intentar pywebview, ir directo al respaldo de CustomTkinter.
+    # (se colgo antes, o el watchdog de main() lo corto).
     if port is not None:
         try:
             import webview
@@ -555,19 +554,27 @@ def _start_ui(port) -> None:
             webview.start(debug=False)
             return
         except Exception as e:
-            _log_error(f"pywebview falló ({type(e).__name__}: {e}) — usando CustomTkinter\n"
-                       + traceback.format_exc())
+            _log_error(f"pywebview falló ({type(e).__name__}: {e})\n" + traceback.format_exc())
 
-    # CTK fallback — uses SQLAlchemy directly, no API wait needed
+    # Ya no existe una pantalla de respaldo distinta (el viejo login de
+    # CustomTkinter se eliminó): si la interfaz moderna no pudo abrir, avisar
+    # claramente en vez de mostrar una pantalla distinta a la real. La causa
+    # más común es que falte el runtime WebView2 en el equipo.
+    _log_error("No se pudo abrir la interfaz moderna (pywebview) y ya no hay pantalla de respaldo.")
     try:
-        import customtkinter as ctk
-        ctk.set_appearance_mode("Light")
-        ctk.set_default_color_theme("blue")
-        from app.ui.login_screen import LoginScreen
-        app = LoginScreen()
-        app.mainloop()
-    except Exception as e:
-        _log_error(f"CustomTkinter falló: {e}\n" + traceback.format_exc())
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "Farmacia Eben-Ezer no pudo abrir la interfaz. Esto suele pasar si "
+            "falta el componente WebView2 de Windows o si el equipo no tuvo "
+            "internet para instalarlo. Reinicia el programa; si el problema "
+            "sigue, comparte este archivo con soporte:\n"
+            f"{cfg.DATA_DIR / 'error.log'}",
+            "Farmacia Eben-Ezer — POS",
+            0x10,  # MB_ICONERROR
+        )
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
