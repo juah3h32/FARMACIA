@@ -301,7 +301,7 @@ def main():
         _run_first_time_setup_wizard()
 
     splash = _BootSplash()
-    boot_result = {"port": None, "ok": False}
+    boot_result = {"port": None, "ok": False, "done": False}
 
     def _boot():
         try:
@@ -382,15 +382,27 @@ def main():
         except Exception as e:
             _log_error(f"Boot crash: {e}\n" + traceback.format_exc())
         finally:
+            boot_result["done"] = True
+            splash.close()
+
+    def _watchdog():
+        # Ultimo respaldo: si algo en _boot() se cuelga de verdad (BD bloqueada
+        # por otro proceso, red que nunca corta la conexion, etc.) el hilo de
+        # arriba se queda atorado para siempre y splash.close() nunca se llama
+        # - el programa se ve "abierto" pero nunca muestra el login. Mejor
+        # forzar que abra en modo reducido (CustomTkinter, sin esperar la API)
+        # que dejarlo pegado en la pantalla de carga sin explicacion.
+        time.sleep(60)
+        if not boot_result["done"]:
+            _log_error("Boot watchdog: el arranque no termino en 60s, forzando apertura")
+            boot_result["done"] = True
             splash.close()
 
     threading.Thread(target=_boot, daemon=True, name="Boot").start()
+    threading.Thread(target=_watchdog, daemon=True, name="BootWatchdog").start()
     splash.run()
 
-    if boot_result["ok"]:
-        _start_ui(boot_result["port"])
-    else:
-        sys.exit(1)
+    _start_ui(boot_result["port"])
 
 
 class _PyWebViewApi:
@@ -443,28 +455,32 @@ class _PyWebViewApi:
             return ""
 
 
-def _start_ui(port: int) -> None:
-    try:
-        import webview
-        # webview renders the web SPA — must wait for API to be ready
-        if not _wait_for_api(port):
-            _log_error("El servidor API no respondió a tiempo")
-            raise RuntimeError("API timeout")
-        window = webview.create_window(
-            title="Farmacia Eben-Ezer — POS",
-            url=f"http://127.0.0.1:{port}",
-            width=cfg.WINDOW_WIDTH,
-            height=cfg.WINDOW_HEIGHT,
-            resizable=True,
-            min_size=(1000, 680),
-            fullscreen=False,
-            js_api=_PyWebViewApi(),
-        )
-        webview.start(debug=False)
-        return
-    except Exception as e:
-        _log_error(f"pywebview falló ({type(e).__name__}: {e}) — usando CustomTkinter\n"
-                   + traceback.format_exc())
+def _start_ui(port) -> None:
+    # port es None cuando el arranque nunca llego a levantar el servidor local
+    # (se colgo antes, o el watchdog de main() lo corto) - en ese caso ni
+    # siquiera intentar pywebview, ir directo al respaldo de CustomTkinter.
+    if port is not None:
+        try:
+            import webview
+            # webview renders the web SPA — must wait for API to be ready
+            if not _wait_for_api(port):
+                _log_error("El servidor API no respondió a tiempo")
+                raise RuntimeError("API timeout")
+            window = webview.create_window(
+                title="Farmacia Eben-Ezer — POS",
+                url=f"http://127.0.0.1:{port}",
+                width=cfg.WINDOW_WIDTH,
+                height=cfg.WINDOW_HEIGHT,
+                resizable=True,
+                min_size=(1000, 680),
+                fullscreen=False,
+                js_api=_PyWebViewApi(),
+            )
+            webview.start(debug=False)
+            return
+        except Exception as e:
+            _log_error(f"pywebview falló ({type(e).__name__}: {e}) — usando CustomTkinter\n"
+                       + traceback.format_exc())
 
     # CTK fallback — uses SQLAlchemy directly, no API wait needed
     try:
