@@ -569,6 +569,7 @@ def _backfill_costo_unitario_v1():
     with get_db() as db:
         if db.query(Configuracion).filter(Configuracion.clave == "backfill_costo_unitario_v1").first():
             return
+        from datetime import datetime
         from app.database.models import ItemVenta, Producto as _Prod, CortesCaja, Venta, EstadoVenta
 
         rows = (
