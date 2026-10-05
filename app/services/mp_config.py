@@ -64,6 +64,11 @@ def cargar_config() -> tuple[str, str]:
     # (antes esta PC seguía usando el token anterior para siempre).
     token = os.getenv("MP_ACCESS_TOKEN", "") or _read_db(_K_TOKEN) or _read_file(_TOKEN_FILE)
     device = os.getenv("MP_DEVICE_ID", "") or _read_file(_DEVICE_FILE) or _read_db(_K_DEVICE)
+    # Si quedó guardado el token en el campo de terminal (error real en
+    # producción), ignorarlo: ni se usa ni se vuelve a mostrar en pantalla.
+    from app.services.mercadopago_service import parece_token
+    if parece_token(device):
+        device = ""
     return token.strip(), device.strip()
 
 

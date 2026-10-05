@@ -212,6 +212,11 @@ def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
     device = (body.device_id or "").strip()
     if not token:
         raise HTTPException(status_code=400, detail="Access Token requerido")
+    from app.services.mercadopago_service import parece_token
+    if device and parece_token(device):
+        raise HTTPException(status_code=400, detail=(
+            "En 'Terminal (ID)' pegaste el Access Token. Ese campo es para el ID de la terminal "
+            "(ej. DSPREAD_D20__…) y se llena solo con el botón Detectar."))
     if device and not _mp_device_valid(device):
         raise HTTPException(status_code=400, detail="ID de terminal inválido — usa el botón Detectar")
     guardar_config(token, device)

@@ -113,10 +113,17 @@ def referencia_externa(ref: Optional[str]) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "", ref or "")[:64] or uuid.uuid4().hex
 
 
+def parece_token(texto: Optional[str]) -> bool:
+    """¿Pegaron el Access Token donde va el ID de terminal? (pasó en producción:
+    el token quedó guardado y mostrado como "terminal elegida")."""
+    t = (texto or "").strip().upper()
+    return t.startswith(("APP_USR-", "TEST-")) or (t.count("-") >= 3 and len(t) > 50)
+
+
 def device_valido(device_id: Optional[str]) -> bool:
-    # IDs reales: "NEWLAND_N950__N950NCB801293324", "GERTEC_MP35P__..." etc.
+    # IDs reales: "NEWLAND_N950__N950NCB801293324", "DSPREAD_D20__...", "GERTEC_MP35P__..."
     d = (device_id or "").strip()
-    return bool(d and len(d) > 8 and " " not in d and not d.isdigit())
+    return bool(d and len(d) > 8 and " " not in d and not d.isdigit() and not parece_token(d))
 
 
 def detalle_es(detail: str) -> str:
@@ -580,7 +587,13 @@ class MercadoPagoPointService:
         # 7) y 8) Terminal elegida en esta PC
         todas = [dict(x, api="nueva") for x in nuevas] + [dict(x, api="anterior") for x in viejas]
         sel = next((x for x in todas if x.get("id") == did), None) if did else None
-        if not did:
+        if did and parece_token(did):
+            # Nunca mostrar el token en pantalla
+            paso("Terminal elegida en esta PC", False,
+                 "En el campo 'Terminal (ID)' está pegado el ACCESS TOKEN, no el ID de la terminal. "
+                 "Bórralo de ese campo; el ID se llena solo con 'Detectar' (ej. DSPREAD_D20__…).")
+            did = ""
+        elif not did:
             paso("Terminal elegida en esta PC", False, "No hay terminal elegida: usa Detectar y Guardar.")
         elif not todas:
             paso("Terminal elegida en esta PC", None,
@@ -599,8 +612,10 @@ class MercadoPagoPointService:
             modo = (sel.get("operating_mode") or "").upper()
             paso("Modo de operación (operating_mode)", modo == "PDV",
                  "PDV — lista para recibir cobros del POS." if modo == "PDV" else
-                 f"Está en modo {modo or 'desconocido'}: usa 'Activar modo PDV' (o en la terminal: Más opciones "
-                 "> Ajustes > Modo de vinculación > Punto de Venta) y REINICIA la terminal.")
+                 f"Mercado Pago la reporta en modo {modo or 'desconocido'}: usa 'Activar modo PDV' (o en la terminal: "
+                 "Más opciones > Ajustes > Modo de vinculación > Punto de Venta) y REINICIA la terminal. Si la "
+                 "terminal ya dice 'Tu Point está vinculado al punto de venta', espera 1-2 minutos y vuelve a "
+                 "correr el Diagnóstico: Mercado Pago tarda en actualizar el modo.")
 
         # Conclusión breve para el dueño
         fallo = next((p for p in pasos if p["ok"] is False), None)

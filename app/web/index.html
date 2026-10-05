@@ -6330,10 +6330,18 @@ function _mpFinishSale(venta) {
 
 // Cobros aprobados en la terminal que no alcanzaron a registrarse (se cerró el
 // programa o se cayó la red a mitad del pago) — se registran al volver al POS.
+// También se revisan cada 30 s: si el cajero cerró el modal de espera y el
+// cliente terminó de pagar después, la venta se registra sola (antes solo al
+// volver a abrir el POS).
 let _mpPendChecked = false;
+let _mpPendTimer = null;
+let _mpPendBusy = false;
+const _mpPendAvisados = new Set();
 async function _mpCheckPendientes() {
-  if (_mpPendChecked) return;
+  if (!_mpPendTimer) _mpPendTimer = setInterval(() => { _mpPendChecked = false; _mpCheckPendientes(); }, 30000);
+  if (_mpPendChecked || _mpPendBusy) return;
   _mpPendChecked = true;
+  _mpPendBusy = true;
   try {
     const res = await api('/pos/terminal/pendientes');
     if (!res.ok) return;
@@ -6344,11 +6352,13 @@ async function _mpCheckPendientes() {
       const x = await r.json().catch(()=>({}));
       if (r.ok && x.status === 'processed' && x.venta) {
         toast(`Cobro con terminal recuperado: venta ${x.venta.folio} por ${fmt(x.venta.total)} registrada`, 'success');
-      } else if (!r.ok && x.detail) {
+      } else if (!r.ok && x.detail && !_mpPendAvisados.has(p.order_id)) {
+        _mpPendAvisados.add(p.order_id);   // avisar una sola vez por cobro
         toast(x.detail, 'error');
       }
     }
   } catch(e) {}
+  finally { _mpPendBusy = false; }
 }
 
 function _enableCobrarBtn(enable) {
