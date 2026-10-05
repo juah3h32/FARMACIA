@@ -172,22 +172,25 @@ class MpSaveIn(BaseModel):
 
 
 def _mp_device_valid(device_id: str) -> bool:
-    # IDs reales: "NEWLAND_N950__N950NCB801293324", "GERTEC_MP35P__..." etc.
-    return bool(device_id and len(device_id) > 8 and " " not in device_id and not device_id.isdigit())
+    # Mismo criterio que usa el POS (mp_point.enabled) — ver device_valido()
+    from app.services.mercadopago_service import device_valido
+    return device_valido(device_id)
 
 
 def _mp_raise(e):
-    raise HTTPException(status_code=e.status_code, detail=e.message)
+    # e.http_status: un 401 de Mercado Pago se responde como 400 para que el
+    # frontend no lo confunda con "sesión vencida" y cierre la sesión del admin.
+    raise HTTPException(status_code=e.http_status, detail=e.message)
 
 
 @router.get("/mp-status")
 def mp_status(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
-    mp_point.ensure_loaded()
+    mp_point.recargar()  # toma el token si se cambió en otra PC
     device_id = mp_point.device_id
     valid_device = _mp_device_valid(device_id)
     return {
-        "enabled":   bool(mp_point.access_token) and valid_device,
+        "enabled":   mp_point.enabled,
         "token_set": bool(mp_point.access_token),
         "token_mask": _mask(mp_point.access_token),
         "device_id": device_id if valid_device else "",
@@ -196,15 +199,16 @@ def mp_status(payload: dict = Depends(get_current_api_user)):
 
 @router.post("/mp-save")
 def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
+    """Guarda sin consultar a Mercado Pago (así se puede guardar aunque MP falle;
+    la validación real la hacen Detectar / Diagnóstico)."""
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     from app.services.mercadopago_service import mp_point
     from app.services.mp_config import guardar_config
     mp_point.ensure_loaded()
-    token = (body.token or "").strip()
-    if token.startswith(_MASK_PREFIX):
-        token = ""  # campo enmascarado sin tocar — conservar el guardado
-    token = token or mp_point.access_token
+    # Misma limpieza que Detectar: antes se guardaba el texto tal cual (con
+    # espacios/"Bearer"/máscara pegada) y Detectar usaba otro token distinto.
+    token = _token_from(body.token)
     device = (body.device_id or "").strip()
     if not token:
         raise HTTPException(status_code=400, detail="Access Token requerido")
@@ -216,33 +220,64 @@ def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
 
 
 def _token_from(token: Optional[str]) -> str:
-    from app.services.mercadopago_service import mp_point
+    """Token que manda la pantalla; si viene vacío o es la máscara "••••abcd"
+    (campo sin tocar), se usa el guardado."""
+    from app.services.mercadopago_service import mp_point, limpiar_token
     mp_point.ensure_loaded()
-    t = (token or "").strip()
+    t = limpiar_token(token)
     if not t or t.startswith(_MASK_PREFIX):
         t = mp_point.access_token
     return t
 
 
-@router.get("/mp-devices")
-def mp_devices(token: Optional[str] = None, payload: dict = Depends(get_current_api_user)):
-    if payload.get("rol") != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores")
+class MpTokenIn(BaseModel):
+    token: Optional[str] = ""
+    device_id: Optional[str] = ""
+
+
+def _mp_detectar(token: Optional[str]) -> dict:
     from app.services.mercadopago_service import mp_point, MercadoPagoError
     use_token = _token_from(token)
     if not use_token:
         raise HTTPException(status_code=400, detail="Access Token no configurado")
     try:
+        cuenta = mp_point.verificar_token(token=use_token)   # token válido y de México
         terms = mp_point.list_terminals(token=use_token)
     except MercadoPagoError as e:
         _mp_raise(e)
     # Se conserva la llave "devices" que ya usa el frontend
-    return {"devices": [
+    return {"cuenta": cuenta, "devices": [
         {"id": t.get("id"), "operating_mode": t.get("operating_mode", ""),
          "store_id": t.get("store_id"), "pos_id": t.get("pos_id"),
-         "external_pos_id": t.get("external_pos_id")}
+         "external_pos_id": t.get("external_pos_id"), "api": t.get("api", "")}
         for t in terms
     ]}
+
+
+@router.get("/mp-devices")
+def mp_devices(token: Optional[str] = None, payload: dict = Depends(get_current_api_user)):
+    # Compatibilidad: la pantalla nueva usa POST (el token en la URL queda en logs)
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    return _mp_detectar(token)
+
+
+@router.post("/mp-devices")
+def mp_devices_post(body: MpTokenIn = MpTokenIn(), payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    return _mp_detectar(body.token)
+
+
+@router.post("/mp-diagnostico")
+def mp_diagnostico(body: MpTokenIn = MpTokenIn(), payload: dict = Depends(get_current_api_user)):
+    """Checklist paso a paso (token, cuenta, terminales en API nueva y anterior,
+    sucursales, cajas, terminal elegida, modo PDV) con el texto crudo de MP.
+    Solo lectura: no guarda ni cambia nada."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.services.mercadopago_service import mp_point
+    return mp_point.diagnostico(token=_token_from(body.token), device_id=body.device_id)
 
 
 class MpPdvIn(BaseModel):

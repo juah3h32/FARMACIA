@@ -453,7 +453,11 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             "monto_pagado": body.monto_pagado,
             "cambio": cambio,
         }
-        bg.add_task(printer_service.print_receipt, venta_data)
+        # Con tarjeta NO se imprime solo: la terminal ya da su comprobante y no
+        # entra dinero al cajón. Si el cliente pide el ticket con productos, el
+        # cajero lo imprime con "Imprimir ticket" (/pos/reimprimir, sin abrir cajón).
+        if body.metodo_pago != "tarjeta":
+            bg.add_task(printer_service.print_receipt, venta_data)
 
         ticket_texto = None
         try:
@@ -479,6 +483,53 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
     finally:
         _venta_lock.release()
         db.close()
+
+
+def venta_data_desde_bd(db, venta) -> dict:
+    """Datos del ticket de una venta YA registrada (folio real, lo que quedó
+    tras devoluciones) — para reimprimir o mandar el detalle a la terminal."""
+    from app.database.models import Usuario
+    cajero = db.query(Usuario).filter(Usuario.id == venta.usuario_id).first()
+    items = []
+    for it in venta.items:
+        if (it.cantidad or 0) <= 0:
+            continue
+        nombre = it.producto.nombre if it.producto else f"Producto {it.producto_id}"
+        if getattr(it, "es_pieza", False):
+            nombre += " (pieza)"
+        items.append({"nombre": nombre, "cantidad": it.cantidad, "precio_unitario": it.precio_unitario,
+                      "subtotal": it.subtotal})
+    return {
+        "folio": venta.folio,
+        "cajero": cajero.nombre if cajero else "Cajero",
+        "cliente": None,
+        "items": items,
+        "subtotal": venta.subtotal,
+        "descuento": venta.descuento or 0.0,
+        "iva": venta.iva or 0.0,
+        "total": venta.total,
+        "metodo_pago": venta.metodo_pago.value if venta.metodo_pago else "",
+        "monto_pagado": venta.monto_pagado,
+        "cambio": venta.cambio or 0.0,
+        "fecha": venta.creado_en.strftime("%d/%m/%Y %H:%M") if venta.creado_en else "",
+    }
+
+
+@router.post("/reimprimir/{venta_id}")
+def reimprimir_ticket(venta_id: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Imprime el ticket de una venta ya hecha (p. ej. pago con tarjeta que el
+    cliente pidió con productos). Nunca abre el cajón."""
+    from app.services.printer_service import printer_service
+    db = get_db_session()
+    try:
+        venta = db.query(Venta).filter(Venta.id == venta_id, Venta.eliminado.is_not(True)).first()
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        data = venta_data_desde_bd(db, venta)
+    finally:
+        db.close()
+    bg.add_task(printer_service.print_receipt, data, None, False)
+    return {"ok": True, "folio": data["folio"]}
 
 
 class ImprimirPruebaIn(BaseModel):
@@ -532,7 +583,7 @@ def imprimir_ticket_prueba(body: ImprimirPruebaIn, bg: BackgroundTasks, payload:
 
         from app.services.printer_service import printer_service
         ticket_texto = printer_service._build_ticket(venta_data, printer_service._load_farmacia_config())
-        bg.add_task(printer_service.print_receipt, venta_data)
+        bg.add_task(printer_service.print_receipt, venta_data, None, False)  # reimpresión: sin abrir cajón
 
         return {"ok": True, "folio": "PRUEBA-000", "total": total, "cambio": cambio, "ticket_texto": ticket_texto}
     except HTTPException:

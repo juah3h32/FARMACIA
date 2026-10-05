@@ -108,7 +108,7 @@
       <button id="mp-btn-retry" onclick="retryMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm text-white" style="background:#009EE3">Reintentar en terminal</button>
       <button id="mp-btn-reg" onclick="pollMpOrder(true)" class="w-full h-10 rounded-xl font-bold text-sm text-white hidden" style="background:#16A34A">Reintentar registrar venta</button>
       <button id="mp-btn-manual" onclick="mpCobrarManual()" class="w-full h-10 rounded-xl font-bold text-sm" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">Cobrar sin terminal (manual)</button>
-      <button onclick="closeMpModal(true)" class="w-full h-9 rounded-xl font-semibold text-xs" style="color:#64748B">Cerrar y volver al carrito</button>
+      <button id="mp-btn-close" onclick="closeMpModal(true)" class="w-full h-9 rounded-xl font-semibold text-xs" style="color:#64748B">Cerrar y volver al carrito</button>
     </div>
   </div>
 </div>
@@ -2608,24 +2608,32 @@
               class="h-9 px-4 rounded-xl font-bold text-xs flex items-center gap-2 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="zap" style="width:13px;height:13px"></i> Probar conexión
             </button>
-            <span id="test-result-mp" class="text-xs font-semibold"></span>
+            <button id="btn-diag-mp" onclick="diagnosticoMp()"
+              class="h-9 px-4 rounded-xl font-bold text-xs flex items-center gap-2 transition hover:opacity-80 shrink-0" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">
+              <i data-lucide="stethoscope" style="width:13px;height:13px"></i> Diagnóstico
+            </button>
           </div>
+          <!-- Mensaje persistente (los toasts desaparecen y el error de MP suele ser largo) -->
+          <div class="px-6 pt-2"><span id="test-result-mp" class="text-xs font-semibold" style="word-break:break-word;white-space:pre-line"></span></div>
+          <div id="mp-diag" class="px-6 pt-3 hidden"></div>
           <div class="p-6 flex flex-col gap-4 overflow-y-auto">
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="lbl">Access Token</label>
-                <input id="mp-token" type="password" class="inp" placeholder="APP_USR-...">
+                <input id="mp-token" type="password" class="inp" placeholder="APP_USR-..." autocomplete="off" onfocus="_mpTokenFocus(this)">
               </div>
               <div>
                 <label class="lbl">Terminal (ID)</label>
                 <div class="flex gap-2">
-                  <input id="mp-device" class="inp flex-1" placeholder="NEWLAND_N950__N950....">
+                  <input id="mp-device" class="inp flex-1" placeholder="DSPREAD_D20__... / NEWLAND_N950__...">
                   <button onclick="detectMpDevices()" class="h-10 px-3 rounded-xl font-semibold text-xs transition hover:opacity-80 flex items-center gap-1.5 shrink-0" style="background:#EEF1F9;color:#1d2140">
                     <i data-lucide="search" style="width:13px;height:13px"></i> Detectar
                   </button>
                 </div>
               </div>
             </div>
+            <!-- Lista de terminales detectadas / ayuda (en vez de prompt()/alert()) -->
+            <div id="mp-devices-list" class="hidden flex flex-col gap-2"></div>
             <div class="flex gap-3 flex-wrap">
               <button onclick="saveMpConfig()" class="h-10 px-5 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#16A34A">
                 <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
@@ -2637,9 +2645,10 @@
             <div class="rounded-xl p-3 text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
               <b>Pasos para la primera configuración:</b><br>
               1. En <b>mercadopago.com.mx → Tu negocio → Sucursales y cajas</b> crea una sucursal y una caja; con la app Mercado Pago vincula la Point Smart 2 a esa caja.<br>
-              2. En <b>mercadopago.com.mx/developers → Tus integraciones</b> crea una aplicación (producto: pagos presenciales / Point) y copia el <b>Access Token de PRODUCCIÓN</b> (APP_USR-…).<br>
+              2. En <b>mercadopago.com.mx/developers → Tus integraciones</b> crea una aplicación (producto: pagos presenciales / Point), entra a <b>Credenciales de producción</b>, actívalas (Industria, Sitio web, aceptar términos) y copia ese <b>Access Token</b>. (El de prueba también empieza con APP_USR-: asegúrate de copiar el de producción.)<br>
               3. Pégalo aquí → <b>Detectar</b> → elige la terminal de esta caja → <b>Guardar</b>.<br>
-              4. <b>Activar modo PDV</b> y luego <b>reinicia la terminal</b> (apagar/encender).<br>
+              4. <b>Activar modo PDV</b> (o en la terminal: Más opciones → Ajustes → Modo de vinculación → Punto de Venta) y luego <b>reinicia la terminal</b> (apagar/encender).<br>
+              Si algo falla, presiona <b>Diagnóstico</b>: revisa paso a paso y muestra lo que contesta Mercado Pago.<br>
               5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal y la venta se registra únicamente si el pago se aprueba.<br>
               <span style="color:#64748B">El token se comparte con las demás PCs por la nube; cada PC elige su propia terminal.</span>
             </div>
@@ -5421,6 +5430,24 @@
       <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:#1d2140">CAMBIO A ENTREGAR</p>
       <p id="pay-cambio" class="text-5xl font-black" style="color:#1d2140"></p>
     </div>
+    <!-- Con tarjeta no se imprime solo (la terminal da comprobante y no se abre
+         el cajón); el ticket con productos se imprime solo si el cliente lo pide -->
+    <p id="pay-nota-tarjeta" class="hidden text-xs mb-2 rounded-xl px-3 py-2" style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE">
+      Pago con tarjeta: no se imprimió ticket ni se abrió el cajón — la terminal entrega su comprobante.
+    </p>
+    <div id="pay-acciones" class="hidden gap-2 mb-3">
+      <button onclick="reimprimirUltimaVenta()" id="pay-btn-reimprimir"
+              class="flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              style="background:#F1F5F9;color:#1d2140;border:1px solid #CBD5E1">
+        <i data-lucide="printer" style="width:13px;height:13px"></i> Imprimir ticket
+      </button>
+      <button onclick="imprimirDetalleTerminal()" id="pay-btn-terminal"
+              class="hidden flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              style="background:#E0F5FF;color:#0369A1;border:1px solid #BAE8FF"
+              title="Imprime en la terminal Mercado Pago un comprobante con los productos (ej. Loratadina)">
+        <i data-lucide="smartphone" style="width:13px;height:13px"></i> Detalle en terminal
+      </button>
+    </div>
     <!-- Ticket preview (solo modo prueba) -->
     <div id="pay-ticket-preview-wrap" class="hidden mb-4">
       <div class="flex items-center justify-between mb-1">
@@ -5918,53 +5945,97 @@ async function loadMpStatus() {
   } catch(e) {}
 }
 
+// Mensaje que se queda visible en la ventana de Mercado Pago (el toast
+// desaparece en 3.5 s y el texto de Mercado Pago suele ser largo).
+function _mpMsg(txt, ok) {
+  const el = document.getElementById('test-result-mp');
+  if (!el) return;
+  el.textContent = txt || '';
+  el.style.color = ok === true ? '#15803D' : (ok === false ? '#DC2626' : '#64748B');
+  el.classList.remove('hidden');
+}
+
+// El campo muestra la máscara "••••abcd" del token guardado: al enfocarlo se
+// selecciona todo, así pegar el token nuevo la REEMPLAZA en vez de quedar
+// "••••abcdAPP_USR-..." (el backend también lo limpia por si acaso).
+function _mpTokenFocus(el) {
+  if (el && el.value.startsWith('••••')) { try { el.select(); } catch(e) {} }
+}
+
 async function saveMpConfig() {
   const token  = document.getElementById('mp-token')?.value.trim();
   const device = document.getElementById('mp-device')?.value.trim();
-  if (!token) { toast('Ingresa el Access Token', 'warning'); return; }
+  if (!token) { toast('Ingresa el Access Token', 'warning'); _mpMsg('Ingresa el Access Token', false); return; }
   const res = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device||'' }) });
   if (res.ok) {
     toast('Terminal Mercado Pago guardada', 'success');
     loadMpStatus();
     probarConexionIntegracion('mp', 'btn-test-mp', 'test-result-mp');
   }
-  else { const e=await res.json().catch(()=>({})); toast(e.detail||'Error al guardar', 'error'); }
+  else { const e=await res.json().catch(()=>({})); toast('Error al guardar', 'error'); _mpMsg(e.detail||'Error al guardar', false); }
 }
 
 async function detectMpDevices() {
   const token = document.getElementById('mp-token')?.value.trim();
+  const box = document.getElementById('mp-devices-list');
   if (!token) { toast('Primero ingresa el Access Token', 'warning'); return; }
-  // Token por query param (si viene enmascarado el backend usa el guardado) — no guarda nada
-  const res = await api(`/config/mp-devices?token=${encodeURIComponent(token)}`);
+  _mpMsg('Consultando Mercado Pago...', null);
+  if (box) { box.innerHTML = ''; box.classList.add('hidden'); }
+  // POST: el token va en el cuerpo, no en la URL (la URL queda en logs).
+  // Si viene enmascarado el backend usa el guardado. No guarda nada.
+  let res;
+  try {
+    res = await api('/config/mp-devices', { method:'POST', body: JSON.stringify({ token }) });
+  } catch(e) { _mpMsg('Sin conexión con el servidor local.', false); return; }
   if (!res.ok) {
     const e = await res.json().catch(()=>({}));
-    toast(e.detail || 'Error consultando Mercado Pago', 'error');
+    toast('Mercado Pago rechazó la consulta — ver detalle en la ventana', 'error');
+    _mpMsg((e.detail || 'Error consultando Mercado Pago') + '\nPresiona "Diagnóstico" para ver paso a paso qué falla.', false);
     return;
   }
   const d = await res.json();
+  const cta = d.cuenta && (d.cuenta.nickname || d.cuenta.user_id)
+    ? `cuenta ${d.cuenta.nickname || d.cuenta.user_id} (${d.cuenta.site_id || ''})` : '';
+  if (!box) return;
+  box.classList.remove('hidden');
   if (!d.devices?.length) {
-    alert([
-      'No se encontraron terminales en esta cuenta de Mercado Pago.',
-      '',
+    _mpMsg(`El token es válido${cta ? ' — ' + cta : ''}, pero la cuenta no tiene terminales vinculadas.`, false);
+    const help = document.createElement('div');
+    help.className = 'rounded-xl p-3 text-xs';
+    help.style.cssText = 'background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;line-height:1.6;white-space:pre-line';
+    help.textContent = [
       '1. En mercadopago.com.mx > Tu negocio > Sucursales y cajas: crea una sucursal y una caja.',
-      '2. En la app Mercado Pago (celular) vincula la Point Smart 2 a esa sucursal/caja',
-      '   (escaneando el QR que muestra la terminal).',
-      '3. Verifica que el Access Token sea el de PRODUCCION de la MISMA cuenta.',
-      '4. Regresa aqui y haz click en Detectar.'
-    ].join('\n'));
+      '2. En la app Mercado Pago (celular) vincula la Point Smart 2 a esa sucursal/caja (escaneando el QR que muestra la terminal).',
+      '3. Verifica que el Access Token sea el de Credenciales de PRODUCCIÓN de la MISMA cuenta.',
+      '4. Regresa aquí y haz click en Detectar (o en Diagnóstico).'
+    ].join('\n');
+    box.appendChild(help);
     return;
   }
+  _mpMsg(`Token válido${cta ? ' — ' + cta : ''}. ${d.devices.length} terminal(es): elige la de ESTA caja y luego Guardar.`, true);
   const pick = (dv) => {
     document.getElementById('mp-device').value = dv.id;
     const modo = (dv.operating_mode||'').toUpperCase();
-    toast(modo === 'PDV'
-      ? 'Terminal detectada (modo PDV) — haz click en Guardar'
-      : `Terminal detectada (modo ${modo||'?'}) — Guarda y luego "Activar modo PDV"`, 'success');
+    _mpMsg(modo === 'PDV'
+      ? `Terminal ${dv.id} elegida (modo PDV) — haz click en Guardar.`
+      : `Terminal ${dv.id} elegida (modo ${modo||'?'}) — Guarda y luego "Activar modo PDV" y reinicia la terminal.`, true);
+    box.querySelectorAll('button').forEach(b => { b.style.borderColor = b.dataset.id === dv.id ? '#16A34A' : '#E2E8F0'; });
   };
-  if (d.devices.length === 1) { pick(d.devices[0]); return; }
-  const list = d.devices.map((dv,i) => `${i+1}) ${dv.id}  [${dv.operating_mode||'?'}]${dv.external_pos_id?'  caja '+dv.external_pos_id:''}`).join('\n');
-  const n = parseInt(prompt(`Terminales encontradas — escribe el número de la de ESTA caja:\n\n${list}`, '1'), 10);
-  if (n >= 1 && n <= d.devices.length) pick(d.devices[n-1]);
+  // Lista con botones dentro del modal (antes prompt(): poco confiable en la
+  // ventana de escritorio y obligaba a teclear un número)
+  for (const dv of d.devices) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.id = dv.id;
+    b.className = 'text-left rounded-xl px-3 py-2 text-xs transition hover:bg-slate-50';
+    b.style.cssText = 'border:1.5px solid #E2E8F0;color:#1d2140';
+    const modo = (dv.operating_mode||'?').toUpperCase();
+    b.textContent = `${dv.id}  ·  modo ${modo}` + (dv.external_pos_id ? `  ·  caja ${dv.external_pos_id}` : (dv.pos_id ? `  ·  caja ${dv.pos_id}` : '  ·  SIN CAJA'))
+      + (dv.api === 'anterior' ? '  ·  API anterior' : '');
+    b.onclick = () => pick(dv);
+    box.appendChild(b);
+  }
+  if (d.devices.length === 1) pick(d.devices[0]);
 }
 
 async function activateMpPdv() {
@@ -5972,15 +6043,74 @@ async function activateMpPdv() {
   const device = document.getElementById('mp-device')?.value.trim();
   if (!token || !device) { toast('Ingresa Access Token y terminal primero', 'warning'); return; }
   const sv = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device }) });
-  if (!sv.ok) { const e=await sv.json().catch(()=>({})); toast(e.detail||'Error al guardar', 'error'); return; }
+  if (!sv.ok) { const e=await sv.json().catch(()=>({})); toast('Error al guardar', 'error'); _mpMsg(e.detail||'Error al guardar', false); return; }
+  _mpMsg('Activando modo PDV...', null);
   const res = await api('/config/mp-pdv', { method: 'POST', body: JSON.stringify({ token, device_id: device }) });
   const d = await res.json().catch(()=>({}));
   if (res.ok) {
-    toast(d.message || 'Modo PDV activado — reinicia la terminal', 'success');
+    toast('Modo PDV activado — reinicia la terminal', 'success');
+    _mpMsg(d.message || 'Modo PDV activado. REINICIA la terminal (apágala y enciéndela).', true);
     loadMpStatus();
   } else {
-    toast(d.detail || 'Error activando PDV', 'error');
+    toast('Error activando PDV — ver detalle en la ventana', 'error');
+    _mpMsg((d.detail || 'Error activando PDV') + '\nTambién puedes activarlo en la terminal: Más opciones > Ajustes > Modo de vinculación > Punto de Venta, y reiniciarla.', false);
   }
+}
+
+// Diagnóstico paso a paso (solo lectura): token, cuenta, terminales en la API
+// nueva y la anterior, sucursales, cajas, terminal elegida y modo PDV, con el
+// texto crudo que contesta Mercado Pago en cada paso.
+async function diagnosticoMp() {
+  const token  = document.getElementById('mp-token')?.value.trim() || '';
+  const device = document.getElementById('mp-device')?.value.trim() || '';
+  const box = document.getElementById('mp-diag');
+  const btn = document.getElementById('btn-diag-mp');
+  if (!box) return;
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  const wait = document.createElement('p');
+  wait.className = 'text-xs'; wait.style.color = '#64748B';
+  wait.textContent = 'Revisando con Mercado Pago, paso a paso...';
+  box.appendChild(wait);
+  if (btn) btn.disabled = true;
+  let d = null;
+  try {
+    const res = await api('/config/mp-diagnostico', { method:'POST', body: JSON.stringify({ token, device_id: device }) });
+    d = await res.json().catch(()=>({}));
+    if (!res.ok) { wait.textContent = d.detail || 'No se pudo ejecutar el diagnóstico.'; wait.style.color = '#DC2626'; return; }
+  } catch(e) {
+    wait.textContent = 'Sin conexión con el servidor local.'; wait.style.color = '#DC2626'; return;
+  } finally { if (btn) btn.disabled = false; }
+  box.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'rounded-xl p-3 flex flex-col gap-2';
+  card.style.cssText = 'background:#F8FAFC;border:1px solid #E2E8F0';
+  for (const p of (d.pasos || [])) {
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 text-xs';
+    const ico = document.createElement('span');
+    ico.style.cssText = 'font-weight:800;width:16px;flex-shrink:0;color:' + (p.ok === true ? '#16A34A' : (p.ok === false ? '#DC2626' : '#D97706'));
+    ico.textContent = p.ok === true ? '✓' : (p.ok === false ? '✗' : '!');
+    const txt = document.createElement('div');
+    txt.style.cssText = 'color:#1d2140;word-break:break-word';
+    const t1 = document.createElement('b'); t1.textContent = p.paso + ': ';
+    const t2 = document.createElement('span'); t2.textContent = p.detalle || '';
+    txt.appendChild(t1); txt.appendChild(t2);
+    if (p.mp) {
+      const raw = document.createElement('div');
+      raw.style.cssText = 'font-family:monospace;font-size:10px;color:#64748B;margin-top:2px';
+      raw.textContent = 'Mercado Pago: ' + p.mp;
+      txt.appendChild(raw);
+    }
+    row.appendChild(ico); row.appendChild(txt);
+    card.appendChild(row);
+  }
+  const concl = document.createElement('div');
+  concl.className = 'text-xs font-semibold pt-2';
+  concl.style.cssText = 'border-top:1px solid #E2E8F0;word-break:break-word;color:' + ((d.pasos || []).some(p => p.ok === false) ? '#DC2626' : '#15803D');
+  concl.textContent = d.conclusion || '';
+  card.appendChild(concl);
+  box.appendChild(card);
 }
 
 function _mpUuid() {
@@ -6006,12 +6136,18 @@ function _mpSetMode(mode) {
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
   const acts = document.getElementById('mp-modal-actions');
   const conAcciones = mode === 'failed' || mode === 'regfail';
-  show('mp-modal-wait', mode === 'waiting');
-  show('mp-btn-cancel', mode === 'waiting');
+  const esperando = mode === 'waiting' || mode === 'stuck';
+  show('mp-modal-wait', esperando);
+  show('mp-btn-cancel', esperando);
   if (acts) { acts.classList.toggle('hidden', !conAcciones); acts.classList.toggle('flex', conAcciones); }
   show('mp-btn-retry',  mode === 'failed');
   show('mp-btn-manual', mode === 'failed');
   show('mp-btn-reg',    mode === 'regfail');
+  show('mp-btn-close',  !esperando);
+  // 'stuck': no se pudo cancelar (sin red / MP rechaza): se sigue esperando el
+  // resultado, pero el cajero puede cerrar. Si el pago se aprueba después, la
+  // venta se recupera sola desde /pos/terminal/pendientes.
+  if (mode === 'stuck' && acts) { acts.classList.remove('hidden'); acts.classList.add('flex'); show('mp-btn-close', true); }
 }
 
 function _mpStopTimers() {
@@ -6139,8 +6275,10 @@ async function cancelMpPayment(auto) {
     }
     // Ya está en la terminal o sin red: se sigue esperando el resultado real
     _mpSetStatus(d.message || d.detail || 'No se pudo cancelar — sigue esperando el resultado.', 'warn');
+    if (d.status !== 'at_terminal') _mpSetMode('stuck');
   } catch(e) {
     _mpSetStatus('Sin conexión — no se pudo cancelar. Sigue esperando el resultado.', 'warn');
+    _mpSetMode('stuck');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -6169,6 +6307,7 @@ function _mpFinishSale(venta) {
   document.getElementById('pay-folio').textContent  = `Folio: ${venta.folio}`;
   document.getElementById('pay-total').textContent  = fmt(venta.total);
   document.getElementById('pay-cambio').textContent = fmt(0);
+  _mostrarAccionesVenta(venta, 'tarjeta', true);
   if (_mpSaleBody) {
     S._pruebaItems  = _mpSaleBody.items;
     S._pruebaPag    = venta.total;
@@ -7769,6 +7908,7 @@ async function _processSaleImpl() {
   if (S.user?.rol === 'cajero_prueba') {
     toast('MODO PRUEBA — venta simulada, sin cambios reales','warning');
     document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
+    _mostrarAccionesVenta(null, metodo, false);
     document.getElementById('pay-total').textContent=fmt(total);
     document.getElementById('pay-cambio').textContent=fmt(Math.max(0,pag-total));
     // Guardar carrito para imprimir prueba antes de limpiar
@@ -7803,7 +7943,14 @@ async function _processSaleImpl() {
     let mpEnabled = false;
     try {
       const mpRes = await api('/pos/terminal/estado');
-      if (mpRes.ok) mpEnabled = !!(await mpRes.json()).enabled;
+      if (mpRes.ok) {
+        const est = await mpRes.json();
+        // configured (hay token) pero sin terminal en esta PC: antes la venta se
+        // registraba como tarjeta SIN mandar nada a la terminal y sin avisar.
+        // Ahora se abre el modal de la terminal, que muestra el motivo exacto
+        // y ofrece "Cobrar sin terminal (manual)".
+        mpEnabled = !!(est.enabled || est.configured);
+      }
     } catch(e) { /* servidor local no respondió — flujo normal */ }
     if (mpEnabled) {
       _enableCobrarBtn(false);
@@ -7835,6 +7982,7 @@ async function _processSaleImpl() {
   document.getElementById('pay-folio').textContent=`Folio: ${data.folio}`;
   document.getElementById('pay-total').textContent=fmt(data.total);
   document.getElementById('pay-cambio').textContent=fmt(data.cambio);
+  _mostrarAccionesVenta(data, metodo, false);
   // Store for re-print button
   S._pruebaItems  = body.items;
   S._pruebaPag    = pag;
@@ -8252,7 +8400,44 @@ function pmPreviewDias(val) {
   else               { el.textContent=`Vigente — ${label}`;                        el.style.color='#16A34A'; }
 }
 
+// ── Ticket de la última venta ────────────────────────────────────────────────
+function _mostrarAccionesVenta(venta, metodo, porTerminal) {
+  S._ultimaVenta = venta && venta.id ? { id: venta.id, folio: venta.folio, metodo, porTerminal } : null;
+  const acc = document.getElementById('pay-acciones');
+  const nota = document.getElementById('pay-nota-tarjeta');
+  const btnT = document.getElementById('pay-btn-terminal');
+  const tarjeta = metodo === 'tarjeta';
+  if (acc) { acc.classList.toggle('hidden', !S._ultimaVenta); acc.classList.toggle('flex', !!S._ultimaVenta); }
+  if (nota) nota.classList.toggle('hidden', !(S._ultimaVenta && tarjeta));
+  if (btnT) { btnT.classList.toggle('hidden', !(S._ultimaVenta && porTerminal)); }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function reimprimirUltimaVenta() {
+  const v = S._ultimaVenta;
+  if (!v) return;
+  const btn = document.getElementById('pay-btn-reimprimir');
+  if (btn) btn.disabled = true;
+  const r = await api(`/pos/reimprimir/${v.id}`, { method: 'POST' });
+  if (btn) btn.disabled = false;
+  if (r.ok) toast(`Ticket ${v.folio} enviado a la impresora`, 'success');
+  else { const e = await r.json().catch(()=>({})); toast(e.detail || 'No se pudo imprimir', 'error'); }
+}
+
+async function imprimirDetalleTerminal() {
+  const v = S._ultimaVenta;
+  if (!v) return;
+  const btn = document.getElementById('pay-btn-terminal');
+  if (btn) btn.disabled = true;
+  const r = await api(`/pos/terminal/imprimir/${v.id}`, { method: 'POST' });
+  if (btn) btn.disabled = false;
+  if (r.ok) toast('Detalle enviado a la terminal — sale impreso en la Point', 'success');
+  else { const e = await r.json().catch(()=>({})); toast(e.detail || 'No se pudo imprimir en la terminal', 'error'); }
+}
+
 async function pmImprimirTicketPrueba() {
+  // Venta real: imprimir la venta registrada (folio real, sin abrir cajón)
+  if (S._ultimaVenta) { reimprimirUltimaVenta(); return; }
   if (!S._pruebaItems?.length) { toast('Sin datos de venta de prueba','warning'); return; }
   const btn = document.getElementById('btn-imprimir-prueba');
   if (btn) { btn.textContent='Imprimiendo...'; btn.disabled=true; }

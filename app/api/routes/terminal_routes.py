@@ -30,7 +30,8 @@ from app.api.routes.auth_routes import get_current_api_user
 from app.api.routes import pos_routes
 from app.database.connection import get_db_session
 from app.database.models import Producto, Lote, Venta
-from app.services.mercadopago_service import mp_point, MercadoPagoError, FINAL_STATES
+from app.services.mercadopago_service import (mp_point, MercadoPagoError, FINAL_STATES,
+                                              device_valido, referencia_externa)
 
 router = APIRouter()
 
@@ -206,8 +207,9 @@ def _respuesta(order_id: str, info: dict, bg: BackgroundTasks) -> dict:
     elif st == "expired":
         out["message"] = "Se agotó el tiempo: el cliente no pagó en la terminal"
     elif st == "action_required":
-        out["message"] = ("La terminal pide confirmar el resultado. Revisa la pantalla/ticket de la "
-                          "terminal: si salió APROBADO usa 'Cobrar sin terminal'; si no, cancela.")
+        # No es final (waiting_payment / check_on_terminal): se sigue consultando
+        out["message"] = ("La terminal pide una confirmación: revisa la pantalla de la terminal y "
+                          "confírmala ahí. El POS sigue esperando el resultado.")
     elif st == "at_terminal":
         out["message"] = "El cliente está pagando en la terminal..."
     elif st == "refunded":
@@ -218,21 +220,82 @@ def _respuesta(order_id: str, info: dict, bg: BackgroundTasks) -> dict:
     return out
 
 
+def _motivo_no_listo() -> str:
+    if not mp_point.access_token:
+        return "Terminal Mercado Pago no configurada: falta el Access Token (Configuración > Integraciones > Mercado Pago)."
+    if not device_valido(mp_point.device_id):
+        return ("Esta PC no tiene una terminal Mercado Pago elegida (o el ID es inválido). El administrador "
+                "debe abrir Configuración > Integraciones > Mercado Pago, Detectar y Guardar.")
+    return ""
+
+
 def _require_enabled():
     if not mp_point.enabled:
-        raise HTTPException(status_code=400, detail="Terminal Mercado Pago no configurada (Configuración > Mercado Pago)")
+        raise HTTPException(status_code=400, detail=_motivo_no_listo())
 
 
 @router.get("/estado")
 def estado(payload: dict = Depends(get_current_api_user)):
-    return {"enabled": mp_point.enabled, "device_id": mp_point.device_id if mp_point.enabled else ""}
+    mp_point.recargar()  # token cambiado en otra PC / terminal guardada recién
+    # configured=True con enabled=False: hay token pero falta la terminal en esta
+    # PC → el POS NO debe registrar la tarjeta en silencio como si no hubiera terminal.
+    return {"enabled": mp_point.enabled, "configured": bool(mp_point.access_token),
+            "device_id": mp_point.device_id if mp_point.enabled else "",
+            "motivo": _motivo_no_listo()}
+
+
+def _descripcion_productos(body) -> str:
+    """Descripción del cobro con los productos (ej. "Farmacia Eben-Ezer: Loratadina
+    10mg x1, Paracetamol x2") — se ve en la actividad de Mercado Pago. El
+    comprobante de pago de la terminal tiene formato fijo; el detalle impreso
+    se manda aparte con /terminal/imprimir/{venta_id}."""
+    try:
+        ids = [i.producto_id for i in body.items]
+        db = get_db_session()
+        try:
+            nombres = {p.id: p.nombre for p in db.query(Producto).filter(Producto.id.in_(ids)).all()}
+        finally:
+            db.close()
+        partes = [f"{nombres.get(i.producto_id, 'Producto')} x{i.cantidad}" for i in body.items]
+        return (f"{cfg.PHARMACY_NAME}: " + ", ".join(partes))[:150]
+    except Exception:
+        return f"{cfg.PHARMACY_NAME}"[:150]
+
+
+@router.post("/imprimir/{venta_id}")
+def imprimir_detalle_en_terminal(venta_id: int, payload: dict = Depends(get_current_api_user)):
+    """Imprime en la propia terminal un comprobante con los productos de la venta
+    (Terminals API, actions type=print). Útil cuando se cobró con tarjeta y el
+    cliente quiere saber qué medicamentos pagó."""
+    _require_enabled()
+    from app.api.routes.pos_routes import venta_data_desde_bd
+    from app.services.mercadopago_service import texto_ticket_terminal
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        venta = db.query(Venta).filter(Venta.id == venta_id, Venta.eliminado.is_not(True)).first()
+        if not venta:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        data = venta_data_desde_bd(db, venta)
+        conf = {c.clave: c.valor for c in db.query(Configuracion).filter(
+            Configuracion.clave.in_(["farmacia_nombre", "sucursal_nombre"])).all()}
+    finally:
+        db.close()
+    texto = texto_ticket_terminal(data, conf.get("farmacia_nombre") or cfg.PHARMACY_NAME,
+                                  conf.get("sucursal_nombre") or "")
+    try:
+        mp_point.imprimir_en_terminal(texto, f"detalle-{data['folio']}")
+    except MercadoPagoError as e:
+        raise HTTPException(status_code=e.http_status, detail=e.message)
+    return {"ok": True}
 
 
 @router.post("/cobro")
 def iniciar_cobro(body: CobroTerminalIn, payload: dict = Depends(get_current_api_user)):
     _require_enabled()
     _load()
-    ref = (body.client_ref or "").strip()[:64] or str(uuid.uuid4())
+    # external_reference de MP: solo [A-Za-z0-9_-], ≤64 (también es la llave de idempotencia)
+    ref = referencia_externa((body.client_ref or "").strip() or uuid.uuid4().hex)
     with _lock:
         # Mismo client_ref = reintento del mismo clic (red lenta) → misma orden
         for oid, p in _pend.items():
@@ -249,7 +312,7 @@ def iniciar_cobro(body: CobroTerminalIn, payload: dict = Depends(get_current_api
                 p["status"] = st
                 if st == "created":
                     try:
-                        mp_point.cancel_order(oid)
+                        mp_point.cancel_order(oid, p.get("terminal_id"))
                         p["status"] = "canceled"
                     except MercadoPagoError:
                         pass
@@ -265,9 +328,9 @@ def iniciar_cobro(body: CobroTerminalIn, payload: dict = Depends(get_current_api
         raise HTTPException(status_code=400, detail="El total debe ser mayor a $0 para cobrar con terminal")
     try:
         order = mp_point.create_order(total, ref, idempotency_key=ref,
-                                      description=f"{cfg.PHARMACY_NAME}"[:150])
+                                      description=_descripcion_productos(body))
     except MercadoPagoError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+        raise HTTPException(status_code=e.http_status, detail=e.message)
     info = mp_point.resumen(order)
     oid = info["order_id"]
     if not oid:
@@ -293,9 +356,10 @@ def consultar_cobro(order_id: str, bg: BackgroundTasks, payload: dict = Depends(
     try:
         info = mp_point.resumen(mp_point.get_order(order_id))
     except MercadoPagoError as e:
-        if e.status_code in (401, 403):
-            raise HTTPException(status_code=e.status_code, detail=e.message)
-        # Sin internet / MP caído: NO es un rechazo — el front sigue esperando
+        # Sin internet / MP caído / token rechazado: NO es un rechazo del pago y
+        # la orden puede seguir viva en la terminal → el front sigue esperando y
+        # muestra el error (antes 401/403 se trataba como "venta no registrada" y
+        # un 401 además cerraba la sesión del cajero).
         return {"order_id": order_id, "status": "unknown", "final": False, "offline": True,
                 "message": f"{e.message} Reintentando..."}
     return _respuesta(order_id, info, bg)
@@ -313,7 +377,7 @@ def cancelar_cobro(order_id: str, bg: BackgroundTasks, payload: dict = Depends(g
     st = info["status"]
     if st == "created":
         try:
-            info = mp_point.resumen(mp_point.cancel_order(order_id))
+            info = mp_point.resumen(mp_point.cancel_order(order_id, _pend[order_id].get("terminal_id")))
             if not info.get("status"):
                 info["status"] = "canceled"
         except MercadoPagoError as e:

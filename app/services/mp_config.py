@@ -6,7 +6,8 @@
 - Terminal (device id): normalmente una por caja → el archivo local de cada PC
   manda; la tabla `configuracion` guarda la última elegida como valor por
   defecto para PCs que aún no eligieron la suya.
-Prioridad: variable de entorno > archivo local > tabla configuracion.
+Prioridad token: variable de entorno > tabla configuracion > archivo local.
+Prioridad terminal: variable de entorno > archivo local > tabla configuracion.
 """
 import os
 import app.config as cfg
@@ -58,7 +59,10 @@ def _write_db(clave: str, valor: str) -> None:
 
 
 def cargar_config() -> tuple[str, str]:
-    token = os.getenv("MP_ACCESS_TOKEN", "") or _read_file(_TOKEN_FILE) or _read_db(_K_TOKEN)
+    # Token: la tabla `configuracion` va ANTES que el archivo local. Si el dueño
+    # cambia el token en otra PC, el archivo viejo de esta PC ya no lo tapa
+    # (antes esta PC seguía usando el token anterior para siempre).
+    token = os.getenv("MP_ACCESS_TOKEN", "") or _read_db(_K_TOKEN) or _read_file(_TOKEN_FILE)
     device = os.getenv("MP_DEVICE_ID", "") or _read_file(_DEVICE_FILE) or _read_db(_K_DEVICE)
     return token.strip(), device.strip()
 

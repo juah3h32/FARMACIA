@@ -209,7 +209,7 @@ class PrinterService:
 
     # ── Impresión ─────────────────────────────────────────────────────────────
 
-    def print_receipt(self, venta_data: dict, farmacia_config: dict = None):
+    def print_receipt(self, venta_data: dict, farmacia_config: dict = None, abrir_cajon: bool = True):
         if farmacia_config is None:
             farmacia_config = self._load_farmacia_config()
 
@@ -229,9 +229,11 @@ class PrinterService:
             self._print_to_console(venta_data, farmacia_config)
             return False
 
-        # Abrir cajón para pagos en efectivo o mixto
+        # Abrir cajón SOLO al cobrar en efectivo o mixto — con tarjeta/transferencia
+        # (incluido el cobro aprobado en la terminal Mercado Pago) no entra dinero
+        # al cajón. Una reimpresión (abrir_cajon=False) nunca lo abre.
         metodo_pago = venta_data.get("metodo_pago", "")
-        if metodo_pago in ("efectivo", "mixto"):
+        if abrir_cajon and metodo_pago in ("efectivo", "mixto"):
             self.open_cash_drawer()
 
         try:
