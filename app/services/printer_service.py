@@ -366,6 +366,14 @@ class PrinterService:
         lines = [sep]
         for ln in self._word_wrap(nombre, W):
             lines.append(ln.center(W))
+        # Mismo nombre y logo en todas las sucursales — la línea de sucursal
+        # (ej. "SUCURSAL LOPEZ MATEOS") es lo que distingue el ticket. "Matriz"
+        # sin renombrar no se imprime, para no cambiar el ticket actual.
+        suc = _s(cfg_d.get("sucursal_nombre") or "").strip()
+        if suc and suc.lower() != "matriz":
+            suc_txt = suc.upper() if suc.upper().startswith("SUCURSAL") else f"SUCURSAL {suc.upper()}"
+            for ln in self._word_wrap(suc_txt, W):
+                lines.append(ln.center(W))
         for ln in self._word_wrap(direccion, W):
             lines.append(ln.center(W))
         lines.append(sep)

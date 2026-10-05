@@ -28,6 +28,28 @@ def _precio_lookup(db, venta_ids) -> dict:
     return {(vid, pid): precio for vid, pid, precio in rows}
 
 
+# Desde v2.3.57 (5-jul-2026, ~19:00) registrar_devolucion ya REDUCE la venta
+# original (items_venta.cantidad/subtotal y venta.total). Restar además el
+# movimiento de devolución descontaba ese dinero DOS veces del Control de Caja.
+# Solo las devoluciones anteriores a ese cambio (venta.total intacto) deben
+# restarse aparte.
+DEV_AJUSTA_VENTA_DESDE = datetime(2026, 7, 5, 19, 0, 0)
+
+
+def _valor_devoluciones(db, dev_movs) -> float:
+    """Dinero de devoluciones parciales que NO está ya descontado de venta.total."""
+    movs = [m for m in dev_movs if m.creado_en and m.creado_en < DEV_AJUSTA_VENTA_DESDE]
+    if not movs:
+        return 0.0
+    precios = _precio_lookup(db, {m.referencia_id for m in movs})
+    total = 0.0
+    for mov in movs:
+        precio = precios.get((mov.referencia_id, mov.producto_id))
+        if precio is not None:
+            total += precio * mov.cantidad
+    return total
+
+
 def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) -> float:
     """
     Monetary value of partial returns processed by usuario_id in [desde, hasta].
@@ -46,15 +68,7 @@ def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) ->
         )
         .all()
     )
-    if not dev_movs:
-        return 0.0
-    precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
-    total = 0.0
-    for mov in dev_movs:
-        precio = precios.get((mov.referencia_id, mov.producto_id))
-        if precio is not None:
-            total += precio * mov.cantidad
-    return total
+    return _valor_devoluciones(db, dev_movs)
 
 
 def _calc_disponibles(db):
@@ -82,13 +96,7 @@ def _calc_disponibles(db):
         MovimientoStock.tipo == TipoMovimiento.devolucion,
         MovimientoStock.referencia_tipo == "devolucion",
     ).all()
-    total_devoluciones = 0.0
-    if dev_movs:
-        precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
-        for mov in dev_movs:
-            precio = precios.get((mov.referencia_id, mov.producto_id))
-            if precio is not None:
-                total_devoluciones += precio * mov.cantidad
+    total_devoluciones = _valor_devoluciones(db, dev_movs)
 
     ventas_netas = tv - total_devoluciones
     # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
@@ -525,6 +533,8 @@ def registrar_retiro(body: RetiroIn, bg: BackgroundTasks, payload: dict = Depend
                 creado_en = parsed.replace(hour=23, minute=59, second=0)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Fecha inválida, usa YYYY-MM-DD")
+            if parsed.date() > datetime.now().date():
+                raise HTTPException(status_code=400, detail="La fecha del retiro no puede ser futura")
         else:
             creado_en = datetime.now()
 
@@ -708,6 +718,18 @@ def editar_retiro(retiro_id: int, body: EditarRetiroIn, bg: BackgroundTasks, pay
             raise HTTPException(status_code=404, detail="Retiro no encontrado")
         tipo_anterior = r.tipo
         concepto_anterior = r.concepto
+        if body.tipo is not None and body.tipo != (tipo_anterior or "personal"):
+            # Cambiar el tipo mueve el monto al otro saldo — mismo límite que al
+            # registrarlo; si no, pasar un retiro de inversión a personal
+            # saltaba el tope de ganancia disponible.
+            gan_disp, cap_inv = _calc_disponibles(db)
+            limite = gan_disp if body.tipo == "personal" else cap_inv
+            if r.monto > limite + 0.005:
+                nombre = "Ganancia disponible" if body.tipo == "personal" else "Capital de inversión disponible"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Saldo insuficiente para cambiar el tipo. {nombre}: ${limite:.2f}",
+                )
         if body.tipo is not None:
             r.tipo = body.tipo
         if body.concepto is not None:
@@ -784,13 +806,7 @@ def resumen_ganancia(
             MovimientoStock.tipo == TipoMovimiento.devolucion,
             MovimientoStock.referencia_tipo == "devolucion",
         ).all()
-        total_devoluciones = 0.0
-        if dev_movs:
-            precios = _precio_lookup(db, {m.referencia_id for m in dev_movs})
-            for mov in dev_movs:
-                precio = precios.get((mov.referencia_id, mov.producto_id))
-                if precio is not None:
-                    total_devoluciones += precio * mov.cantidad
+        total_devoluciones = _valor_devoluciones(db, dev_movs)
 
         ventas_netas        = tv - total_devoluciones
         # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
@@ -834,13 +850,7 @@ def resumen_ganancia(
             total_costo_p = _costo_ventas(db, vids_p)
 
             dev_movs_p = [m for m in dev_movs if m.creado_en and d_ini <= m.creado_en <= d_fin]
-            total_dev_p = 0.0
-            if dev_movs_p:
-                precios_p = _precio_lookup(db, {m.referencia_id for m in dev_movs_p})
-                for mov in dev_movs_p:
-                    precio = precios_p.get((mov.referencia_id, mov.producto_id))
-                    if precio is not None:
-                        total_dev_p += precio * mov.cantidad
+            total_dev_p = _valor_devoluciones(db, dev_movs_p)
 
             retiros_p = [r for r in all_retiros if r.creado_en and d_ini <= r.creado_en <= d_fin]
             ret_personal_p  = sum(r.monto for r in retiros_p if (r.tipo or "personal") == "personal")
@@ -874,6 +884,97 @@ def resumen_ganancia(
             }
 
         return result
+    finally:
+        db.close()
+
+
+@router.get("/ganancia-mensual")
+def ganancia_mensual(anio: Optional[int] = None, payload: dict = Depends(get_current_api_user)):
+    """Ganancia mes por mes de un año — misma fórmula que /cortes/ganancia
+    (ventas netas de devoluciones, sin IVA, menos costo congelado) para que la
+    suma de los 12 meses cuadre con el resumen. Admin only."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    anio = anio or datetime.now().year
+    ini, fin = datetime(anio, 1, 1), datetime(anio + 1, 1, 1)
+    db = get_db_session()
+    try:
+        filtro_venta = (Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+        anios = sorted({
+            int(a) for (a,) in db.query(func.strftime("%Y", Venta.creado_en))
+            .filter(*filtro_venta, Venta.creado_en.isnot(None)).distinct().all() if a
+        } | {anio}, reverse=True)
+
+        meses = [{
+            "mes": m, "num_ventas": 0, "total_ventas": 0.0, "iva": 0.0, "total_costo": 0.0,
+            "total_devoluciones": 0.0, "efectivo": 0.0, "tarjeta": 0.0, "transferencia": 0.0,
+            "retiros_personales": 0.0, "retiros_inversion": 0.0,
+        } for m in range(1, 13)]
+
+        ventas = db.query(Venta).filter(*filtro_venta, Venta.creado_en >= ini, Venta.creado_en < fin).all()
+        mes_de_venta = {}
+        for v in ventas:
+            d = meses[v.creado_en.month - 1]
+            mes_de_venta[v.id] = d
+            d["num_ventas"] += 1
+            d["total_ventas"] += v.total or 0.0
+            d["iva"] += v.iva or 0.0
+            if v.metodo_pago == MetodoPago.efectivo:
+                d["efectivo"] += v.total or 0.0
+            elif v.metodo_pago == MetodoPago.tarjeta:
+                d["tarjeta"] += v.total or 0.0
+            elif v.metodo_pago == MetodoPago.transferencia:
+                d["transferencia"] += v.total or 0.0
+
+        if mes_de_venta:
+            for vid, cant, costo in (
+                db.query(ItemVenta.venta_id, ItemVenta.cantidad, ItemVenta.costo_unitario)
+                .filter(ItemVenta.venta_id.in_(list(mes_de_venta))).all()
+            ):
+                mes_de_venta[vid]["total_costo"] += (cant or 0) * (costo or 0.0)
+
+        dev_movs = db.query(MovimientoStock).filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_tipo == "devolucion",
+            MovimientoStock.creado_en >= ini, MovimientoStock.creado_en < fin,
+        ).all()
+        for m in range(1, 13):
+            movs_m = [x for x in dev_movs if x.creado_en.month == m]
+            if movs_m:
+                meses[m - 1]["total_devoluciones"] = _valor_devoluciones(db, movs_m)
+
+        for r in db.query(RetiroCaja).filter(RetiroCaja.creado_en >= ini, RetiroCaja.creado_en < fin).all():
+            d = meses[r.creado_en.month - 1]
+            if (r.tipo or "personal") == "inversion":
+                d["retiros_inversion"] += r.monto or 0.0
+            else:
+                d["retiros_personales"] += r.monto or 0.0
+
+        for d in meses:
+            d["ventas_netas"] = d["total_ventas"] - d["total_devoluciones"]
+            base = d["ventas_netas"] - d["iva"]
+            d["ganancia"] = base - d["total_costo"]
+            d["margen"] = (d["ganancia"] / base * 100) if base > 0 else 0.0
+            d["ticket_promedio"] = d["total_ventas"] / d["num_ventas"] if d["num_ventas"] else 0.0
+            for k, val in list(d.items()):
+                if isinstance(val, float):
+                    d[k] = round(val, 2)
+
+        con_ventas = [d for d in meses if d["num_ventas"]]
+        mejor = max(con_ventas, key=lambda d: d["ganancia"], default=None)
+        peor = min(con_ventas, key=lambda d: d["ganancia"], default=None)
+        tot = lambda k: round(sum(d[k] for d in meses), 2)
+        return {
+            "anio": anio,
+            "anios": anios,
+            "meses": meses,
+            "mejor_mes": mejor["mes"] if mejor else None,
+            "peor_mes": peor["mes"] if peor and peor is not mejor else None,
+            "totales": {k: tot(k) for k in (
+                "num_ventas", "total_ventas", "total_devoluciones", "ventas_netas", "iva",
+                "total_costo", "ganancia", "retiros_personales", "retiros_inversion",
+            )},
+        }
     finally:
         db.close()
 

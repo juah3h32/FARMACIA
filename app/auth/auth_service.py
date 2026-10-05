@@ -54,9 +54,15 @@ def is_admin() -> bool:
     return current_user is not None and current_user.rol == RolUsuario.admin
 
 
-def create_api_token(user_id: int, username: str, nombre: str = "", rol: str = "cajero") -> str:
+def create_api_token(user_id: int, username: str, nombre: str = "", rol: str = "cajero",
+                     typ: str = "pos") -> str:
+    """typ separa tokens de empleados del POS ("pos") y de clientes de la app
+    ("cliente"): ambos se firman con la misma SECRET_KEY y el `sub` es un id de
+    tablas distintas — sin esto, el cliente id=1 de la app pasaba como el
+    Usuario id=1 (admin) del POS."""
     expire = datetime.utcnow() + timedelta(hours=config.ACCESS_TOKEN_EXPIRE_HOURS)
-    payload = {"sub": str(user_id), "username": username, "nombre": nombre, "rol": rol, "exp": expire}
+    payload = {"sub": str(user_id), "username": username, "nombre": nombre, "rol": rol,
+               "exp": expire, "typ": typ}
     return jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
 
 
@@ -65,7 +71,7 @@ def create_long_token(user_id: int, username: str, nombre: str = "", rol: str = 
     expire = datetime.utcnow() + timedelta(days=days)
     payload = {
         "sub": str(user_id), "username": username, "nombre": nombre, "rol": rol,
-        "exp": expire, "token_name": token_name, "long_lived": True,
+        "exp": expire, "token_name": token_name, "long_lived": True, "typ": "pos",
     }
     return jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
 

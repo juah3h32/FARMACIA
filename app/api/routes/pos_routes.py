@@ -52,6 +52,8 @@ class CreateVentaIn(BaseModel):
     monto_pagado: float
     descuento_global: float = 0.0
     notas: Optional[str] = None
+    # Id de orden/pago de la terminal Mercado Pago (solo lo llena terminal_routes)
+    referencia_pago: Optional[str] = None
 
 
 def _gen_folio() -> str:
@@ -73,12 +75,47 @@ def _precio_esperado(prod, es_pieza: bool) -> float:
     return prod.precio_venta
 
 
+def _costo_esperado(prod, es_pieza: bool) -> float:
+    """Costo de compra de UNA unidad vendida de la línea — precio_compra es por
+    caja, así que una pieza suelta cuesta la parte proporcional, no la caja
+    completa (antes se congelaba el costo de la caja por cada pieza vendida,
+    inflando el costo y bajando la ganancia del Control de Caja)."""
+    costo = prod.precio_compra or 0.0
+    if prod.venta_fraccionada and es_pieza:
+        return costo / (prod.unidades_por_caja or 1)
+    return costo
+
+
+def item_es_pieza(item, prod) -> bool:
+    """¿La línea de venta fue por pieza suelta? Usa items_venta.es_pieza; para
+    ventas anteriores a esa columna lo infiere: el precio cobrado está más
+    cerca del precio por pieza que del de caja."""
+    if getattr(item, "es_pieza", False):
+        return True
+    if not prod or not prod.venta_fraccionada or (prod.unidades_por_caja or 1) <= 1:
+        return False
+    precio_pieza = (prod.precio_pieza if prod.precio_pieza and prod.precio_pieza > 0
+                    else (prod.precio_venta or 0) / prod.unidades_por_caja)
+    return abs((item.precio_unitario or 0) - precio_pieza) < abs((item.precio_unitario or 0) - (prod.precio_venta or 0))
+
+
+def reponer_stock(prod, cantidad: int, es_pieza: bool) -> None:
+    """Regresa al inventario `cantidad` unidades de una línea vendida
+    (cancelación o devolución): piezas a piezas_sueltas, cajas a stock."""
+    if es_pieza and prod.venta_fraccionada:
+        prod.piezas_sueltas = (prod.piezas_sueltas or 0) + cantidad
+    else:
+        prod.stock = (prod.stock or 0) + cantidad
+
+
 def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
     """
     Decrement lote quantities in FEFO order (earliest expiry first).
     Lotes without fecha_vencimiento are consumed last.
     Silently handles products without lotes (legacy/pre-lote-tracking).
     """
+    from datetime import date as _date
+    hoy = _date.today()
     lotes = (
         db.query(Lote)
         .filter(Lote.producto_id == producto_id, Lote.cantidad > 0)
@@ -88,6 +125,10 @@ def _fefo_consume(db, producto_id: int, cantidad: int) -> None:
         )
         .all()
     )
+    # Vigentes primero (FEFO), vencidos al final: antes el "primero en caducar"
+    # era justo el lote ya vencido, así que la venta descontaba de producto
+    # caducado y dejaba el vigente intacto en el sistema.
+    lotes.sort(key=lambda l: l.fecha_vencimiento is not None and l.fecha_vencimiento < hoy)
     remaining = cantidad
     for lote in lotes:
         if remaining <= 0:
@@ -130,6 +171,14 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             if item.cantidad <= 0:
                 raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
+        # Guard: descuentos solo con rol admin — la pantalla del POS no ofrece
+        # descuentos, pero el backend aceptaba de cualquier cajero hasta el 100%
+        # (venta de $500 registrada en $0).
+        if payload.get("rol") != "admin" and (
+            (body.descuento_global or 0) > 0 or any((i.descuento or 0) > 0 for i in body.items)
+        ):
+            raise HTTPException(status_code=403, detail="Solo un administrador puede aplicar descuentos")
+
         # Guard: reject if all available lotes are expired (no usable stock)
         from datetime import date as _date
         hoy = _date.today()
@@ -151,7 +200,28 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                         detail=f"'{prod.nombre}' tiene todos los lotes vencidos — no se puede vender",
                     )
 
-        # Guard: reject if insufficient stock before any decrement
+        # Guard: stock por PRODUCTO sumando todas sus líneas — antes se validaba
+        # línea por línea, así que dos líneas del mismo producto (o caja + pieza)
+        # pasaban cada una por separado y se vendía más de lo que había (el
+        # max(0, ...) de abajo escondía el faltante).
+        pedido: dict[int, list] = {}
+        for item in body.items:
+            cajas_pz = pedido.setdefault(item.producto_id, [0, 0])
+            cajas_pz[1 if item.es_pieza else 0] += item.cantidad
+        for pid, (cajas, piezas) in pedido.items():
+            prod = products.get(pid)
+            if not prod:
+                continue
+            upc = (prod.unidades_por_caja or 1) if prod.venta_fraccionada else 1
+            disponibles_pz = (prod.stock or 0) * upc + ((prod.piezas_sueltas or 0) if prod.venta_fraccionada else 0)
+            if cajas > (prod.stock or 0) or cajas * upc + piezas > disponibles_pz:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(f"Stock insuficiente: '{prod.nombre}' — disponible {prod.stock or 0} "
+                            f"{prod.unidad_caja or 'caja(s)' if prod.venta_fraccionada else ''}"
+                            + (f" + {prod.piezas_sueltas or 0} {prod.unidad_pieza or 'pieza(s)'}" if prod.venta_fraccionada else "")
+                            + f", solicitado {cajas} " + (f"caja(s) + {piezas} pieza(s)" if prod.venta_fraccionada else "")).replace("  ", " "),
+                )
         for item in body.items:
             prod = products.get(item.producto_id)
             if not prod:
@@ -203,6 +273,11 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
         # the sale's own subtotal (both would push total below zero).
         descuento_global = min(max(body.descuento_global, 0.0), subtotal)
         base   = subtotal - descuento_global
+        # El IVA va sobre el precio YA descontado: el descuento global se reparte
+        # proporcional entre las líneas (antes se cobraba IVA sobre el precio
+        # sin descuento — p. ej. $16 en vez de $14.40).
+        if subtotal > 0 and descuento_global:
+            iva_total *= base / subtotal
         total  = base + iva_total
         cambio = max(0.0, body.monto_pagado - total)
         folio  = _gen_folio()
@@ -237,13 +312,17 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
             cambio=cambio,
             estado=EstadoVenta.completada,
             notas=body.notas,
+            referencia_pago=(body.referencia_pago or None),
             creado_en=_dt.now(),
         )
         db.add(venta)
         db.flush()  # Get venta.id for items
 
         usuario_id = int(payload["sub"])
-        for idx, item in enumerate(body.items):
+        # Cajas completas antes que piezas: si una línea de piezas abriera cajas
+        # primero, la línea de caja del mismo producto podía quedarse sin stock.
+        orden = sorted(enumerate(body.items), key=lambda t: bool(t[1].es_pieza))
+        for idx, item in orden:
             precio    = precios_validos[idx]
             descuento = descuentos_validos[idx]
             prod = products[item.producto_id]
@@ -257,7 +336,8 @@ def crear_venta(body: CreateVentaIn, bg: BackgroundTasks, payload: dict = Depend
                 # Congelado al momento de vender — Control de Caja debe usar
                 # SIEMPRE este valor, nunca Producto.precio_compra en vivo
                 # (ver costo_unitario en models.py).
-                costo_unitario=prod.precio_compra or 0.0,
+                costo_unitario=_costo_esperado(prod, item.es_pieza),
+                es_pieza=bool(prod.venta_fraccionada and item.es_pieza),
             ))
             stock_ant = prod.stock
             import math as _math

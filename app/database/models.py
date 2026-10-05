@@ -182,6 +182,10 @@ class Venta(Base):
     eliminado_en = Column(DateTime, nullable=True)
     facturada = Column(Boolean, default=False)
     cfdi_global_id = Column(Integer, ForeignKey("cfdi_facturas_globales.id"), nullable=True)
+    # Cobro con terminal (Mercado Pago Point): id de la orden MP ("ORD...") y del
+    # pago — para conciliar contra el panel de MP y evitar registrar dos veces
+    # la misma orden. Null en ventas de efectivo/tarjeta manual.
+    referencia_pago = Column(String(120), nullable=True)
 
     usuario = relationship("Usuario", back_populates="ventas")
     cliente = relationship("Cliente", back_populates="ventas")
@@ -213,6 +217,10 @@ class ItemVenta(Base):
     # ya cerradas se recalculaba con el costo ACTUAL cada vez que alguien
     # editaba el costo de un producto, corriendo el Control de Caja histórico.
     costo_unitario = Column(Float, default=0.0)
+    # Línea vendida por pieza suelta (producto fraccionado) — sin esto, cancelar
+    # o devolver una venta de piezas reponía CAJAS. Ventas viejas: ver
+    # pos_routes.item_es_pieza (lo infiere por precio).
+    es_pieza = Column(Boolean, default=False)
 
     venta = relationship("Venta", back_populates="items")
     producto = relationship("Producto", back_populates="items_venta")
@@ -399,6 +407,9 @@ class CortesCaja(Base):
     abierto_en = Column(DateTime, default=_dt.now)
     cerrado_en = Column(DateTime, nullable=True)
     notas = Column(Text)
+    # Para el sync entre PCs: "gana el último que escribió" — sin esto una copia
+    # vieja de Turso reabría turnos ya cerrados o revertía sus totales.
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
     usuario = relationship("Usuario", back_populates="cortes")
     retiros = relationship("RetiroCaja", back_populates="corte", cascade="all, delete-orphan")
@@ -421,6 +432,8 @@ class RetiroCaja(Base):
     concepto = Column(Text)
     tipo = Column(SAEnum("personal", "inversion", name="tipo_retiro"), default="personal")
     creado_en = Column(DateTime, default=_dt.now)
+    # Ver CortesCaja.actualizado_en — evita que un pull revierta la edición de un retiro.
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
 
     corte = relationship("CortesCaja", back_populates="retiros")
     usuario = relationship("Usuario")

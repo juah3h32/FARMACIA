@@ -101,7 +101,10 @@ def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current
     switched_to_turso = False
     if cfg.TURSO_DATABASE_URL and cfg.TURSO_AUTH_TOKEN and cfg.SYNC_MODE != "turso":
         try:
-            cfg.SETUP_FILE.write_text(json.dumps({"sync_mode": "turso"}), encoding="utf-8")
+            # Conservar el resto de setup.json (p. ej. la sucursal de esta PC)
+            _setup = cfg._load_setup()
+            _setup["sync_mode"] = "turso"
+            cfg.SETUP_FILE.write_text(json.dumps(_setup), encoding="utf-8")
             cfg.reload_setup()
             switched_to_turso = True
         except Exception:
@@ -160,22 +163,33 @@ def set_catalogo_publico(body: CatalogoPublicoIn, payload: dict = Depends(get_cu
     return {"ok": True, "restart_required": True}
 
 
-# ── Mercado Pago Point ────────────────────────────────────────────────────────
+# ── Mercado Pago Point (Orders API) ───────────────────────────────────────────
+# Ver app/services/mercadopago_service.py para el porqué de cada endpoint.
 
 class MpSaveIn(BaseModel):
-    token: str
+    token: Optional[str] = ""
     device_id: Optional[str] = ""
+
+
+def _mp_device_valid(device_id: str) -> bool:
+    # IDs reales: "NEWLAND_N950__N950NCB801293324", "GERTEC_MP35P__..." etc.
+    return bool(device_id and len(device_id) > 8 and " " not in device_id and not device_id.isdigit())
+
+
+def _mp_raise(e):
+    raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/mp-status")
 def mp_status(payload: dict = Depends(get_current_api_user)):
     from app.services.mercadopago_service import mp_point
+    mp_point.ensure_loaded()
     device_id = mp_point.device_id
-    # Device IDs reales de MP son alfanuméricos (NEWLAND_ME30SU__...). Solo dígitos = inválido.
-    valid_device = bool(device_id and len(device_id) > 8 and not device_id.isdigit())
+    valid_device = _mp_device_valid(device_id)
     return {
-        "enabled":   mp_point.enabled and valid_device,
+        "enabled":   bool(mp_point.access_token) and valid_device,
         "token_set": bool(mp_point.access_token),
+        "token_mask": _mask(mp_point.access_token),
         "device_id": device_id if valid_device else "",
     }
 
@@ -184,52 +198,51 @@ def mp_status(payload: dict = Depends(get_current_api_user)):
 def mp_save(body: MpSaveIn, payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    token  = body.token.strip()
-    device = body.device_id.strip() if body.device_id else ""
+    from app.services.mercadopago_service import mp_point
+    from app.services.mp_config import guardar_config
+    mp_point.ensure_loaded()
+    token = (body.token or "").strip()
+    if token.startswith(_MASK_PREFIX):
+        token = ""  # campo enmascarado sin tocar — conservar el guardado
+    token = token or mp_point.access_token
+    device = (body.device_id or "").strip()
     if not token:
         raise HTTPException(status_code=400, detail="Access Token requerido")
-    (cfg.DATA_DIR / "mp_access_token.key").write_text(token, encoding="utf-8")
-    # Solo guarda device_id si tiene formato válido (alfanumérico, no solo dígitos)
-    valid_device = bool(device and len(device) > 8 and not device.isdigit())
-    if valid_device:
-        (cfg.DATA_DIR / "mp_device_id.key").write_text(device, encoding="utf-8")
-    elif not device:
-        # Limpiar archivo si se guardó sin device_id
-        kf = cfg.DATA_DIR / "mp_device_id.key"
-        if kf.exists():
-            kf.unlink()
-    cfg.MP_ACCESS_TOKEN = token
-    cfg.MP_DEVICE_ID    = device if valid_device else ""
+    if device and not _mp_device_valid(device):
+        raise HTTPException(status_code=400, detail="ID de terminal inválido — usa el botón Detectar")
+    guardar_config(token, device)
+    mp_point.configure(token, device or mp_point.device_id)
+    return {"ok": True, "enabled": mp_point.enabled}
+
+
+def _token_from(token: Optional[str]) -> str:
     from app.services.mercadopago_service import mp_point
-    mp_point.configure(token, cfg.MP_DEVICE_ID)
-    return {"ok": True, "enabled": mp_point.enabled and valid_device}
+    mp_point.ensure_loaded()
+    t = (token or "").strip()
+    if not t or t.startswith(_MASK_PREFIX):
+        t = mp_point.access_token
+    return t
 
 
 @router.get("/mp-devices")
 def mp_devices(token: Optional[str] = None, payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    from app.services.mercadopago_service import mp_point, MercadoPagoPointService
-    import requests as _req
-    # Usa token del query param (temporal, sin guardar) o el configurado
-    use_token = (token or "").strip() or mp_point.access_token
+    from app.services.mercadopago_service import mp_point, MercadoPagoError
+    use_token = _token_from(token)
     if not use_token:
         raise HTTPException(status_code=400, detail="Access Token no configurado")
     try:
-        headers = {"Authorization": f"Bearer {use_token}", "Content-Type": "application/json"}
-        r = _req.get("https://api.mercadopago.com/point/integration-api/devices", headers=headers, timeout=10)
-        if r.status_code == 401:
-            raise HTTPException(status_code=401, detail="Token inválido o sin permisos de Point")
-        if r.status_code == 403:
-            raise HTTPException(status_code=403, detail="La cuenta no tiene acceso a la API de Point. Activa la integración en developers.mercadopago.com")
-        r.raise_for_status()
-        data = r.json()
-        devices = data.get("devices", [])
-        return {"devices": devices}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error MP API: {e}")
+        terms = mp_point.list_terminals(token=use_token)
+    except MercadoPagoError as e:
+        _mp_raise(e)
+    # Se conserva la llave "devices" que ya usa el frontend
+    return {"devices": [
+        {"id": t.get("id"), "operating_mode": t.get("operating_mode", ""),
+         "store_id": t.get("store_id"), "pos_id": t.get("pos_id"),
+         "external_pos_id": t.get("external_pos_id")}
+        for t in terms
+    ]}
 
 
 class MpPdvIn(BaseModel):
@@ -237,81 +250,25 @@ class MpPdvIn(BaseModel):
     device_id: Optional[str] = ""
 
 
-_MP_ERRORS = {
-    "111": "Acción no soportada por la terminal",
-    "112": "Terminal no configurada para integración. Enciende la terminal, conéctala a WiFi y vuelve a intentarlo.",
-    "113": "Terminal no permite esta acción ahora. Asegúrate de que esté ENCENDIDA y conectada a WiFi/datos.",
-}
-
-
 @router.post("/mp-pdv")
 def mp_set_pdv(body: MpPdvIn = MpPdvIn(), payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
-    import requests as _req
-    from app.services.mercadopago_service import mp_point
-    token     = (body.token or "").strip() or mp_point.access_token
+    from app.services.mercadopago_service import mp_point, MercadoPagoError
+    token = _token_from(body.token)
     device_id = (body.device_id or "").strip() or mp_point.device_id
     if not token or not device_id:
-        raise HTTPException(status_code=400, detail="Guarda el Access Token y Device ID primero, luego activa PDV")
+        raise HTTPException(status_code=400, detail="Guarda el Access Token y elige la terminal primero")
     try:
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        r = _req.patch(
-            f"https://api.mercadopago.com/point/integration-api/devices/{device_id}",
-            headers=headers, json={"operating_mode": "PDV"}, timeout=15,
-        )
-        if r.status_code == 200:
-            mp_point.configure(token, device_id)
-            return {"ok": True}
-        data = r.json()
-        mp_error = str(data.get("error", ""))
-        friendly = _MP_ERRORS.get(mp_error, data.get("message", "Error desconocido"))
-        raise HTTPException(status_code=502, detail=friendly)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error de red: {e}")
-
-
-# ── MP Payment Intent (usado por processSale en webview) ─────────────────────
-
-@router.post("/mp-intent")
-def mp_create_intent(body: dict, payload: dict = Depends(get_current_api_user)):
-    from app.services.mercadopago_service import mp_point
-    if not mp_point.enabled:
-        raise HTTPException(status_code=400, detail="Terminal MP no configurada")
-    amount    = float(body.get("amount", 0))
-    reference = str(body.get("reference", ""))
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Monto inválido")
-    mp_point.cancel_current_intent()
-    try:
-        intent = mp_point.create_payment_intent(amount, reference)
-        return {"intent_id": intent.get("id"), "state": intent.get("state")}
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error creando intent: {e}")
-
-
-@router.get("/mp-intent/{intent_id}")
-def mp_get_intent(intent_id: str, payload: dict = Depends(get_current_api_user)):
-    from app.services.mercadopago_service import mp_point
-    if not mp_point.access_token:
-        raise HTTPException(status_code=400, detail="Token MP no configurado")
-    try:
-        data = mp_point.get_payment_intent(intent_id)
-        return {
-            "state":       data.get("state"),
-            "payment":     data.get("payment", {}),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error consultando intent: {e}")
-
-
-@router.delete("/mp-intent")
-def mp_cancel_intent(payload: dict = Depends(get_current_api_user)):
-    from app.services.mercadopago_service import mp_point
-    mp_point.cancel_current_intent()
-    return {"ok": True}
+        data = mp_point.set_pdv_mode(device_id, token=token)
+    except MercadoPagoError as e:
+        _mp_raise(e)
+    modo = ""
+    for t in (data.get("terminals") or []):
+        if t.get("id") == device_id:
+            modo = t.get("operating_mode", "")
+    return {"ok": True, "operating_mode": modo or "PDV",
+            "message": "Modo PDV activado. REINICIA la terminal (apágala y enciéndela) para que aplique."}
 
 
 # ── WhatsApp Alertas (CallMeBot) ─────────────────────────────────────────────
@@ -493,5 +450,71 @@ def set_facturacion(body: FacturacionIn, payload: dict = Depends(get_current_api
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ── Sucursal (nombre de sucursal y dirección para tickets y pantalla) ────────
+# Todas las sucursales comparten nombre comercial y logo; lo que cambia es el
+# nombre de la sucursal (ej. "13 de Abril", "López Mateos") y su dirección.
+# Cada sucursal tiene su propia BD, así que estos datos viven en su tabla
+# configuracion y se sincronizan entre las cajas de ESA sucursal. La clave la
+# fija setup.json de cada PC (cfg.SUCURSAL_CLAVE) y no se edita desde aquí.
+_SUCURSAL_CAMPOS = {
+    "sucursal_nombre":    "nombre_sucursal",
+    "farmacia_nombre":    "nombre_farmacia",
+    "farmacia_direccion": "direccion",
+    "farmacia_telefono":  "telefono",
+}
+
+
+def _leer_sucursal(db) -> dict:
+    from app.database.models import Configuracion
+    filas = {c.clave: c.valor for c in db.query(Configuracion).filter(
+        Configuracion.clave.in_(list(_SUCURSAL_CAMPOS)))}
+    out = {campo: (filas.get(clave) or "") for clave, campo in _SUCURSAL_CAMPOS.items()}
+    out["nombre_farmacia"] = out["nombre_farmacia"] or cfg.PHARMACY_NAME
+    out["clave"] = cfg.SUCURSAL_CLAVE
+    return out
+
+
+@router.get("/sucursal")
+def get_sucursal():
+    """Público (sin login): la pantalla de inicio de sesión muestra el nombre y
+    logo de la sucursal. No contiene nada sensible."""
+    from app.database.connection import get_db_session
+    db = get_db_session()
+    try:
+        return _leer_sucursal(db)
+    finally:
+        db.close()
+
+
+class SucursalIn(BaseModel):
+    nombre_sucursal: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+@router.post("/sucursal")
+def set_sucursal(body: SucursalIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        datos = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+        for clave, campo in _SUCURSAL_CAMPOS.items():
+            val = datos.get(campo)
+            if val is None or campo == "nombre_farmacia":  # nombre comercial: igual en todas
+                continue
+            row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+            if row:
+                row.valor = val.strip()
+            else:
+                db.add(Configuracion(clave=clave, valor=val.strip()))
+        db.commit()
+        return {"ok": True, **_leer_sucursal(db)}
     finally:
         db.close()

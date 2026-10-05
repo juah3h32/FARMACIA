@@ -16,6 +16,7 @@ from datetime import datetime
 
 import requests as _requests
 import app.config as cfg
+from app.database import ids_pc as _ids_pc
 
 BACKUP_DIR     = cfg.DATA_DIR / "backups"
 BACKUP_KEEP    = 7  # days of local backups to retain
@@ -78,6 +79,24 @@ _TS_INCREMENTAL = frozenset({
 # non-full-sync tables. Still fully resynced on the PULL side (_FULL_SYNC) so a wiped
 # local DB gets it all back.
 _PUSH_APPEND_ONLY = frozenset({"items_venta"})
+
+# Tablas de dinero editables (cerrar turno, editar retiro): last-writer-wins por
+# actualizado_en en ambos sentidos. Antes era INSERT OR REPLACE ciego — una PC
+# con copia vieja reabría turnos cerrados o revertía el tipo de un retiro.
+_LWW_CAJA = frozenset({"cortes_caja", "retiros_caja"})
+
+
+def _lww_upsert_sql(table: str, cols: list) -> str:
+    """UPSERT que solo aplica la fila entrante si es más reciente. NULL-safe:
+    filas anteriores a la columna actualizado_en cuentan como ''."""
+    newer = (f"COALESCE(excluded.actualizado_en, '') > "
+             f"COALESCE({table}.actualizado_en, '')")
+    set_clause = ", ".join(
+        f"{c} = CASE WHEN {newer} THEN excluded.{c} ELSE {table}.{c} END"
+        for c in cols if c != "id"
+    )
+    return (f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)}) "
+            f"ON CONFLICT(id) DO UPDATE SET {set_clause}")
 
 # Watermark per table: last id synced to Turso (append-only tables), or last
 # actualizado_en synced (ts-incremental tables). Persisted to disk so restarts
@@ -173,13 +192,14 @@ def _py_to_turso(v):
     return {"type": "text", "value": str(v)}
 
 
-def _turso_batch(stmts: list[dict]) -> None:
+def _turso_batch(stmts: list[dict]) -> int:
     """
     Send multiple SQL statements in one (or a few) HTTP pipeline call(s).
     stmts = [{"sql": "...", "args": [...]}, ...]
     """
     if not stmts:
-        return
+        return 0
+    n_errors = 0
     BATCH = 200  # statements per HTTP call
     url, hdrs = _turso_pipeline_url(), _turso_headers()
 
@@ -201,6 +221,8 @@ def _turso_batch(stmts: list[dict]) -> None:
             # Log all errors but don't abort — partial sync is better than no sync
             for msg in errors:
                 print(f"[Sync] Turso stmt error: {msg}")
+            n_errors += len(errors)
+    return n_errors
 
 
 def _turso_read_table(table: str) -> tuple[list[str], list[tuple]]:
@@ -288,26 +310,22 @@ def eliminar_venta(venta_id: int, restaurar_stock: bool = True) -> dict:
 
         folio = venta.folio or str(venta_id)
 
-        # 1. Restore stock via MovimientoStock records
-        movements = (db.query(MovimientoStock)
-                     .filter(MovimientoStock.referencia_id == venta_id,
-                             MovimientoStock.referencia_tipo == "venta")
-                     .all())
-        restored = False
-        for mov in movements:
-            prod = db.query(Producto).filter(Producto.id == mov.producto_id).first()
-            if restaurar_stock and prod and mov.cantidad and mov.cantidad > 0:
-                prod.stock += mov.cantidad
-                restored = True
-            db.delete(mov)
-
-        # 2. Fallback: restore from items when no movements exist
-        if restaurar_stock and not restored:
-            items = db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).all()
-            for item in items:
+        # 1. Reponer stock desde items_venta — su cantidad YA está neta de
+        # devoluciones parciales (antes se reponía desde los movimientos de la
+        # venta original y una venta con devolución parcial se reponía dos
+        # veces), y cada línea sabe si fue pieza o caja (antes las piezas
+        # volvían como cajas completas).
+        from app.api.routes.pos_routes import item_es_pieza, reponer_stock
+        if restaurar_stock:
+            for item in db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).all():
                 prod = db.query(Producto).filter(Producto.id == item.producto_id).first()
                 if prod and item.cantidad and item.cantidad > 0:
-                    prod.stock += item.cantidad
+                    reponer_stock(prod, item.cantidad, item_es_pieza(item, prod))
+        for mov in (db.query(MovimientoStock)
+                    .filter(MovimientoStock.referencia_id == venta_id,
+                            MovimientoStock.referencia_tipo == "venta")
+                    .all()):
+            db.delete(mov)
 
         # 3. Delete items locally
         db.query(ItemVenta).filter(ItemVenta.venta_id == venta_id).delete(
@@ -423,6 +441,36 @@ def import_from_turso() -> bool:
             lconn.close()
 
 
+_sucursal_ok = False
+
+
+def _sucursal_coincide() -> bool:
+    """Seguro anti-cruce: esta PC solo sincroniza con la BD de SU sucursal.
+    Si alguien cambia la URL de Turso a la de otra sucursal en una PC con
+    datos, el push subiría las ventas/inventario de una sucursal a la otra.
+    Compara configuracion.sucursal_clave de la nube con la de setup.json.
+    Una BD de nube sin clave (la matriz antes de esta versión) se acepta y
+    queda marcada con la clave local en el siguiente push."""
+    global _sucursal_ok
+    if _sucursal_ok:
+        return True
+    try:
+        cols, rows = _turso_read_table("configuracion")
+    except Exception:
+        return False  # sin red: no sincronizar a ciegas
+    if not cols:
+        return False  # no se pudo leer (sin red / error): reintentar en el próximo ciclo
+    if "clave" in cols and "valor" in cols:
+        ci, vi = cols.index("clave"), cols.index("valor")
+        nube = next((r[vi] for r in rows if r[ci] == "sucursal_clave"), None)
+        if nube and str(nube).strip().lower() != cfg.SUCURSAL_CLAVE:
+            print(f"[Sync] BLOQUEADO: esta PC es de la sucursal '{cfg.SUCURSAL_CLAVE}' pero la "
+                  f"BD de la nube es de '{nube}'. Revisa la URL de Turso en Configuración.")
+            return False
+    _sucursal_ok = True
+    return True
+
+
 def sync_to_turso(only_incremental: bool = False) -> None:
     """
     Push local SQLite data to Turso via batched HTTP pipeline.
@@ -440,10 +488,16 @@ def sync_to_turso(only_incremental: bool = False) -> None:
     tenga que releer y resubir tablas enteras que no cambiaron — esas tablas
     igual se sincronizan completas en cada latido (ver start_background_sync).
     """
+    if not _sucursal_coincide():
+        return
     with _lock:
         lconn = _local_conn()
         try:
             synced = 0
+            try:
+                _push_tombstones(lconn)
+            except Exception as e:
+                print(f"[Sync] sync_borrados push warning: {e}")
             for table in _TABLE_ORDER:
                 try:
                     if table in _TS_INCREMENTAL:
@@ -532,6 +586,8 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                                     f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
                                     f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
                                 )
+                            elif table in _LWW_CAJA and "actualizado_en" in cols:
+                                upsert = _lww_upsert_sql(table, cols)
                             else:
                                 upsert = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
 
@@ -545,6 +601,12 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                                     "sql": f"DELETE FROM {table} WHERE id NOT IN ({ids_str})",
                                     "args": [],
                                 })
+                            borrados = _tombstones(lconn, table) if table in _NO_TURSO_DELETE else set()
+                            if borrados:
+                                rows = [r for r in rows if r["id"] not in borrados]
+                                ids_b = ", ".join(str(i) for i in sorted(borrados))
+                                stmts.append({"sql": f"DELETE FROM {table} WHERE id IN ({ids_b})",
+                                              "args": []})
                             for row in rows:
                                 stmts.append({"sql": upsert,
                                               "args": [_py_to_turso(v) for v in tuple(row)]})
@@ -553,10 +615,19 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                         _turso_batch(stmts)
 
                     else:
+                        # Dos rangos (ver ids_pc.py): ids viejos (< ID_BLOQUE) con el
+                        # watermark de siempre, e ids del bloque de ESTA PC con el suyo.
+                        # Nunca un watermark global: tras jalar items_venta de otra PC
+                        # (ids de su bloque) el watermark saltaba por encima del bloque
+                        # propio y las ventas nuevas de esta PC ya no se subían.
+                        base = _ids_pc.base_pc()
+                        key_pc = f"{table}@pc"
                         last_id = _watermarks.get(table, 0)
+                        last_pc = max(_watermarks.get(key_pc, base), base)
                         rows = lconn.execute(
-                            f"SELECT * FROM {table} WHERE id > ? ORDER BY id",
-                            (last_id,),
+                            f"SELECT * FROM {table} WHERE (id > ? AND id < ?) "
+                            f"OR (id > ? AND id < ?) ORDER BY id",
+                            (last_id, _ids_pc.ID_BLOQUE, last_pc, base + _ids_pc.ID_BLOQUE),
                         ).fetchall()
 
                         if not rows:
@@ -569,7 +640,12 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                         stmts   = [{"sql": sql, "args": [_py_to_turso(v) for v in tuple(row)]}
                                    for row in rows]
                         _turso_batch(stmts)
-                        _watermarks[table] = max(row["id"] for row in rows)
+                        viejos = [row["id"] for row in rows if row["id"] < _ids_pc.ID_BLOQUE]
+                        propios = [row["id"] for row in rows if row["id"] >= _ids_pc.ID_BLOQUE]
+                        if viejos:
+                            _watermarks[table] = max(viejos)
+                        if propios:
+                            _watermarks[key_pc] = max(propios)
                         synced += len(rows)
 
                 except Exception as e:
@@ -612,6 +688,76 @@ def upsert_ids_to_turso(table: str, ids: list[int]) -> None:
         _turso_batch(stmts)
 
 
+_COSTOS_TURSO_MARK = cfg.DATA_DIR / "costos_items_venta_turso_v3.done"
+
+
+def reparar_costos_turso() -> None:
+    """
+    Una sola vez por PC: re-sube a Turso el costo_unitario de TODOS los
+    items_venta locales que ya lo tienen. El push normal de items_venta es
+    append-only por id, así que las filas que ya estaban en Turso antes de
+    congelar el costo se quedaron allá con 0 para siempre — y cada pull las
+    regresaba en 0 a todas las PCs. Solo actualiza la columna de costo (nunca
+    cantidad/subtotal). Solo marca como hecho si Turso no reportó errores.
+    """
+    if _COSTOS_TURSO_MARK.exists():
+        return
+    with _lock:
+        lconn = _local_conn()
+        try:
+            rows = lconn.execute(
+                "SELECT id, costo_unitario FROM items_venta WHERE COALESCE(costo_unitario, 0) <> 0"
+            ).fetchall()
+        finally:
+            lconn.close()
+        # Sube el costo local aunque Turso tenga otro distinto de 0: la migración
+        # v2 también corrige líneas de pieza que traían el costo de la caja entera.
+        sql = ("UPDATE items_venta SET costo_unitario = ? "
+               "WHERE id = ? AND COALESCE(costo_unitario, 0) <> ?")
+        errores = _turso_batch([
+            {"sql": sql, "args": [_py_to_turso(float(r["costo_unitario"])), _py_to_turso(r["id"]),
+                                  _py_to_turso(float(r["costo_unitario"]))]}
+            for r in rows
+        ])
+    if errores:
+        print(f"[Sync] reparar_costos_turso: {errores} errores — se reintenta en el próximo arranque")
+        return
+    _COSTOS_TURSO_MARK.write_text("1", encoding="utf-8")
+    print(f"[Sync] reparar_costos_turso: {len(rows)} costos de items_venta subidos a Turso")
+
+
+# ── Borrados que viajan entre PCs ────────────────────────────────────────────
+# Las tablas de _NO_TURSO_DELETE nunca se borran "por ausencia", así que un
+# borrado hecho en una PC no llegaba a las demás: la otra PC seguía teniendo la
+# fila y la volvía a subir en su push completo → el retiro/gasto borrado
+# "resucitaba". Cada borrado se anota en sync_borrados (local y en Turso, solo
+# se agregan filas, nunca se quitan); el push nunca sube esos ids y el pull
+# los elimina localmente.
+_TOMB_DDL = ("CREATE TABLE IF NOT EXISTS sync_borrados ("
+             "tabla TEXT NOT NULL, id INTEGER NOT NULL, PRIMARY KEY (tabla, id))")
+_TOMB_INSERT = "INSERT OR IGNORE INTO sync_borrados (tabla, id) VALUES (?, ?)"
+
+
+def _tombstones(lconn, table: str) -> set:
+    lconn.execute(_TOMB_DDL)
+    return {r[0] for r in lconn.execute("SELECT id FROM sync_borrados WHERE tabla = ?", (table,))}
+
+
+def _push_tombstones(lconn) -> None:
+    lconn.execute(_TOMB_DDL)
+    rows = lconn.execute("SELECT tabla, id FROM sync_borrados").fetchall()
+    _turso_batch([{"sql": _TOMB_DDL, "args": []}] + [
+        {"sql": _TOMB_INSERT, "args": [_py_to_turso(t), _py_to_turso(i)]} for t, i in rows
+    ])
+
+
+def _pull_tombstones(lconn) -> None:
+    lconn.execute(_TOMB_DDL)
+    cols, rows = _turso_read_table("sync_borrados")
+    if cols and rows:
+        lconn.executemany(_TOMB_INSERT, [tuple(r) for r in rows])
+
+
 def delete_ids_from_turso(table: str, ids: list[int]) -> None:
     """
     Explicit, immediate delete of specific row ids in Turso.
@@ -624,6 +770,17 @@ def delete_ids_from_turso(table: str, ids: list[int]) -> None:
     if not ids:
         return
     with _lock:
+        if table in _NO_TURSO_DELETE:
+            lconn = _local_conn()
+            try:
+                lconn.execute(_TOMB_DDL)
+                lconn.executemany(_TOMB_INSERT, [(table, int(i)) for i in ids])
+                lconn.commit()
+            finally:
+                lconn.close()
+            _turso_batch([{"sql": _TOMB_DDL, "args": []}] +
+                         [{"sql": _TOMB_INSERT, "args": [_py_to_turso(table), _py_to_turso(int(i))]}
+                          for i in ids])
         ids_str = ", ".join(str(int(i)) for i in ids)
         _turso_batch([{"sql": f"DELETE FROM {table} WHERE id IN ({ids_str})", "args": []}])
 
@@ -634,11 +791,17 @@ def sync_from_turso() -> int:
     Runs on every startup so that products added on other PCs appear locally.
     Returns total rows merged.
     """
+    if not _sucursal_coincide():
+        return 0
     with _lock:
         lconn = _local_conn()
         try:
             lconn.execute("PRAGMA foreign_keys = OFF")
             total = 0
+            try:
+                _pull_tombstones(lconn)
+            except Exception as e:
+                print(f"[Sync] sync_borrados pull warning: {e}")
             for table in _TABLE_ORDER:
                 if table not in _FULL_SYNC:
                     continue
@@ -704,6 +867,13 @@ def sync_from_turso() -> int:
                                 f"{c}=CASE WHEN excluded.actualizado_en > ventas.actualizado_en"
                                 f" THEN excluded.{c} ELSE ventas.{c} END"
                             ) if _has_ts and c != "actualizado_en"
+                            else (
+                                # Nunca bajar el timestamp local: una venta editada aquí
+                                # (devolución) que aún no se subía quedaba bajo el
+                                # watermark y jamás llegaba a la otra PC.
+                                "actualizado_en = MAX(COALESCE(excluded.actualizado_en, ''),"
+                                " COALESCE(ventas.actualizado_en, ''))"
+                            ) if c == "actualizado_en"
                             else f"{c} = excluded.{c}"
                             for c in cols if c != "id"
                         )
@@ -742,6 +912,32 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(clave) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql, rows)
+                    elif table == "items_venta" and "costo_unitario" in cols:
+                        # items_venta se sube por watermark de id (append-only), así que
+                        # Turso conserva costo_unitario=0 en las filas subidas ANTES de
+                        # que existiera esa columna. Con INSERT OR REPLACE, cada pull
+                        # pisaba el costo congelado local con ese 0 → la ganancia y el
+                        # capital de inversión del Control de Caja "brincaban" solos
+                        # (se notaba al editar inventario, que dispara la sincronización).
+                        # Un costo local ya congelado nunca se reemplaza por el de Turso.
+                        # Igual con cantidad/subtotal/descuento: solo BAJAN (devoluciones
+                        # parciales), así que una copia vieja de Turso no puede regresar
+                        # la cantidad previa a una devolución local aún no subida.
+                        def _col_items(c):
+                            if c == "costo_unitario":
+                                return ("costo_unitario = CASE WHEN COALESCE(items_venta.costo_unitario, 0) <> 0"
+                                        " THEN items_venta.costo_unitario ELSE excluded.costo_unitario END")
+                            if c in ("cantidad", "subtotal", "descuento"):
+                                return f"{c} = MIN(excluded.{c}, items_venta.{c})"
+                            return f"{c} = excluded.{c}"
+                        set_clause = ", ".join(_col_items(c) for c in cols if c != "id")
+                        sql = (
+                            f"INSERT INTO items_venta ({col_str}) VALUES ({ph_str}) "
+                            f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
+                        )
+                        lconn.executemany(sql, rows)
+                    elif table in _LWW_CAJA and "actualizado_en" in cols:
+                        lconn.executemany(_lww_upsert_sql(table, cols), rows)
                     else:
                         sql = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql, rows)
@@ -749,6 +945,12 @@ def sync_from_turso() -> int:
                     print(f"[Sync] <- Turso {table}: {len(rows)} rows")
                 except Exception as e:
                     print(f"[Sync] sync_from_turso warning — {table}: {e}")
+            # Quitar localmente las filas borradas en cualquier PC (ver sync_borrados).
+            for table in _NO_TURSO_DELETE:
+                borrados = _tombstones(lconn, table)
+                if borrados:
+                    ids_b = ", ".join(str(i) for i in sorted(borrados))
+                    lconn.execute(f"DELETE FROM {table} WHERE id IN ({ids_b})")
             lconn.execute("PRAGMA foreign_keys = ON")
             lconn.commit()
             print(f"[Sync] Pull complete — {total} rows merged from Turso")
@@ -982,6 +1184,16 @@ def start_image_watch(interval: int = 12) -> threading.Thread:
     return t
 
 
+_bg_thread: threading.Thread | None = None
+
+
+def asegurar_background_sync(interval: int = 180) -> None:
+    """Arranca el hilo de sync si no está corriendo — para cuando una sucursal
+    que trabajaba solo local se conecta a la nube sin reiniciar el programa."""
+    if _bg_thread is None or not _bg_thread.is_alive():
+        start_background_sync(interval=interval)
+
+
 def start_background_sync(interval: int = 30) -> threading.Thread:
     """Daemon thread: daily backup + bidirectional sync every cycle.
 
@@ -998,6 +1210,10 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
             sync_to_turso()
         except Exception as e:
             print(f"[Sync] Initial push error: {e}")
+        try:
+            reparar_costos_turso()
+        except Exception as e:
+            print(f"[Sync] reparar_costos_turso error: {e}")
         # Then pull to get changes from other PCs
         try:
             sync_from_turso()
@@ -1037,7 +1253,9 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
                 except Exception as e:
                     print(f"[Sync] Pull error: {e}")
 
+    global _bg_thread
     t = threading.Thread(target=_loop, daemon=True, name="TursoSync")
     t.start()
+    _bg_thread = t
     print(f"[Sync] Background sync started (push on write + pull every {interval}s)")
     return t

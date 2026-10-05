@@ -562,24 +562,28 @@ def _check_removebg() -> dict:
 
 
 def _check_mp() -> dict:
-    from app.services.mercadopago_service import mp_point
+    from app.services.mercadopago_service import mp_point, MercadoPagoError
+    mp_point.ensure_loaded()
     if not mp_point.access_token:
         return {"ok": True, "enabled": False, "message": "Mercado Pago no está configurado."}
     try:
-        import requests as _req
-        r = _req.get(
-            "https://api.mercadopago.com/point/integration-api/devices",
-            headers={"Authorization": f"Bearer {mp_point.access_token}"},
-            timeout=6,
-        )
-        if r.status_code == 401:
-            return {"ok": False, "enabled": True, "message": "Token de Mercado Pago inválido."}
-        if r.status_code == 403:
-            return {"ok": False, "enabled": True, "message": "La cuenta no tiene acceso a la API de Point."}
-        r.raise_for_status()
-        return {"ok": True, "enabled": True, "message": "Conectado."}
+        terms = mp_point.list_terminals()
+    except MercadoPagoError as e:
+        return {"ok": False, "enabled": True, "message": e.message[:200]}
     except Exception as e:
         return {"ok": False, "enabled": True, "message": f"Sin conexión con Mercado Pago: {str(e)[:150]}"}
+    if not mp_point.device_id:
+        return {"ok": False, "enabled": True,
+                "message": f"Token válido ({len(terms)} terminal(es) en la cuenta) — falta elegir la terminal."}
+    t = next((t for t in terms if t.get("id") == mp_point.device_id), None)
+    if not t:
+        return {"ok": False, "enabled": True,
+                "message": "La terminal guardada no aparece en esta cuenta de Mercado Pago."}
+    modo = (t.get("operating_mode") or "").upper()
+    if modo != "PDV":
+        return {"ok": False, "enabled": True,
+                "message": f"Terminal en modo {modo or 'desconocido'} — activa el modo PDV y reiníciala."}
+    return {"ok": True, "enabled": True, "message": "Conectado — terminal en modo PDV."}
 
 
 @router.get("/integrations-status")

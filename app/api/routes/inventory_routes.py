@@ -591,8 +591,21 @@ def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
     import threading as _t
     import app.config as _cfg
     if _cfg.TURSO_SYNC:
-        from app.database.sync_service import sync_from_turso
-        _t.Thread(target=sync_from_turso, daemon=True, name="PullNube").start()
+        from app.database.sync_service import sync_to_turso, sync_from_turso
+
+        # Subir primero lo local: la pantalla de Inventario llama esto al abrir y
+        # cada 60s, y un pull sin push previo pisaba con la copia de la nube los
+        # retiros/cortes/ventas de esta PC que aún no se habían subido — por eso
+        # el Control de Caja "brincaba" al entrar a Inventario.
+        def _push_then_pull():
+            try:
+                sync_to_turso()
+            except Exception as e:
+                print(f"[PullNube] push previo falló, se omite el pull: {e}")
+                return
+            sync_from_turso()
+
+        _t.Thread(target=_push_then_pull, daemon=True, name="PullNube").start()
     return {"ok": True}
 
 
@@ -703,21 +716,23 @@ def recalcular_stock(bg: BackgroundTasks, payload: dict = Depends(get_current_ap
         from sqlalchemy import text as _sql_text
 
         # Last movement per product — stock_nuevo is what prod.stock SHOULD be after that op
+        # "Último" por fecha, no por id: con ids por PC (ids_pc.py) el id más
+        # alto es el de la PC con bloque mayor, no el movimiento más reciente.
         last_mov_sub = (
             db.query(
                 MovimientoStock.producto_id,
-                func.max(MovimientoStock.id).label("last_id"),
+                MovimientoStock.stock_nuevo,
+                func.row_number().over(
+                    partition_by=MovimientoStock.producto_id,
+                    order_by=(MovimientoStock.creado_en.desc(), MovimientoStock.id.desc()),
+                ).label("rn"),
             )
-            .group_by(MovimientoStock.producto_id)
             .subquery()
         )
         last_stock_map: dict[int, int] = {
             r.producto_id: int(r.stock_nuevo if r.stock_nuevo is not None else -1)
-            for r in db.query(
-                MovimientoStock.producto_id,
-                MovimientoStock.stock_nuevo,
-            )
-            .join(last_mov_sub, MovimientoStock.id == last_mov_sub.c.last_id)
+            for r in db.query(last_mov_sub.c.producto_id, last_mov_sub.c.stock_nuevo)
+            .filter(last_mov_sub.c.rn == 1)
             .all()
         }
 

@@ -43,6 +43,8 @@ def get_current_cliente_app(credentials: HTTPAuthorizationCredentials = Depends(
     payload = verify_api_token(credentials.credentials)
     if not payload or payload.get("rol") not in ("cliente_app", "admin_web", "admin"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    if payload.get("typ") == "pos":  # token de empleado del POS, no de cliente
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
     # Revalidar contra la BD: una cuenta desactivada no debe seguir con acceso
     # solo porque su JWT viejo aún no expiró.
     db = get_db_session()
@@ -82,6 +84,7 @@ def _token_response(cliente: ClienteApp) -> dict:
         username=cliente.email,
         nombre=cliente.nombre,
         rol=rol,
+        typ="cliente",
     )
     return {
         "success": True,

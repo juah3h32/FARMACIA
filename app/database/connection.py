@@ -16,6 +16,32 @@ def _on_local_commit(session):
             pass
 
 
+def _aplicar_cambio_de_sucursal_pendiente():
+    """Si el admin convirtió esta PC en otra sucursal (ver sucursales_routes
+    asignar_esta_pc), aparta la BD local vieja ANTES de abrirla — con la app
+    corriendo Windows no deja mover el archivo. Al arrancar con la BD vacía,
+    import_from_turso baja todo de la BD de la nueva sucursal."""
+    marca = cfg.DATA_DIR / "cambiar_sucursal.pendiente"
+    if not marca.exists() or cfg.USE_TURSO:
+        return
+    import time as _t
+    sello = _t.strftime("%Y%m%d_%H%M%S")
+    for sufijo in ("", "-wal", "-shm"):
+        f = cfg.DB_PATH.with_name(cfg.DB_PATH.name + sufijo)
+        if f.exists():
+            f.rename(cfg.DATA_DIR / f"farmacia_anterior_{sello}.db{sufijo}")
+    for nombre in ("watermarks.json", "costos_items_venta_turso_v3.done", "backfill_costo_unitario_v2.done"):
+        try:
+            (cfg.DATA_DIR / nombre).unlink()
+        except FileNotFoundError:
+            pass
+    marca.unlink()
+    print(f"[Sucursal] BD anterior apartada como farmacia_anterior_{sello}.db — se descargará la de la nueva sucursal")
+
+
+_aplicar_cambio_de_sucursal_pendiente()
+
+
 def _build_engine():
     if cfg.USE_TURSO:
         try:
@@ -59,6 +85,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Trigger Turso sync after every local write
 event.listen(SessionLocal, "after_commit", _on_local_commit)
 
+# Ids por PC (ver ids_pc.py) — solo con SQLite local; en Vercel la BD es la nube directa.
+if not cfg.USE_TURSO:
+    from app.database import ids_pc as _ids_pc
+    _ids_pc.instalar(Base)
+
 
 @contextmanager
 def get_db():
@@ -74,7 +105,11 @@ def get_db():
 
 
 def get_db_session() -> Session:
-    return SessionLocal()
+    # Admin administrando otra sucursal (selector, header X-Sucursal): sesión
+    # directa a la BD de esa sucursal — ver app/database/sucursales.py.
+    from app.database import sucursales as _suc
+    remota = _suc.session_remota_actual()
+    return remota if remota is not None else SessionLocal()
 
 
 # Indices Base.metadata.create_all only applies to brand-new tables/DBs — Turso
@@ -148,6 +183,10 @@ def _migrate():
         ("productos", "precio_tachado", "REAL"),
         ("productos", "destacado",      "BOOLEAN DEFAULT 0"),
         ("items_venta", "costo_unitario", "REAL DEFAULT 0.0"),
+        ("cortes_caja",  "actualizado_en", "TEXT"),
+        ("items_venta",  "es_pieza",       "BOOLEAN DEFAULT 0"),
+        ("retiros_caja", "actualizado_en", "TEXT"),
+        ("ventas",       "referencia_pago", "VARCHAR(120)"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
@@ -318,6 +357,8 @@ def init_db():
     _recalcular_cortes_v1()
     _recalcular_cortes_v2()
     _backfill_costo_unitario_v1()
+    _backfill_costo_unitario_v2()
+    _V2_MARK.write_text("1", encoding="utf-8")  # solo tras el commit exitoso
 
 
 def _actualizar_info_farmacia_v2():
@@ -327,10 +368,11 @@ def _actualizar_info_farmacia_v2():
             Configuracion.clave == "farmacia_info_v2"
         ).first():
             return
-        for clave, valor in [
-            ("farmacia_nombre",    cfg.PHARMACY_NAME),
-            ("farmacia_direccion", cfg.PHARMACY_ADDRESS),
-        ]:
+        pares = [("farmacia_nombre", cfg.PHARMACY_NAME)]
+        # La dirección fija es la de la matriz — nunca pisar la de otra sucursal
+        if cfg.SUCURSAL_CLAVE == "matriz" and not cfg.SUCURSAL_INFO.get("direccion"):
+            pares.append(("farmacia_direccion", cfg.PHARMACY_ADDRESS))
+        for clave, valor in pares:
             row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
             if row:
                 row.valor = valor
@@ -361,6 +403,17 @@ def _seed_initial_data():
     with get_db() as db:
         # Batch-check existing usernames (1 query instead of 2)
         existing_users = {u.username for u in db.query(Usuario.username).all()}
+
+        # Solo en una BD sin ningún usuario (instalación nueva). Antes se
+        # recreaban admin/admin123 y cajero/cajero123 en CADA arranque si alguien
+        # renombraba esas cuentas — y se subían a Turso, quedando como puerta
+        # trasera con contraseña pública.
+        if existing_users:
+            existing_users |= {"admin", "cajero"}
+        # Una sucursal nueva no lleva el cajero de prueba: el admin da de alta
+        # a SUS cajeros (cada sucursal tiene los suyos).
+        if cfg.SUCURSAL_CLAVE != "matriz":
+            existing_users.add("cajero")
 
         if "admin" not in existing_users:
             from app.auth.auth_service import hash_password
@@ -396,8 +449,12 @@ def _seed_initial_data():
         from app.auth.auth_service import hash_password as _hp
         configs_default = {
             "farmacia_nombre":          cfg.PHARMACY_NAME,
-            "farmacia_direccion":       cfg.PHARMACY_ADDRESS,
-            "farmacia_telefono":        cfg.PHARMACY_PHONE,
+            # Identidad de la sucursal de ESTA BD (cada sucursal = su propia BD
+            # en Turso). Solo se siembra si falta — nunca pisa lo ya configurado.
+            "sucursal_clave":           cfg.SUCURSAL_CLAVE,
+            "sucursal_nombre":          cfg.SUCURSAL_INFO.get("nombre") or ("Matriz" if cfg.SUCURSAL_CLAVE == "matriz" else cfg.SUCURSAL_CLAVE.title()),
+            "farmacia_direccion":       cfg.SUCURSAL_INFO.get("direccion") or cfg.PHARMACY_ADDRESS,
+            "farmacia_telefono":        cfg.SUCURSAL_INFO.get("telefono") or cfg.PHARMACY_PHONE,
             "farmacia_rfc":             cfg.PHARMACY_RFC,
             "tasa_iva":                 str(cfg.TAX_RATE),
             "stock_minimo_alerta":      str(cfg.LOW_STOCK_THRESHOLD),
@@ -620,3 +677,114 @@ def _backfill_costo_unitario_v1():
         db.add(Configuracion(clave="backfill_costo_unitario_v1", valor="1"))
         print(f"[Migration] backfill_costo_unitario_v1: {len(rows)} items_venta congelados, "
               f"{cortes_actualizados} cortes con total_costo recalculado")
+
+
+_V2_MARK = cfg.DATA_DIR / "backfill_costo_unitario_v2.done"
+
+
+def _backfill_costo_unitario_v2():
+    """
+    One-time: repara el costo congelado que v1 fijó y que la sincronización
+    con Turso volvió a poner en 0 (el pull hacía INSERT OR REPLACE de
+    items_venta con la copia de la nube, que nunca recibió el costo — ver
+    sync_from_turso). Con eso la ganancia y el capital de inversión cambiaban
+    solos cada vez que la app sincronizaba (p. ej. al editar inventario).
+
+    - Costo en 0: se usa el precio de compra registrado en la última compra
+      del producto ANTERIOR a la venta (items_compra); si no hay compras, el
+      precio_compra actual del producto como última opción.
+    - Venta por pieza (producto fraccionado): el costo es por pieza
+      (precio de caja / unidades_por_caja), no el de la caja completa. Antes
+      se congelaba el costo de la caja entera por cada pieza vendida.
+
+    Recalcula total_costo de los cortes para que cuadren con el resumen.
+    """
+    with get_db() as db:
+        # Marca LOCAL (no en configuracion, que se sincroniza): si otra PC subía
+        # la marca, esta PC la jalaba y se saltaba su propia reparación.
+        if _V2_MARK.exists():
+            return
+        from bisect import bisect_right
+        from collections import defaultdict
+        from datetime import datetime
+        from app.database.models import (
+            ItemVenta, Producto as _Prod, CortesCaja, Venta, EstadoVenta, Compra, ItemCompra,
+        )
+
+        # Historial de costos por producto: [(fecha_compra, precio_unitario)] ordenado
+        hist = defaultdict(list)
+        for pid, fecha, precio in (
+            db.query(ItemCompra.producto_id, Compra.creado_en, ItemCompra.precio_unitario)
+            .join(Compra, ItemCompra.compra_id == Compra.id)
+            .filter(Compra.creado_en.isnot(None), ItemCompra.precio_unitario > 0)
+            .order_by(Compra.creado_en)
+            .all()
+        ):
+            hist[pid].append((fecha, precio))
+        hist_fechas = {pid: [f for f, _ in h] for pid, h in hist.items()}
+
+        prods = {p.id: p for p in db.query(_Prod).all()}
+
+        def _es_pieza(item, prod) -> bool:
+            if not prod.venta_fraccionada or (prod.unidades_por_caja or 1) <= 1:
+                return False
+            precio_pieza = (prod.precio_pieza if prod.precio_pieza and prod.precio_pieza > 0
+                            else (prod.precio_venta or 0) / prod.unidades_por_caja)
+            # La línea se cobró a precio de pieza si está más cerca de ese
+            # precio que del de caja.
+            return abs(item.precio_unitario - precio_pieza) < abs(item.precio_unitario - (prod.precio_venta or 0))
+
+        reparados = piezas = 0
+        items = (
+            db.query(ItemVenta, Venta.creado_en)
+            .join(Venta, ItemVenta.venta_id == Venta.id)
+            .all()
+        )
+        for item, fecha_venta in items:
+            prod = prods.get(item.producto_id)
+            if not prod:
+                continue
+            upc = prod.unidades_por_caja or 1
+            pieza = _es_pieza(item, prod)
+            if not item.costo_unitario:
+                costo_caja = None
+                if fecha_venta and item.producto_id in hist:
+                    idx = bisect_right(hist_fechas[item.producto_id], fecha_venta) - 1
+                    if idx >= 0:
+                        costo_caja = hist[item.producto_id][idx][1]
+                if costo_caja is None:
+                    costo_caja = prod.precio_compra or 0.0
+                item.costo_unitario = costo_caja / upc if pieza else costo_caja
+                reparados += 1
+            elif pieza and item.costo_unitario > item.precio_unitario:
+                # Costo de la caja completa congelado en una línea de pieza
+                # (cuesta más que su propio precio de venta → no es por pieza).
+                item.costo_unitario = item.costo_unitario / upc
+                piezas += 1
+        db.flush()
+
+        cortes_actualizados = 0
+        for c in db.query(CortesCaja).filter(CortesCaja.abierto_en.isnot(None)).all():
+            hasta = c.cerrado_en or datetime.now()
+            venta_ids = [
+                v.id for v in db.query(Venta.id).filter(
+                    Venta.usuario_id == c.usuario_id,
+                    Venta.creado_en >= c.abierto_en,
+                    Venta.creado_en <= hasta,
+                    Venta.estado == EstadoVenta.completada,
+                    Venta.eliminado.is_not(True),
+                ).all()
+            ]
+            nuevo_costo = 0.0
+            if venta_ids:
+                nuevo_costo = sum(
+                    r.cantidad * (r.costo_unitario or 0.0)
+                    for r in db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
+                    .filter(ItemVenta.venta_id.in_(venta_ids)).all()
+                )
+            if c.total_costo is None or abs((c.total_costo or 0.0) - nuevo_costo) > 0.005:
+                c.total_costo = nuevo_costo
+                cortes_actualizados += 1
+
+        print(f"[Migration] backfill_costo_unitario_v2: {reparados} costos en 0 reparados, "
+              f"{piezas} lineas de pieza corregidas, {cortes_actualizados} cortes recalculados")

@@ -37,22 +37,25 @@ def _wait_for_api(port: int, timeout: int = 30) -> bool:
     return False
 
 
+# Asistente tipo POS profesional (Square/Shopify): la sucursal trabaja LOCAL
+# desde el primer minuto y la nube se conecta cuando se quiera — al conectar la
+# cuenta de Turso se busca/crea su base de datos (una sola vez) y se sube todo.
 _WIZARD_OPTIONS = [
     {
-        "mode": "turso",
-        "icon": "☁",
-        "title": "Nube (Turso)",
-        "desc": "Respaldo automático y sincroniza entre varias computadoras.\nRecomendado si tienes internet estable.",
-        "badge": "RECOMENDADO",
+        "mode": "nueva",
+        "icon": "🏪",
+        "title": "Sucursal nueva",
+        "desc": "Primera caja de una sucursal que abre.\nFunciona sin internet; la nube se conecta cuando quieras.",
+        "badge": "NUEVA",
         "accent": "#16A34A",
     },
     {
-        "mode": "local",
-        "icon": "🖥",
-        "title": "Solo este equipo",
-        "desc": "Todo se queda en esta computadora, sin nube.\nIdeal para una sola caja, sin necesidad de red.",
+        "mode": "existente",
+        "icon": "☁",
+        "title": "Caja de una sucursal existente",
+        "desc": "Otra computadora para una sucursal que ya trabaja.\nBaja su inventario, ventas y cajeros de la nube.",
         "badge": None,
-        "accent": "#1d2140",
+        "accent": "#2563EB",
     },
     {
         "mode": "offline",
@@ -63,6 +66,54 @@ _WIZARD_OPTIONS = [
         "accent": "#D97706",
     },
 ]
+
+
+def _wizard_ilustracion(tipo: str, color: str, size: int = 76):
+    """Fachada de farmacia dibujada con PIL (sin archivos extra) para las
+    tarjetas del asistente: 'nueva' (+), 'existente' (nube), 'offline' (sin red)."""
+    from PIL import Image, ImageDraw
+    S = 4 * size
+    k = S / 100.0
+    im = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    rgb = tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
+    claro = tuple(int(c + (255 - c) * 0.86) for c in rgb)
+    osc = tuple(int(c * 0.62) for c in rgb)
+    R = lambda *v: [x * k for x in v]
+    d.rounded_rectangle(R(0, 0, 100, 100), radius=24 * k, fill=claro)
+    d.ellipse(R(16, 84, 84, 92), fill=(15, 23, 42, 28))
+    d.rectangle(R(22, 40, 78, 86), fill="white", outline=osc, width=int(1.6 * k))   # edificio
+    d.rounded_rectangle(R(18, 26, 82, 40), radius=3 * k, fill=osc)                    # letrero
+    d.rectangle(R(22, 30, 28, 36), fill="white")                                      # cruz médica
+    d.rectangle(R(24.3, 31, 25.7, 35), fill=rgb)
+    d.rectangle(R(23, 32.3, 27, 33.7), fill=rgb)
+    for t in range(4):                                                                 # letras del letrero
+        d.rounded_rectangle(R(34 + t * 11, 31.5, 42 + t * 11, 34.5), radius=k, fill=(255, 255, 255, 210))
+    for t in range(6):                                                                 # toldo
+        x0 = 22 + t * 56 / 6
+        col = rgb if t % 2 == 0 else (255, 255, 255)
+        d.rectangle(R(x0, 40, x0 + 56 / 6, 47), fill=col)
+        d.pieslice(R(x0, 43, x0 + 56 / 6, 51), 0, 180, fill=col)
+    d.rectangle(R(27, 55, 47, 73), fill=(224, 242, 254), outline=osc, width=int(1.2 * k))  # vitrina
+    d.line(R(37, 55, 37, 73), fill=osc, width=int(k))
+    d.rectangle(R(54, 54, 72, 86), fill=osc)                                           # puerta
+    d.rectangle(R(57, 57, 69, 67), fill=(186, 230, 253))
+    d.ellipse(R(68, 70, 70.5, 72.5), fill=(253, 230, 138))
+    # Distintivo de la esquina
+    d.ellipse(R(66, 6, 94, 34), fill=rgb, outline="white", width=int(2.2 * k))
+    if tipo == "nueva":
+        d.rectangle(R(78.6, 12, 81.4, 28), fill="white")
+        d.rectangle(R(72, 18.6, 88, 21.4), fill="white")
+    elif tipo == "existente":
+        d.ellipse(R(71, 17, 81, 26), fill="white")
+        d.ellipse(R(76, 13, 87, 24), fill="white")
+        d.rounded_rectangle(R(71, 20, 89, 27), radius=3 * k, fill="white")
+    else:
+        for r in (11, 7):
+            d.arc(R(80 - r, 22 - r, 80 + r, 22 + r), 215, 325, fill="white", width=int(2 * k))
+        d.ellipse(R(78.5, 21.5, 81.5, 24.5), fill="white")
+        d.line(R(71, 12, 89, 30), fill="white", width=int(2.4 * k))
+    return im.resize((size, size), Image.LANCZOS)
 
 
 def _run_first_time_setup_wizard() -> None:
@@ -82,108 +133,351 @@ def _run_first_time_setup_wizard() -> None:
 
     root = ctk.CTk()
     root.title("Configuración inicial — Farmacia Eben-Ezer")
-    root.geometry("620x600")
+    root.geometry("960x620")
     root.resizable(False, False)
     root.configure(fg_color=BG)
     root.protocol("WM_DELETE_WINDOW", lambda: None)  # no cerrar sin elegir
     root.after(10, lambda: root.eval('tk::PlaceWindow . center'))
     root.attributes("-topmost", True)
 
-    # ── Encabezado con marca ──────────────────────────────────────────────
-    header = ctk.CTkFrame(root, fg_color=NAVY, corner_radius=0, height=110)
-    header.pack(fill="x")
-    header.pack_propagate(False)
-    ctk.CTkLabel(header, text="Farmacia Eben-Ezer — POS", font=ctk.CTkFont(size=17, weight="bold"),
-                 text_color="white").pack(pady=(24, 2))
-    ctk.CTkLabel(header, text="Configuración inicial · esto solo se pregunta una vez",
-                 font=ctk.CTkFont(size=12), text_color="#B9BDD6").pack()
+    # ── Panel de marca (izquierda): logo, bienvenida y pasos ──────────────
+    lado = ctk.CTkFrame(root, fg_color=NAVY, corner_radius=0, width=300)
+    lado.pack(side="left", fill="y")
+    lado.pack_propagate(False)
+    try:
+        from PIL import Image as _PILImage
+        _logo = _PILImage.open(cfg.BASE_DIR / "assets" / "logos" / "BLANCO_LOGO.png")
+        ctk.CTkLabel(lado, text="", image=ctk.CTkImage(_logo, size=(220, 61))).pack(pady=(44, 0))
+    except Exception:
+        ctk.CTkLabel(lado, text="Farmacia Eben-Ezer", font=ctk.CTkFont(size=20, weight="bold"),
+                     text_color="white").pack(pady=(50, 0))
+    ctk.CTkLabel(lado, text="Bienvenido", font=ctk.CTkFont(size=24, weight="bold"),
+                 text_color="white").pack(anchor="w", padx=34, pady=(42, 4))
+    ctk.CTkLabel(lado, text="Vamos a preparar este equipo.\nToma menos de un minuto.",
+                 font=ctk.CTkFont(size=13), text_color="#B9BDD6", justify="left").pack(anchor="w", padx=34)
 
+    pasos_frame = ctk.CTkFrame(lado, fg_color="transparent")
+    pasos_frame.pack(fill="x", padx=34, pady=(40, 0))
+    _pasos = []
+    for n, texto in enumerate(("Tipo de equipo", "Datos de la sucursal", "Listo para vender"), start=1):
+        fila = ctk.CTkFrame(pasos_frame, fg_color="transparent")
+        fila.pack(fill="x", pady=7)
+        circ = ctk.CTkLabel(fila, text=str(n), width=30, height=30, corner_radius=15,
+                            font=ctk.CTkFont(size=13, weight="bold"))
+        circ.pack(side="left")
+        lbl = ctk.CTkLabel(fila, text=texto, font=ctk.CTkFont(size=13, weight="bold"))
+        lbl.pack(side="left", padx=12)
+        _pasos.append((circ, lbl))
+
+    def _paso(actual: int):
+        for n, (circ, lbl) in enumerate(_pasos, start=1):
+            if n < actual:
+                circ.configure(text=str(n), fg_color="#16A34A", text_color="white")
+                lbl.configure(text_color="#86EFAC")
+            elif n == actual:
+                circ.configure(text=str(n), fg_color="white", text_color=NAVY)
+                lbl.configure(text_color="white")
+            else:
+                circ.configure(text=str(n), fg_color="#2D3260", text_color="#8A90B8")
+                lbl.configure(text_color="#8A90B8")
+
+    ctk.CTkLabel(lado, text="Esto solo se pregunta una vez", font=ctk.CTkFont(size=11),
+                 text_color="#6B7199").pack(side="bottom", pady=22)
+
+    # ── Contenido (derecha) ───────────────────────────────────────────────
     body = ctk.CTkFrame(root, fg_color="transparent")
-    body.pack(fill="both", expand=True, padx=28, pady=22)
+    body.pack(side="left", fill="both", expand=True, padx=40, pady=34)
 
-    ctk.CTkLabel(body, text="¿Cómo va a trabajar este equipo?",
-                 font=ctk.CTkFont(size=15, weight="bold"), text_color="#0F172A").pack(anchor="w", pady=(0, 14))
+    titulo = ctk.CTkLabel(body, text="¿Qué es este equipo?",
+                          font=ctk.CTkFont(size=22, weight="bold"), text_color="#0F172A")
+    titulo.pack(anchor="w")
+    subtitulo = ctk.CTkLabel(body, text="Elige cómo va a trabajar esta computadora.",
+                             font=ctk.CTkFont(size=13), text_color=GRAY)
+    subtitulo.pack(anchor="w", pady=(2, 18))
+
+    def _encabezado(t: str, sub: str):
+        titulo.configure(text=t)
+        subtitulo.configure(text=sub)
 
     cards_frame = ctk.CTkFrame(body, fg_color="transparent")
     cards_frame.pack(fill="both", expand=True)
 
     progress_frame = ctk.CTkFrame(body, fg_color="transparent")
-    status_label = ctk.CTkLabel(progress_frame, text="Configurando...", font=ctk.CTkFont(size=13),
-                                 text_color=NAVY)
-    progress = ctk.CTkProgressBar(progress_frame, width=420, mode="indeterminate")
+    progress_img = ctk.CTkLabel(progress_frame, text="")
+    status_label = ctk.CTkLabel(progress_frame, text="Configurando...", font=ctk.CTkFont(size=14, weight="bold"),
+                                 text_color=NAVY, justify="center")
+    progress = ctk.CTkProgressBar(progress_frame, width=420, height=8, mode="indeterminate",
+                                  progress_color="#16A34A")
 
-    def _do_setup(mode: str):
-        try:
-            cfg.SETUP_FILE.write_text(
-                __import__("json").dumps({"sync_mode": mode}), encoding="utf-8"
-            )
-        except Exception:
-            pass
-        cfg.reload_setup()
+    import json as _json
 
-        if mode == "turso":
-            steps = [
-                ("Descargando datos de la nube...", lambda: __import__("app.database.sync_service", fromlist=["import_from_turso"]).import_from_turso()),
-                ("Subiendo datos locales...", lambda: __import__("app.database.sync_service", fromlist=["sync_to_turso"]).sync_to_turso()),
-                ("Sincronizando cambios recientes...", lambda: __import__("app.database.sync_service", fromlist=["sync_from_turso"]).sync_from_turso()),
-            ]
-            for texto, fn in steps:
-                root.after(0, lambda t=texto: status_label.configure(text=t))
-                try:
-                    fn()
-                except Exception as e:
-                    _log_error(f"Setup inicial Turso falló ({texto}): {e}")
-        else:
-            root.after(0, lambda: status_label.configure(text="Preparando base de datos local..."))
-            time.sleep(0.8)  # da tiempo visual — no queremos que el spinner parpadee y desaparezca
+    def _status(texto: str):
+        root.after(0, lambda t=texto: status_label.configure(text=t))
 
-        root.after(0, root.destroy)
-
-    def _elegir(mode: str):
-        cards_frame.pack_forget()
-        progress_frame.pack(fill="x", expand=True, pady=(40, 0))
-        status_label.pack(pady=(0, 14))
+    def _mostrar_progreso(tipo: str = "nueva", color: str = "#16A34A"):
+        for f in (cards_frame, form_nueva, form_existente):
+            f.pack_forget()
+        _paso(3)
+        _encabezado("Preparando todo...", "No cierres esta ventana — en un momento abre el programa.")
+        progress_img.configure(image=ctk.CTkImage(_wizard_ilustracion(tipo, color, 150), size=(150, 150)))
+        progress_frame.pack(fill="both", expand=True, pady=(20, 0))
+        progress_img.pack(pady=(10, 22))
+        status_label.pack(pady=(0, 16))
         progress.pack()
         progress.start()
-        threading.Thread(target=_do_setup, args=(mode,), daemon=True).start()
+
+    def _guardar_setup(data: dict):
+        cfg.SETUP_FILE.write_text(_json.dumps(data), encoding="utf-8")
+        cfg.reload_setup()
+
+    def _setup_offline():
+        try:
+            _guardar_setup({"sync_mode": "offline"})
+        except Exception as e:
+            _log_error(f"Setup offline: {e}")
+        _status("Preparando base de datos local...")
+        time.sleep(0.8)  # da tiempo visual — que el spinner no parpadee
+        root.after(0, root.destroy)
+
+    def _setup_nueva(nombre: str, direccion: str, telefono: str, api_token: str):
+        from app.database.sucursales import normalizar_clave
+        try:
+            clave = normalizar_clave(nombre) or "sucursal"
+            _guardar_setup({"sync_mode": "local", "sucursal": {
+                "clave": clave, "nombre": nombre, "direccion": direccion, "telefono": telefono}})
+            _status(f"Creando Sucursal {nombre}...")
+            init_db()
+            if api_token:
+                from app.services import turso_cuenta
+                try:
+                    turso_cuenta.conectar_esta_sucursal(api_token, progreso=_status)
+                    _status("Sucursal conectada a la nube ✓")
+                    time.sleep(1.2)
+                except Exception as e:
+                    _log_error(f"Conectar sucursal nueva a Turso: {e}")
+                    _status("No se pudo conectar a la nube — la sucursal funciona local.\n"
+                            "Conéctala después en Configuración → Sucursal.")
+                    time.sleep(4)
+        except Exception as e:
+            _log_error(f"Setup sucursal nueva: {e}\n" + traceback.format_exc())
+        root.after(0, root.destroy)
+
+    def _setup_existente(suc: dict, api_token: str, org: str):
+        from app.services import turso_cuenta
+        try:
+            turso_cuenta.unir_caja_a_sucursal(suc, api_token, org, progreso=_status)
+        except Exception as e:
+            _log_error(f"Setup caja existente: {e}\n" + traceback.format_exc())
+        root.after(0, root.destroy)
+
+    # ── Formulario: sucursal nueva ────────────────────────────────────────
+    form_nueva = ctk.CTkFrame(body, fg_color="transparent")
+
+    def _campo(parent, etiqueta, placeholder="", secreto=False):
+        ctk.CTkLabel(parent, text=etiqueta, font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color="#374151").pack(anchor="w", pady=(8, 2))
+        e = ctk.CTkEntry(parent, placeholder_text=placeholder, height=36, show="•" if secreto else "")
+        e.pack(fill="x")
+        return e
+
+    n_nombre = _campo(form_nueva, "Nombre de la sucursal *", "Ej. López Mateos")
+    n_dir = _campo(form_nueva, "Dirección", "Calle, número, colonia, ciudad")
+    n_tel = _campo(form_nueva, "Teléfono", "Teléfono de la sucursal")
+    n_tok = _campo(form_nueva, "Token de tu cuenta Turso (opcional)", "Pégalo para conectar la nube ahora", secreto=True)
+    n_err = ctk.CTkLabel(form_nueva, text="", text_color="#DC2626", font=ctk.CTkFont(size=11))
+    n_err.pack(anchor="w", pady=(6, 0))
+    n_btns = ctk.CTkFrame(form_nueva, fg_color="transparent")
+    n_btns.pack(fill="x", pady=(8, 0))
+
+    def _crear_nueva():
+        nombre = n_nombre.get().strip()
+        if not nombre:
+            n_err.configure(text="Escribe el nombre de la sucursal")
+            return
+        _mostrar_progreso("nueva", "#16A34A")
+        threading.Thread(target=_setup_nueva, args=(nombre, n_dir.get().strip(), n_tel.get().strip(),
+                                                    n_tok.get().strip()), daemon=True).start()
+
+    # ── Formulario: caja de una sucursal existente ───────────────────────
+    form_existente = ctk.CTkFrame(body, fg_color="transparent")
+    # Botones primero (abajo): pack reparte el espacio en orden, así nunca se recortan
+    e_btns = ctk.CTkFrame(form_existente, fg_color="transparent")
+    e_btns.pack(side="bottom", fill="x", pady=(10, 0))
+    e_tok = _campo(form_existente, "Token de Turso *", "El token de tu cuenta — sirve para todas tus sucursales", secreto=True)
+    e_ayuda = ctk.CTkLabel(form_existente, justify="left", font=ctk.CTkFont(size=11), text_color=GRAY,
+                           text="Se crea en Turso → Settings → API Tokens → Create. Con él se encuentran solas todas tus sucursales.",
+                           wraplength=520)
+    e_ayuda.pack(anchor="w", pady=(6, 0))
+
+    # Alternativa plegable: URL + token de UNA sola base (oculta por defecto)
+    url_frame = ctk.CTkFrame(form_existente, fg_color="#EEF2FF", corner_radius=12)
+    url_interior = ctk.CTkFrame(url_frame, fg_color="transparent")
+    url_interior.pack(fill="x", padx=14, pady=(4, 12))
+    e_url = _campo(url_interior, "URL de la base de datos", "libsql://farmacia-....turso.io")
+    ctk.CTkLabel(url_interior, justify="left", font=ctk.CTkFont(size=11), text_color=GRAY, wraplength=480,
+                 text="En Turso: entra a la base → copia su 'Database URL'. En el campo de arriba pega el token "
+                      "de esa base (botón 'Create Token').").pack(anchor="w", pady=(6, 0))
+    _url_abierto = {"v": False}
+
+    def _toggle_url():
+        _url_abierto["v"] = not _url_abierto["v"]
+        if _url_abierto["v"]:
+            e_ayuda.pack_forget()
+            url_frame.pack(fill="x", pady=(6, 0), after=url_toggle)
+            url_toggle.configure(text="▾  Usar el token de una sola base (con su URL)")
+            e_tok.configure(placeholder_text="Token de esa base de datos")
+        else:
+            url_frame.pack_forget()
+            e_ayuda.pack(anchor="w", pady=(6, 0), before=url_toggle)
+            e_url.delete(0, "end")
+            url_toggle.configure(text="▸  Usar el token de una sola base (con su URL)")
+            e_tok.configure(placeholder_text="El token de tu cuenta — sirve para todas tus sucursales")
+
+    url_toggle = ctk.CTkButton(form_existente, text="▸  Usar el token de una sola base (con su URL)",
+                               fg_color="transparent", hover_color="#EEF2FF", text_color="#2563EB",
+                               anchor="w", height=30, font=ctk.CTkFont(size=12, weight="bold"),
+                               command=_toggle_url)
+    url_toggle.pack(anchor="w", pady=(10, 0))
+    root._wizard_toggle_url = _toggle_url  # para pruebas automáticas
+    e_info = ctk.CTkLabel(form_existente, text="", text_color=GRAY, font=ctk.CTkFont(size=11), justify="left")
+    e_info.pack(anchor="w", pady=(6, 0))
+    e_lista = ctk.CTkFrame(form_existente, fg_color="transparent", height=1)  # crece con los resultados
+    e_lista.pack(fill="x")
+    e_sel = ctk.StringVar(value="")
+    e_estado = {"lista": [], "org": ""}
+
+    def _buscar():
+        tok = e_tok.get().strip()
+        if not tok:
+            e_info.configure(text="Pega el token de tu cuenta de Turso", text_color="#DC2626")
+            return
+        url = e_url.get().strip() if _url_abierto["v"] else ""
+        if _url_abierto["v"] and not url:
+            e_info.configure(text="Pega la URL de esa base de datos (libsql://...)", text_color="#DC2626")
+            return
+        e_info.configure(text="Buscando sucursales...", text_color=GRAY)
+
+        def _bg():
+            from app.services import turso_cuenta
+            try:
+                if url:   # token de UNA base de datos + su URL
+                    org = ""
+                    lista = [turso_cuenta.sucursal_por_token_de_bd(url, tok)]
+                else:     # token de la cuenta: todas las sucursales
+                    org = turso_cuenta.detectar_org(tok)
+                    lista = turso_cuenta.sucursales_de_cuenta(tok, org, incluir_sin_identidad=True)
+            except Exception as e:
+                root.after(0, lambda m=str(e): e_info.configure(text=m, text_color="#DC2626"))
+                return
+
+            def _pintar():
+                for w in e_lista.winfo_children():
+                    w.destroy()
+                e_estado.update(lista=lista, org=org)
+                if not lista:
+                    e_info.configure(text="No hay sucursales conectadas a la nube en esta cuenta.\n"
+                                          "Elige 'Sucursal nueva' para crear la primera.", text_color="#D97706")
+                    return
+                e_info.configure(text="¿De qué sucursal es esta caja?", text_color="#0F172A")
+                for suc in lista:
+                    ctk.CTkRadioButton(e_lista, text=f"Sucursal {suc['nombre']}", variable=e_sel,
+                                       value=suc["clave"]).pack(anchor="w", pady=4)
+                e_sel.set(lista[0]["clave"])
+            root.after(0, _pintar)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _conectar_existente():
+        suc = next((x for x in e_estado["lista"] if x["clave"] == e_sel.get()), None)
+        if not suc:
+            e_info.configure(text="Primero busca y elige la sucursal", text_color="#DC2626")
+            return
+        _mostrar_progreso("existente", "#2563EB")
+        threading.Thread(target=_setup_existente, args=(suc, e_tok.get().strip(), e_estado["org"]),
+                         daemon=True).start()
+
+    def _volver():
+        form_nueva.pack_forget()
+        form_existente.pack_forget()
+        _paso(1)
+        _encabezado("¿Qué es este equipo?", "Elige cómo va a trabajar esta computadora.")
+        cards_frame.pack(fill="both", expand=True)
+
+    for frame, accion, texto in ((n_btns, _crear_nueva, "Crear sucursal"),
+                                 (e_btns, _conectar_existente, "Conectar esta caja")):
+        ctk.CTkButton(frame, text="← Volver", fg_color="#E2E8F0", text_color="#0F172A",
+                      hover_color="#CBD5E1", width=110, height=38, command=_volver).pack(side="left")
+        ctk.CTkButton(frame, text=texto, fg_color=NAVY, height=38, command=accion).pack(side="right")
+    ctk.CTkButton(e_btns, text="Buscar sucursales", fg_color="#2563EB", height=38,
+                  command=_buscar).pack(side="right", padx=8)
+
+    def _elegir(mode: str):
+        if mode == "offline":
+            _mostrar_progreso("offline", "#D97706")
+            threading.Thread(target=_setup_offline, daemon=True).start()
+            return
+        cards_frame.pack_forget()
+        _paso(2)
+        if mode == "nueva":
+            _encabezado("Sucursal nueva", "Funciona sin internet desde el primer minuto. La nube se conecta cuando quieras.")
+        else:
+            _encabezado("Caja de una sucursal existente", "Pega el token de tu cuenta de Turso y elige la sucursal.")
+        (form_nueva if mode == "nueva" else form_existente).pack(fill="both", expand=True)
+
+    root._wizard_elegir = _elegir  # para pruebas automáticas del asistente
+    root._wizard_volver = _volver
+    root._wizard_progreso = _mostrar_progreso
 
     def _make_card(parent, opt):
-        card = ctk.CTkFrame(parent, fg_color="white", corner_radius=14, border_width=2,
-                             border_color=BORDER, height=108)
+        card = ctk.CTkFrame(parent, fg_color="white", corner_radius=16, border_width=2,
+                            border_color=BORDER, height=124)
         card.pack(fill="x", pady=7)
         card.pack_propagate(False)
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=18, pady=14)
+        inner.pack(fill="both", expand=True, padx=18, pady=12)
 
-        icon_box = ctk.CTkFrame(inner, fg_color=opt["accent"], corner_radius=12, width=52, height=52)
-        icon_box.pack(side="left", padx=(0, 16))
-        icon_box.pack_propagate(False)
-        ctk.CTkLabel(icon_box, text=opt["icon"], font=ctk.CTkFont(size=22), text_color="white").pack(expand=True)
+        img = ctk.CTkImage(_wizard_ilustracion(opt["mode"], opt["accent"], 92), size=(92, 92))
+        icon = ctk.CTkLabel(inner, text="", image=img)
+        icon.pack(side="left", padx=(0, 18))
 
         text_col = ctk.CTkFrame(inner, fg_color="transparent")
-        text_col.pack(side="left", fill="both", expand=True)
+        text_col.pack(side="left", fill="both", expand=True, pady=6)
 
         title_row = ctk.CTkFrame(text_col, fg_color="transparent")
         title_row.pack(anchor="w", fill="x")
-        ctk.CTkLabel(title_row, text=opt["title"], font=ctk.CTkFont(size=14, weight="bold"),
+        ctk.CTkLabel(title_row, text=opt["title"], font=ctk.CTkFont(size=16, weight="bold"),
                      text_color="#0F172A").pack(side="left")
         if opt["badge"]:
-            badge = ctk.CTkLabel(title_row, text=opt["badge"], font=ctk.CTkFont(size=9, weight="bold"),
-                                  text_color="white", fg_color="#16A34A", corner_radius=6, padx=8, height=18)
-            badge.pack(side="left", padx=(10, 0))
-        ctk.CTkLabel(text_col, text=opt["desc"], font=ctk.CTkFont(size=11), text_color=GRAY,
-                     justify="left", anchor="w").pack(anchor="w", pady=(4, 0))
+            ctk.CTkLabel(title_row, text=opt["badge"], font=ctk.CTkFont(size=9, weight="bold"),
+                         text_color="white", fg_color=opt["accent"], corner_radius=6, padx=8,
+                         height=18).pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(text_col, text=opt["desc"], font=ctk.CTkFont(size=12), text_color=GRAY,
+                     justify="left", anchor="w").pack(anchor="w", pady=(6, 0))
+        flecha = ctk.CTkLabel(inner, text="›", font=ctk.CTkFont(size=30), text_color="#CBD5E1")
+        flecha.pack(side="right", padx=(8, 4))
 
-        # Toda la tarjeta es clickeable, con hover sutil.
-        widgets = [card, inner, icon_box, text_col, title_row] + list(inner.winfo_children()) + list(text_col.winfo_children())
+        # Toda la tarjeta es clickeable, con hover (borde + flecha del color de la opción).
+        def _on(_e=None):
+            card.configure(border_color=opt["accent"], fg_color="#FBFCFE")
+            flecha.configure(text_color=opt["accent"])
+
+        def _off(_e=None):
+            card.configure(border_color=BORDER, fg_color="white")
+            flecha.configure(text_color="#CBD5E1")
+
+        widgets = [card, inner, icon, text_col, title_row, flecha] + list(text_col.winfo_children()) + list(title_row.winfo_children())
         for w in widgets:
             w.bind("<Button-1>", lambda e: _elegir(opt["mode"]))
-            w.bind("<Enter>", lambda e: card.configure(border_color=opt["accent"]))
-            w.bind("<Leave>", lambda e: card.configure(border_color=BORDER))
+            w.bind("<Enter>", _on)
+            w.bind("<Leave>", _off)
+            try:
+                w.configure(cursor="hand2")
+            except Exception:
+                pass
 
     for opt in _WIZARD_OPTIONS:
         _make_card(cards_frame, opt)
+    _paso(1)
 
     root.mainloop()
 

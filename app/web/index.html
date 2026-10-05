@@ -96,13 +96,20 @@
     <div id="mp-modal-status" class="text-sm text-center px-4 py-3 rounded-xl w-full" style="background:#F0F9FF;color:#0369A1;border:1px solid #BAE8FF">
       Enviando monto a la terminal...
     </div>
-    <div class="flex items-center gap-2">
+    <div id="mp-modal-wait" class="flex items-center gap-2">
       <div class="w-2 h-2 rounded-full animate-pulse" style="background:#009EE3"></div>
-      <span class="text-xs" style="color:#64748B">Esperando que el cliente pague...</span>
+      <span class="text-xs" style="color:#64748B">Esperando pago en terminal… <b id="mp-modal-timer">0:00</b></span>
     </div>
-    <button onclick="cancelMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5">
-      <i data-lucide="x-circle" style="width:15px;height:15px"></i> Cancelar operación
+    <p id="mp-modal-order" class="text-[10px] -mt-3" style="color:#94A3B8"></p>
+    <button id="mp-btn-cancel" onclick="cancelMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5">
+      <i data-lucide="x-circle" style="width:15px;height:15px"></i> Cancelar cobro
     </button>
+    <div id="mp-modal-actions" class="w-full flex-col gap-2 hidden">
+      <button id="mp-btn-retry" onclick="retryMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm text-white" style="background:#009EE3">Reintentar en terminal</button>
+      <button id="mp-btn-reg" onclick="pollMpOrder(true)" class="w-full h-10 rounded-xl font-bold text-sm text-white hidden" style="background:#16A34A">Reintentar registrar venta</button>
+      <button id="mp-btn-manual" onclick="mpCobrarManual()" class="w-full h-10 rounded-xl font-bold text-sm" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">Cobrar sin terminal (manual)</button>
+      <button onclick="closeMpModal(true)" class="w-full h-9 rounded-xl font-semibold text-xs" style="color:#64748B">Cerrar y volver al carrito</button>
+    </div>
   </div>
 </div>
 
@@ -1191,7 +1198,7 @@
         Iniciar Sesión
       </button>
 
-      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer &nbsp;·&nbsp; <span id="l-version">v1.0.0</span></p>
+      <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer<span id="l-sucursal"></span> &nbsp;·&nbsp; <span id="l-version">v1.0.0</span></p>
     </div>
   </div>
 </div>
@@ -1271,6 +1278,12 @@
             style="border-bottom:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,.04)">
       <div class="flex items-center gap-2">
         <h1 id="page-title" class="text-base font-bold" style="color:#0F172A">Dashboard</h1>
+        <!-- Selector de sucursal (solo admin con otras sucursales registradas) -->
+        <div id="suc-switch-wrap" class="hidden items-center gap-2 ml-3 pl-3" style="border-left:1px solid #E2E8F0">
+          <i data-lucide="store" style="width:15px;height:15px;color:#64748B"></i>
+          <select id="suc-switch" onchange="cambiarSucursal(this.value)" title="Elige qué sucursal administrar — el cambio es inmediato"
+            class="h-8 pl-2 pr-7 rounded-xl text-xs font-bold border cursor-pointer" style="border-color:#C5CEDE;background:#EEF1F9;color:#1d2140"></select>
+        </div>
       </div>
       <div class="ml-auto flex items-center gap-3">
         <!-- Turno button -->
@@ -2187,6 +2200,94 @@
 
         <div id="settings-cat-general" class="settings-cat-panel flex flex-col gap-5">
 
+        <!-- ── Sucursal ────────────────────────────────────────────
+             Mismo nombre comercial y logo en todas las sucursales; aquí solo
+             cambia el nombre de la sucursal y su dirección (salen en el ticket). -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#1d2140,#2563EB)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+              <i data-lucide="store" style="width:20px;height:20px;color:#1d2140"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-bold" style="color:#0F172A">Sucursal</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Nombre y dirección de esta sucursal · salen en el ticket · el nombre de la farmacia y el logo son los mismos en todas</p>
+            </div>
+            <span id="suc-clave" class="text-xs font-semibold px-2.5 py-1 rounded-full" style="background:#F1F5F9;color:#64748B" title="Clave de la sucursal de esta PC (setup.json). Cada sucursal sincroniza solo con su propia base de datos.">—</span>
+          </div>
+          <div class="p-6 grid grid-cols-3 gap-3">
+            <div>
+              <label class="lbl">Nombre de la sucursal</label>
+              <input id="suc-nombre" class="inp" placeholder="Ej. 13 de Abril, López Mateos">
+            </div>
+            <div>
+              <label class="lbl">Dirección</label>
+              <input id="suc-direccion" class="inp" placeholder="Calle, número, colonia, ciudad">
+            </div>
+            <div>
+              <label class="lbl">Teléfono</label>
+              <input id="suc-telefono" class="inp" placeholder="Teléfono de la sucursal">
+            </div>
+            <!-- Nube: la sucursal funciona local; al conectar la cuenta de Turso
+                 se busca/crea SU base de datos (una sola vez) y se sube todo -->
+            <div class="col-span-3 rounded-xl p-4 flex flex-col gap-3" style="background:#F8FAFC;border:1px solid #E2E8F0">
+              <div class="flex items-center gap-2">
+                <i data-lucide="cloud" style="width:15px;height:15px;color:#2563EB"></i>
+                <p class="text-xs font-bold" style="color:#374151">Nube</p>
+                <span id="suc-nube-estado" class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:#F1F5F9;color:#64748B">—</span>
+              </div>
+              <div class="flex gap-2 items-end">
+                <div class="flex-1">
+                  <label class="lbl">Token de tu cuenta de Turso (uno para todas tus sucursales)</label>
+                  <input id="suc-nube-token" type="password" class="inp" placeholder="Turso → Settings → API Tokens → Create">
+                </div>
+                <button onclick="conectarNube()" class="h-10 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#2563EB">
+                  <i data-lucide="cloud-upload" style="width:14px;height:14px"></i> Conectar
+                </button>
+              </div>
+              <p class="text-xs" style="color:#94A3B8">Si esta sucursal todavía no tiene base de datos en la nube, se crea sola y se sube todo lo que ya tiene. Si ya existe, solo se vuelve a conectar. Con la cuenta conectada, tus otras sucursales aparecen solas en el selector de arriba.</p>
+            </div>
+            <div class="col-span-3 flex items-center justify-between">
+              <p class="text-xs" style="color:#94A3B8">Farmacia: <b id="suc-farmacia" style="color:#374151">—</b></p>
+              <button onclick="guardarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#1d2140">
+                <i data-lucide="save" style="width:14px;height:14px"></i> Guardar sucursal
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Sucursales que administro (selector del encabezado) ── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#16A34A)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EFF6FF">
+              <i data-lucide="building-2" style="width:20px;height:20px;color:#2563EB"></i>
+            </div>
+            <div>
+              <h2 class="font-bold" style="color:#0F172A">Otras sucursales que administro</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Cada sucursal tiene su propia base de datos e inventario · al registrarla aparece el selector arriba y cambias al instante</p>
+            </div>
+          </div>
+          <div class="p-6 flex flex-col gap-4">
+            <div id="suc-lista" class="flex flex-col gap-2 text-xs" style="color:#64748B">—</div>
+            <div class="rounded-xl p-4" style="background:#F8FAFC;border:1px solid #E2E8F0">
+              <p class="text-xs font-bold mb-3" style="color:#374151">Agregar sucursal</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Nombre de la sucursal</label><input id="sucn-nombre" class="inp" placeholder="Ej. López Mateos"></div>
+                <div><label class="lbl">Dirección</label><input id="sucn-direccion" class="inp" placeholder="Calle, número, colonia"></div>
+                <div><label class="lbl">URL de su base de datos (Turso)</label><input id="sucn-url" class="inp" placeholder="libsql://farmacia-lopez-mateos-....turso.io"></div>
+                <div><label class="lbl">Token de su base de datos</label><input id="sucn-token" type="password" class="inp" placeholder="eyJhbGciOi..."></div>
+              </div>
+              <p class="text-xs mt-3" style="color:#94A3B8">Crea primero una base de datos <b>vacía</b> para la sucursal en turso.tech (Create Database) y copia su URL y un token. Al registrarla, si está vacía, se prepara sola con tu catálogo de productos (existencias en 0), categorías, proveedores y usuarios.</p>
+              <div class="flex justify-end mt-3">
+                <button id="sucn-btn" onclick="agregarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#2563EB">
+                  <i data-lucide="plus" style="width:14px;height:14px"></i> Agregar sucursal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Ajustes Rápidos del POS ─────────────────────────── -->
         <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
           <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#7C3AED,#16A34A)"></div>
@@ -2325,7 +2426,7 @@
                 <i data-lucide="credit-card" style="width:16px;height:16px;color:#009EE3"></i>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-bold" style="color:#0F172A">Mercado Pago (ME30S)</p>
+                <p class="text-sm font-bold" style="color:#0F172A">Mercado Pago Point</p>
                 <p class="text-[11px]" style="color:#94A3B8">Cobro automático con terminal</p>
               </div>
               <span id="mp-status-badge" class="px-2.5 py-1 rounded-lg text-[10px] font-bold">—</span>
@@ -2496,7 +2597,7 @@
           <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
             <div class="flex items-center gap-2">
               <i data-lucide="credit-card" style="width:18px;height:18px;color:#009EE3"></i>
-              <h2 class="font-bold" style="color:#0F172A">Terminal Mercado Pago (ME30S)</h2>
+              <h2 class="font-bold" style="color:#0F172A">Terminal Mercado Pago Point (Smart 2)</h2>
             </div>
             <button onclick="closeModal('modal-integ-mp')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
               <i data-lucide="x" style="width:16px;height:16px"></i>
@@ -2516,9 +2617,9 @@
                 <input id="mp-token" type="password" class="inp" placeholder="APP_USR-...">
               </div>
               <div>
-                <label class="lbl">Device ID</label>
+                <label class="lbl">Terminal (ID)</label>
                 <div class="flex gap-2">
-                  <input id="mp-device" class="inp flex-1" placeholder="GERTEC-MP-ME30S-...">
+                  <input id="mp-device" class="inp flex-1" placeholder="NEWLAND_N950__N950....">
                   <button onclick="detectMpDevices()" class="h-10 px-3 rounded-xl font-semibold text-xs transition hover:opacity-80 flex items-center gap-1.5 shrink-0" style="background:#EEF1F9;color:#1d2140">
                     <i data-lucide="search" style="width:13px;height:13px"></i> Detectar
                   </button>
@@ -2535,11 +2636,12 @@
             </div>
             <div class="rounded-xl p-3 text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
               <b>Pasos para la primera configuración:</b><br>
-              1. En tu celular: abre la app <b>Mercado Pago → Tu negocio → Cobrar con Point</b> y activa tu ME30S<br>
-              2. Regresa aquí → click <b>Detectar</b> → el Device ID aparece automático<br>
-              3. Click <b>Guardar</b><br>
-              4. Click <b>Activar modo PDV</b> (solo una vez — pone la terminal en modo integración)<br>
-              5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal
+              1. En <b>mercadopago.com.mx → Tu negocio → Sucursales y cajas</b> crea una sucursal y una caja; con la app Mercado Pago vincula la Point Smart 2 a esa caja.<br>
+              2. En <b>mercadopago.com.mx/developers → Tus integraciones</b> crea una aplicación (producto: pagos presenciales / Point) y copia el <b>Access Token de PRODUCCIÓN</b> (APP_USR-…).<br>
+              3. Pégalo aquí → <b>Detectar</b> → elige la terminal de esta caja → <b>Guardar</b>.<br>
+              4. <b>Activar modo PDV</b> y luego <b>reinicia la terminal</b> (apagar/encender).<br>
+              5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal y la venta se registra únicamente si el pago se aprueba.<br>
+              <span style="color:#64748B">El token se comparte con las demás PCs por la nube; cada PC elige su propia terminal.</span>
             </div>
           </div>
         </div>
@@ -2971,6 +3073,9 @@
             </div>
           </div>
           <div class="flex gap-2 flex-wrap">
+            <button onclick="abrirGananciaMensual()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#F0FDF4;color:#15803D;border:1px solid #86EFAC" title="Ver cuánto ganaste en cada mes y cuál fue el mejor">
+              <i data-lucide="bar-chart-3" style="width:13px;height:13px"></i> Ganancia por mes
+            </button>
             <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
             </button>
@@ -5672,8 +5777,15 @@ function icons() { if (window.lucide) lucide.createIcons(); }
 
 async function api(path, opts={}) {
   const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type':'application/json', ...(S.token?{Authorization:`Bearer ${S.token}`}:{}) },
     ...opts,
+    headers: {
+      'Content-Type':'application/json',
+      ...(S.token?{Authorization:`Bearer ${S.token}`}:{}),
+      // Admin administrando otra sucursal: el servidor responde con los datos
+      // de ESA sucursal, en vivo desde su base de datos (ver sucursales.py)
+      ...(S.sucursalRemota?{'X-Sucursal':S.sucursalRemota}:{}),
+      ...(opts.headers||{}),
+    },
   });
   // Don't force logout during an active update — the API may briefly restart.
   if (res.status === 401 && !_updPollTimer) { doLogout(); return res; }
@@ -5749,13 +5861,23 @@ function showConfirm({ title, message, confirmText='Confirmar', cancelText='Canc
 // ══════════════════════════════════════════════════════════
 // MERCADO PAGO POINT
 // ══════════════════════════════════════════════════════════
+// Cobro con terminal (Orders API de Mercado Pago, ver terminal_routes.py):
+// la venta SOLO se registra en el servidor cuando MP responde "processed".
 let _mpPollTimer  = null;
-let _mpIntentId   = null;
-let _mpSaleBody   = null;   // guardamos el body de venta para ejecutar después del pago
+let _mpTickTimer  = null;
+let _mpOrderId    = null;
+let _mpSaleBody   = null;   // {cliente_id, items, _total} del carrito que se está cobrando
+let _mpTotal      = 0;
+let _mpStart      = 0;
+let _mpFinal      = true;   // true = no hay cobro vivo en la terminal
+let _mpPolling    = false;
+let _mpAbort      = false;  // el cajero canceló antes de que MP devolviera la orden
+let _mpForceManual = false; // "Cobrar sin terminal (manual)"
+const MP_TIMEOUT_MS = 5 * 60 * 1000 + 20000; // la orden expira en MP a los 5 min
 
 function _mpDeviceIdValid(id) {
-  // Valid: length > 8 y no es solo números (IDs reales son alfanuméricos)
-  return id && id.length > 8 && !/^\d+$/.test(id);
+  // IDs reales: NEWLAND_N950__N950NCB801293324 (alfanuméricos, sin espacios)
+  return !!id && id.length > 8 && !/^\d+$/.test(id) && !/\s/.test(id);
 }
 
 async function loadMpStatus() {
@@ -5765,14 +5887,16 @@ async function loadMpStatus() {
     const d = await res.json();
     const badge    = document.getElementById('mp-status-badge');
     const deviceEl = document.getElementById('mp-device');
+    const tokenEl  = document.getElementById('mp-token');
     const validDevice = _mpDeviceIdValid(d.device_id);
     if (d.device_id && deviceEl && validDevice) deviceEl.value = d.device_id;
+    if (tokenEl && d.token_mask && !tokenEl.value) tokenEl.value = d.token_mask;
     if (badge) {
       if (d.token_set && validDevice) {
         badge.textContent = 'LISTO';
         badge.style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
       } else if (d.token_set) {
-        badge.textContent = 'FALTA DEVICE ID';
+        badge.textContent = 'FALTA TERMINAL';
         badge.style.cssText = 'background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;padding:6px 12px;border-radius:12px;font-size:10px;font-weight:700';
       } else {
         badge.textContent = 'SIN CONFIGURAR';
@@ -5788,187 +5912,292 @@ async function saveMpConfig() {
   if (!token) { toast('Ingresa el Access Token', 'warning'); return; }
   const res = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device||'' }) });
   if (res.ok) {
-    toast('Terminal MP configurada', 'success');
+    toast('Terminal Mercado Pago guardada', 'success');
     loadMpStatus();
     probarConexionIntegracion('mp', 'btn-test-mp', 'test-result-mp');
   }
-  else { const e=await res.json(); toast(e.detail||'Error al guardar', 'error'); }
+  else { const e=await res.json().catch(()=>({})); toast(e.detail||'Error al guardar', 'error'); }
 }
 
 async function detectMpDevices() {
   const token = document.getElementById('mp-token')?.value.trim();
   if (!token) { toast('Primero ingresa el Access Token', 'warning'); return; }
-  // Pasa el token como query param — NO guarda antes de detectar para no borrar device_id existente
+  // Token por query param (si viene enmascarado el backend usa el guardado) — no guarda nada
   const res = await api(`/config/mp-devices?token=${encodeURIComponent(token)}`);
   if (!res.ok) {
-    const e = await res.json();
-    if (res.status === 401 || res.status === 403) {
-      toast(e.detail || 'Sin permisos de Point', 'error');
-    } else {
-      toast(e.detail || 'Error MP API', 'error');
-    }
+    const e = await res.json().catch(()=>({}));
+    toast(e.detail || 'Error consultando Mercado Pago', 'error');
     return;
   }
   const d = await res.json();
   if (!d.devices?.length) {
-    // No terminales vinculadas — mostrar instrucciones
-    const msg = [
-      'No se encontraron terminales en tu cuenta.',
+    alert([
+      'No se encontraron terminales en esta cuenta de Mercado Pago.',
       '',
-      'Pasos para vincular tu ME30S:',
-      '1. Abre la app "Mercado Pago" en tu celular',
-      '2. Ve a Tu negocio → Cobrar con Point',
-      '3. Sigue los pasos para activar la terminal',
-      '4. Regresa aquí y haz click en Detectar nuevamente',
-      '',
-      'Si ya la tienes activa, entra a developers.mercadopago.com',
-      'y verifica que tu app tenga el alcance "point:read"'
-    ].join('\n');
-    alert(msg);
+      '1. En mercadopago.com.mx > Tu negocio > Sucursales y cajas: crea una sucursal y una caja.',
+      '2. En la app Mercado Pago (celular) vincula la Point Smart 2 a esa sucursal/caja',
+      '   (escaneando el QR que muestra la terminal).',
+      '3. Verifica que el Access Token sea el de PRODUCCION de la MISMA cuenta.',
+      '4. Regresa aqui y haz click en Detectar.'
+    ].join('\n'));
     return;
   }
-  if (d.devices.length === 1) {
-    const did = d.devices[0].id;
-    document.getElementById('mp-device').value = did;
-    toast(`Terminal detectada — haz click en Guardar`, 'success');
-  } else {
-    const list = d.devices.map(dv => `${dv.id}  (${dv.operating_mode||''})`).join('\n');
-    alert(`Terminales encontradas — copia el ID al campo Device ID:\n\n${list}`);
-  }
+  const pick = (dv) => {
+    document.getElementById('mp-device').value = dv.id;
+    const modo = (dv.operating_mode||'').toUpperCase();
+    toast(modo === 'PDV'
+      ? 'Terminal detectada (modo PDV) — haz click en Guardar'
+      : `Terminal detectada (modo ${modo||'?'}) — Guarda y luego "Activar modo PDV"`, 'success');
+  };
+  if (d.devices.length === 1) { pick(d.devices[0]); return; }
+  const list = d.devices.map((dv,i) => `${i+1}) ${dv.id}  [${dv.operating_mode||'?'}]${dv.external_pos_id?'  caja '+dv.external_pos_id:''}`).join('\n');
+  const n = parseInt(prompt(`Terminales encontradas — escribe el número de la de ESTA caja:\n\n${list}`, '1'), 10);
+  if (n >= 1 && n <= d.devices.length) pick(d.devices[n-1]);
 }
 
 async function activateMpPdv() {
   const token  = document.getElementById('mp-token')?.value.trim();
   const device = document.getElementById('mp-device')?.value.trim();
-  if (!token || !device) { toast('Ingresa Access Token y Device ID primero', 'warning'); return; }
-  // Auto-guarda primero para que el backend tenga los valores
-  await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device }) });
-  const res = await api('/config/mp-pdv', {
-    method: 'POST',
-    body: JSON.stringify({ token, device_id: device }),
-  });
+  if (!token || !device) { toast('Ingresa Access Token y terminal primero', 'warning'); return; }
+  const sv = await api('/config/mp-save', { method:'POST', body: JSON.stringify({ token, device_id: device }) });
+  if (!sv.ok) { const e=await sv.json().catch(()=>({})); toast(e.detail||'Error al guardar', 'error'); return; }
+  const res = await api('/config/mp-pdv', { method: 'POST', body: JSON.stringify({ token, device_id: device }) });
+  const d = await res.json().catch(()=>({}));
   if (res.ok) {
-    toast('Modo PDV activado — la terminal ya recibe pagos desde el POS', 'success');
+    toast(d.message || 'Modo PDV activado — reinicia la terminal', 'success');
     loadMpStatus();
   } else {
-    const e = await res.json();
-    toast(e.detail || 'Error activando PDV', 'error');
+    toast(d.detail || 'Error activando PDV', 'error');
   }
 }
 
-async function startMpPayment(amount, reference, saleBody) {
-  _mpSaleBody = saleBody;
-  document.getElementById('mp-modal-amount').textContent = fmt(amount);
-  document.getElementById('mp-modal-status').textContent = 'Enviando monto a la terminal...';
-  document.getElementById('modal-mp-terminal').classList.remove('hidden');
-  document.getElementById('modal-mp-terminal').classList.add('flex');
+function _mpUuid() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e) {}
+  return 'pos-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
 
+function _mpSetStatus(msg, kind) {
+  const el = document.getElementById('mp-modal-status');
+  if (!el) return;
+  el.textContent = msg;
+  const st = {
+    info:  'background:#F0F9FF;color:#0369A1;border:1px solid #BAE8FF',
+    ok:    'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC',
+    warn:  'background:#FEF3C7;color:#92400E;border:1px solid #FCD34D',
+    error: 'background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5',
+  }[kind || 'info'];
+  el.style.cssText = st + ';border-radius:12px;padding:12px 16px;font-size:14px;text-align:center;width:100%';
+}
+
+// mode: 'waiting' | 'failed' | 'regfail' | 'done'
+function _mpSetMode(mode) {
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
+  const acts = document.getElementById('mp-modal-actions');
+  const conAcciones = mode === 'failed' || mode === 'regfail';
+  show('mp-modal-wait', mode === 'waiting');
+  show('mp-btn-cancel', mode === 'waiting');
+  if (acts) { acts.classList.toggle('hidden', !conAcciones); acts.classList.toggle('flex', conAcciones); }
+  show('mp-btn-retry',  mode === 'failed');
+  show('mp-btn-manual', mode === 'failed');
+  show('mp-btn-reg',    mode === 'regfail');
+}
+
+function _mpStopTimers() {
+  clearInterval(_mpPollTimer); _mpPollTimer = null;
+  clearInterval(_mpTickTimer); _mpTickTimer = null;
+}
+
+function _mpTick() {
+  const s = Math.floor((Date.now() - _mpStart) / 1000);
+  const t = document.getElementById('mp-modal-timer');
+  if (t) t.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  if (!_mpFinal && _mpOrderId && Date.now() - _mpStart > MP_TIMEOUT_MS) {
+    _mpStart = Date.now() - MP_TIMEOUT_MS + 30000; // no reintentar cada segundo
+    _mpSetStatus('Tiempo agotado — cancelando el cobro en la terminal...', 'warn');
+    cancelMpPayment(true);
+  }
+}
+
+async function startMpPayment(saleBody) {
+  _mpSaleBody = saleBody;
+  _mpOrderId = null; _mpFinal = false; _mpAbort = false;
+  _mpTotal = saleBody._total || 0;
+  document.getElementById('mp-modal-amount').textContent = fmt(_mpTotal);
+  document.getElementById('mp-modal-order').textContent = '';
+  _mpSetStatus('Enviando monto a la terminal...', 'info');
+  _mpSetMode('waiting');
+  const m = document.getElementById('modal-mp-terminal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  if (window.lucide) lucide.createIcons();
+  _mpStart = Date.now();
+  _mpStopTimers();
+  _mpTickTimer = setInterval(_mpTick, 1000);
+
+  let res = null, d = {};
   try {
-    const res = await api('/config/mp-intent', { method:'POST', body: JSON.stringify({ amount, reference }) });
+    res = await api('/pos/terminal/cobro', { method:'POST', body: JSON.stringify({
+      cliente_id: saleBody.cliente_id || null,
+      items: saleBody.items,
+      client_ref: _mpUuid(),
+    })});
+    d = await res.json().catch(()=>({}));
+  } catch(err) { res = null; }
+  if (!res || !res.ok) {
+    _mpFinal = true; _mpStopTimers();
+    _mpSetStatus((d && d.detail) || 'No se pudo contactar la terminal (¿sin internet?).', 'error');
+    _mpSetMode('failed');
+    return;
+  }
+  _mpOrderId = d.order_id;
+  _mpTotal = d.total;
+  document.getElementById('mp-modal-amount').textContent = fmt(d.total);
+  document.getElementById('mp-modal-order').textContent = `Orden MP ${d.order_id}`;
+  if (_mpAbort) { cancelMpPayment(); return; }
+  _mpSetStatus('Monto enviado. El cliente debe insertar, deslizar o acercar su tarjeta en la terminal.', 'info');
+  _mpPollTimer = setInterval(pollMpOrder, 2500);
+}
+
+function retryMpPayment() {
+  if (!_mpSaleBody) { closeMpModal(); return; }
+  startMpPayment(_mpSaleBody);
+}
+
+async function pollMpOrder(force) {
+  if (!_mpOrderId || _mpPolling || (_mpFinal && force !== true)) return;
+  _mpPolling = true;
+  try {
+    let res;
+    try { res = await api(`/pos/terminal/cobro/${encodeURIComponent(_mpOrderId)}`); }
+    catch(e) { _mpSetStatus('Sin conexión con el servidor local — reintentando...', 'warn'); return; }
+    const d = await res.json().catch(()=>({}));
     if (!res.ok) {
-      closeMpModal();
-      const e = await res.json();
-      toast(e.detail || 'No se pudo conectar con la terminal', 'error');
-      _enableCobrarBtn(true);
+      // Error al registrar una venta YA aprobada (p. ej. stock cambió): no volver a cobrar
+      _mpFinal = true; _mpStopTimers();
+      _mpSetStatus(d.detail || 'Error consultando el cobro', 'error');
+      _mpSetMode(res.status === 404 ? 'failed' : 'regfail');
       return;
     }
-    const d = await res.json();
-    _mpIntentId = d.intent_id;
-    document.getElementById('mp-modal-status').textContent = 'El cliente debe insertar tarjeta y PIN en la terminal...';
-    _mpPollTimer = setInterval(pollMpIntent, 2500);
-  } catch(err) {
-    closeMpModal();
-    toast('Error de conexión con la terminal', 'error');
-    _enableCobrarBtn(true);
-  }
-}
-
-async function pollMpIntent() {
-  if (!_mpIntentId) return;
-  try {
-    const res = await api(`/config/mp-intent/${_mpIntentId}`);
-    if (!res.ok) return;
-    const d = await res.json();
-    const state = d.state;
-    if (state === 'PROCESSED') {
-      clearInterval(_mpPollTimer); _mpPollTimer = null;
-      const pState = d.payment?.state;
-      if (pState === 'APPROVED') {
-        document.getElementById('mp-modal-status').textContent = 'Pago aprobado — registrando venta...';
-        document.getElementById('mp-modal-status').style.cssText = 'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:12px;padding:12px 16px;font-size:14px;text-align:center;width:100%';
-        await completeMpSale();
-      } else {
-        closeMpModal();
-        toast(`Pago rechazado: ${pState}`, 'error');
-        _enableCobrarBtn(true);
-      }
-    } else if (['CANCELED','ERROR','ABANDONED'].includes(state)) {
-      clearInterval(_mpPollTimer); _mpPollTimer = null;
-      closeMpModal();
-      toast(`Terminal: ${state}`, 'error');
-      _enableCobrarBtn(true);
+    if (d.offline) { _mpSetStatus(d.message, 'warn'); return; }
+    if (d.status === 'processed' && d.venta) {
+      _mpFinal = true; _mpStopTimers();
+      _mpSetStatus('Pago aprobado — venta registrada', 'ok');
+      _mpSetMode('done');
+      setTimeout(() => _mpFinishSale(d.venta), 600);
+      return;
     }
-  } catch(e) {}
+    if (d.final) {
+      _mpFinal = true; _mpStopTimers();
+      _mpSetStatus(d.message || `Cobro ${d.status}`, d.status === 'action_required' ? 'warn' : 'error');
+      _mpSetMode('failed');
+      return;
+    }
+    _mpSetStatus(d.message || 'Esperando pago en terminal...', 'info');
+  } finally {
+    _mpPolling = false;
+  }
 }
 
-async function completeMpSale() {
-  closeMpModal();
-  _enableCobrarBtn(true);
-
-  // Cajero de prueba: body es null → no registrar en BD, solo mostrar éxito
-  if (!_mpSaleBody) {
-    document.getElementById('pay-folio').textContent  = 'Folio: PRUEBA-MP';
-    document.getElementById('pay-total').textContent  = document.getElementById('mp-modal-amount')?.textContent || '';
-    document.getElementById('pay-cambio').textContent = '$0.00';
-    const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
-    if (ticketWrap) ticketWrap.classList.add('hidden');
-    openModal('modal-payment');
-    S.cart=[]; renderCart();
-    document.getElementById('cart-pagado').value=''; updateCambio();
+async function cancelMpPayment(auto) {
+  if (!_mpOrderId) {
+    // La orden aún no existe (POST en vuelo): se cancela en cuanto MP la devuelva
+    _mpAbort = true;
+    if (_mpFinal) closeMpModal();
+    else _mpSetStatus('Cancelando...', 'warn');
     return;
   }
-
-  const body = { ..._mpSaleBody, metodo_pago: 'tarjeta', monto_pagado: _mpSaleBody._total };
-  delete body._total;
-  let res;
+  if (_mpFinal) { closeMpModal(); return; }
+  const btn = document.getElementById('mp-btn-cancel');
+  if (btn) btn.disabled = true;
   try {
-    res = await api('/pos/', { method:'POST', body: JSON.stringify(body) });
+    const res = await api(`/pos/terminal/cobro/${encodeURIComponent(_mpOrderId)}/cancelar`, { method:'POST' });
+    const d = await res.json().catch(()=>({}));
+    if (res.ok && d.status === 'processed' && d.venta) {
+      // Se aprobó justo antes de cancelar: la venta ya quedó registrada
+      _mpFinal = true; _mpStopTimers();
+      _mpSetStatus('El cliente ya había pagado — venta registrada', 'ok');
+      _mpSetMode('done');
+      setTimeout(() => _mpFinishSale(d.venta), 900);
+      return;
+    }
+    if (res.ok && d.ok) {
+      _mpFinal = true; _mpStopTimers();
+      _mpSetStatus(auto ? 'Tiempo agotado: cobro cancelado. No se registró la venta.' : 'Cobro cancelado. No se registró la venta.', 'warn');
+      _mpSetMode('failed');
+      return;
+    }
+    // Ya está en la terminal o sin red: se sigue esperando el resultado real
+    _mpSetStatus(d.message || d.detail || 'No se pudo cancelar — sigue esperando el resultado.', 'warn');
   } catch(e) {
-    toast('Error de red al registrar venta', 'error');
-    return;
+    _mpSetStatus('Sin conexión — no se pudo cancelar. Sigue esperando el resultado.', 'warn');
+  } finally {
+    if (btn) btn.disabled = false;
   }
-  if (!res.ok) { const e=await res.json(); toast(e.detail||'Error al registrar venta','error'); return; }
-  const data = await res.json();
-  document.getElementById('pay-folio').textContent  = `Folio: ${data.folio}`;
-  document.getElementById('pay-total').textContent  = fmt(data.total);
+}
+
+function closeMpModal(userAction) {
+  // Si el cobro sigue vivo en la terminal, se intenta cancelar antes de soltar el carrito
+  if (userAction && !_mpFinal && _mpOrderId) {
+    api(`/pos/terminal/cobro/${encodeURIComponent(_mpOrderId)}/cancelar`, { method:'POST' }).catch(()=>{});
+  }
+  _mpStopTimers();
+  _mpFinal = true;
+  const m = document.getElementById('modal-mp-terminal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  _enableCobrarBtn(true);
+}
+
+function mpCobrarManual() {
+  closeMpModal(true);
+  _mpForceManual = true;
+  processSale();
+}
+
+function _mpFinishSale(venta) {
+  closeMpModal();
+  document.getElementById('pay-folio').textContent  = `Folio: ${venta.folio}`;
+  document.getElementById('pay-total').textContent  = fmt(venta.total);
   document.getElementById('pay-cambio').textContent = fmt(0);
+  if (_mpSaleBody) {
+    S._pruebaItems  = _mpSaleBody.items;
+    S._pruebaPag    = venta.total;
+    S._pruebaMetodo = 'tarjeta';
+  }
   const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
   const ticketEl   = document.getElementById('pay-ticket-texto');
-  if (data.ticket_texto && ticketWrap && ticketEl) {
-    ticketEl.textContent = data.ticket_texto;
+  if (venta.ticket_texto && ticketWrap && ticketEl) {
+    ticketEl.textContent = venta.ticket_texto;
     ticketWrap.classList.remove('hidden');
   } else if (ticketWrap) { ticketWrap.classList.add('hidden'); }
   openModal('modal-payment');
   S.cart = []; renderCart();
   document.getElementById('cart-pagado').value = '';
   updateCambio();
+  _mpSaleBody = null; _mpOrderId = null;
   loadPOS(); loadDashboard();
   if (document.querySelector('[data-page="caja"].active')) loadCajaAdmin();
 }
 
-async function cancelMpPayment() {
-  clearInterval(_mpPollTimer); _mpPollTimer = null;
-  _mpIntentId = null; _mpSaleBody = null;
-  await api('/config/mp-intent', { method:'DELETE' });
-  closeMpModal();
-  _enableCobrarBtn(true);
-  toast('Pago cancelado', 'warning');
-}
-
-function closeMpModal() {
-  clearInterval(_mpPollTimer); _mpPollTimer = null;
-  const m = document.getElementById('modal-mp-terminal');
-  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+// Cobros aprobados en la terminal que no alcanzaron a registrarse (se cerró el
+// programa o se cayó la red a mitad del pago) — se registran al volver al POS.
+let _mpPendChecked = false;
+async function _mpCheckPendientes() {
+  if (_mpPendChecked) return;
+  _mpPendChecked = true;
+  try {
+    const res = await api('/pos/terminal/pendientes');
+    if (!res.ok) return;
+    const d = await res.json();
+    for (const p of (d.pendientes || [])) {
+      if (p.order_id === _mpOrderId) continue;
+      const r = await api(`/pos/terminal/cobro/${encodeURIComponent(p.order_id)}`);
+      const x = await r.json().catch(()=>({}));
+      if (r.ok && x.status === 'processed' && x.venta) {
+        toast(`Cobro con terminal recuperado: venta ${x.venta.folio} por ${fmt(x.venta.total)} registrada`, 'success');
+      } else if (!r.ok && x.detail) {
+        toast(x.detail, 'error');
+      }
+    }
+  } catch(e) {}
 }
 
 function _enableCobrarBtn(enable) {
@@ -6372,6 +6601,7 @@ async function doLogin() {
 }
 
 function doLogout() {
+  S.sucursalRemota = null; document.getElementById('_suc-banner')?.remove();
   S.token=null; S.user=null;
   localStorage.removeItem('token'); localStorage.removeItem('user');
   document.getElementById('app').classList.add('hidden');
@@ -6514,6 +6744,95 @@ function launchApp() {
   checkUpdateSilent();
   // Re-check every 30 min while app is open — shows banner without re-login
   setInterval(checkUpdateSilent, 30 * 60 * 1000);
+  if (S.user?.rol === 'admin') initSucursalSwitch();
+}
+
+// ── Cambio de sucursal al instante (admin) ───────────────────────────────────
+// La sucursal de esta PC trabaja con su BD local; al elegir otra, cada request
+// lleva X-Sucursal y el servidor lee/escribe directo en la BD de esa sucursal.
+// Las pantallas que ya se refrescan solas (dashboard 30s, caja 20s, inventario
+// 60s) muestran así lo que pasa en la otra sucursal en tiempo real.
+S.sucursalRemota = null;
+let _sucursales = [];
+
+async function initSucursalSwitch() {
+  const res = await api('/sucursales/');
+  if (!res.ok) return;
+  _sucursales = await res.json();
+  const wrap = document.getElementById('suc-switch-wrap');
+  const sel  = document.getElementById('suc-switch');
+  if (!wrap || !sel) return;
+  if (_sucursales.length < 2) { wrap.classList.add('hidden'); wrap.classList.remove('flex'); return; }
+  sel.innerHTML = _sucursales.map(x => `<option value="${x.clave}">${x.local ? '🏠 ' : ''}Sucursal ${x.nombre}</option>`).join('');
+  wrap.classList.remove('hidden'); wrap.classList.add('flex');
+  // Recordar la última sucursal elegida en esta PC
+  let ult = null;
+  try { ult = localStorage.getItem('sucursal_admin'); } catch(e) {}
+  const remota = _sucursales.find(x => x.clave === ult && !x.local);
+  if (remota) cambiarSucursal(remota.clave, true);
+  else sel.value = _sucursales.find(x => x.local)?.clave || '';
+}
+
+function _sucLoader(texto) {
+  document.getElementById('_suc-loader')?.remove();
+  if (!texto) return;
+  const ov = document.createElement('div');
+  ov.id = '_suc-loader';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.55);backdrop-filter:blur(6px)';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:22px;padding:28px 34px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 30px 80px rgba(0,0,0,.3);min-width:300px">
+      <div style="width:46px;height:46px;border-radius:50%;border:4px solid #E2E8F0;border-top-color:#1d2140;animation:spin .8s linear infinite"></div>
+      <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0">${texto}</p>
+      <p style="font-size:12px;color:#64748B;margin:0">Cargando inventario, ventas y caja…</p>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+function _sucBanner() {
+  let b = document.getElementById('_suc-banner');
+  const suc = _sucursales.find(x => x.clave === S.sucursalRemota);
+  if (!suc) { b?.remove(); return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = '_suc-banner';
+    const header = document.querySelector('header');
+    header.parentNode.insertBefore(b, header.nextSibling);
+  }
+  const local = _sucursales.find(x => x.local);
+  b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 24px;background:linear-gradient(90deg,#1d2140,#2563EB);color:#fff;font-size:12px;flex-shrink:0';
+  b.innerHTML = `
+    <span style="width:8px;height:8px;border-radius:50%;background:#4ADE80;box-shadow:0 0 0 3px rgba(74,222,128,.3)"></span>
+    <span>Estás administrando <b>Sucursal ${suc.nombre}</b> · datos en tiempo real desde su base de datos</span>
+    <button onclick="cambiarSucursal('${local?.clave||''}')" style="margin-left:auto;height:26px;padding:0 12px;border-radius:9px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:11px;cursor:pointer">Volver a Sucursal ${local?.nombre||''}</button>`;
+}
+
+async function cambiarSucursal(clave, silencioso=false) {
+  const suc = _sucursales.find(x => x.clave === clave);
+  if (!suc) return;
+  const anterior = S.sucursalRemota;
+  const nueva = suc.local ? null : suc.clave;
+  if (nueva === anterior && !silencioso) return;
+  _sucLoader(`Cambiando a Sucursal ${suc.nombre}…`);
+  S.sucursalRemota = nueva;
+  try {
+    // Probar la conexión antes de cambiar la pantalla
+    const r = await api('/dashboard/stats');
+    if (!r || !r.ok) throw new Error('sin conexión');
+  } catch(e) {
+    S.sucursalRemota = anterior;
+    _sucLoader(null);
+    document.getElementById('suc-switch').value = anterior || _sucursales.find(x => x.local)?.clave;
+    toast(`No se pudo conectar con Sucursal ${suc.nombre}. Revisa internet o sus datos en Configuración.`, 'error');
+    return;
+  }
+  try { localStorage.setItem('sucursal_admin', nueva || ''); } catch(e) {}
+  document.getElementById('suc-switch').value = clave;
+  _sucBanner();
+  const pagina = document.querySelector('[data-page].active')?.dataset.page || 'dashboard';
+  // POS: el admin no vende — y nunca se cobra en otra sucursal desde aquí
+  navigate(pagina === 'pos' ? 'dashboard' : pagina);
+  setTimeout(() => _sucLoader(null), 700);
+  if (!silencioso) toast(`Ahora administras Sucursal ${suc.nombre}`, 'success');
 }
 
 function buildNav() {
@@ -7032,6 +7351,7 @@ async function loadPOS() {
     cobrarBtn.style.cursor = isAdmin ? 'not-allowed' : 'pointer';
     cobrarBtn.title = isAdmin ? 'Solo cajeros pueden cobrar' : '';
   }
+  _mpCheckPendientes();  // cobros de terminal aprobados sin venta (1 vez por sesión)
   const res=await api('/productos/');
   if (!res.ok) return;
   S.allProducts=await res.json();
@@ -7377,7 +7697,17 @@ function _showTurnoCerradoModal(cerradoHoy) {
 }
 
 let _saleInProgress = false;
+// Candado SÍNCRONO de todo el cobro: _saleInProgress se ponía en true hasta
+// después de esperar /cortes/activo y la terminal, así que dos F10 o un doble
+// clic rápidos pasaban ambos el guard y registraban la venta dos veces.
+let _processSaleBusy = false;
 async function processSale() {
+  if (_processSaleBusy) return;
+  _processSaleBusy = true;
+  try { await _processSaleImpl(); }
+  finally { _processSaleBusy = false; }
+}
+async function _processSaleImpl() {
   if (_saleInProgress) return;
   if (S.user?.rol === 'admin') { toast('El administrador no puede realizar ventas. Inicia sesión como cajero.','error'); return; }
   if (!S.cart.length) { toast('El carrito está vacío','warning'); return; }
@@ -7418,24 +7748,12 @@ async function processSale() {
   // Tarjeta/transferencia: si no ingresó monto, se asume igual al total
   const pag = (!isNaN(pagInput) && pagInput > 0) ? pagInput : total;
 
-  // Usuario de prueba — simular venta sin afectar BD ni stock
-  // Si método=tarjeta y MP configurada, SÍ manda a terminal real (para probar el flujo)
-  if (S.user?.rol === 'cajero_prueba' && metodo === 'tarjeta') {
-    try {
-      const mpChk = await api('/config/mp-status');
-      if (mpChk.ok) {
-        const mpd = await mpChk.json();
-        if (mpd.enabled) {
-          toast('MODO PRUEBA — Monto enviado a terminal real (venta NO guardada en BD)','warning');
-          _saleInProgress = true; _enableCobrarBtn(false);
-          const folio = 'PRUEBA-' + Date.now().toString().slice(-6);
-          await startMpPayment(total, folio, null); // null = no guardar en BD
-          return;
-        }
-      }
-    } catch(e) {}
-  }
+  // "Cobrar sin terminal (manual)" desde el modal de la terminal: una sola vez
+  const _sinTerminal = _mpForceManual;
+  _mpForceManual = false;
 
+  // Usuario de prueba — simular venta sin afectar BD ni stock (nunca cobra en
+  // la terminal real: un cobro aprobado ahí sí movería dinero de verdad)
   if (S.user?.rol === 'cajero_prueba') {
     toast('MODO PRUEBA — venta simulada, sin cambios reales','warning');
     document.getElementById('pay-folio').textContent='Folio: PRUEBA-000';
@@ -7467,25 +7785,19 @@ async function processSale() {
 
   const saleItems = S.cart.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio_venta,descuento:0,es_pieza:!!i._esPieza}));
 
-  // ── Terminal Mercado Pago: interceptar tarjeta si está configurada ──
-  if (metodo === 'tarjeta') {
+  // ── Terminal Mercado Pago: tarjeta + terminal configurada → cobrar en la
+  // terminal; la venta se registra en el servidor SOLO si el pago se aprueba.
+  if (metodo === 'tarjeta' && !_sinTerminal) {
+    let mpEnabled = false;
     try {
-      const mpRes = await api('/config/mp-status');
-      if (mpRes.ok) {
-        const mpData = await mpRes.json();
-        if (mpData.enabled) {
-          _saleInProgress = true;
-          _enableCobrarBtn(false);
-          const folio = 'F' + Date.now().toString().slice(-8);
-          await startMpPayment(total, folio, {
-            cliente_id:  S.posCustomer?.id||null,
-            items:       saleItems,
-            _total:      total,
-          });
-          return; // sale se completa en completeMpSale() cuando terminal aprueba
-        }
-      }
-    } catch(e) { /* MP no disponible — continuar flujo normal */ }
+      const mpRes = await api('/pos/terminal/estado');
+      if (mpRes.ok) mpEnabled = !!(await mpRes.json()).enabled;
+    } catch(e) { /* servidor local no respondió — flujo normal */ }
+    if (mpEnabled) {
+      _enableCobrarBtn(false);
+      startMpPayment({ cliente_id: S.posCustomer?.id||null, items: saleItems, _total: total });
+      return;
+    }
   }
   // ─────────────────────────────────────────────────────────────────────
 
@@ -7495,6 +7807,7 @@ async function processSale() {
     metodo_pago: metodo,
     monto_pagado:pag,
   };
+  if (_sinTerminal) body.notas = 'Tarjeta cobrada sin terminal integrada (manual)';
   _saleInProgress = true;
   const btn = document.getElementById('btn-cobrar');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
@@ -10087,6 +10400,169 @@ async function loadCajaAdmin() {
   }
 }
 
+// ── Ganancia por mes ─────────────────────────────────────────────────────────
+// Misma fórmula que las tarjetas de arriba (/cortes/ganancia), desglosada mes a
+// mes para un año elegido — la suma de los 12 meses cuadra con el acumulado.
+const _MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let _gmData = null;
+let _gmMesSel = null;
+
+async function abrirGananciaMensual(anio) {
+  document.getElementById('_modal-ganancia-mes')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '_modal-ganancia-mes';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="height:4px;background:linear-gradient(90deg,#16A34A,#22C55E)"></div>
+      <div style="padding:18px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F1F5F9;flex-wrap:wrap">
+        <div style="width:40px;height:40px;border-radius:14px;background:#F0FDF4;display:flex;align-items:center;justify-content:center">
+          <i data-lucide="bar-chart-3" style="width:20px;height:20px;color:#16A34A"></i>
+        </div>
+        <div style="flex:1;min-width:160px">
+          <p style="font-size:17px;font-weight:900;color:#0F172A;margin:0">Ganancia por mes</p>
+          <p style="font-size:12px;color:#64748B;margin:0">Elige un mes para ver su detalle · ventas sin IVA − costo de lo vendido</p>
+        </div>
+        <label style="font-size:12px;color:#64748B">Año
+          <select id="_gm-anio" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;margin-left:4px"></select>
+        </label>
+        <label style="font-size:12px;color:#64748B">Mes
+          <select id="_gm-mes" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;margin-left:4px"></select>
+        </label>
+        <button id="_gm-cerrar" style="width:32px;height:32px;border-radius:10px;border:1px solid #E2E8F0;background:#F8FAFC;cursor:pointer;color:#64748B;font-size:16px">✕</button>
+      </div>
+      <div id="_gm-body" style="padding:18px 24px;overflow:auto">
+        <p style="font-size:13px;color:#94A3B8">Cargando…</p>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const cerrar = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
+  document.getElementById('_gm-cerrar').onclick = cerrar;
+  if (window.lucide) lucide.createIcons();
+
+  const qs = anio ? `?anio=${anio}` : '';
+  const res = await api('/cortes/ganancia-mensual' + qs);
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    document.getElementById('_gm-body').innerHTML = `<p style="color:#DC2626;font-size:13px">${e.detail || 'No se pudo cargar la ganancia mensual'}</p>`;
+    return;
+  }
+  _gmData = await res.json();
+  const hoy = new Date();
+  // Mes inicial: el actual si es el año en curso, si no el mejor mes del año
+  _gmMesSel = (_gmData.anio === hoy.getFullYear()) ? hoy.getMonth() + 1 : (_gmData.mejor_mes || 1);
+
+  const selAnio = document.getElementById('_gm-anio');
+  selAnio.innerHTML = _gmData.anios.map(a => `<option value="${a}" ${a===_gmData.anio?'selected':''}>${a}</option>`).join('');
+  selAnio.onchange = () => abrirGananciaMensual(parseInt(selAnio.value));
+  const selMes = document.getElementById('_gm-mes');
+  selMes.innerHTML = _MESES.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+  selMes.value = _gmMesSel;
+  selMes.onchange = () => { _gmMesSel = parseInt(selMes.value); _renderGananciaMensual(); };
+  _renderGananciaMensual();
+}
+
+function _renderGananciaMensual() {
+  const d = _gmData; if (!d) return;
+  const body = document.getElementById('_gm-body'); if (!body) return;
+  const $ = v => '$' + (v||0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const $c = v => '$' + Math.round(v||0).toLocaleString('es-MX');
+  const m = d.meses[_gmMesSel - 1];
+  const prev = _gmMesSel > 1 ? d.meses[_gmMesSel - 2] : null;
+  const maxAbs = Math.max(1, ...d.meses.map(x => Math.abs(x.ganancia)));
+  const hayNeg = d.meses.some(x => x.ganancia < 0);
+  const H = 170;                         // alto del área de barras (px)
+  const baseY = hayNeg ? H * 0.75 : H;   // línea base (0) — deja espacio abajo si hay pérdidas
+  const escala = (hayNeg ? H * 0.75 : H) / maxAbs;
+
+  const barras = d.meses.map((x, i) => {
+    const mes = i + 1, sel = mes === _gmMesSel, mejor = mes === d.mejor_mes;
+    const h = Math.max(x.num_ventas ? 2 : 0, Math.abs(x.ganancia) * escala);
+    const neg = x.ganancia < 0;
+    const color = neg ? '#DC2626' : (sel ? '#15803D' : '#86C99A');
+    const top = neg ? baseY : baseY - h;
+    const tip = `${_MESES[i]} ${d.anio}\nGanancia: ${$(x.ganancia)}\nVentas: ${$(x.total_ventas)} (${x.num_ventas})`;
+    return `
+      <div onclick="_gmMesSel=${mes};document.getElementById('_gm-mes').value=${mes};_renderGananciaMensual()" title="${tip}"
+        style="flex:1;position:relative;height:${H}px;cursor:pointer;border-radius:8px;${sel?'background:#F0FDF4':''}">
+        ${mejor && x.num_ventas ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, top-30)}px;text-align:center;font-size:10px;font-weight:800;color:#15803D">★ ${$c(x.ganancia)}</div>`
+          : (sel && x.num_ventas ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, (neg? top+h+2 : top-16))}px;text-align:center;font-size:10px;font-weight:700;color:#0F172A">${$c(x.ganancia)}</div>` : '')}
+        <div style="position:absolute;left:22%;right:22%;top:${top}px;height:${h}px;background:${color};border-radius:${neg?'0 0 4px 4px':'4px 4px 0 0'}"></div>
+      </div>`;
+  }).join('');
+  const etiquetas = _MESES.map((n, i) => `<div style="flex:1;text-align:center;font-size:10px;font-weight:${i+1===_gmMesSel?800:500};color:${i+1===_gmMesSel?'#0F172A':'#94A3B8'}">${n.slice(0,3)}</div>`).join('');
+
+  const delta = (act, ant) => {
+    if (!ant || !ant.num_ventas) return '';
+    const dif = act - ant.ganancia;
+    const col = dif >= 0 ? '#15803D' : '#DC2626';
+    return `<span style="font-size:11px;font-weight:700;color:${col}">${dif>=0?'▲':'▼'} ${$(Math.abs(dif))} vs ${_MESES[_gmMesSel-2]}</span>`;
+  };
+  const tile = (lbl, val, sub='', color='#0F172A') => `
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:10px 12px">
+      <p style="font-size:11px;color:#64748B;margin:0;font-weight:600">${lbl}</p>
+      <p style="font-size:17px;font-weight:900;color:${color};margin:2px 0 0">${val}</p>
+      ${sub ? `<p style="font-size:11px;color:#94A3B8;margin:2px 0 0">${sub}</p>` : ''}
+    </div>`;
+  const ranking = d.meses.filter(x => x.num_ventas).sort((a,b) => b.ganancia - a.ganancia);
+  const pos = ranking.findIndex(x => x.mes === _gmMesSel);
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:6px;flex-wrap:wrap">
+      <div>
+        <p style="font-size:12px;color:#64748B;margin:0;font-weight:600">${_MESES[_gmMesSel-1]} ${d.anio}${pos>=0 ? ` · lugar ${pos+1} de ${ranking.length} meses` : ''}${_gmMesSel===d.mejor_mes ? ' · <b style="color:#15803D">★ tu mejor mes</b>' : ''}</p>
+        <p style="font-size:30px;font-weight:900;color:${m.ganancia<0?'#DC2626':'#15803D'};margin:0;line-height:1.1">${$(m.ganancia)}</p>
+      </div>
+      <div style="padding-bottom:6px">${delta(m.ganancia, prev)}</div>
+    </div>
+    ${m.num_ventas ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:12px 0 18px">
+      ${tile('Ventas', $(m.total_ventas), `${m.num_ventas} ventas · ticket ${$(m.ticket_promedio)}`)}
+      ${tile('Devoluciones', '−' + $(m.total_devoluciones))}
+      ${tile('IVA cobrado (SAT)', '−' + $(m.iva), 'no es ganancia')}
+      ${tile('Costo de lo vendido', '−' + $(m.total_costo), 'regresa a inversión')}
+      ${tile('Margen', m.margen.toFixed(1) + '%', 'ganancia / venta sin IVA')}
+      ${tile('Cobrado', $(m.efectivo), `efectivo · tarjeta ${$(m.tarjeta)} · transf. ${$(m.transferencia)}`)}
+      ${tile('Retiros del mes', $(m.retiros_personales + m.retiros_inversion), `personal ${$(m.retiros_personales)} · inversión ${$(m.retiros_inversion)}`, '#DC2626')}
+    </div>` : `<p style="font-size:13px;color:#94A3B8;margin:12px 0 18px">No hubo ventas en ${_MESES[_gmMesSel-1]} ${d.anio}.</p>`}
+
+    <p style="font-size:12px;font-weight:700;color:#374151;margin:0 0 8px">Ganancia de cada mes de ${d.anio} <span style="font-weight:500;color:#94A3B8">— clic en una barra para ver ese mes</span></p>
+    <div style="position:relative;border-bottom:1px solid #E2E8F0;${hayNeg?'':''}">
+      <div style="display:flex;gap:4px">${barras}</div>
+      ${hayNeg ? `<div style="position:absolute;left:0;right:0;top:${baseY}px;border-top:1px dashed #CBD5E1"></div>` : ''}
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px">${etiquetas}</div>
+
+    <div style="overflow:auto;margin-top:18px;border:1px solid #E2E8F0;border-radius:14px">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:#F8FAFC;color:#64748B;text-align:right">
+          <th style="text-align:left;padding:8px 12px">Mes</th><th style="padding:8px">Ventas</th><th style="padding:8px">Núm.</th>
+          <th style="padding:8px">Costo</th><th style="padding:8px">IVA</th><th style="padding:8px">Ganancia</th><th style="padding:8px">Margen</th>
+          <th style="padding:8px 12px">Retirado</th></tr></thead>
+        <tbody>
+          ${d.meses.map((x,i) => `
+            <tr onclick="_gmMesSel=${i+1};document.getElementById('_gm-mes').value=${i+1};_renderGananciaMensual()"
+              style="cursor:pointer;text-align:right;border-top:1px solid #F1F5F9;${i+1===_gmMesSel?'background:#F0FDF4;font-weight:700':''};${x.num_ventas?'':'color:#CBD5E1'}">
+              <td style="text-align:left;padding:7px 12px">${_MESES[i]}${i+1===d.mejor_mes?' ★':''}</td>
+              <td style="padding:7px 8px">${$(x.total_ventas)}</td><td style="padding:7px 8px">${x.num_ventas}</td>
+              <td style="padding:7px 8px">${$(x.total_costo)}</td><td style="padding:7px 8px">${$(x.iva)}</td>
+              <td style="padding:7px 8px;color:${x.ganancia<0?'#DC2626':(x.num_ventas?'#0F172A':'inherit')}">${$(x.ganancia)}</td>
+              <td style="padding:7px 8px">${x.num_ventas ? x.margen.toFixed(1)+'%' : '—'}</td>
+              <td style="padding:7px 12px">${$(x.retiros_personales + x.retiros_inversion)}</td>
+            </tr>`).join('')}
+          <tr style="border-top:2px solid #E2E8F0;text-align:right;font-weight:800;background:#F8FAFC">
+            <td style="text-align:left;padding:8px 12px">Total ${d.anio}</td>
+            <td style="padding:8px">${$(d.totales.total_ventas)}</td><td style="padding:8px">${d.totales.num_ventas}</td>
+            <td style="padding:8px">${$(d.totales.total_costo)}</td><td style="padding:8px">${$(d.totales.iva)}</td>
+            <td style="padding:8px;color:#15803D">${$(d.totales.ganancia)}</td><td style="padding:8px"></td>
+            <td style="padding:8px 12px">${$(d.totales.retiros_personales + d.totales.retiros_inversion)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
 function _updateCajaStats() {
   const hoy  = new Date().toLocaleDateString('sv-SE');
   const desde = document.getElementById('caja-desde')?.value || '';
@@ -11399,6 +11875,9 @@ async function doRestoreBackup() {
 }
 
 function initSettings() {
+  cargarSucursal();
+  cargarListaSucursales();
+  cargarEstadoNube();
   const baseUrl = document.getElementById('api-base-url');
   if (baseUrl) baseUrl.textContent = window.location.origin;
 
@@ -12451,7 +12930,218 @@ window.addEventListener('load', () => {
       if (vEl) vEl.textContent = `v${d.version}`;
     }
   }).catch(()=>{});
+  _aplicarSucursalUI();
 });
+
+// ── Sucursal ─────────────────────────────────────────────────────────────────
+// Mismo nombre comercial y logo en todas; solo cambia nombre de sucursal y
+// dirección. "Matriz" sin renombrar no se muestra (todo se ve igual que hoy).
+function _nombreSucursalVisible(s) {
+  const n = (s?.nombre_sucursal || '').trim();
+  return (!n || n.toLowerCase() === 'matriz') ? '' : n;
+}
+async function _aplicarSucursalUI() {
+  try {
+    const s = await (await fetch('/api/config/sucursal')).json();
+    const suc = _nombreSucursalVisible(s);
+    const el = document.getElementById('l-sucursal');
+    if (el) el.textContent = suc ? ` · Sucursal ${suc}` : '';
+    document.title = `Farmacia Eben-Ezer${suc ? ' · ' + suc : ''} · POS`;
+    return s;
+  } catch(e) { return null; }
+}
+async function cargarSucursal() {
+  // Con api(): si el admin está administrando otra sucursal, se ven y editan
+  // los datos de ESA sucursal (su nombre/dirección en su propio ticket).
+  let s = null;
+  try { const r = await api('/config/sucursal'); if (r.ok) s = await r.json(); } catch(e) {}
+  if (!s) return;
+  if (S.sucursalRemota) s.clave = S.sucursalRemota;
+  document.getElementById('suc-nombre').value    = s.nombre_sucursal || '';
+  document.getElementById('suc-direccion').value = s.direccion || '';
+  document.getElementById('suc-telefono').value  = s.telefono || '';
+  document.getElementById('suc-farmacia').textContent = s.nombre_farmacia || '';
+  document.getElementById('suc-clave').textContent = 'Clave: ' + (s.clave || 'matriz');
+}
+// Ilustración de fachada de farmacia (SVG en línea) para las tarjetas de sucursal
+function _svgTienda(c, cOsc) {
+  const toldo = Array.from({length: 8}, (_, k) => {
+    const x = 34 + k * 16.5, col = k % 2 ? '#FFFFFF' : c;
+    return `<rect x="${x}" y="44" width="16.5" height="12" fill="${col}"/>
+            <path d="M${x} 56 a8.25 6 0 0 0 16.5 0 z" fill="${col}"/>`;
+  }).join('');
+  return `
+  <svg viewBox="0 0 200 124" width="100%" height="100%" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <ellipse cx="100" cy="116" rx="86" ry="6" fill="rgba(15,23,42,.10)"/>
+    <rect x="38" y="40" width="124" height="74" rx="3" fill="#FFFFFF" stroke="${cOsc}" stroke-width="1.5"/>
+    <rect x="30" y="20" width="140" height="22" rx="5" fill="${cOsc}"/>
+    <rect x="38" y="25" width="12" height="12" rx="2" fill="#FFFFFF"/>
+    <path d="M42.5 27h3v3h3v3h-3v3h-3v-3h-3v-3h3z" fill="${c}"/>
+    <text x="108" y="35.5" text-anchor="middle" font-family="Montserrat,Segoe UI,sans-serif" font-size="11" font-weight="800" letter-spacing="2" fill="#FFFFFF">FARMACIA</text>
+    ${toldo}
+    <rect x="50" y="68" width="50" height="36" rx="2" fill="#E0F2FE" stroke="${cOsc}" stroke-width="1.2"/>
+    <line x1="75" y1="68" x2="75" y2="104" stroke="${cOsc}" stroke-width="1"/>
+    <line x1="50" y1="86" x2="100" y2="86" stroke="${cOsc}" stroke-width="1"/>
+    <rect x="55" y="77" width="6" height="8" rx="1" fill="${c}" opacity=".8"/><rect x="63" y="79" width="5" height="6" rx="1" fill="#F59E0B"/>
+    <rect x="80" y="76" width="7" height="9" rx="1" fill="#F43F5E" opacity=".75"/><rect x="89" y="78" width="6" height="7" rx="1" fill="${c}" opacity=".6"/>
+    <rect x="56" y="95" width="5" height="8" rx="1" fill="#22C55E" opacity=".7"/><rect x="82" y="94" width="8" height="9" rx="1" fill="#38BDF8"/>
+    <rect x="112" y="66" width="36" height="48" rx="2" fill="${cOsc}"/>
+    <rect x="116" y="70" width="28" height="22" rx="1.5" fill="#BAE6FD" opacity=".55"/>
+    <circle cx="140" cy="94" r="1.8" fill="#FDE68A"/>
+    <rect x="22" y="104" width="12" height="10" rx="2" fill="#B45309"/><circle cx="28" cy="100" r="7" fill="#22C55E"/>
+    <rect x="166" y="104" width="12" height="10" rx="2" fill="#B45309"/><circle cx="172" cy="100" r="7" fill="#16A34A"/>
+  </svg>`;
+}
+
+async function cargarListaSucursales() {
+  const el = document.getElementById('suc-lista');
+  if (!el) return;
+  const res = await api('/sucursales/');
+  if (!res.ok) { el.textContent = '—'; return; }
+  const lista = await res.json();
+  // Mantener el selector del encabezado al día con lo que se ve aquí
+  _sucursales = lista;
+  const actual = S.sucursalRemota || lista.find(x => x.local)?.clave;
+  const tarjetas = lista.map(x => {
+    const viendo = x.clave === actual;
+    const [c, cOsc, fondo] = x.local ? ['#22C55E', '#166534', 'linear-gradient(160deg,#ECFDF5,#D1FAE5)']
+                                     : ['#3B82F6', '#1d2140', 'linear-gradient(160deg,#EFF6FF,#DBEAFE)'];
+    return `
+    <div class="rounded-2xl overflow-hidden flex flex-col" style="background:#fff;border:2px solid ${viendo ? cOsc : '#E2E8F0'};box-shadow:0 4px 14px rgba(15,23,42,.06)">
+      <div style="height:132px;background:${fondo};padding:10px 14px 0;position:relative">
+        ${_svgTienda(c, cOsc)}
+        ${viendo ? `<span style="position:absolute;top:10px;right:10px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;background:${cOsc};color:#fff">VIENDO AHORA</span>` : ''}
+      </div>
+      <div class="p-4 flex flex-col gap-2 flex-1">
+        <p style="font-size:15px;font-weight:900;color:#0F172A;margin:0">Sucursal ${x.nombre}</p>
+        <p style="font-size:11px;margin:0;display:flex;align-items:center;gap:6px;color:#64748B">
+          ${x.local
+            ? `<i data-lucide="monitor" style="width:12px;height:12px;color:#16A34A"></i> Esta PC · base de datos local`
+            : `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.25)"></span> En la nube · datos en tiempo real`}
+        </p>
+        <div class="flex gap-2 mt-auto pt-2">
+          ${viendo
+            ? `<span class="flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center" style="background:#F1F5F9;color:#64748B">Administrando</span>`
+            : `<button onclick="cambiarSucursal('${x.clave}')" class="flex-1 h-9 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90" style="background:${cOsc}">
+                 <i data-lucide="arrow-right-left" style="width:13px;height:13px"></i> Administrar</button>`}
+          ${x.local ? '' : `
+            <button onclick="asignarEstaPC('${x.clave}')" title="Solo para una PC nueva que va a trabajar EN esa sucursal" class="h-9 w-9 rounded-xl flex items-center justify-center" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF"><i data-lucide="monitor-check" style="width:15px;height:15px"></i></button>
+            <button onclick="quitarSucursal('${x.clave}')" title="Quitar del selector (no borra sus datos)" class="h-9 w-9 rounded-xl flex items-center justify-center" style="background:#FEF2F2;border:1px solid #FECACA;color:#DC2626"><i data-lucide="eye-off" style="width:15px;height:15px"></i></button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  const agregar = `
+    <button onclick="document.getElementById('sucn-nombre').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('sucn-nombre').focus()"
+      class="rounded-2xl flex flex-col items-center justify-center gap-2 hover:opacity-80" style="min-height:250px;border:2px dashed #CBD5E1;background:#F8FAFC;color:#64748B;cursor:pointer">
+      <span style="width:46px;height:46px;border-radius:14px;background:#E2E8F0;display:flex;align-items:center;justify-content:center"><i data-lucide="plus" style="width:22px;height:22px;color:#475569"></i></span>
+      <span style="font-size:13px;font-weight:800;color:#334155">Agregar sucursal</span>
+      <span style="font-size:11px;max-width:180px;text-align:center">Con tu cuenta de Turso conectada aparecen solas</span>
+    </button>`;
+  el.className = 'grid gap-4';
+  el.style.gridTemplateColumns = 'repeat(auto-fill,minmax(230px,1fr))';
+  el.innerHTML = tarjetas + agregar;
+  if (window.lucide) lucide.createIcons();
+}
+async function agregarSucursal() {
+  const body = {
+    nombre:    document.getElementById('sucn-nombre').value.trim(),
+    direccion: document.getElementById('sucn-direccion').value.trim(),
+    url:       document.getElementById('sucn-url').value.trim(),
+    token:     document.getElementById('sucn-token').value.trim(),
+  };
+  if (!body.nombre || !body.url || !body.token) { toast('Llena nombre, URL y token','warning'); return; }
+  const btn = document.getElementById('sucn-btn'); btn.disabled = true; btn.style.opacity = '.6';
+  try {
+    const res = await api('/sucursales/', { method:'POST', body: JSON.stringify(body) });
+    const d = await res.json().catch(()=>({}));
+    if (!res.ok) { toast(d.detail || 'No se pudo registrar','error'); return; }
+    if (!d.inicializada) {
+      _sucLoader(`Preparando Sucursal ${d.nombre}…`);
+      const r2 = await api(`/sucursales/${d.clave}/inicializar`, { method:'POST', body: JSON.stringify({ direccion: body.direccion }) });
+      const d2 = await r2.json().catch(()=>({}));
+      _sucLoader(null);
+      if (!r2.ok) { toast(d2.detail || 'No se pudo preparar la base de datos','error'); }
+      else toast(`Sucursal ${d.nombre} lista — ${d2.copiados} registros copiados (inventario en 0)`, d2.errores ? 'warning' : 'success');
+    } else {
+      toast(`Sucursal ${d.nombre} agregada`,'success');
+    }
+    ['sucn-nombre','sucn-direccion','sucn-url','sucn-token'].forEach(id => document.getElementById(id).value = '');
+    cargarListaSucursales();
+    initSucursalSwitch();
+  } finally { btn.disabled = false; btn.style.opacity = ''; }
+}
+async function asignarEstaPC(clave) {
+  const nombre = (_sucursales.find(x => x.clave === clave) || {}).nombre || clave;
+  showConfirm({
+    title: `¿Esta PC es de Sucursal ${nombre}?`,
+    message: `Úsalo solo en una PC nueva que va a trabajar EN esa sucursal. Al cerrar y abrir el programa, esta PC tendrá el inventario, ventas y caja de Sucursal ${nombre}. Si esta PC ya tiene ventas no se permite.`,
+    confirmText: 'Sí, convertir esta PC',
+    icon: 'store',
+    onConfirm: async () => {
+      const res = await api(`/sucursales/${clave}/asignar-esta-pc`, { method:'POST' });
+      const d = await res.json().catch(()=>({}));
+      if (!res.ok) { toast(d.detail || 'No se pudo','error'); return; }
+      toast(d.mensaje, 'success');
+    },
+  });
+}
+async function quitarSucursal(clave) {
+  const nombre = (_sucursales.find(x => x.clave === clave) || {}).nombre || clave;
+  const res = await api(`/sucursales/${clave}`, { method:'DELETE' });
+  if (!res.ok) { toast('No se pudo quitar','error'); return; }
+  toast(`Sucursal ${nombre} quitada del selector (sus datos siguen intactos en su base)`,'info');
+  if (S.sucursalRemota === clave) { const l = _sucursales.find(x=>x.local); if (l) await cambiarSucursal(l.clave); }
+  cargarListaSucursales();
+  initSucursalSwitch();
+}
+async function cargarEstadoNube() {
+  const el = document.getElementById('suc-nube-estado');
+  if (!el) return;
+  try {
+    const r = await api('/sucursales/nube');
+    if (!r.ok) return;
+    const d = await r.json();
+    const ok = d.sincronizando;
+    el.textContent = ok
+      ? `Conectada${d.bd ? ' · ' + d.bd : ''}${d.cuenta_conectada ? ' · cuenta ✓' : ''}`
+      : 'Solo local (sin nube)';
+    el.style.background = ok ? '#DCFCE7' : '#FEF3C7';
+    el.style.color = ok ? '#166534' : '#92400E';
+  } catch(e) {}
+}
+async function conectarNube() {
+  const token = document.getElementById('suc-nube-token').value.trim();
+  if (!token) { toast('Pega el token de tu cuenta de Turso','warning'); return; }
+  _sucLoader('Conectando la sucursal con la nube…');
+  try {
+    const r = await api('/sucursales/nube/conectar', { method:'POST', body: JSON.stringify({ api_token: token }) });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'No se pudo conectar','error'); return; }
+    const msg = {
+      creada:      'Se creó la base de datos de esta sucursal en la nube y se subió todo ✓',
+      vinculada:   'Base de datos de esta sucursal encontrada — conectada y sincronizada ✓',
+      ya_conectada:'Cuenta conectada ✓',
+    }[d.accion] || 'Conectada ✓';
+    toast(msg + (d.sucursales_nuevas ? ` · ${d.sucursales_nuevas} sucursal(es) nueva(s) en el selector` : ''), 'success');
+    document.getElementById('suc-nube-token').value = '';
+    cargarEstadoNube();
+    cargarListaSucursales();
+    initSucursalSwitch();
+  } finally { _sucLoader(null); }
+}
+async function guardarSucursal() {
+  const body = {
+    nombre_sucursal: document.getElementById('suc-nombre').value.trim(),
+    direccion:       document.getElementById('suc-direccion').value.trim(),
+    telefono:        document.getElementById('suc-telefono').value.trim(),
+  };
+  if (!body.nombre_sucursal) { toast('Escribe el nombre de la sucursal','warning'); return; }
+  const res = await api('/config/sucursal', { method:'POST', body: JSON.stringify(body) });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); toast(e.detail || 'No se pudo guardar','error'); return; }
+  toast('Sucursal guardada — así saldrá en el ticket','success');
+  cargarSucursal();
+}
 
 // ══════════════════════════════════════════════════════════
 // MARKETING

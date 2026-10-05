@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
-from app.database.connection import get_db_session
+from app.database.connection import get_db_session, SessionLocal
 from app.database.models import Usuario
 from app.auth.auth_service import verify_password, create_api_token, verify_api_token
 import time, threading
@@ -59,9 +59,15 @@ def get_current_api_user(credentials: HTTPAuthorizationCredentials = Depends(sec
     payload = verify_api_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
+    # Un token de cliente de la app (o uno viejo sin "typ" con rol de cliente)
+    # nunca es un empleado — su `sub` es un id de clientes_app, no de usuarios.
+    if payload.get("typ", "pos") != "pos" or payload.get("rol") in ("cliente_app", "admin_web"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
     # Revalidar contra la BD: un usuario desactivado (o con rol cambiado) no debe
-    # seguir teniendo acceso solo porque su JWT viejo aún no expiró.
-    db = get_db_session()
+    # seguir teniendo acceso solo porque su JWT viejo aún no expiró. Siempre la
+    # BD LOCAL: quien inició sesión es un usuario de esta PC aunque esté
+    # administrando otra sucursal (ver sucursales.py).
+    db = SessionLocal()
     try:
         user = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
         if not user or not user.activo:

@@ -208,6 +208,12 @@ def registrar_devolucion(
             raise HTTPException(status_code=404, detail="Venta no encontrada")
         if venta.estado == EstadoVenta.devolucion:
             raise HTTPException(status_code=400, detail="Venta ya marcada como devolución completa")
+        # Un cajero solo puede devolver sus propias ventas; el admin, cualquiera.
+        if payload.get("rol") != "admin" and venta.usuario_id != int(payload["sub"]):
+            raise HTTPException(status_code=403, detail="Solo puedes devolver ventas que tú cobraste — pide al administrador")
+        from app.api.routes.pos_routes import item_es_pieza, reponer_stock
+        subtotal_ant = venta.subtotal or 0.0
+        total_ant = venta.total or 0.0
 
         orig_items = {i.producto_id: i for i in venta.items}
         cantidad_original = {i.producto_id: i.cantidad for i in venta.items}
@@ -233,7 +239,7 @@ def registrar_devolucion(
             prod = db.query(Producto).filter(Producto.id == dev.producto_id).first()
             if prod:
                 stock_ant = prod.stock
-                prod.stock += dev.cantidad
+                reponer_stock(prod, dev.cantidad, item_es_pieza(orig, prod))
                 db.add(MovimientoStock(
                     producto_id=dev.producto_id,
                     tipo=TipoMovimiento.devolucion,
@@ -266,7 +272,18 @@ def registrar_devolucion(
         venta.iva = round(sum(
             (i.subtotal or 0.0) * 0.16 for i in venta.items if i.producto and i.producto.aplica_iva
         ), 2)
+        # El descuento global se reduce en la misma proporción que el subtotal:
+        # conservarlo completo dejaba el total negativo al devolver todo
+        # (venta de $100 − $20 → devolución total = −$20).
+        if subtotal_ant > 0 and venta.descuento:
+            venta.descuento = round(venta.descuento * (venta.subtotal / subtotal_ant), 2)
+            if venta.subtotal > 0:
+                # Mismo criterio que al vender: IVA sobre el precio ya descontado
+                venta.iva = round(venta.iva * (1 - venta.descuento / venta.subtotal), 2)
         venta.total = round((venta.subtotal - (venta.descuento or 0.0)) + venta.iva, 2)
+        # Lo que realmente se regresa al cliente: incluye IVA y descuentos
+        # (antes solo precio × cantidad, sin IVA — el cajero devolvía de menos).
+        total_devuelto = round(total_ant - venta.total, 2)
 
         # Full return → mark sale as devolucion
         dev_map = {d.producto_id: d.cantidad for d in body.items if d.cantidad > 0}

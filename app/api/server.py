@@ -15,6 +15,7 @@ from app.api.routes import public_routes, app_auth_routes, pedidos_web_routes, c
 from app.api.routes import credito_routes, recetas_routes, promociones_routes
 from app.api.routes import ordenes_compra_routes, citas_routes, inventario_ciclico_routes
 from app.api.routes import gastos_routes, alertas_routes, cfdi_routes, facturas_compra_routes
+from app.api.routes import terminal_routes
 import uvicorn
 import app.config as cfg
 
@@ -166,14 +167,19 @@ app.add_middleware(
     allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Sucursal"],
 )
+
+# Admin administrando otra sucursal: X-Sucursal → sesión a la BD de esa sucursal
+from app.database.sucursales import SucursalMiddleware
+app.add_middleware(SucursalMiddleware)
 
 app.include_router(auth_routes.router,      prefix="/api/auth",       tags=["Auth"])
 app.include_router(products_routes.router,  prefix="/api/productos",  tags=["Productos"])
 app.include_router(sales_routes.router,     prefix="/api/ventas",     tags=["Ventas"])
 app.include_router(inventory_routes.router, prefix="/api/inventario", tags=["Inventario"])
 app.include_router(dashboard_routes.router, prefix="/api/dashboard",  tags=["Dashboard"])
+app.include_router(terminal_routes.router,  prefix="/api/pos/terminal", tags=["POS Terminal MP"])
 app.include_router(pos_routes.router,       prefix="/api/pos",        tags=["POS"])
 app.include_router(customers_routes.router, prefix="/api/clientes",   tags=["Clientes"])
 app.include_router(employees_routes.router, prefix="/api/empleados",  tags=["Empleados"])
@@ -185,6 +191,8 @@ app.include_router(suppliers_routes.router, prefix="/api/proveedores", tags=["Pr
 app.include_router(historial_routes.router,    prefix="/api/historial",   tags=["Historial"])
 app.include_router(marketing_routes.router,    prefix="/api/marketing",   tags=["Marketing"])
 app.include_router(config_routes.router,       prefix="/api/config",      tags=["Config"])
+from app.api.routes import sucursales_routes
+app.include_router(sucursales_routes.router,   prefix="/api/sucursales",  tags=["Sucursales"])
 # App móvil/web — público (sin auth)
 app.include_router(public_routes.router,       prefix="/api/public",      tags=["Público"])
 # App móvil/web — clientes autenticados
@@ -306,10 +314,18 @@ async def serve_spa(path: str = ""):
         from fastapi import HTTPException
         raise HTTPException(status_code=404)
     
-    # Intenta servir archivo estático si existe
-    file_path = _WEB_DIR / path
-    if path and file_path.exists() and file_path.is_file():
-        return FileResponse(str(file_path))
+    # Intenta servir archivo estático si existe — SOLO dentro de _WEB_DIR. Sin
+    # el relative_to, una ruta absoluta (/C:/.../secret.key) o con ".." leía
+    # cualquier archivo del disco sin login (llave JWT, BD, tokens de Turso).
+    if path:
+        file_path = (_WEB_DIR / path).resolve()
+        try:
+            file_path.relative_to(_WEB_DIR.resolve())
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404)
+        if file_path.is_file():
+            return FileResponse(str(file_path))
 
     # index.html es el shell de la SPA — nunca debe quedar cacheado por el
     # webview (WebView2/Edge cachea agresivamente por defecto), o el usuario

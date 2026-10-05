@@ -9,6 +9,7 @@ import io, csv, os, tempfile
 
 from app.database.connection import get_db_session
 from app.database.models import Venta, ItemVenta, Producto, EstadoVenta, CortesCaja, Lote, MovimientoStock, TipoMovimiento, MetodoPago
+from app.api.routes.cortes_routes import _valor_devoluciones
 from app.api.routes.auth_routes import get_current_api_user
 
 router = APIRouter()
@@ -74,18 +75,7 @@ def resumen(
             MovimientoStock.creado_en >= fi,
             MovimientoStock.creado_en <= ff,
         ).all()
-        total_devoluciones = 0.0
-        if dev_movs:
-            venta_ids_dev = {mov.referencia_id for mov in dev_movs}
-            # Una sola consulta por lote en vez de una por cada movimiento (evita N+1).
-            precios_por_par = {
-                (i.venta_id, i.producto_id): i.precio_unitario
-                for i in db.query(ItemVenta).filter(ItemVenta.venta_id.in_(venta_ids_dev)).all()
-            }
-            for mov in dev_movs:
-                precio = precios_por_par.get((mov.referencia_id, mov.producto_id))
-                if precio is not None:
-                    total_devoluciones += precio * mov.cantidad
+        total_devoluciones = _valor_devoluciones(db, dev_movs)
         ventas_netas = total - total_devoluciones
         # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
         ganancia = (ventas_netas - iva_total) - total_costo
@@ -1403,17 +1393,7 @@ def rentabilidad_cajero(
                 MovimientoStock.creado_en >= fi,
                 MovimientoStock.creado_en <= ff,
             ).all()
-            total_dev = 0.0
-            if dev_movs:
-                vids_dev = {mov.referencia_id for mov in dev_movs}
-                precios_por_par = {
-                    (i.venta_id, i.producto_id): i.precio_unitario
-                    for i in db.query(ItemVenta).filter(ItemVenta.venta_id.in_(vids_dev)).all()
-                }
-                for mov in dev_movs:
-                    precio = precios_por_par.get((mov.referencia_id, mov.producto_id))
-                    if precio is not None:
-                        total_dev += precio * mov.cantidad
+            total_dev = _valor_devoluciones(db, dev_movs)
 
             ventas_netas = total_v - total_dev
             # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja

@@ -99,8 +99,14 @@ def _load_setup() -> dict:
 def reload_setup() -> None:
     """Re-lee setup.json y actualiza SYNC_MODE/USE_TURSO/TURSO_SYNC en caliente —
     se llama justo después de que el asistente de primer arranque guarda la elección."""
-    global SYNC_MODE, USE_TURSO, TURSO_SYNC, NEEDS_FIRST_RUN_SETUP
+    global SYNC_MODE, USE_TURSO, TURSO_SYNC, NEEDS_FIRST_RUN_SETUP, SUCURSAL_CLAVE, SUCURSAL_INFO
     _setup = _load_setup()
+    # Sucursal a la que pertenece ESTA PC (local, nunca se sincroniza). Cada
+    # sucursal tiene su propia BD en Turso; la instalación existente es "matriz".
+    SUCURSAL_CLAVE = ((_setup.get("sucursal") or {}).get("clave") or "matriz").strip().lower()
+    # Nombre/dirección/teléfono capturados en el asistente de una sucursal nueva
+    # (solo siembran la BD local la primera vez; después se editan en Configuración)
+    SUCURSAL_INFO = dict(_setup.get("sucursal") or {})
 
     # Instalación existente (viene de una versión anterior a este asistente, o
     # simplemente nunca guardó setup.json) — ya tiene farmacia.db con datos reales.
@@ -119,6 +125,9 @@ def reload_setup() -> None:
     USE_TURSO  = _ON_VERCEL
     TURSO_SYNC = (not _ON_VERCEL) and SYNC_MODE == "turso"
 
+
+SUCURSAL_CLAVE = "matriz"
+SUCURSAL_INFO: dict = {}
 
 # Vercel: Turso es la BD primaria (no hay disco persistente) — siempre, sin asistente.
 # EXE local: el asistente de primer arranque decide (turso/local/offline), guardado en setup.json.
