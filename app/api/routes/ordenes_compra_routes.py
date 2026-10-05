@@ -5,8 +5,13 @@ from datetime import datetime
 from app.database.connection import get_db_session
 from app.database.models import OrdenCompra, ItemOrdenCompra, Producto, Lote, MovimientoStock, TipoMovimiento, EstadoOrdenCompra
 from app.api.routes.auth_routes import get_current_api_user
+import threading
 
 router = APIRouter()
+
+# Serializa los cambios de estado: dos clics casi simultáneos en "Recibida" leían
+# ambos la orden como no recibida y sumaban el stock dos veces.
+_estado_lock = threading.Lock()
 
 
 def _require_admin(p):
@@ -152,12 +157,18 @@ def cambiar_estado(oid: int, estado: str, bg: BackgroundTasks, payload: dict = D
     if estado not in EstadoOrdenCompra._value2member_map_:
         raise HTTPException(400, f"Estado inválido: {estado}")
     db = get_db_session()
+    _estado_lock.acquire()
     try:
         o = db.query(OrdenCompra).filter(OrdenCompra.id == oid).first()
         if not o:
             raise HTTPException(404, "Orden no encontrada")
 
-        ya_recibida = o.estado == EstadoOrdenCompra.recibida
+        # recibida_en se pone una sola vez y nunca se borra: antes una orden
+        # recibida → enviada → recibida volvía a sumar toda su mercancía.
+        ya_recibida = o.estado == EstadoOrdenCompra.recibida or o.recibida_en is not None
+        if ya_recibida and estado != "recibida":
+            raise HTTPException(400, "La orden ya fue recibida y su mercancía ya está en inventario; "
+                                     "no se puede cambiar su estado")
         o.estado = estado
         if estado == "enviada" and not o.enviada_en:
             o.enviada_en = datetime.now()
@@ -201,4 +212,5 @@ def cambiar_estado(oid: int, estado: str, bg: BackgroundTasks, payload: dict = D
         db.rollback()
         raise HTTPException(500, str(e))
     finally:
+        _estado_lock.release()
         db.close()

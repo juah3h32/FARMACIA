@@ -6,7 +6,7 @@ from sqlalchemy import func
 from app.database.connection import get_db_session
 from app.database.models import (
     CortesCaja, RetiroCaja, Venta, EstadoVenta, MetodoPago,
-    ItemVenta, MovimientoStock, TipoMovimiento, FacturaCompra,
+    ItemVenta, MovimientoStock, TipoMovimiento, FacturaCompra, Gasto,
 )
 from app.api.routes.auth_routes import get_current_api_user
 
@@ -48,6 +48,74 @@ def _valor_devoluciones(db, dev_movs) -> float:
         if precio is not None:
             total += precio * mov.cantidad
     return total
+
+
+def _retiros_en_turno(db, c, hasta: datetime) -> float:
+    """Retiros sacados del cajón DURANTE el turno — se restan del efectivo
+    esperado del cajero (si no, le aparecían como faltante). Solo los hechos
+    en la MISMA PC que el turno: con ids por PC (ids_pc.py) el bloque del id
+    dice de qué computadora/cajón salió; dos cajas abiertas a la vez no se
+    descuentan el retiro de la otra. Ids viejos (bloque 0) se comparan igual."""
+    if not c.abierto_en or c.id is None:
+        return 0.0
+    from app.database.ids_pc import ID_BLOQUE
+    bloque = c.id // ID_BLOQUE
+    return sum(
+        r.monto or 0.0
+        for r in db.query(RetiroCaja).filter(
+            RetiroCaja.creado_en >= c.abierto_en, RetiroCaja.creado_en <= hasta
+        ).all()
+        if (r.id or 0) // ID_BLOQUE == bloque
+    )
+
+
+def _total_gastos(db, desde=None, hasta=None) -> float:
+    """Gastos de la farmacia (renta, luz, sueldos…) del módulo Gastos — se
+    restan de la ganancia: son un rubro aparte de la inversión en mercancía.
+    La categoría 'compras' NO: comprar mercancía es inversión (ya se paga con
+    retiros tipo inversión) y restarla aquí la contaría dos veces."""
+    from app.database.models import CategoriaGasto
+    q = db.query(func.sum(Gasto.monto)).filter(Gasto.categoria != CategoriaGasto.compras)
+    if desde is not None:
+        q = q.filter(Gasto.fecha >= desde)
+    if hasta is not None:
+        q = q.filter(Gasto.fecha <= hasta)
+    return q.scalar() or 0.0
+
+
+# ── Reinicio de saldos a cero ────────────────────────────────────────────────
+# "Dejar en ceros" la ganancia disponible y/o el capital de inversión (p. ej.
+# ya se vació la caja y quedó un saldo negativo arrastrado). NO se borra ni se
+# modifica ninguna venta ni retiro: se guarda un ajuste (offset) igual al saldo
+# de ese momento, y los saldos se calculan como (acumulado − ajuste). Es un
+# NUEVO INICIO definitivo (no se puede deshacer); el historial de ventas y
+# retiros queda intacto para reportes, y el ajuste viaja a las demás cajas de
+# la sucursal porque vive en `configuracion` (que se sincroniza).
+_CLAVE_REINICIO = "caja_reinicio"
+
+
+def _leer_reinicio(db) -> dict:
+    import json as _json
+    from app.database.models import Configuracion
+    row = db.query(Configuracion).filter(Configuracion.clave == _CLAVE_REINICIO).first()
+    try:
+        d = _json.loads(row.valor) if row and row.valor else {}
+    except Exception:
+        d = {}
+    d.setdefault("ganancia_offset", 0.0)
+    d.setdefault("inversion_offset", 0.0)
+    d.setdefault("historial", [])
+    return d
+
+
+def _guardar_reinicio(db, d: dict) -> None:
+    import json as _json
+    from app.database.models import Configuracion
+    row = db.query(Configuracion).filter(Configuracion.clave == _CLAVE_REINICIO).first()
+    if row:
+        row.valor = _json.dumps(d)
+    else:
+        db.add(Configuracion(clave=_CLAVE_REINICIO, valor=_json.dumps(d)))
 
 
 def _calc_devoluciones(db, usuario_id: int, desde: datetime, hasta: datetime) -> float:
@@ -108,7 +176,9 @@ def _calc_disponibles(db):
     ret_inversion = db.query(func.sum(RetiroCaja.monto)).filter(
         RetiroCaja.tipo == "inversion"
     ).scalar() or 0.0
-    return ganancia - ret_personal, max(0.0, total_costo - ret_inversion)
+    aj = _leer_reinicio(db)
+    return (ganancia - _total_gastos(db) - ret_personal - aj["ganancia_offset"],
+            max(0.0, total_costo - ret_inversion - aj["inversion_offset"]))
 
 
 class AbrirCorteIn(BaseModel):
@@ -213,7 +283,7 @@ def _auto_cerrar_turno(db, c: CortesCaja, nota: str = "Cierre automático fin de
         cierre_dt = ahora
     ef, _, _, _, _ = _calcular_totales_corte(db, c, cierre_dt)
     c.cerrado_en   = cierre_dt
-    c.monto_cierre = (c.monto_apertura or 0.0) + ef
+    c.monto_cierre = (c.monto_apertura or 0.0) + ef - _retiros_en_turno(db, c, cierre_dt)
     if c.notas:
         c.notas = c.notas + " | " + nota
     else:
@@ -246,7 +316,14 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             )
             .all()
         )
-        retiros = db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
+        # Retiros hechos durante el turno en esta misma caja (ver _retiros_en_turno)
+        from app.database.ids_pc import ID_BLOQUE
+        retiros = [
+            r for r in db.query(RetiroCaja).filter(
+                RetiroCaja.creado_en >= c.abierto_en, RetiroCaja.creado_en <= datetime.now()
+            ).all()
+            if (r.id or 0) // ID_BLOQUE == c.id // ID_BLOQUE
+        ]
         ef, tj, tr, tv = _sumar_totales_ventas(ventas)
         total_retiros = sum(r.monto for r in retiros)
         total_costo = _costo_ventas(db, [v.id for v in ventas])
@@ -273,13 +350,11 @@ def corte_activo(payload: dict = Depends(get_current_api_user)):
             "ganancia":         ganancia,
             "total_retiros":    total_retiros,
             "disponible":       disponible,
-            # Los retiros siempre los hace el admin (los cajeros no pueden
-            # registrar retiros), nunca se descuentan del cuadre de UN turno —
-            # son un movimiento del cajón en general, no responsabilidad de
-            # ese cajero. Antes restarlos aquí producía "esperado" negativo
-            # cada vez que un pago a proveedor superaba las ventas del propio
-            # turno, aunque el dinero viniera acumulado de turnos anteriores.
-            "esperado_caja":    c.monto_apertura + ef,
+            # Efectivo que debe haber en el cajón: fondo + ventas en efectivo −
+            # lo que el admin sacó de ESTE cajón durante el turno (si no se
+            # restaba, al cajero le aparecía como faltante).
+            "esperado_caja":    (c.monto_apertura or 0.0) + ef - total_retiros,
+            "retiros_turno":    total_retiros,
             "notas":            c.notas or "",
             "total_devoluciones": total_devoluciones,
             "ventas_netas":       ventas_netas,
@@ -370,9 +445,7 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
 
         ahora = datetime.now()
         ef, tj, tr, tv, total_costo = _calcular_totales_corte(db, c, ahora)
-        total_retiros = sum(
-            r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
-        )
+        total_retiros = _retiros_en_turno(db, c, ahora)
 
         c.monto_cierre = body.monto_cierre
         c.cerrado_en   = ahora
@@ -403,9 +476,8 @@ def cerrar_corte(body: CerrarCorteIn, bg: BackgroundTasks, payload: dict = Depen
         # que las cubra ese mismo día sin que nadie tenga que acordarse de darle al
         # botón manual del panel admin.
         bg.add_task(_reconstruir_historicos_run)
-        # Los retiros los hace el admin, nunca el cajero — no se descuentan del
-        # cuadre de un turno individual (ver mismo criterio en /activo).
-        esperado   = apertura + ef
+        # Fondo + efectivo vendido − retiros sacados de este cajón en el turno
+        esperado   = apertura + ef - total_retiros
         diferencia = body.monto_cierre - esperado
         return {
             "ok":                 True,
@@ -460,12 +532,8 @@ def historial_cajero(
             tv  = c.total_ventas         or 0.0
             tc  = c.total_costo          or 0.0
             ape = c.monto_apertura       or 0.0
-            total_retiros_c = sum(
-                r.monto for r in db.query(RetiroCaja).filter(RetiroCaja.corte_id == c.id).all()
-            )
-            # Los retiros los hace el admin, nunca el cajero — no se descuentan
-            # del cuadre de un turno individual (ver mismo criterio en /activo).
-            esperado_caja = ape + ef
+            total_retiros_c = _retiros_en_turno(db, c, c.cerrado_en or datetime.now())
+            esperado_caja = ape + ef - total_retiros_c
             dif = (c.monto_cierre - esperado_caja) if c.monto_cierre is not None else None
             hasta = c.cerrado_en or datetime.now()
             total_dev = _calc_devoluciones(db, usuario_id, c.abierto_en, hasta) if c.abierto_en else 0.0
@@ -811,10 +879,13 @@ def resumen_ganancia(
         ventas_netas        = tv - total_devoluciones
         # El IVA cobrado no es ganancia — es dinero del SAT que solo pasa por caja
         ganancia            = (ventas_netas - iva_total) - total_costo
-        ganancia_disponible = ganancia - retiros_personales
+        aj = _leer_reinicio(db)
+        total_gastos = _total_gastos(db)
+        ganancia_neta = ganancia - total_gastos
+        ganancia_disponible = ganancia_neta - retiros_personales - aj["ganancia_offset"]
         # Puede ser negativo si se retiró más de lo que las ventas han recuperado
         # (sobregiro de inversión) — se reporta tal cual para no ocultarlo.
-        capital_inversion             = total_costo - retiros_inversion
+        capital_inversion             = total_costo - retiros_inversion - aj["inversion_offset"]
         capital_inversion_disponible  = max(0.0, capital_inversion)
 
         result = {
@@ -833,6 +904,19 @@ def resumen_ganancia(
             "capital_inversion_disponible":  round(capital_inversion_disponible, 2),
             # Informativo — ver comentario arriba de total_facturas_proveedores.
             "total_facturas_proveedores":    round(total_facturas_proveedores, 2),
+            # Último "dejar en ceros" (None si nunca se ha hecho) — ver _leer_reinicio
+            "reinicio": (aj["historial"][-1] if aj["historial"] else None),
+            # Para que el dueño sepa DÓNDE está el dinero: el IVA cobrado no es
+            # suyo (es del SAT) y lo cobrado con tarjeta/transferencia está en el
+            # banco, no en el cajón — ambos ya están dentro de los saldos de arriba.
+            "iva_cobrado": round(iva_total, 2),
+            # Gastos de la farmacia (módulo Gastos): ya restados de "Puedo retirar"
+            "total_gastos": round(total_gastos, 2),
+            "ganancia_neta": round(ganancia_neta, 2),
+            "cobrado_banco": round(sum(
+                v.total for v in ventas
+                if v.metodo_pago in (MetodoPago.tarjeta, MetodoPago.transferencia)
+            ), 2),
         }
 
         if desde or hasta:
@@ -863,6 +947,7 @@ def resumen_ganancia(
 
             ventas_netas_p = tv_p - total_dev_p
             ganancia_p = (ventas_netas_p - iva_p) - total_costo_p
+            gastos_p = _total_gastos(db, d_ini.date(), d_fin.date())
 
             result["periodo"] = {
                 "desde":               desde,
@@ -873,6 +958,8 @@ def resumen_ganancia(
                 "ventas_netas":        round(ventas_netas_p, 2),
                 "total_costo":         round(total_costo_p, 2),
                 "ganancia":            round(ganancia_p, 2),
+                "gastos":              round(gastos_p, 2),
+                "ganancia_neta":       round(ganancia_p - gastos_p, 2),
                 "retiros_personales":  round(ret_personal_p, 2),
                 "retiros_inversion":   round(ret_inversion_p, 2),
                 # Costo recuperado en el período menos lo pagado a proveedores en
@@ -908,7 +995,8 @@ def ganancia_mensual(anio: Optional[int] = None, payload: dict = Depends(get_cur
         meses = [{
             "mes": m, "num_ventas": 0, "total_ventas": 0.0, "iva": 0.0, "total_costo": 0.0,
             "total_devoluciones": 0.0, "efectivo": 0.0, "tarjeta": 0.0, "transferencia": 0.0,
-            "retiros_personales": 0.0, "retiros_inversion": 0.0,
+            "retiros_personales": 0.0, "retiros_inversion": 0.0, "facturas_proveedores": 0.0,
+            "gastos": 0.0,
         } for m in range(1, 13)]
 
         ventas = db.query(Venta).filter(*filtro_venta, Venta.creado_en >= ini, Venta.creado_en < fin).all()
@@ -950,19 +1038,41 @@ def ganancia_mensual(anio: Optional[int] = None, payload: dict = Depends(get_cur
             else:
                 d["retiros_personales"] += r.monto or 0.0
 
+        # Facturas de proveedor del mes — solo informativo (pueden estar pagadas a
+        # crédito o por transferencia; lo que sale de caja es el retiro de inversión)
+        for f in db.query(FacturaCompra).filter(
+            FacturaCompra.fecha_factura >= ini.date(), FacturaCompra.fecha_factura < fin.date()
+        ).all():
+            meses[f.fecha_factura.month - 1]["facturas_proveedores"] += f.total or 0.0
+
+        from app.database.models import CategoriaGasto
+        for gto in db.query(Gasto).filter(
+            Gasto.fecha >= ini.date(), Gasto.fecha < fin.date(),
+            Gasto.categoria != CategoriaGasto.compras,  # ver _total_gastos
+        ).all():
+            meses[gto.fecha.month - 1]["gastos"] += gto.monto or 0.0
+
         for d in meses:
+            # Inversión del mes: lo que las ventas regresaron para reponer
+            # mercancía (costo de lo vendido) menos lo pagado a proveedores.
+            d["inversion_recuperada"] = d["total_costo"]
+            d["inversion_neta"] = d["total_costo"] - d["retiros_inversion"]
             d["ventas_netas"] = d["total_ventas"] - d["total_devoluciones"]
             base = d["ventas_netas"] - d["iva"]
             d["ganancia"] = base - d["total_costo"]
+            # Lo que de verdad te quedó: ganancia menos gastos de la farmacia
+            d["ganancia_neta"] = d["ganancia"] - d["gastos"]
             d["margen"] = (d["ganancia"] / base * 100) if base > 0 else 0.0
             d["ticket_promedio"] = d["total_ventas"] / d["num_ventas"] if d["num_ventas"] else 0.0
             for k, val in list(d.items()):
                 if isinstance(val, float):
                     d[k] = round(val, 2)
 
-        con_ventas = [d for d in meses if d["num_ventas"]]
-        mejor = max(con_ventas, key=lambda d: d["ganancia"], default=None)
-        peor = min(con_ventas, key=lambda d: d["ganancia"], default=None)
+        con_ventas = [d for d in meses if d["num_ventas"] or d["gastos"]]
+        con_mov_inv = [d for d in meses if d["num_ventas"] or d["retiros_inversion"]]
+        mejor_inv = max(con_mov_inv, key=lambda d: d["inversion_recuperada"], default=None)
+        mejor = max(con_ventas, key=lambda d: d["ganancia_neta"], default=None)
+        peor = min(con_ventas, key=lambda d: d["ganancia_neta"], default=None)
         tot = lambda k: round(sum(d[k] for d in meses), 2)
         return {
             "anio": anio,
@@ -970,11 +1080,70 @@ def ganancia_mensual(anio: Optional[int] = None, payload: dict = Depends(get_cur
             "meses": meses,
             "mejor_mes": mejor["mes"] if mejor else None,
             "peor_mes": peor["mes"] if peor and peor is not mejor else None,
+            "mejor_mes_inversion": mejor_inv["mes"] if mejor_inv else None,
             "totales": {k: tot(k) for k in (
                 "num_ventas", "total_ventas", "total_devoluciones", "ventas_netas", "iva",
                 "total_costo", "ganancia", "retiros_personales", "retiros_inversion",
+                "inversion_recuperada", "inversion_neta", "facturas_proveedores",
+                "gastos", "ganancia_neta",
             )},
         }
+    finally:
+        db.close()
+
+
+class ReinicioIn(BaseModel):
+    ganancia: bool = True
+    inversion: bool = True
+    nota: Optional[str] = None
+
+
+@router.post("/reiniciar-saldos")
+def reiniciar_saldos(body: ReinicioIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Deja en $0 la ganancia disponible y/o el capital de inversión a partir de
+    hoy, sin borrar historial (ver _leer_reinicio). Admin only."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    if not body.ganancia and not body.inversion:
+        raise HTTPException(status_code=400, detail="Elige ganancia, inversión o ambas")
+    db = get_db_session()
+    try:
+        aj = _leer_reinicio(db)
+        # Saldos actuales SIN redondeo ni tope (el capital puede estar negativo)
+        gan_disp, _ = _calc_disponibles(db)
+        tot_costo = db.query(
+            func.sum(ItemVenta.cantidad * func.coalesce(ItemVenta.costo_unitario, 0.0))
+        ).join(Venta, ItemVenta.venta_id == Venta.id).filter(
+            Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True)
+        ).scalar() or 0.0
+        ret_inv = db.query(func.sum(RetiroCaja.monto)).filter(RetiroCaja.tipo == "inversion").scalar() or 0.0
+        cap = tot_costo - ret_inv - aj["inversion_offset"]
+
+        entrada = {
+            "fecha": datetime.now().isoformat(timespec="seconds"),
+            "usuario_id": int(payload["sub"]),
+            "ganancia": body.ganancia, "inversion": body.inversion,
+            "ganancia_antes": round(gan_disp, 2) if body.ganancia else None,
+            "inversion_antes": round(cap, 2) if body.inversion else None,
+            "offsets_previos": [aj["ganancia_offset"], aj["inversion_offset"]],
+            "nota": (body.nota or "").strip() or None,
+        }
+        if body.ganancia:
+            aj["ganancia_offset"] += gan_disp
+        if body.inversion:
+            aj["inversion_offset"] += cap
+        aj["historial"] = (aj["historial"] + [entrada])[-50:]
+        _guardar_reinicio(db, aj)
+        db.commit()
+
+        from app.auth.auth_service import _registrar_auditoria
+        _registrar_auditoria(int(payload["sub"]), "CAJA_REINICIO_SALDOS", "configuracion", None,
+                             f"Ganancia antes:{entrada['ganancia_antes']} Inversión antes:{entrada['inversion_antes']}")
+        import app.config as _cfg
+        if _cfg.TURSO_SYNC:
+            from app.database.sync_service import sync_to_turso
+            bg.add_task(sync_to_turso)
+        return {"ok": True, **entrada}
     finally:
         db.close()
 

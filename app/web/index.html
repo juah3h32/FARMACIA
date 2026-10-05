@@ -3073,8 +3073,14 @@
             </div>
           </div>
           <div class="flex gap-2 flex-wrap">
-            <button onclick="abrirGananciaMensual()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#F0FDF4;color:#15803D;border:1px solid #86EFAC" title="Ver cuánto ganaste en cada mes y cuál fue el mejor">
+            <button onclick="abrirGananciaMensual(undefined,'ganancia')" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#F0FDF4;color:#15803D;border:1px solid #86EFAC" title="Ver cuánto ganaste en cada mes y cuál fue el mejor">
               <i data-lucide="bar-chart-3" style="width:13px;height:13px"></i> Ganancia por mes
+            </button>
+            <button onclick="abrirGananciaMensual(undefined,'inversion')" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF2FF;color:#1d2140;border:1px solid #C7D2FE" title="Ver cuánto se recuperó para reinvertir cada mes y cuánto pagaste a proveedores">
+              <i data-lucide="landmark" style="width:13px;height:13px"></i> Inversión por mes
+            </button>
+            <button onclick="abrirReinicioSaldos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA" title="Nuevo inicio: deja la ganancia y/o la inversión en $0 (definitivo; no borra ventas ni retiros)">
+              <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i> Dejar en ceros
             </button>
             <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
@@ -3116,8 +3122,9 @@
               <p class="text-xs font-bold" style="color:#166534">Puedo retirar ahora</p>
               <p id="caja-stat-disponible" class="font-black" style="color:#15803D;font-size:1.65rem;line-height:1.15">—</p>
               <p class="text-xs truncate" style="color:#86EFAC">
-                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> ganancia&nbsp;·&nbsp;<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado personal
+                <span id="caja-stat-ef" style="color:#16A34A;font-weight:600">—</span> ganancia&nbsp;·&nbsp;−<span id="caja-stat-gastos" style="color:#DC2626;font-weight:600">—</span> gastos&nbsp;·&nbsp;−<span id="caja-stat-ret-turno" style="color:#DC2626;font-weight:600">—</span> retirado
               </p>
+              <p id="caja-stat-donde" class="text-xs truncate" style="color:#64748B" title="Los saldos de arriba incluyen todo lo cobrado. El IVA no es tuyo (hay que pagarlo al SAT) y lo cobrado con tarjeta o transferencia está en el banco, no en el cajón."></p>
             </div>
           </div>
 
@@ -3133,6 +3140,7 @@
                 <span id="caja-stat-costo-rec" style="color:#1d2140;font-weight:600">—</span> recuperado&nbsp;·&nbsp;<span id="caja-stat-ret-inv" style="color:#DC2626;font-weight:600">—</span> pagado proveedores
               </p>
               <p id="caja-stat-inversion-warn" class="text-xs font-semibold mt-0.5 hidden" style="color:#DC2626"></p>
+              <p id="caja-stat-reinicio" class="text-xs mt-0.5 hidden" style="color:#C2410C"></p>
               <p id="caja-stat-facturas-proveedor" class="text-xs mt-0.5" style="color:#64748B" title="Total de facturas de proveedor registradas (Facturas de Compra) — solo informativo, para comparar contra lo que ya retiraste como 'inversión'. NO se resta sola de tu saldo: una factura puede estar pagada en efectivo, transferencia o a crédito, así que la única forma de que un pago a proveedor reduzca tu capital disponible es registrarlo como un retiro tipo Inversión.">—</p>
             </div>
           </div>
@@ -5775,6 +5783,10 @@ const fmtDate = iso => {
 
 function icons() { if (window.lucide) lucide.createIcons(); }
 
+// Fecha local YYYY-MM-DD para inputs type=date — toISOString() es UTC y en
+// México después de las 18:00 ya da el día siguiente.
+function _fechaLocal(d) { return (d || new Date()).toLocaleDateString('sv-SE'); }
+
 async function api(path, opts={}) {
   const res = await fetch(`/api${path}`, {
     ...opts,
@@ -7111,19 +7123,19 @@ function loadPage(page) {
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
   if (page==='marketing')  loadMarketing();
-  if (page==='citas')         { const hoy=new Date().toISOString().split('T')[0]; const fe=document.getElementById('citas-fecha'); if(fe)fe.value=hoy; loadCitas(); }
+  if (page==='citas')         { const hoy=_fechaLocal(new Date()); const fe=document.getElementById('citas-fecha'); if(fe)fe.value=hoy; loadCitas(); }
   if (page==='ordenes-compra') loadOrdenesCompra();
   if (page==='promociones')    loadPromociones();
   // Nuevas páginas
   if (page==='gastos') {
-    const hoy=new Date().toISOString().split('T')[0];
+    const hoy=_fechaLocal(new Date());
     const fi=document.getElementById('gastos-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
     const ff=document.getElementById('gastos-ff'); if(ff&&!ff.value)ff.value=hoy;
     loadGastos();
   }
   if (page==='alertas')       loadAlertas();
   if (page==='rentabilidad') {
-    const hoy=new Date().toISOString().split('T')[0];
+    const hoy=_fechaLocal(new Date());
     const fi=document.getElementById('rent-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
     const ff=document.getElementById('rent-ff'); if(ff&&!ff.value)ff.value=hoy;
     loadRentabilidad();
@@ -7137,7 +7149,7 @@ function loadPage(page) {
     cargarConfigSmtp();
   }
   if (page==='facturas-compra') {
-    const hoy=new Date().toISOString().split('T')[0];
+    const hoy=_fechaLocal(new Date());
     const fi=document.getElementById('fc-fi'); if(fi&&!fi.value)fi.value=hoy.slice(0,7)+'-01';
     const ff=document.getElementById('fc-ff'); if(ff&&!ff.value)ff.value=hoy;
     loadFacturasCompra();
@@ -8826,8 +8838,8 @@ function deleteCust(id) {
 // ══════════════════════════════════════════════════════════
 async function initReports() {
   const hoy=new Date(); const y=hoy.getFullYear(),m=hoy.getMonth();
-  document.getElementById('rep-hasta').value=hoy.toISOString().split('T')[0];
-  document.getElementById('rep-desde').value=new Date(y,m,1).toISOString().split('T')[0];
+  document.getElementById('rep-hasta').value=_fechaLocal(hoy);
+  document.getElementById('rep-desde').value=_fechaLocal(new Date(y,m,1));
   _repActiveTab = 'ventas';
   const isAdmin = S.user?.rol === 'admin';
   ['cortes','vencimientos'].forEach(t => {
@@ -8858,8 +8870,8 @@ function repPeriodo(d) {
     desde=new Date(hoy.getFullYear(),hoy.getMonth()-1,1); hasta=pm;
   } else if (d===-99) { desde=new Date('2020-01-01'); }
   else { desde=new Date(); desde.setDate(hasta.getDate()-d); }
-  document.getElementById('rep-desde').value=desde.toISOString().split('T')[0];
-  document.getElementById('rep-hasta').value=hasta.toISOString().split('T')[0];
+  document.getElementById('rep-desde').value=_fechaLocal(desde);
+  document.getElementById('rep-hasta').value=_fechaLocal(hasta);
   loadReports();
 }
 
@@ -8871,10 +8883,10 @@ async function openVentasCajeroModal() {
   }
   const desdeEl = document.getElementById('modal-vc-desde');
   const hastaEl = document.getElementById('modal-vc-hasta');
-  if (hastaEl && !hastaEl.value) hastaEl.value = new Date().toISOString().slice(0,10);
+  if (hastaEl && !hastaEl.value) hastaEl.value = _fechaLocal(new Date());
   if (desdeEl && !desdeEl.value) {
     const d = new Date(); d.setDate(d.getDate() - 90);
-    desdeEl.value = d.toISOString().slice(0,10);
+    desdeEl.value = _fechaLocal(d);
   }
   openModal('modal-ventas-cajero');
 }
@@ -9398,24 +9410,15 @@ function showCorteDetalle(c) {
       <span class="text-sm font-bold" style="color:${estadoColor}">${estado}</span>
     </div>`;
   openModal('modal-corte-detalle');
-  // Cargar retiros de este corte
-  if (S.user?.rol === 'admin') {
-    api(`/cortes/retiros?corte_id=${c.id}&limite=50`).then(async r => {
-      if (!r.ok) return;
-      const retiros = await r.json();
-      const sec = document.getElementById('detalle-retiros-seccion');
-      if (!sec) return;
-      if (retiros.length === 0) { sec.innerHTML = ''; return; }
-      const total = retiros.reduce((a,r)=>a+r.monto, 0);
-      const money = v => '$'+(v||0).toFixed(2);
-      sec.innerHTML = `<div class="flex justify-between mt-1" style="color:#DC2626">
-        <span>— Retiros de caja</span><span class="font-semibold">${money(total)}</span>
-      </div>` + retiros.map(r =>
-        `<div class="flex justify-between pl-3 text-xs" style="color:#DC2626;opacity:.8">
-          <span>${r.concepto||'Sin concepto'}</span><span>${money(r.monto)}</span>
-        </div>`
-      ).join('');
-    });
+  // Retiros sacados de este cajón durante el turno — el servidor ya los restó
+  // del "Esperado en caja" (ver _retiros_en_turno en cortes_routes.py)
+  const sec = document.getElementById('detalle-retiros-seccion');
+  if (sec) {
+    sec.innerHTML = (c.total_retiros || 0) > 0
+      ? `<div class="flex justify-between mt-1" style="color:#DC2626">
+           <span>− Retiros durante el turno</span><span class="font-semibold">${fmt(c.total_retiros)}</span>
+         </div>`
+      : '';
   }
 }
 
@@ -10292,10 +10295,10 @@ async function loadCajaAdmin() {
   if (!_cajaVerTodoRetiros) {
     if (desdeEl && !desdeEl.value) {
       const d = new Date(); d.setDate(d.getDate() - 90);
-      desdeEl.value = d.toISOString().slice(0, 10);
+      desdeEl.value = _fechaLocal(d);
     }
     if (hastaEl && !hastaEl.value) {
-      hastaEl.value = new Date().toISOString().slice(0, 10);
+      hastaEl.value = _fechaLocal(new Date());
     }
   }
 
@@ -10327,6 +10330,7 @@ async function loadCajaAdmin() {
     set('caja-stat-disponible', money(g.ganancia_disponible ?? g.disponible));
     set('caja-stat-ef',         money(g.ganancia));
     set('caja-stat-ret-turno',  money(g.retiros_personales ?? g.total_retiros));
+    set('caja-stat-gastos',     money(g.total_gastos ?? 0));
     set('caja-stat-costo-rec',  money(g.total_costo ?? 0));
     set('caja-stat-ret-inv',    money(g.retiros_inversion ?? 0));
 
@@ -10345,6 +10349,20 @@ async function loadCajaAdmin() {
         warnEl.classList.add('hidden');
       }
     }
+    const dondeEl = document.getElementById('caja-stat-donde');
+    if (dondeEl) dondeEl.innerHTML = `IVA cobrado (del SAT): <b style="color:#B45309">${money(g.iva_cobrado)}</b> · en banco (tarjeta/transf.): <b style="color:#1E40AF">${money(g.cobrado_banco)}</b>`;
+    const reinEl = document.getElementById('caja-stat-reinicio');
+    if (reinEl) {
+      if (g.reinicio) {
+        const f = new Date(g.reinicio.fecha).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
+        const que = [g.reinicio.ganancia ? 'ganancia' : '', g.reinicio.inversion ? 'inversión' : ''].filter(Boolean).join(' e ');
+        reinEl.textContent = `↺ Nuevo inicio: ${que} desde ${f}`;
+        reinEl.classList.remove('hidden');
+      } else {
+        reinEl.classList.add('hidden');
+      }
+    }
+    window._cajaUltimoSaldo = { ganancia: g.ganancia_disponible ?? g.disponible ?? 0, inversion: g.capital_inversion ?? 0 };
     const facturasEl = document.getElementById('caja-stat-facturas-proveedor');
     if (facturasEl) {
       facturasEl.textContent = `Facturas de proveedor registradas: ${money(g.total_facturas_proveedores ?? 0)} (informativo)`;
@@ -10403,25 +10421,48 @@ async function loadCajaAdmin() {
 // ── Ganancia por mes ─────────────────────────────────────────────────────────
 // Misma fórmula que las tarjetas de arriba (/cortes/ganancia), desglosada mes a
 // mes para un año elegido — la suma de los 12 meses cuadra con el acumulado.
+// Dos vistas: Ganancia (lo que es tuyo) e Inversión (lo que regresó para
+// reponer mercancía menos lo pagado a proveedores).
 const _MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 let _gmData = null;
 let _gmMesSel = null;
+let _gmModo = 'ganancia';   // 'ganancia' | 'inversion'
 
-async function abrirGananciaMensual(anio) {
+function _gmCfg() {
+  const d = _gmData || {};
+  return _gmModo === 'inversion' ? {
+    titulo: 'Inversión por mes',
+    sub: 'Costo recuperado con las ventas − lo pagado a proveedores',
+    icono: 'landmark', color: '#1d2140', claro: '#93A5CF', fondo: '#EEF2FF', barra: 'linear-gradient(90deg,#1d2140,#2563EB)',
+    val: x => x.inversion_neta, activo: x => x.num_ventas || x.retiros_inversion,
+    mejor: d.mejor_mes_inversion, etiqueta: 'Inversión neta',
+  } : {
+    titulo: 'Ganancia por mes',
+    sub: 'Ventas sin IVA − costo de lo vendido − gastos de la farmacia',
+    icono: 'bar-chart-3', color: '#15803D', claro: '#86C99A', fondo: '#F0FDF4', barra: 'linear-gradient(90deg,#16A34A,#22C55E)',
+    val: x => x.ganancia_neta, activo: x => x.num_ventas || x.gastos,
+    mejor: d.mejor_mes, etiqueta: 'Ganancia neta',
+  };
+}
+
+async function abrirGananciaMensual(anio, modo) {
+  if (modo) _gmModo = modo;
   document.getElementById('_modal-ganancia-mes')?.remove();
   const overlay = document.createElement('div');
   overlay.id = '_modal-ganancia-mes';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:24px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
-      <div style="height:4px;background:linear-gradient(90deg,#16A34A,#22C55E)"></div>
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:980px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div id="_gm-barra" style="height:4px"></div>
       <div style="padding:18px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F1F5F9;flex-wrap:wrap">
-        <div style="width:40px;height:40px;border-radius:14px;background:#F0FDF4;display:flex;align-items:center;justify-content:center">
-          <i data-lucide="bar-chart-3" style="width:20px;height:20px;color:#16A34A"></i>
-        </div>
+        <div id="_gm-icono-wrap" style="width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
         <div style="flex:1;min-width:160px">
-          <p style="font-size:17px;font-weight:900;color:#0F172A;margin:0">Ganancia por mes</p>
-          <p style="font-size:12px;color:#64748B;margin:0">Elige un mes para ver su detalle · ventas sin IVA − costo de lo vendido</p>
+          <p id="_gm-titulo" style="font-size:17px;font-weight:900;color:#0F172A;margin:0"></p>
+          <p id="_gm-sub" style="font-size:12px;color:#64748B;margin:0"></p>
+        </div>
+        <div style="display:flex;background:#F1F5F9;border-radius:12px;padding:3px">
+          <button id="_gm-tab-ganancia" onclick="_gmCambiarModo('ganancia')" style="height:30px;padding:0 14px;border-radius:9px;border:none;cursor:pointer;font-size:12px;font-weight:800">Ganancia</button>
+          <button id="_gm-tab-inversion" onclick="_gmCambiarModo('inversion')" style="height:30px;padding:0 14px;border-radius:9px;border:none;cursor:pointer;font-size:12px;font-weight:800">Inversión</button>
         </div>
         <label style="font-size:12px;color:#64748B">Año
           <select id="_gm-anio" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0;margin-left:4px"></select>
@@ -10439,19 +10480,19 @@ async function abrirGananciaMensual(anio) {
   const cerrar = () => overlay.remove();
   overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
   document.getElementById('_gm-cerrar').onclick = cerrar;
-  if (window.lucide) lucide.createIcons();
+  _gmPintarEncabezado();
 
   const qs = anio ? `?anio=${anio}` : '';
   const res = await api('/cortes/ganancia-mensual' + qs);
   if (!res.ok) {
     const e = await res.json().catch(()=>({}));
-    document.getElementById('_gm-body').innerHTML = `<p style="color:#DC2626;font-size:13px">${e.detail || 'No se pudo cargar la ganancia mensual'}</p>`;
+    document.getElementById('_gm-body').innerHTML = `<p style="color:#DC2626;font-size:13px">${e.detail || 'No se pudo cargar el resumen mensual'}</p>`;
     return;
   }
   _gmData = await res.json();
   const hoy = new Date();
   // Mes inicial: el actual si es el año en curso, si no el mejor mes del año
-  _gmMesSel = (_gmData.anio === hoy.getFullYear()) ? hoy.getMonth() + 1 : (_gmData.mejor_mes || 1);
+  _gmMesSel = (_gmData.anio === hoy.getFullYear()) ? hoy.getMonth() + 1 : (_gmCfg().mejor || 1);
 
   const selAnio = document.getElementById('_gm-anio');
   selAnio.innerHTML = _gmData.anios.map(a => `<option value="${a}" ${a===_gmData.anio?'selected':''}>${a}</option>`).join('');
@@ -10463,39 +10504,67 @@ async function abrirGananciaMensual(anio) {
   _renderGananciaMensual();
 }
 
+function _gmPintarEncabezado() {
+  const c = _gmCfg();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('_gm-titulo', c.titulo);
+  set('_gm-sub', c.sub + ' · elige un mes para ver su detalle');
+  const barra = document.getElementById('_gm-barra'); if (barra) barra.style.background = c.barra;
+  const wrap = document.getElementById('_gm-icono-wrap');
+  if (wrap) { wrap.style.background = c.fondo; wrap.innerHTML = `<i data-lucide="${c.icono}" style="width:20px;height:20px;color:${c.color}"></i>`; }
+  for (const m of ['ganancia', 'inversion']) {
+    const b = document.getElementById('_gm-tab-' + m); if (!b) continue;
+    const on = m === _gmModo;
+    b.style.background = on ? '#fff' : 'transparent';
+    b.style.color = on ? (m === 'ganancia' ? '#15803D' : '#1d2140') : '#64748B';
+    b.style.boxShadow = on ? '0 1px 4px rgba(15,23,42,.12)' : 'none';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function _gmCambiarModo(modo) {
+  _gmModo = modo;
+  _gmPintarEncabezado();
+  _renderGananciaMensual();
+}
+
 function _renderGananciaMensual() {
   const d = _gmData; if (!d) return;
   const body = document.getElementById('_gm-body'); if (!body) return;
+  const c = _gmCfg();
   const $ = v => '$' + (v||0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
   const $c = v => '$' + Math.round(v||0).toLocaleString('es-MX');
   const m = d.meses[_gmMesSel - 1];
   const prev = _gmMesSel > 1 ? d.meses[_gmMesSel - 2] : null;
-  const maxAbs = Math.max(1, ...d.meses.map(x => Math.abs(x.ganancia)));
-  const hayNeg = d.meses.some(x => x.ganancia < 0);
+  const maxAbs = Math.max(1, ...d.meses.map(x => Math.abs(c.val(x))));
+  const hayNeg = d.meses.some(x => c.val(x) < 0);
   const H = 170;                         // alto del área de barras (px)
-  const baseY = hayNeg ? H * 0.75 : H;   // línea base (0) — deja espacio abajo si hay pérdidas
+  const baseY = hayNeg ? H * 0.75 : H;   // línea base (0) — deja espacio abajo si hay negativos
   const escala = (hayNeg ? H * 0.75 : H) / maxAbs;
+  const irMes = mes => `_gmMesSel=${mes};document.getElementById('_gm-mes').value=${mes};_renderGananciaMensual()`;
 
   const barras = d.meses.map((x, i) => {
-    const mes = i + 1, sel = mes === _gmMesSel, mejor = mes === d.mejor_mes;
-    const h = Math.max(x.num_ventas ? 2 : 0, Math.abs(x.ganancia) * escala);
-    const neg = x.ganancia < 0;
-    const color = neg ? '#DC2626' : (sel ? '#15803D' : '#86C99A');
+    const mes = i + 1, sel = mes === _gmMesSel, mejor = mes === c.mejor, v = c.val(x);
+    const h = Math.max(c.activo(x) ? 2 : 0, Math.abs(v) * escala);
+    const neg = v < 0;
+    const color = neg ? '#DC2626' : (sel ? c.color : c.claro);
     const top = neg ? baseY : baseY - h;
-    const tip = `${_MESES[i]} ${d.anio}\nGanancia: ${$(x.ganancia)}\nVentas: ${$(x.total_ventas)} (${x.num_ventas})`;
+    const tip = _gmModo === 'inversion'
+      ? `${_MESES[i]} ${d.anio}\nRecuperado: ${$(x.inversion_recuperada)}\nPagado a proveedores: ${$(x.retiros_inversion)}\nNeto: ${$(v)}`
+      : `${_MESES[i]} ${d.anio}\nGanancia neta: ${$(v)}\nGanancia bruta: ${$(x.ganancia)} · Gastos: ${$(x.gastos)}\nVentas: ${$(x.total_ventas)} (${x.num_ventas})`;
     return `
-      <div onclick="_gmMesSel=${mes};document.getElementById('_gm-mes').value=${mes};_renderGananciaMensual()" title="${tip}"
-        style="flex:1;position:relative;height:${H}px;cursor:pointer;border-radius:8px;${sel?'background:#F0FDF4':''}">
-        ${mejor && x.num_ventas ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, top-30)}px;text-align:center;font-size:10px;font-weight:800;color:#15803D">★ ${$c(x.ganancia)}</div>`
-          : (sel && x.num_ventas ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, (neg? top+h+2 : top-16))}px;text-align:center;font-size:10px;font-weight:700;color:#0F172A">${$c(x.ganancia)}</div>` : '')}
+      <div onclick="${irMes(mes)}" title="${tip}"
+        style="flex:1;position:relative;height:${H}px;cursor:pointer;border-radius:8px;${sel?'background:'+c.fondo:''}">
+        ${mejor && c.activo(x) ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, top-30)}px;text-align:center;font-size:10px;font-weight:800;color:${c.color}">★ ${$c(v)}</div>`
+          : (sel && c.activo(x) ? `<div style="position:absolute;left:0;right:0;top:${Math.max(0, (neg? top+h+2 : top-16))}px;text-align:center;font-size:10px;font-weight:700;color:#0F172A">${$c(v)}</div>` : '')}
         <div style="position:absolute;left:22%;right:22%;top:${top}px;height:${h}px;background:${color};border-radius:${neg?'0 0 4px 4px':'4px 4px 0 0'}"></div>
       </div>`;
   }).join('');
   const etiquetas = _MESES.map((n, i) => `<div style="flex:1;text-align:center;font-size:10px;font-weight:${i+1===_gmMesSel?800:500};color:${i+1===_gmMesSel?'#0F172A':'#94A3B8'}">${n.slice(0,3)}</div>`).join('');
 
   const delta = (act, ant) => {
-    if (!ant || !ant.num_ventas) return '';
-    const dif = act - ant.ganancia;
+    if (!ant || !c.activo(ant)) return '';
+    const dif = act - c.val(ant);
     const col = dif >= 0 ? '#15803D' : '#DC2626';
     return `<span style="font-size:11px;font-weight:700;color:${col}">${dif>=0?'▲':'▼'} ${$(Math.abs(dif))} vs ${_MESES[_gmMesSel-2]}</span>`;
   };
@@ -10505,30 +10574,72 @@ function _renderGananciaMensual() {
       <p style="font-size:17px;font-weight:900;color:${color};margin:2px 0 0">${val}</p>
       ${sub ? `<p style="font-size:11px;color:#94A3B8;margin:2px 0 0">${sub}</p>` : ''}
     </div>`;
-  const ranking = d.meses.filter(x => x.num_ventas).sort((a,b) => b.ganancia - a.ganancia);
+  const ranking = d.meses.filter(c.activo).sort((a,b) => (_gmModo === 'inversion' ? b.inversion_recuperada - a.inversion_recuperada : c.val(b) - c.val(a)));  // ganancia: por ganancia neta
   const pos = ranking.findIndex(x => x.mes === _gmMesSel);
+  const v = c.val(m);
 
-  body.innerHTML = `
-    <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:6px;flex-wrap:wrap">
-      <div>
-        <p style="font-size:12px;color:#64748B;margin:0;font-weight:600">${_MESES[_gmMesSel-1]} ${d.anio}${pos>=0 ? ` · lugar ${pos+1} de ${ranking.length} meses` : ''}${_gmMesSel===d.mejor_mes ? ' · <b style="color:#15803D">★ tu mejor mes</b>' : ''}</p>
-        <p style="font-size:30px;font-weight:900;color:${m.ganancia<0?'#DC2626':'#15803D'};margin:0;line-height:1.1">${$(m.ganancia)}</p>
-      </div>
-      <div style="padding-bottom:6px">${delta(m.ganancia, prev)}</div>
-    </div>
-    ${m.num_ventas ? `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:12px 0 18px">
+  const tiles = _gmModo === 'inversion' ? `
+      ${tile('Recuperado con las ventas', $(m.inversion_recuperada), 'costo de lo vendido — dinero para reponer mercancía', '#1d2140')}
+      ${tile('Pagado a proveedores', '−' + $(m.retiros_inversion), 'retiros tipo inversión del mes', '#DC2626')}
+      ${tile('Neto del mes', $(m.inversion_neta), m.inversion_neta < 0 ? 'pagaste más de lo que recuperaste' : 'queda para seguir reinvirtiendo', m.inversion_neta < 0 ? '#DC2626' : '#15803D')}
+      ${tile('Facturas de proveedor', $(m.facturas_proveedores), 'registradas en el mes · informativo')}
+      ${tile('Ventas del mes', $(m.total_ventas), `${m.num_ventas} ventas`)}`
+    : `
       ${tile('Ventas', $(m.total_ventas), `${m.num_ventas} ventas · ticket ${$(m.ticket_promedio)}`)}
       ${tile('Devoluciones', '−' + $(m.total_devoluciones))}
       ${tile('IVA cobrado (SAT)', '−' + $(m.iva), 'no es ganancia')}
       ${tile('Costo de lo vendido', '−' + $(m.total_costo), 'regresa a inversión')}
-      ${tile('Margen', m.margen.toFixed(1) + '%', 'ganancia / venta sin IVA')}
+      ${tile('Ganancia bruta', $(m.ganancia), 'antes de gastos')}
+      ${tile('Gastos de la farmacia', '−' + $(m.gastos), 'renta, luz, sueldos… (módulo Gastos)', '#DC2626')}
+      ${tile('Margen', m.margen.toFixed(1) + '%', 'ganancia bruta / venta sin IVA')}
       ${tile('Cobrado', $(m.efectivo), `efectivo · tarjeta ${$(m.tarjeta)} · transf. ${$(m.transferencia)}`)}
-      ${tile('Retiros del mes', $(m.retiros_personales + m.retiros_inversion), `personal ${$(m.retiros_personales)} · inversión ${$(m.retiros_inversion)}`, '#DC2626')}
-    </div>` : `<p style="font-size:13px;color:#94A3B8;margin:12px 0 18px">No hubo ventas en ${_MESES[_gmMesSel-1]} ${d.anio}.</p>`}
+      ${tile('Retiros del mes', $(m.retiros_personales + m.retiros_inversion), `personal ${$(m.retiros_personales)} · inversión ${$(m.retiros_inversion)}`, '#DC2626')}`;
 
-    <p style="font-size:12px;font-weight:700;color:#374151;margin:0 0 8px">Ganancia de cada mes de ${d.anio} <span style="font-weight:500;color:#94A3B8">— clic en una barra para ver ese mes</span></p>
-    <div style="position:relative;border-bottom:1px solid #E2E8F0;${hayNeg?'':''}">
+  const tabla = _gmModo === 'inversion' ? {
+    cab: `<th style="text-align:left;padding:8px 12px">Mes</th><th style="padding:8px">Ventas</th><th style="padding:8px">Recuperado</th>
+          <th style="padding:8px">Pagado proveedores</th><th style="padding:8px">Neto</th><th style="padding:8px 12px">Facturas prov.</th>`,
+    fila: x => `<td style="padding:7px 8px">${$(x.total_ventas)}</td><td style="padding:7px 8px">${$(x.inversion_recuperada)}</td>
+          <td style="padding:7px 8px">${$(x.retiros_inversion)}</td>
+          <td style="padding:7px 8px;color:${x.inversion_neta<0?'#DC2626':(c.activo(x)?'#0F172A':'inherit')}">${$(x.inversion_neta)}</td>
+          <td style="padding:7px 12px">${$(x.facturas_proveedores)}</td>`,
+    total: `<td style="padding:8px">${$(d.totales.total_ventas)}</td><td style="padding:8px">${$(d.totales.inversion_recuperada)}</td>
+          <td style="padding:8px">${$(d.totales.retiros_inversion)}</td>
+          <td style="padding:8px;color:${d.totales.inversion_neta<0?'#DC2626':'#1d2140'}">${$(d.totales.inversion_neta)}</td>
+          <td style="padding:8px 12px">${$(d.totales.facturas_proveedores)}</td>`,
+  } : {
+    cab: `<th style="text-align:left;padding:8px 12px">Mes</th><th style="padding:8px">Ventas</th><th style="padding:8px">Núm.</th>
+          <th style="padding:8px">Costo</th><th style="padding:8px">IVA</th><th style="padding:8px">Ganancia bruta</th>
+          <th style="padding:8px">Gastos</th><th style="padding:8px">Ganancia neta</th><th style="padding:8px 12px">Retirado</th>`,
+    fila: x => `<td style="padding:7px 8px">${$(x.total_ventas)}</td><td style="padding:7px 8px">${x.num_ventas}</td>
+          <td style="padding:7px 8px">${$(x.total_costo)}</td><td style="padding:7px 8px">${$(x.iva)}</td>
+          <td style="padding:7px 8px">${$(x.ganancia)}</td>
+          <td style="padding:7px 8px">${$(x.gastos)}</td>
+          <td style="padding:7px 8px;color:${x.ganancia_neta<0?'#DC2626':(c.activo(x)?'#0F172A':'inherit')}">${$(x.ganancia_neta)}</td>
+          <td style="padding:7px 12px">${$(x.retiros_personales + x.retiros_inversion)}</td>`,
+    total: `<td style="padding:8px">${$(d.totales.total_ventas)}</td><td style="padding:8px">${d.totales.num_ventas}</td>
+          <td style="padding:8px">${$(d.totales.total_costo)}</td><td style="padding:8px">${$(d.totales.iva)}</td>
+          <td style="padding:8px">${$(d.totales.ganancia)}</td>
+          <td style="padding:8px">${$(d.totales.gastos)}</td>
+          <td style="padding:8px;color:#15803D">${$(d.totales.ganancia_neta)}</td>
+          <td style="padding:8px 12px">${$(d.totales.retiros_personales + d.totales.retiros_inversion)}</td>`,
+  };
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:6px;flex-wrap:wrap">
+      <div>
+        <p style="font-size:12px;color:#64748B;margin:0;font-weight:600">${c.etiqueta} · ${_MESES[_gmMesSel-1]} ${d.anio}${pos>=0 ? ` · lugar ${pos+1} de ${ranking.length} meses` : ''}${_gmMesSel===c.mejor ? ` · <b style="color:${c.color}">★ ${_gmModo==='inversion' ? 'mes que más recuperaste' : 'tu mejor mes'}</b>` : ''}</p>
+        <p style="font-size:30px;font-weight:900;color:${v<0?'#DC2626':c.color};margin:0;line-height:1.1">${$(v)}</p>
+        ${_gmModo === 'inversion' && c.activo(m) ? `<p style="font-size:12px;color:#64748B;margin:2px 0 0">Recuperado ${$(m.inversion_recuperada)} − pagado a proveedores ${$(m.retiros_inversion)}</p>` : ''}
+        ${_gmModo === 'ganancia' && c.activo(m) ? `<p style="font-size:12px;color:#64748B;margin:2px 0 0">Ganancia bruta ${$(m.ganancia)} − gastos ${$(m.gastos)}</p>` : ''}
+      </div>
+      <div style="padding-bottom:6px">${delta(v, prev)}</div>
+    </div>
+    ${c.activo(m) ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:12px 0 18px">${tiles}</div>`
+      : `<p style="font-size:13px;color:#94A3B8;margin:12px 0 18px">Sin movimientos en ${_MESES[_gmMesSel-1]} ${d.anio}.</p>`}
+
+    <p style="font-size:12px;font-weight:700;color:#374151;margin:0 0 8px">${c.etiqueta} de cada mes de ${d.anio} <span style="font-weight:500;color:#94A3B8">— clic en una barra para ver ese mes</span></p>
+    <div style="position:relative;border-bottom:1px solid #E2E8F0">
       <div style="display:flex;gap:4px">${barras}</div>
       ${hayNeg ? `<div style="position:absolute;left:0;right:0;top:${baseY}px;border-top:1px dashed #CBD5E1"></div>` : ''}
     </div>
@@ -10536,31 +10647,91 @@ function _renderGananciaMensual() {
 
     <div style="overflow:auto;margin-top:18px;border:1px solid #E2E8F0;border-radius:14px">
       <table style="width:100%;font-size:12px;border-collapse:collapse">
-        <thead><tr style="background:#F8FAFC;color:#64748B;text-align:right">
-          <th style="text-align:left;padding:8px 12px">Mes</th><th style="padding:8px">Ventas</th><th style="padding:8px">Núm.</th>
-          <th style="padding:8px">Costo</th><th style="padding:8px">IVA</th><th style="padding:8px">Ganancia</th><th style="padding:8px">Margen</th>
-          <th style="padding:8px 12px">Retirado</th></tr></thead>
+        <thead><tr style="background:#F8FAFC;color:#64748B;text-align:right">${tabla.cab}</tr></thead>
         <tbody>
           ${d.meses.map((x,i) => `
-            <tr onclick="_gmMesSel=${i+1};document.getElementById('_gm-mes').value=${i+1};_renderGananciaMensual()"
-              style="cursor:pointer;text-align:right;border-top:1px solid #F1F5F9;${i+1===_gmMesSel?'background:#F0FDF4;font-weight:700':''};${x.num_ventas?'':'color:#CBD5E1'}">
-              <td style="text-align:left;padding:7px 12px">${_MESES[i]}${i+1===d.mejor_mes?' ★':''}</td>
-              <td style="padding:7px 8px">${$(x.total_ventas)}</td><td style="padding:7px 8px">${x.num_ventas}</td>
-              <td style="padding:7px 8px">${$(x.total_costo)}</td><td style="padding:7px 8px">${$(x.iva)}</td>
-              <td style="padding:7px 8px;color:${x.ganancia<0?'#DC2626':(x.num_ventas?'#0F172A':'inherit')}">${$(x.ganancia)}</td>
-              <td style="padding:7px 8px">${x.num_ventas ? x.margen.toFixed(1)+'%' : '—'}</td>
-              <td style="padding:7px 12px">${$(x.retiros_personales + x.retiros_inversion)}</td>
+            <tr onclick="${irMes(i+1)}"
+              style="cursor:pointer;text-align:right;border-top:1px solid #F1F5F9;${i+1===_gmMesSel?'background:'+c.fondo+';font-weight:700':''};${c.activo(x)?'':'color:#CBD5E1'}">
+              <td style="text-align:left;padding:7px 12px">${_MESES[i]}${i+1===c.mejor?' ★':''}</td>
+              ${tabla.fila(x)}
             </tr>`).join('')}
           <tr style="border-top:2px solid #E2E8F0;text-align:right;font-weight:800;background:#F8FAFC">
             <td style="text-align:left;padding:8px 12px">Total ${d.anio}</td>
-            <td style="padding:8px">${$(d.totales.total_ventas)}</td><td style="padding:8px">${d.totales.num_ventas}</td>
-            <td style="padding:8px">${$(d.totales.total_costo)}</td><td style="padding:8px">${$(d.totales.iva)}</td>
-            <td style="padding:8px;color:#15803D">${$(d.totales.ganancia)}</td><td style="padding:8px"></td>
-            <td style="padding:8px 12px">${$(d.totales.retiros_personales + d.totales.retiros_inversion)}</td>
+            ${tabla.total}
           </tr>
         </tbody>
       </table>
     </div>`;
+}
+
+// ── Dejar en ceros (ganancia / inversión) ───────────────────────────────────
+// Nuevo inicio DEFINITIVO (no se deshace). No borra ventas ni retiros: el
+// servidor guarda un ajuste igual al saldo de este momento y desde ahí cuenta
+// de nuevo (ver _leer_reinicio en cortes_routes).
+function abrirReinicioSaldos() {
+  document.getElementById('_modal-reinicio')?.remove();
+  const s = window._cajaUltimoSaldo || { ganancia: 0, inversion: 0 };
+  const $ = v => (v < 0 ? '-$' : '$') + Math.abs(v||0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const fila = (id, titulo, valor, color) => `
+    <label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #E2E8F0;border-radius:14px;cursor:pointer">
+      <input type="checkbox" id="${id}" checked style="width:18px;height:18px;accent-color:#C2410C">
+      <span style="flex:1;font-size:13px;font-weight:700;color:#0F172A">${titulo}</span>
+      <span style="font-size:14px;font-weight:900;color:${valor < 0 ? '#DC2626' : color}">${$(valor)}</span>
+      <span style="font-size:12px;color:#94A3B8">→ $0.00</span>
+    </label>`;
+  const ov = document.createElement('div');
+  ov.id = '_modal-reinicio';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px)';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="height:4px;background:linear-gradient(90deg,#EA580C,#F59E0B)"></div>
+      <div style="padding:26px 26px 0">
+        <div style="width:54px;height:54px;border-radius:18px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+          <i data-lucide="rotate-ccw" style="width:26px;height:26px;color:#EA580C"></i>
+        </div>
+        <p style="font-size:18px;font-weight:900;color:#0F172A;margin:0 0 4px">Dejar en ceros</p>
+        <p style="font-size:13px;color:#64748B;margin:0 0 16px;line-height:1.5">
+          Nuevo inicio: desde este momento los saldos cuentan desde $0 (p. ej. ya vaciaste la caja y quedó un saldo negativo).
+          Tus ventas y retiros <b>no se borran</b> — los reportes quedan igual.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${fila('_rein-gan', 'Ganancia disponible', s.ganancia, '#15803D')}
+          ${fila('_rein-inv', 'Capital de inversión', s.inversion, '#1d2140')}
+        </div>
+        <input id="_rein-nota" placeholder="Nota (opcional): ej. vacié la caja el 30 de sep"
+          style="width:100%;height:40px;margin-top:12px;padding:0 12px;border-radius:12px;border:1px solid #E2E8F0;font-size:12px;box-sizing:border-box">
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;padding:10px 12px;border-radius:12px;background:#FEF2F2;border:1px solid #FECACA;cursor:pointer">
+          <input type="checkbox" id="_rein-confirmo" style="width:16px;height:16px;margin-top:1px;accent-color:#DC2626">
+          <span style="font-size:12px;color:#991B1B;line-height:1.4"><b>Entiendo que no se puede deshacer.</b> Los saldos actuales quedarán en $0 para siempre.</span>
+        </label>
+        <p id="_rein-err" style="font-size:11px;color:#DC2626;margin:6px 0 0;min-height:14px"></p>
+      </div>
+      <div style="padding:12px 26px 26px;display:flex;flex-direction:column;gap:10px">
+        <button id="_rein-ok" style="height:44px;border-radius:14px;border:none;cursor:pointer;background:linear-gradient(135deg,#EA580C,#F59E0B);color:#fff;font-size:14px;font-weight:800">Dejar en $0</button>
+        <button id="_rein-cancel" style="height:40px;border-radius:14px;border:1px solid #E2E8F0;background:#F8FAFC;color:#64748B;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  if (window.lucide) lucide.createIcons();
+  const cerrar = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) cerrar(); });
+  document.getElementById('_rein-cancel').onclick = cerrar;
+  document.getElementById('_rein-ok').onclick = async () => {
+    const body = {
+      ganancia:  document.getElementById('_rein-gan').checked,
+      inversion: document.getElementById('_rein-inv').checked,
+      nota:      document.getElementById('_rein-nota').value.trim() || null,
+    };
+    if (!body.ganancia && !body.inversion) { document.getElementById('_rein-err').textContent = 'Elige al menos una'; return; }
+    if (!document.getElementById('_rein-confirmo').checked) { document.getElementById('_rein-err').textContent = 'Marca la casilla para confirmar el nuevo inicio'; return; }
+    const btn = document.getElementById('_rein-ok'); btn.disabled = true; btn.style.opacity = '.6';
+    const r = await api('/cortes/reiniciar-saldos', { method:'POST', body: JSON.stringify(body) });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { document.getElementById('_rein-err').textContent = d.detail || 'No se pudo'; btn.disabled = false; btn.style.opacity = ''; return; }
+    cerrar();
+    toast('Listo — nuevo inicio: tus saldos empiezan en $0.', 'success');
+    loadCajaAdmin();
+  };
 }
 
 function _updateCajaStats() {
@@ -11921,10 +12092,10 @@ async function loadAdminVentas() {
   const hastaEl = document.getElementById('av-hasta');
   if (desdeEl && !desdeEl.value) {
     const d = new Date(); d.setDate(d.getDate() - 30);
-    desdeEl.value = d.toISOString().slice(0, 10);
+    desdeEl.value = _fechaLocal(d);
   }
   if (hastaEl && !hastaEl.value) {
-    hastaEl.value = new Date().toISOString().slice(0, 10);
+    hastaEl.value = _fechaLocal(new Date());
   }
   const desde = desdeEl?.value;
   const hasta  = hastaEl?.value;
@@ -12327,7 +12498,11 @@ async function openEntradaModal(prod) {
 }
 
 // POST entrada to API
+// Evita registrar la misma entrada dos veces (doble clic, o Enter + clic en
+// "Registrar Entrada"): cada POST suma stock, así que el segundo la duplicaba.
+let _entradaEnCurso = false;
 async function saveEntrada() {
+  if (_entradaEnCurso) return;
   const cantidad = parseInt(document.getElementById('en-cantidad').value);
   if (!cantidad || cantidad <= 0) { toast('Cantidad inválida', 'error'); return; }
   const body = {
@@ -12337,6 +12512,7 @@ async function saveEntrada() {
     fecha_vencimiento: document.getElementById('en-fecha').value.trim() || null,
     precio_compra: parseFloat(document.getElementById('en-pcompra').value) || 0,
   };
+  _entradaEnCurso = true;
   try {
     const res = await api('/inventario/entrada', { method: 'POST', body: JSON.stringify(body) });
     if (res.ok) {
@@ -12353,6 +12529,8 @@ async function saveEntrada() {
     }
   } catch (ex) {
     toast('Error de red: ' + ex.message, 'error');
+  } finally {
+    _entradaEnCurso = false;
   }
 }
 
@@ -12867,7 +13045,7 @@ function openHistRegistroModal() {
   if (!S.histPid) return;
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('hist-reg-fecha').value = now.toISOString().slice(0, 16);
+  document.getElementById('hist-reg-fecha').value = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0, 16);  // hora local, no UTC
   ['sistolica','diastolica','pulso','temp','peso','talla','glucosa','o2'].forEach(id => {
     document.getElementById('hist-reg-'+id).value = '';
   });
@@ -13007,39 +13185,39 @@ async function cargarListaSucursales() {
     const [c, cOsc, fondo] = x.local ? ['#22C55E', '#166534', 'linear-gradient(160deg,#ECFDF5,#D1FAE5)']
                                      : ['#3B82F6', '#1d2140', 'linear-gradient(160deg,#EFF6FF,#DBEAFE)'];
     return `
-    <div class="rounded-2xl overflow-hidden flex flex-col" style="background:#fff;border:2px solid ${viendo ? cOsc : '#E2E8F0'};box-shadow:0 4px 14px rgba(15,23,42,.06)">
-      <div style="height:132px;background:${fondo};padding:10px 14px 0;position:relative">
+    <div class="rounded-xl overflow-hidden flex flex-col" style="background:#fff;border:2px solid ${viendo ? cOsc : '#E2E8F0'};box-shadow:0 2px 8px rgba(15,23,42,.05)">
+      <div style="height:78px;background:${fondo};padding:6px 10px 0;position:relative">
         ${_svgTienda(c, cOsc)}
-        ${viendo ? `<span style="position:absolute;top:10px;right:10px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;background:${cOsc};color:#fff">VIENDO AHORA</span>` : ''}
+        ${viendo ? `<span style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:800;padding:2px 6px;border-radius:999px;background:${cOsc};color:#fff">ACTUAL</span>` : ''}
       </div>
-      <div class="p-4 flex flex-col gap-2 flex-1">
-        <p style="font-size:15px;font-weight:900;color:#0F172A;margin:0">Sucursal ${x.nombre}</p>
-        <p style="font-size:11px;margin:0;display:flex;align-items:center;gap:6px;color:#64748B">
+      <div class="px-3 py-2.5 flex flex-col gap-1.5 flex-1">
+        <p style="font-size:13px;font-weight:900;color:#0F172A;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Sucursal ${x.nombre}">Sucursal ${x.nombre}</p>
+        <p style="font-size:10px;margin:0;display:flex;align-items:center;gap:5px;color:#64748B;white-space:nowrap">
           ${x.local
-            ? `<i data-lucide="monitor" style="width:12px;height:12px;color:#16A34A"></i> Esta PC · base de datos local`
-            : `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.25)"></span> En la nube · datos en tiempo real`}
+            ? `<i data-lucide="monitor" style="width:12px;height:12px;color:#16A34A"></i> Esta PC · local`
+            : `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.25)"></span> En la nube · en vivo`}
         </p>
-        <div class="flex gap-2 mt-auto pt-2">
+        <div class="flex gap-1.5 mt-auto pt-1">
           ${viendo
-            ? `<span class="flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center" style="background:#F1F5F9;color:#64748B">Administrando</span>`
-            : `<button onclick="cambiarSucursal('${x.clave}')" class="flex-1 h-9 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90" style="background:${cOsc}">
-                 <i data-lucide="arrow-right-left" style="width:13px;height:13px"></i> Administrar</button>`}
+            ? `<span class="flex-1 h-7 rounded-lg text-xs font-bold flex items-center justify-center" style="background:#F1F5F9;color:#64748B">Administrando</span>`
+            : `<button onclick="cambiarSucursal('${x.clave}')" class="flex-1 h-7 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1 hover:opacity-90" style="background:${cOsc}">
+                 <i data-lucide="arrow-right-left" style="width:12px;height:12px"></i> Administrar</button>`}
           ${x.local ? '' : `
-            <button onclick="asignarEstaPC('${x.clave}')" title="Solo para una PC nueva que va a trabajar EN esa sucursal" class="h-9 w-9 rounded-xl flex items-center justify-center" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF"><i data-lucide="monitor-check" style="width:15px;height:15px"></i></button>
-            <button onclick="quitarSucursal('${x.clave}')" title="Quitar del selector (no borra sus datos)" class="h-9 w-9 rounded-xl flex items-center justify-center" style="background:#FEF2F2;border:1px solid #FECACA;color:#DC2626"><i data-lucide="eye-off" style="width:15px;height:15px"></i></button>`}
+            <button onclick="asignarEstaPC('${x.clave}')" title="Solo para una PC nueva que va a trabajar EN esa sucursal" class="h-7 w-7 rounded-lg flex items-center justify-center" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF"><i data-lucide="monitor-check" style="width:13px;height:13px"></i></button>
+            <button onclick="quitarSucursal('${x.clave}')" title="Quitar del selector (no borra sus datos)" class="h-7 w-7 rounded-lg flex items-center justify-center" style="background:#FEF2F2;border:1px solid #FECACA;color:#DC2626"><i data-lucide="eye-off" style="width:13px;height:13px"></i></button>`}
         </div>
       </div>
     </div>`;
   }).join('');
   const agregar = `
     <button onclick="document.getElementById('sucn-nombre').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('sucn-nombre').focus()"
-      class="rounded-2xl flex flex-col items-center justify-center gap-2 hover:opacity-80" style="min-height:250px;border:2px dashed #CBD5E1;background:#F8FAFC;color:#64748B;cursor:pointer">
-      <span style="width:46px;height:46px;border-radius:14px;background:#E2E8F0;display:flex;align-items:center;justify-content:center"><i data-lucide="plus" style="width:22px;height:22px;color:#475569"></i></span>
-      <span style="font-size:13px;font-weight:800;color:#334155">Agregar sucursal</span>
-      <span style="font-size:11px;max-width:180px;text-align:center">Con tu cuenta de Turso conectada aparecen solas</span>
+      class="rounded-xl flex flex-col items-center justify-center gap-1.5 hover:opacity-80" style="min-height:150px;border:2px dashed #CBD5E1;background:#F8FAFC;color:#64748B;cursor:pointer">
+      <span style="width:32px;height:32px;border-radius:10px;background:#E2E8F0;display:flex;align-items:center;justify-content:center"><i data-lucide="plus" style="width:16px;height:16px;color:#475569"></i></span>
+      <span style="font-size:12px;font-weight:800;color:#334155">Agregar sucursal</span>
+      <span style="font-size:10px;max-width:140px;text-align:center">Con tu cuenta de Turso aparecen solas</span>
     </button>`;
-  el.className = 'grid gap-4';
-  el.style.gridTemplateColumns = 'repeat(auto-fill,minmax(230px,1fr))';
+  el.className = 'grid gap-3';
+  el.style.gridTemplateColumns = 'repeat(auto-fill,minmax(170px,190px))';
   el.innerHTML = tarjetas + agregar;
   if (window.lucide) lucide.createIcons();
 }
@@ -13191,7 +13369,7 @@ async function mktDescargarManual() {
     });
     if (!res.ok) { toast('Error al generar el manual', 'error'); return; }
     const blob = await res.blob();
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const date = _fechaLocal(new Date()).replace(/-/g, '');
     await _saveFile(blob, `Manual_FarmaciaPos_${date}.pdf`, [
       { description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }
     ]);
@@ -13290,7 +13468,7 @@ async function mktGenerarPDF(tipo = 'todos') {
     );
     if (!res.ok) { toast('Error generando PDF', 'error'); return; }
     const blob  = await res.blob();
-    const date  = new Date().toISOString().slice(0,10);
+    const date  = _fechaLocal(new Date());
     const fname = `Catalogo_${labels[tipo]}_${date}.pdf`;
     const saved = await _saveFile(blob, fname, [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]);
     if (saved) toast('PDF guardado', 'success');
@@ -13523,7 +13701,7 @@ async function mktDescargarPromo() {
   const blob = await _mktGetPromoBlob();
   if (!blob) return;
   const name  = (_mktSelectedProd?.nombre||'promo').slice(0,20).replace(/\s+/g,'_');
-  const fname = `Promo_${name}_${new Date().toISOString().slice(0,10)}.png`;
+  const fname = `Promo_${name}_${_fechaLocal(new Date())}.png`;
   const saved = await _saveFile(blob, fname, [{ description: 'Imagen PNG', accept: { 'image/png': ['.png'] } }]);
   if (saved) toast('Imagen guardada', 'success');
 }
@@ -13841,9 +14019,14 @@ function chatAddToCart(pid) {
   function devMostrarPanel(v) {
     if (v.estado === 'devolucion') { toast('Esta venta ya fue devuelta completamente', 'warning'); return; }
     devVenta = { id: v.id, folio: v.folio };
+    // Una entrada por LÍNEA de la venta (caja y piezas del mismo producto son
+    // líneas distintas). i.cantidad ya es lo que queda tras devoluciones previas:
+    // restarle ya_devuelto otra vez dejaba devolver de menos.
     devEntries = (v.items || []).map(i => {
       const ya = i.ya_devuelto || 0;
-      return { producto_id: i.producto_id, nombre: i.nombre, qty_orig: i.cantidad, ya_devuelto: ya, max_dev: i.cantidad - ya, precio: i.precio_unitario };
+      return { key: i.item_id ?? i.producto_id, item_id: i.item_id ?? null, producto_id: i.producto_id,
+               nombre: i.nombre + (i.es_pieza ? ' (pieza)' : ''), qty_orig: i.cantidad + ya, ya_devuelto: ya,
+               max_dev: i.cantidad, precio: i.precio_unitario };
     });
     const folioEl = document.getElementById('dev-selected-folio');
     folioEl.textContent = v.folio; folioEl.style.display = '';
@@ -13882,10 +14065,10 @@ function chatAddToCart(pid) {
         </div>
         <span class="w-14 text-center text-sm font-bold" style="color:#64748B">×${item.qty_orig}</span>
         <input type="number" min="0" max="${item.max_dev}" value="0"
-               id="dev-qty-${item.producto_id}"
+               id="dev-qty-${item.key}"
                class="w-16 h-8 text-center text-sm font-bold border rounded-xl outline-none"
                style="border-color:#E2E8F0;color:#1d2140">
-        <button onclick="devEliminarProducto(${item.producto_id})" title="Quitar de la lista"
+        <button onclick="devEliminarProducto(${item.key})" title="Quitar de la lista"
                 class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA">
           <i data-lucide="x" style="width:14px;height:14px"></i>
@@ -13896,7 +14079,7 @@ function chatAddToCart(pid) {
   }
 
   window.devEliminarProducto = function(pid) {
-    devEntries = devEntries.filter(e => e.producto_id !== pid);
+    devEntries = devEntries.filter(e => e.key !== pid);
     devRenderItems();
   };
 
@@ -13907,10 +14090,10 @@ function chatAddToCart(pid) {
     const items = [];
     for (const e of devEntries) {
       if (e.max_dev <= 0) continue;
-      const inp = document.getElementById('dev-qty-' + e.producto_id);
+      const inp = document.getElementById('dev-qty-' + e.key);
       const qty = inp ? parseInt(inp.value) || 0 : 0;
       if (qty < 0 || qty > e.max_dev) { toast(`Cantidad inválida: ${e.nombre} (máx ${e.max_dev})`, 'warning'); return; }
-      if (qty > 0) items.push({ producto_id: e.producto_id, cantidad: qty, nombre: e.nombre });
+      if (qty > 0) items.push({ producto_id: e.producto_id, item_id: e.item_id, cantidad: qty, nombre: e.nombre });
     }
     if (!items.length) { toast('Indica al menos 1 unidad a devolver', 'warning'); return; }
     devShowConfirm(items, motivo, async () => {
@@ -13919,7 +14102,7 @@ function chatAddToCart(pid) {
       try {
         const r = await api('/ventas/' + devVenta.id + '/devolucion', {
           method: 'POST',
-          body: JSON.stringify({ items: items.map(x => ({ producto_id: x.producto_id, cantidad: x.cantidad })), motivo })
+          body: JSON.stringify({ items: items.map(x => ({ producto_id: x.producto_id, item_id: x.item_id, cantidad: x.cantidad })), motivo })
         });
         const data = await r.json();
         if (r.ok && data.ok) {
@@ -15463,7 +15646,7 @@ async function abrirModalPagoSat(existente) {
   document.getElementById('pago-sat-periodo-label').textContent = `${CFDI_MESES[_pagoSatCtx.mes-1]} ${_pagoSatCtx.anio}`;
   document.getElementById('pago-sat-iva').value = Math.max(0, _pagoSatCtx.iva || 0).toFixed(2);
   document.getElementById('pago-sat-isr').value = (_pagoSatCtx.isr || 0).toFixed(2);
-  document.getElementById('pago-sat-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('pago-sat-fecha').value = _fechaLocal(new Date());
   document.getElementById('pago-sat-linea').value = '';
   document.getElementById('pago-sat-notas').value = '';
   if (existente) {
@@ -16330,7 +16513,7 @@ function fcCalcularTotal() {
 
 function abrirModalFacturaCompra() {
   ['fc-proveedor','fc-rfc','fc-folio','fc-concepto'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('fc-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fc-fecha').value = _fechaLocal(new Date());
   document.getElementById('fc-subtotal').value = '';
   document.getElementById('fc-iva').value = '';
   document.getElementById('fc-total').value = '';
@@ -17722,7 +17905,7 @@ async function exportarInventarioExcel() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `inventario_${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.download = `inventario_${_fechaLocal(new Date())}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   } catch(e) { toast(e.message, 'error'); }

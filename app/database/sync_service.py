@@ -268,6 +268,10 @@ def _purge_tables(tables: list[str]) -> None:
             lconn.execute("PRAGMA foreign_keys = OFF")
             for table in tables:
                 lconn.execute(f"DELETE FROM {table}")
+            if "productos" in tables:
+                # Sin productos no hay stock acordado con la nube (ver sync_stock_base).
+                lconn.execute(_BASE_DDL)
+                lconn.execute("DELETE FROM sync_stock_base")
             lconn.commit()
         finally:
             lconn.execute("PRAGMA foreign_keys = ON")
@@ -500,7 +504,11 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                 print(f"[Sync] sync_borrados push warning: {e}")
             for table in _TABLE_ORDER:
                 try:
-                    if table in _TS_INCREMENTAL:
+                    if table == "productos":
+                        # Stock por deltas + LWW en lo demás (ver _push_productos).
+                        synced += _push_productos(lconn)
+
+                    elif table in _TS_INCREMENTAL:
                         last_ts = _ts_watermarks.get(table, "")
                         rows = lconn.execute(
                             f"SELECT * FROM {table} WHERE actualizado_en > ? ORDER BY actualizado_en",
@@ -536,13 +544,14 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                                 f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) "
                                 f"ON CONFLICT(id) DO UPDATE SET {', '.join(set_parts)}"
                             )
-                        else:  # productos
+                        else:  # (productos tiene su propia rama arriba)
                             upsert = f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({ph_str})"
 
                         stmts = [{"sql": upsert, "args": [_py_to_turso(v) for v in tuple(row)]}
                                   for row in rows]
                         _turso_batch(stmts)
-                        _ts_watermarks[table] = max(row[ts_idx] for row in rows)
+                        # Tope en el reloj local — ver el comentario en _push_productos.
+                        _ts_watermarks[table] = max(last_ts, min(max(row[ts_idx] for row in rows), _ahora_ts()))
                         synced += len(rows)
 
                     elif table in _FULL_SYNC and table not in _PUSH_APPEND_ONLY:
@@ -758,6 +767,139 @@ def _pull_tombstones(lconn) -> None:
         lconn.executemany(_TOMB_INSERT, [tuple(r) for r in rows])
 
 
+# ── Stock de productos: merge por DELTAS, no last-writer-wins ────────────────
+# Antes el stock viajaba como valor absoluto dentro de la fila de productos, con
+# last-writer-wins por actualizado_en. Eso perdía ventas ("hay veces que no se
+# descuenta"):
+#   - PC A vende 1 (10→9) y PC B vende 2 (10→8) antes de sincronizar: gana la
+#     última en subir y la nube queda en 8 en vez de 7.
+#   - PC A vende 4 (10→6); PC B, con copia vieja (10), edita el precio: su fila
+#     es "más nueva" y sube stock=10 → la venta de A desaparece en todas las PCs.
+#   - Reloj de otra PC (o de la app web en UTC) adelantado: la fila de la nube
+#     queda "en el futuro" y cada pull pisaba el stock recién vendido aquí.
+# Ahora cada PC guarda en sync_stock_base el último stock que acordó con la nube
+# (al subir o al bajar). Al subir manda solo la diferencia (local - base) como
+# "stock = stock + delta"; al bajar aplica local = nube + (local - base). Así las
+# ventas/compras de varias PCs se suman, sin importar timestamps ni relojes.
+_BASE_DDL = ("CREATE TABLE IF NOT EXISTS sync_stock_base ("
+             "producto_id INTEGER PRIMARY KEY, stock INTEGER, piezas INTEGER)")
+_BASE_UPSERT = "INSERT OR REPLACE INTO sync_stock_base (producto_id, stock, piezas) VALUES (?, ?, ?)"
+_STOCK_COLS = ("stock", "piezas_sueltas")
+
+
+def _ts_sql(expr: str) -> str:
+    """Timestamp comparable como texto: NULL → '' y 'T' (ISO) → ' ' (formato de
+    SQLAlchemy). Sin esto, '2026-10-04T10:00' > '2026-10-04 23:00' (la 'T' pesa
+    más que el espacio) y una fila con formato ISO siempre parecía más nueva."""
+    return f"REPLACE(COALESCE({expr}, ''), 'T', ' ')"
+
+
+def _ahora_ts() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def _push_productos(lconn) -> int:
+    """Sube productos: columnas normales con last-writer-wins por actualizado_en,
+    y el stock como delta contra sync_stock_base (ver arriba)."""
+    lconn.execute(_BASE_DDL)
+    last_ts = _ts_watermarks.get("productos", "")
+    # Además de lo editado desde el último push (watermark), sube todo producto
+    # cuyo stock difiere de su base — así una venta nunca se queda sin subir
+    # aunque su actualizado_en quede detrás del watermark (reloj desfasado).
+    rows = lconn.execute(
+        "SELECT p.*, b.producto_id AS _b_id, b.stock AS _b_stock, b.piezas AS _b_piezas "
+        "FROM productos p LEFT JOIN sync_stock_base b ON b.producto_id = p.id "
+        "WHERE p.actualizado_en > ? OR (b.producto_id IS NOT NULL AND "
+        "(COALESCE(p.stock, 0) <> COALESCE(b.stock, 0) "
+        " OR COALESCE(p.piezas_sueltas, 0) <> COALESCE(b.piezas, 0))) "
+        "ORDER BY p.actualizado_en",
+        (last_ts,),
+    ).fetchall()
+    if not rows:
+        return 0
+
+    cols = [c for c in rows[0].keys() if not c.startswith("_b_")]
+    col_str = ", ".join(cols)
+    ph_str = ", ".join("?" for _ in cols)
+    newer = f"{_ts_sql('excluded.actualizado_en')} > {_ts_sql('productos.actualizado_en')}"
+
+    def _upsert(lww_stock: bool) -> str:
+        sets = []
+        for c in cols:
+            if c == "id":
+                continue
+            if c in _STOCK_COLS and not lww_stock:
+                continue  # el stock lo mueve el UPDATE por delta de abajo
+            sets.append(f"{c} = CASE WHEN {newer} THEN excluded.{c} ELSE productos.{c} END")
+        return (f"INSERT INTO productos ({col_str}) VALUES ({ph_str}) "
+                f"ON CONFLICT(id) DO UPDATE SET {', '.join(sets)}")
+
+    sql_con_base = _upsert(lww_stock=False)
+    # Sin base (primera sincronización tras actualizar, o producto nuevo): el
+    # stock viaja como antes, pero con last-writer-wins en vez de pisar a ciegas.
+    sql_sin_base = _upsert(lww_stock=True)
+    sql_delta = ("UPDATE productos SET stock = MAX(0, COALESCE(stock, 0) + ?), "
+                 "piezas_sueltas = MAX(0, COALESCE(piezas_sueltas, 0) + ?) WHERE id = ?")
+
+    synced = 0
+    CHUNK = 90  # ≤ 2 sentencias por producto → cabe en un solo request de _turso_batch
+    for i in range(0, len(rows), CHUNK):
+        chunk = rows[i:i + CHUNK]
+        stmts, bases = [], []
+        for r in chunk:
+            stock, piezas = r["stock"] or 0, r["piezas_sueltas"] or 0
+            vals = [r[c] for c in cols]
+            if r["_b_id"] is not None:
+                b_stock, b_piezas = r["_b_stock"] or 0, r["_b_piezas"] or 0
+                # Si la fila no existe en la nube se inserta con la base y el
+                # delta la lleva al valor local; si existe, solo se suma el delta.
+                vals[cols.index("stock")] = b_stock
+                if "piezas_sueltas" in cols:
+                    vals[cols.index("piezas_sueltas")] = b_piezas
+                stmts.append({"sql": sql_con_base, "args": [_py_to_turso(v) for v in vals]})
+                d_stock, d_piezas = stock - b_stock, piezas - b_piezas
+                if d_stock or d_piezas:
+                    stmts.append({"sql": sql_delta, "args": [
+                        _py_to_turso(d_stock), _py_to_turso(d_piezas), _py_to_turso(r["id"])]})
+            else:
+                stmts.append({"sql": sql_sin_base, "args": [_py_to_turso(v) for v in vals]})
+            bases.append((r["id"], stock, piezas))
+        _turso_batch(stmts)  # si falla la red lanza excepción → la base no avanza y se reintenta
+        # La base es el valor LEÍDO y ya subido (no el actual): si una venta entró
+        # mientras tanto, su delta sale en el siguiente push.
+        lconn.executemany(_BASE_UPSERT, bases)
+        lconn.commit()
+        synced += len(chunk)
+
+    ts_vals = [r["actualizado_en"] for r in rows if r["actualizado_en"]]
+    if ts_vals:
+        # Nunca adelantar el watermark más allá del reloj local: una fila jalada de
+        # una PC con reloj adelantado lo dejaba "en el futuro" y las ediciones de
+        # esta PC dejaban de subirse hasta que el reloj la alcanzara.
+        _ts_watermarks["productos"] = max(last_ts, min(max(ts_vals), _ahora_ts()))
+    return synced
+
+
+def _merge_stock_pull(lconn, cols: list, rows: list) -> None:
+    """Pull de stock: local = nube + (local - base) para productos con base; luego
+    la base pasa a ser el valor de la nube. Corre dentro de la transacción del pull
+    (ya con el lock de escritura de SQLite), así que ninguna venta se cuela a medias."""
+    if "id" not in cols or "stock" not in cols:
+        return
+    id_i, st_i = cols.index("id"), cols.index("stock")
+    pz_i = cols.index("piezas_sueltas") if "piezas_sueltas" in cols else None
+    nube = [(r[id_i], r[st_i] or 0, (r[pz_i] or 0) if pz_i is not None else 0) for r in rows]
+    base_sub = "(SELECT COALESCE({c}, 0) FROM sync_stock_base WHERE producto_id = productos.id)"
+    lconn.executemany(
+        "UPDATE productos SET "
+        f"stock = MAX(0, ? + COALESCE(stock, 0) - {base_sub.format(c='stock')}), "
+        f"piezas_sueltas = MAX(0, ? + COALESCE(piezas_sueltas, 0) - {base_sub.format(c='piezas')}) "
+        "WHERE id = ? AND EXISTS (SELECT 1 FROM sync_stock_base WHERE producto_id = productos.id)",
+        [(s, p, i) for i, s, p in nube],
+    )
+    lconn.executemany(_BASE_UPSERT, nube)
+
+
 def delete_ids_from_turso(table: str, ids: list[int]) -> None:
     """
     Explicit, immediate delete of specific row ids in Turso.
@@ -817,19 +959,26 @@ def sync_from_turso() -> int:
                         # Pass 1: insert rows that don't exist yet (new products from other PCs)
                         sql_insert = f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({ph_str})"
                         lconn.executemany(sql_insert, rows)
-                        # Pass 2: update existing rows — last-writer-wins by actualizado_en.
-                        # All fields (including stock/piezas_sueltas) use actualizado_en:
-                        # take Turso value only if Turso's timestamp is strictly newer than
-                        # local — so a sale on THIS PC (which updates actualizado_en) always
-                        # wins over an older Turso snapshot, while a newer sale on ANOTHER PC
-                        # correctly overwrites the stale local stock.
+                        # Pass 2: update existing rows — last-writer-wins by actualizado_en
+                        # (comparado con _ts_sql: NULL/'T' normalizados).
+                        # stock/piezas_sueltas NO van por LWW cuando el producto ya tiene
+                        # base en sync_stock_base: se combinan por delta en
+                        # _merge_stock_pull (antes un pull con fila "más nueva" de otra PC
+                        # pisaba la venta que se acababa de hacer aquí).
                         # imagen_url/descripcion: keep local if Turso sends null.
+                        lconn.execute(_BASE_DDL)
                         _has_ts = "actualizado_en" in cols
+                        _newer = (f"{_ts_sql('excluded.actualizado_en')} > "
+                                  f"{_ts_sql(table + '.actualizado_en')}")
+                        _lww = "{c}=CASE WHEN " + _newer + " THEN excluded.{c} ELSE " + table + ".{c} END"
+                        _con_base = ("EXISTS (SELECT 1 FROM sync_stock_base "
+                                     "WHERE producto_id = " + table + ".id)")
                         set_clause = ", ".join(
                             (
-                                f"{c}=CASE WHEN excluded.actualizado_en > {table}.actualizado_en"
-                                f" THEN excluded.{c} ELSE {table}.{c} END"
-                            ) if _has_ts else
+                                f"{c}=CASE WHEN {_con_base} THEN {table}.{c}"
+                                f" WHEN {_newer} THEN excluded.{c} ELSE {table}.{c} END"
+                            ) if _has_ts and c in _STOCK_COLS else
+                            _lww.format(c=c) if _has_ts else
                             f"{c}=COALESCE(excluded.{c}, {table}.{c})"
                             if c in ("imagen_url", "descripcion") else
                             f"{c}=excluded.{c}"
@@ -840,18 +989,8 @@ def sync_from_turso() -> int:
                             f"ON CONFLICT(id) DO UPDATE SET {set_clause}"
                         )
                         lconn.executemany(sql_update, rows)
-                        # Diagnostic: show Turso stock vs local after UPSERT
-                        if "stock" in cols:
-                            id_idx  = cols.index("id")
-                            stk_idx = cols.index("stock")
-                            for row in rows:
-                                turso_stock = row[stk_idx]
-                                local_now = lconn.execute(
-                                    f"SELECT stock FROM productos WHERE id=?", (row[id_idx],)
-                                ).fetchone()
-                                local_stock = local_now[0] if local_now else "?"
-                                if str(turso_stock) != str(local_stock):
-                                    print(f"[Sync] productos id={row[id_idx]}: Turso={turso_stock} -> kept local={local_stock}")
+                        # Stock: local = nube + (pendiente local); la base pasa a la nube.
+                        _merge_stock_pull(lconn, cols, rows)
                     elif table == "ventas" and "eliminado" in cols:
                         # eliminado: monotonic, nunca retrocede de 1 a 0.
                         # facturada/cfdi_global_id (y demás campos mutables): last-writer-wins

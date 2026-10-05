@@ -143,8 +143,12 @@ def obtener_venta(venta_id: int, payload: dict = Depends(get_current_api_user)):
             "creado_en": venta.creado_en.isoformat() if venta.creado_en else None,
             "items": [
                 {
+                    "item_id":        i.id,
+                    "es_pieza":       bool(getattr(i, "es_pieza", False)),
                     "producto_id":    i.producto_id,
                     "nombre":         i.producto.nombre if i.producto else "",
+                    # cantidad YA es lo que queda (las devoluciones parciales la
+                    # reducen); ya_devuelto es solo informativo
                     "cantidad":       i.cantidad,
                     "ya_devuelto":    ya_devuelto.get(i.producto_id, 0),
                     "precio_unitario": i.precio_unitario,
@@ -178,6 +182,9 @@ def eliminar_venta_endpoint(
 class DevolucionItemIn(BaseModel):
     producto_id: int
     cantidad: int
+    # Línea exacta de la venta (items_venta.id). Una venta puede tener caja y
+    # piezas del MISMO producto en dos líneas; sin esto solo se veía una.
+    item_id: Optional[int] = None
 
 
 class DevolucionIn(BaseModel):
@@ -215,8 +222,10 @@ def registrar_devolucion(
         subtotal_ant = venta.subtotal or 0.0
         total_ant = venta.total or 0.0
 
-        orig_items = {i.producto_id: i for i in venta.items}
-        cantidad_original = {i.producto_id: i.cantidad for i in venta.items}
+        por_id = {i.id: i for i in venta.items}
+        por_producto: dict = {}
+        for i in venta.items:
+            por_producto.setdefault(i.producto_id, i)
         usuario_id = int(payload["sub"])
         total_devuelto = 0.0
         nota_parts = []
@@ -225,7 +234,18 @@ def registrar_devolucion(
         for dev in body.items:
             if dev.cantidad <= 0:
                 continue
-            orig = orig_items.get(dev.producto_id)
+            if dev.item_id:
+                orig = por_id.get(dev.item_id)
+                if orig is not None and orig.producto_id != dev.producto_id:
+                    orig = None
+            else:
+                # Sin item_id (versión anterior del POS en otra caja): de las líneas
+                # de ese producto, la que alcance para la cantidad pedida; si hay
+                # caja y piezas, primero la de piezas (son las que se devuelven sueltas).
+                lineas = [i for i in venta.items if i.producto_id == dev.producto_id]
+                alcanza = [i for i in lineas if (i.cantidad or 0) >= dev.cantidad]
+                alcanza.sort(key=lambda i: not item_es_pieza(i, i.producto))
+                orig = (alcanza or lineas or [None])[0]
             if not orig:
                 raise HTTPException(
                     status_code=400,
@@ -286,11 +306,10 @@ def registrar_devolucion(
         total_devuelto = round(total_ant - venta.total, 2)
 
         # Full return → mark sale as devolucion
-        dev_map = {d.producto_id: d.cantidad for d in body.items if d.cantidad > 0}
-        all_returned = all(
-            dev_map.get(pid, 0) >= cant_orig
-            for pid, cant_orig in cantidad_original.items()
-        )
+        # Devolución total = ya no queda ninguna unidad en ninguna línea (antes se
+        # comparaba por producto y una línea de piezas tapaba a la de caja: devolver
+        # 2 piezas marcaba toda la venta como devuelta, borrando la caja vendida).
+        all_returned = all((i.cantidad or 0) <= 0 for i in venta.items)
         if all_returned:
             venta.estado = EstadoVenta.devolucion
 
