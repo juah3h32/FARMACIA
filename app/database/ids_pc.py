@@ -58,13 +58,18 @@ def _siguiente_id(connection, tabla: str) -> int:
     # sucursal (admin administrando otra sucursal) y cada una lleva su propio máximo.
     key = (id(connection.engine), tabla)
     with _lock:
-        if key not in _ultimo:
-            ultimo = connection.execute(
-                text(f"SELECT MAX(id) FROM {tabla} WHERE id >= :a AND id < :b"),
-                {"a": base, "b": base + ID_BLOQUE},
-            ).scalar()
-            _ultimo[key] = ultimo or base
-        _ultimo[key] += 1
+        # Se consulta el máximo REAL en la BD en cada inserción (búsqueda por
+        # rango de la llave primaria: es instantánea) y se combina con la caché.
+        # Solo con la caché, si el programa estaba abierto DOS veces (o quedó una
+        # instancia vieja tras actualizar), cada copia repartía el mismo id y la
+        # venta fallaba con "UNIQUE constraint failed" DESPUÉS de cobrar en la
+        # terminal (pasó en producción). La caché sigue cubriendo las filas de
+        # este mismo flush que aún no se escriben.
+        en_bd = connection.execute(
+            text(f"SELECT MAX(id) FROM {tabla} WHERE id >= :a AND id < :b"),
+            {"a": base, "b": base + ID_BLOQUE},
+        ).scalar() or base
+        _ultimo[key] = max(_ultimo.get(key, base), en_bd) + 1
         return _ultimo[key]
 
 

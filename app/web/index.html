@@ -5783,9 +5783,13 @@
 // ══════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════
+// Sesión por ventana: la ventana principal recuerda la sesión (localStorage);
+// las ventanas extra (?ventana=N, al abrir el programa otra vez) tienen su
+// PROPIA sesión (sessionStorage) — p. ej. admin en una y cajero en otra.
+const _SES = new URLSearchParams(location.search).has('ventana') ? sessionStorage : localStorage;
 const S = {
-  token:       localStorage.getItem('token'),
-  user:        JSON.parse(localStorage.getItem('user') || 'null'),
+  token:       _SES.getItem('token'),
+  user:        JSON.parse(_SES.getItem('user') || 'null'),
   cart:        [],
   allProducts: [],
   allInv:      [],
@@ -6780,8 +6784,8 @@ async function doLogin() {
       const data = await res.json();
       S.token = data.access_token;
       S.user  = {id:data.user_id, username:data.username, nombre:data.nombre||data.username, rol:data.rol, foto_url:data.foto_url||null};
-      localStorage.setItem('token', S.token);
-      localStorage.setItem('user', JSON.stringify(S.user));
+      _SES.setItem('token', S.token);
+      _SES.setItem('user', JSON.stringify(S.user));
       launchApp();
     }
   } catch(e) { errEl.textContent='Error de conexión'; }
@@ -6791,7 +6795,7 @@ async function doLogin() {
 function doLogout() {
   S.sucursalRemota = null; document.getElementById('_suc-banner')?.remove();
   S.token=null; S.user=null;
-  localStorage.removeItem('token'); localStorage.removeItem('user');
+  _SES.removeItem('token'); _SES.removeItem('user');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('app').classList.remove('flex');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -7133,7 +7137,7 @@ async function handlePhotoUpload(e) {
     if (!res.ok) { const err = await res.json().catch(()=>({})); toast(err.detail || 'Error al subir foto', 'error'); return; }
     const data = await res.json();
     S.user.foto_url = data.foto_url;
-    localStorage.setItem('user', JSON.stringify(S.user));
+    _SES.setItem('user', JSON.stringify(S.user));
     // Cache locally so it persists without re-login
     localStorage.setItem('profile_photo_' + S.user.id, data.foto_url);
 
@@ -7157,7 +7161,7 @@ async function removeProfilePhoto() {
     });
   } catch(_) {}
   S.user.foto_url = null;
-  localStorage.setItem('user', JSON.stringify(S.user));
+  _SES.setItem('user', JSON.stringify(S.user));
   localStorage.removeItem('profile_photo_' + S.user.id);
   const u = S.user;
   const displayName = u?.nombre || u?.username || '?';
@@ -13321,7 +13325,7 @@ async function deleteHistRegistro(id) {
 window.addEventListener('load', () => {
   icons(); // render login icons
   if (S.token && S.user) {
-    api('/auth/me').then(r=>{ if (r.ok) launchApp(); else { S.token=null; localStorage.removeItem('token'); } }).catch(()=>{});
+    api('/auth/me').then(r=>{ if (r.ok) launchApp(); else { S.token=null; _SES.removeItem('token'); } }).catch(()=>{});
   }
   document.getElementById('l-user').focus();
   fetch('/api/health').then(r=>r.json()).then(d=>{

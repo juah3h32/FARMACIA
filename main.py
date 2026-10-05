@@ -590,7 +590,67 @@ class _BootSplash:
         self.root.mainloop()
 
 
+_INSTANCIA_MUTEX = None  # se conserva vivo mientras corre el programa
+
+
+def _instancia_file():
+    return cfg.DATA_DIR / "instancia.json"
+
+
+def _pedir_ventana_a_instancia_abierta() -> bool:
+    """Le pide a la copia que ya está abierta que abra OTRA VENTANA (p. ej. una
+    con el admin y otra con el cajero). Así hay un solo programa sobre la BD."""
+    import json as _json
+    import urllib.request
+    try:
+        port = int(_json.loads(_instancia_file().read_text(encoding="utf-8"))["port"])
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/ventana/nueva", data=b"{}",
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=4) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _asegurar_una_instancia() -> bool:
+    """Un solo PROGRAMA por carpeta de datos (con dos programas sobre la misma
+    BD, cada uno repartía los mismos ids y una venta YA cobrada en la terminal
+    no se pudo registrar — pasó en producción). Si se abre otra vez, en lugar
+    de otro programa se abre otra VENTANA del que ya corre, con su propia
+    sesión (admin en una, cajero en otra). Al actualizar, la copia vieja tarda
+    unos segundos en cerrar: se espera hasta 15 s."""
+    global _INSTANCIA_MUTEX
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+        import hashlib
+        k32 = ctypes.windll.kernel32
+        nombre = "Local\\FarmaciaPOS_" + hashlib.md5(str(cfg.DATA_DIR).lower().encode()).hexdigest()[:16]
+        for intento in range(30):
+            h = k32.CreateMutexW(None, False, nombre)
+            if h and k32.GetLastError() != 183:  # 183 = ERROR_ALREADY_EXISTS
+                _INSTANCIA_MUTEX = h
+                return True
+            if h:
+                k32.CloseHandle(h)
+            if _pedir_ventana_a_instancia_abierta():
+                return False  # la otra copia ya abrió la ventana nueva
+            time.sleep(0.5)
+        ctypes.windll.user32.MessageBoxW(
+            None, "El punto de venta ya está abierto en esta computadora.\n\n"
+                  "Búscalo en la barra de tareas. Si no lo ves, ciérralo desde el "
+                  "Administrador de tareas y vuelve a abrirlo.",
+            "Farmacia Eben-Ezer", 0x40)
+        return False
+    except Exception as e:
+        _log_error(f"Chequeo de instancia única falló: {e}")
+        return True  # ante la duda, abrir
+
+
 def main():
+    if not _asegurar_una_instancia():
+        return
     # La pantalla de carga solo tiene sentido en una instalacion NUEVA (elegir
     # modo de trabajo + preparar la base de datos por primera vez, que sí
     # tarda). En una instalacion ya existente (la inmensa mayoria de los
@@ -691,6 +751,11 @@ def _boot_and_launch(mostrar_splash: bool, esperar_webview2: bool = False) -> No
                     _log_error("No se pudo encontrar puerto libre para la API")
                     return
             cfg.API_PORT = port
+            try:
+                import json as _json
+                _instancia_file().write_text(_json.dumps({"port": port}), encoding="utf-8")
+            except Exception:
+                pass
 
             if cfg.TURSO_SYNC:
                 _status("Sincronizando con la nube...")
@@ -835,6 +900,20 @@ def _start_ui(port) -> None:
             if not _wait_for_api(port):
                 _log_error("El servidor API no respondió a tiempo")
                 raise RuntimeError("API timeout")
+            # Ventanas extra pedidas por una segunda apertura del programa (ver
+            # _asegurar_una_instancia): misma app, sesión propia por ventana.
+            _n_ventana = {"n": 1}
+
+            def _abrir_ventana_extra():
+                _n_ventana["n"] += 1
+                webview.create_window(
+                    title=f"Farmacia Eben-Ezer — POS (ventana {_n_ventana['n']})",
+                    url=f"http://127.0.0.1:{port}/?ventana={_n_ventana['n']}",
+                    width=cfg.WINDOW_WIDTH, height=cfg.WINDOW_HEIGHT,
+                    resizable=True, min_size=(1000, 680), js_api=_PyWebViewApi(),
+                )
+            cfg.ABRIR_VENTANA_EXTRA = _abrir_ventana_extra
+
             window = webview.create_window(
                 title="Farmacia Eben-Ezer — POS",
                 url=f"http://127.0.0.1:{port}",

@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import Request, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -305,6 +305,23 @@ async def serve_uploaded_image(subpath: str):
     if file_path.is_file():
         return FileResponse(str(file_path))
     raise HTTPException(status_code=404)
+
+
+@app.post("/api/ventana/nueva")
+async def ventana_nueva(request: Request):
+    """Otra apertura del programa en esta misma PC pide abrir una ventana más
+    (ver _asegurar_una_instancia en main.py). Solo desde esta computadora."""
+    from fastapi import HTTPException
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=403)
+    import app.config as _cfg
+    abrir = getattr(_cfg, "ABRIR_VENTANA_EXTRA", None)
+    if not abrir:
+        raise HTTPException(status_code=503, detail="La interfaz todavía no está lista")
+    import threading as _th
+    _th.Thread(target=abrir, daemon=True, name="VentanaExtra").start()
+    return {"ok": True}
 
 
 @app.get("/")
