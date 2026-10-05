@@ -356,7 +356,7 @@ class MercadoPagoPointService:
 
     # ── Órdenes ─────────────────────────────────────────────────────────────
     def create_order(self, amount: float, external_reference: str, idempotency_key: Optional[str] = None,
-                     description: str = "Venta farmacia", expiration: str = "PT5M") -> dict:
+                     description: str = "Venta farmacia", expiration: str = "PT2M") -> dict:
         """amount en pesos MXN (string con 2 decimales, como exige la API)."""
         self.ensure_loaded()
         if not self.device_id:

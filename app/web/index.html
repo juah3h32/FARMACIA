@@ -108,7 +108,7 @@
       <button id="mp-btn-retry" onclick="retryMpPayment()" class="w-full h-10 rounded-xl font-bold text-sm text-white" style="background:#009EE3">Reintentar en terminal</button>
       <button id="mp-btn-reg" onclick="pollMpOrder(true)" class="w-full h-10 rounded-xl font-bold text-sm text-white hidden" style="background:#16A34A">Reintentar registrar venta</button>
       <button id="mp-btn-manual" onclick="mpCobrarManual()" class="w-full h-10 rounded-xl font-bold text-sm" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">Cobrar sin terminal (manual)</button>
-      <button id="mp-btn-close" onclick="closeMpModal(true)" class="w-full h-9 rounded-xl font-semibold text-xs" style="color:#64748B">Cerrar y volver al carrito</button>
+      <button id="mp-btn-close" onclick="closeMpModal(true)" class="w-full h-9 rounded-xl font-semibold text-xs" style="color:#64748B">Dejar de esperar y volver al carrito</button>
     </div>
   </div>
 </div>
@@ -2591,67 +2591,83 @@
         </div>
       </div>
 
-      <div id="modal-integ-mp" class="fixed inset-0 z-50 hidden items-center justify-center">
+      <div id="modal-integ-mp" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div class="absolute inset-0" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="closeModal('modal-integ-mp')"></div>
-        <div class="modal-pane relative bg-white rounded-2xl shadow-2xl w-[560px] max-h-[85vh] flex flex-col">
+        <!-- Encabezado fijo · UN solo cuerpo con scroll · botones fijos abajo.
+             Antes el resultado del Diagnóstico quedaba fuera del área con scroll y
+             aplastaba los campos: la ventana se veía cortada y el botón Guardar
+             desaparecía. -->
+        <div class="modal-pane relative bg-white rounded-2xl shadow-2xl flex flex-col" style="width:min(680px,96vw);max-height:92vh">
           <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style="border-color:#E2E8F0">
-            <div class="flex items-center gap-2">
-              <i data-lucide="credit-card" style="width:18px;height:18px;color:#009EE3"></i>
-              <h2 class="font-bold" style="color:#0F172A">Terminal Mercado Pago Point (Smart 2)</h2>
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:#E0F5FF">
+                <i data-lucide="credit-card" style="width:18px;height:18px;color:#009EE3"></i>
+              </div>
+              <div>
+                <h2 class="font-bold" style="color:#0F172A">Terminal Mercado Pago Point</h2>
+                <p class="text-xs" style="color:#94A3B8">Cobro con tarjeta desde el punto de venta (modo PDV)</p>
+              </div>
             </div>
             <button onclick="closeModal('modal-integ-mp')" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#94A3B8">
               <i data-lucide="x" style="width:16px;height:16px"></i>
             </button>
           </div>
-          <div class="px-6 pt-4 flex items-center gap-3">
-            <button id="btn-test-mp" onclick="probarConexionIntegracion('mp','btn-test-mp','test-result-mp')"
-              class="h-9 px-4 rounded-xl font-bold text-xs flex items-center gap-2 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
-              <i data-lucide="zap" style="width:13px;height:13px"></i> Probar conexión
-            </button>
-            <button id="btn-diag-mp" onclick="diagnosticoMp()"
-              class="h-9 px-4 rounded-xl font-bold text-xs flex items-center gap-2 transition hover:opacity-80 shrink-0" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">
-              <i data-lucide="stethoscope" style="width:13px;height:13px"></i> Diagnóstico
-            </button>
-          </div>
-          <!-- Mensaje persistente (los toasts desaparecen y el error de MP suele ser largo) -->
-          <div class="px-6 pt-2"><span id="test-result-mp" class="text-xs font-semibold" style="word-break:break-word;white-space:pre-line"></span></div>
-          <div id="mp-diag" class="px-6 pt-3 hidden"></div>
-          <div class="p-6 flex flex-col gap-4 overflow-y-auto">
-            <div class="grid grid-cols-2 gap-4">
+
+          <div class="flex-1 min-h-0 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+            <!-- Mensaje persistente (los toasts desaparecen y el error de MP suele ser largo) -->
+            <span id="test-result-mp" class="text-xs font-semibold" style="word-break:break-word;white-space:pre-line"></span>
+
+            <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
               <div>
-                <label class="lbl">Access Token</label>
+                <label class="lbl">Access Token (producción)</label>
                 <input id="mp-token" type="password" class="inp" placeholder="APP_USR-..." autocomplete="off" onfocus="_mpTokenFocus(this)">
               </div>
               <div>
-                <label class="lbl">Terminal (ID)</label>
+                <label class="lbl">Terminal de esta caja</label>
                 <div class="flex gap-2">
-                  <input id="mp-device" class="inp flex-1" placeholder="DSPREAD_D20__... / NEWLAND_N950__...">
+                  <input id="mp-device" class="inp flex-1 min-w-0" placeholder="Pulsa Detectar →">
                   <button onclick="detectMpDevices()" class="h-10 px-3 rounded-xl font-semibold text-xs transition hover:opacity-80 flex items-center gap-1.5 shrink-0" style="background:#EEF1F9;color:#1d2140">
                     <i data-lucide="search" style="width:13px;height:13px"></i> Detectar
                   </button>
                 </div>
               </div>
             </div>
+
             <!-- Lista de terminales detectadas / ayuda (en vez de prompt()/alert()) -->
             <div id="mp-devices-list" class="hidden flex flex-col gap-2"></div>
-            <div class="flex gap-3 flex-wrap">
-              <button onclick="saveMpConfig()" class="h-10 px-5 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#16A34A">
-                <i data-lucide="save" style="width:15px;height:15px"></i> Guardar
-              </button>
-              <button onclick="activateMpPdv()" class="h-10 px-5 rounded-xl font-bold text-sm flex items-center gap-2 transition hover:opacity-90" style="background:#E0F5FF;color:#009EE3;border:1px solid #BAE8FF">
-                <i data-lucide="wifi" style="width:15px;height:15px"></i> Activar modo PDV
-              </button>
-            </div>
-            <div class="rounded-xl p-3 text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
-              <b>Pasos para la primera configuración:</b><br>
-              1. En <b>mercadopago.com.mx → Tu negocio → Sucursales y cajas</b> crea una sucursal y una caja; con la app Mercado Pago vincula la Point Smart 2 a esa caja.<br>
-              2. En <b>mercadopago.com.mx/developers → Tus integraciones</b> crea una aplicación (producto: pagos presenciales / Point), entra a <b>Credenciales de producción</b>, actívalas (Industria, Sitio web, aceptar términos) y copia ese <b>Access Token</b>. (El de prueba también empieza con APP_USR-: asegúrate de copiar el de producción.)<br>
-              3. Pégalo aquí → <b>Detectar</b> → elige la terminal de esta caja → <b>Guardar</b>.<br>
-              4. <b>Activar modo PDV</b> (o en la terminal: Más opciones → Ajustes → Modo de vinculación → Punto de Venta) y luego <b>reinicia la terminal</b> (apagar/encender).<br>
-              Si algo falla, presiona <b>Diagnóstico</b>: revisa paso a paso y muestra lo que contesta Mercado Pago.<br>
-              5. Listo — al cobrar con <b>Tarjeta</b> el monto va solo a la terminal y la venta se registra únicamente si el pago se aprueba.<br>
-              <span style="color:#64748B">El token se comparte con las demás PCs por la nube; cada PC elige su propia terminal.</span>
-            </div>
+
+            <!-- Resultado del Diagnóstico (dentro del área con scroll) -->
+            <div id="mp-diag" class="hidden"></div>
+
+            <details class="rounded-xl text-xs" style="background:#F0F9FF;border:1px solid #BAE8FF;color:#0369A1;line-height:1.6">
+              <summary class="px-3 py-2 font-bold cursor-pointer select-none">Pasos para la primera configuración</summary>
+              <div class="px-3 pb-3">
+                1. En <b>mercadopago.com.mx → Tu negocio → Sucursales y cajas</b> crea una sucursal y una caja; con la app Mercado Pago vincula la Point a esa caja.<br>
+                2. En <b>mercadopago.com.mx/developers → Tus integraciones</b> crea una aplicación (producto: Point), entra a <b>Credenciales de producción</b>, actívalas (Industria, Sitio web, aceptar términos) y copia ese <b>Access Token</b>. (El de prueba también empieza con APP_USR-: copia el de producción.)<br>
+                3. Pega el token arriba → <b>Detectar</b> → elige la terminal de esta caja → <b>Guardar</b>.<br>
+                4. <b>Activar modo PDV</b> (o en la terminal: Más opciones → Ajustes → Modo de vinculación → Punto de Venta) y <b>reinicia la terminal</b>.<br>
+                5. Si algo falla, presiona <b>Diagnóstico</b>: revisa paso a paso y muestra lo que contesta Mercado Pago.<br>
+                <span style="color:#64748B">El token se comparte con las demás PCs por la nube; cada PC elige su propia terminal.</span>
+              </div>
+            </details>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap px-6 py-3 border-t flex-shrink-0" style="border-color:#E2E8F0;background:#F8FAFC;border-radius:0 0 16px 16px">
+            <button id="btn-test-mp" onclick="probarConexionIntegracion('mp','btn-test-mp','test-result-mp')"
+              class="h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
+              <i data-lucide="zap" style="width:13px;height:13px"></i> Probar conexión
+            </button>
+            <button id="btn-diag-mp" onclick="diagnosticoMp()"
+              class="h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition hover:opacity-80" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">
+              <i data-lucide="stethoscope" style="width:13px;height:13px"></i> Diagnóstico
+            </button>
+            <div class="flex-1"></div>
+            <button onclick="activateMpPdv()" class="h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition hover:opacity-90" style="background:#E0F5FF;color:#009EE3;border:1px solid #BAE8FF">
+              <i data-lucide="wifi" style="width:13px;height:13px"></i> Activar modo PDV
+            </button>
+            <button onclick="saveMpConfig()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-1.5 transition hover:opacity-90" style="background:#16A34A">
+              <i data-lucide="save" style="width:13px;height:13px"></i> Guardar
+            </button>
           </div>
         </div>
       </div>
@@ -5912,7 +5928,7 @@ let _mpFinal      = true;   // true = no hay cobro vivo en la terminal
 let _mpPolling    = false;
 let _mpAbort      = false;  // el cajero canceló antes de que MP devolviera la orden
 let _mpForceManual = false; // "Cobrar sin terminal (manual)"
-const MP_TIMEOUT_MS = 5 * 60 * 1000 + 20000; // la orden expira en MP a los 5 min
+const MP_TIMEOUT_MS = 2 * 60 * 1000 + 20000; // la orden expira en MP a los 2 min (PT2M)
 
 function _mpDeviceIdValid(id) {
   // IDs reales: NEWLAND_N950__N950NCB801293324 (alfanuméricos, sin espacios)
@@ -6111,6 +6127,7 @@ async function diagnosticoMp() {
   concl.textContent = d.conclusion || '';
   card.appendChild(concl);
   box.appendChild(card);
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function _mpUuid() {
@@ -6273,9 +6290,17 @@ async function cancelMpPayment(auto) {
       _mpSetMode('failed');
       return;
     }
-    // Ya está en la terminal o sin red: se sigue esperando el resultado real
-    _mpSetStatus(d.message || d.detail || 'No se pudo cancelar — sigue esperando el resultado.', 'warn');
-    if (d.status !== 'at_terminal') _mpSetMode('stuck');
+    // Ya está en la pantalla de la terminal: Mercado Pago SOLO deja cancelarlo
+    // desde la terminal. Antes el POS se quedaba esperando sin poder cerrar
+    // (hasta que expiraba); ahora el cajero puede dejar de esperar y volver al
+    // carrito. Si el cliente sí paga, la venta se registra sola (revisión cada 30 s).
+    if (d.status === 'at_terminal') {
+      _mpSetStatus('El cobro ya está en la pantalla de la terminal: presiona ✕ / "Cancelar" EN LA TERMINAL. '
+        + 'Puedes cerrar esta ventana: si el cliente llega a pagar, la venta se registra sola.', 'warn');
+    } else {
+      _mpSetStatus(d.message || d.detail || 'No se pudo cancelar — sigue esperando el resultado.', 'warn');
+    }
+    _mpSetMode('stuck');
   } catch(e) {
     _mpSetStatus('Sin conexión — no se pudo cancelar. Sigue esperando el resultado.', 'warn');
     _mpSetMode('stuck');
@@ -6286,7 +6311,9 @@ async function cancelMpPayment(auto) {
 
 function closeMpModal(userAction) {
   // Si el cobro sigue vivo en la terminal, se intenta cancelar antes de soltar el carrito
+  // (si ya estaba en la terminal, el backend lo deja vivo y se recupera solo si se paga)
   if (userAction && !_mpFinal && _mpOrderId) {
+    toast('Si el cliente paga en la terminal, la venta se registrará sola.', 'info');
     api(`/pos/terminal/cobro/${encodeURIComponent(_mpOrderId)}/cancelar`, { method:'POST' }).catch(()=>{});
   }
   _mpStopTimers();
