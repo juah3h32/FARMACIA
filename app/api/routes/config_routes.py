@@ -581,6 +581,9 @@ class ReglaUbicacion(BaseModel):
     doble: Optional[bool] = None    # solo tipo "anaquel": tiene parte de atrás
     repisas: Optional[int] = None   # solo tipo "anaquel": cuántas repisas tiene
     seccion: Optional[str] = None
+    categoria: Optional[int] = None          # tipo "letras": solo productos de esta categoría
+    categoria_nombre: Optional[str] = None
+    todas: Optional[bool] = None             # tipo "letras": toda la categoría, sin importar la letra
 
 
 class UbicacionesIn(BaseModel):
@@ -633,14 +636,18 @@ def set_ubicaciones(body: UbicacionesIn, payload: dict = Depends(get_current_api
             continue
         if not anaquel and not seccion:
             continue  # renglón vacío
-        desde = (r.desde or "").strip().upper()[:1]
-        hasta = (r.hasta or desde).strip().upper()[:1]
+        todas = bool(r.todas and r.categoria)
+        desde = "A" if todas else (r.desde or "").strip().upper()[:1]
+        hasta = "Z" if todas else (r.hasta or desde).strip().upper()[:1]
         if not desde.isalpha() or not hasta.isalpha():
             raise HTTPException(status_code=400, detail=f"Regla {i}: indica la letra inicial y final (A-Z)")
         if desde > hasta:
             desde, hasta = hasta, desde
-        limpias.append({"tipo": "letras", "desde": desde, "hasta": hasta,
-                        "anaquel": anaquel, "lado": lado, "seccion": seccion})
+        regla = {"tipo": "letras", "desde": desde, "hasta": hasta,
+                 "anaquel": anaquel, "lado": lado, "seccion": seccion}
+        if r.categoria:
+            regla.update(categoria=int(r.categoria), categoria_nombre=(r.categoria_nombre or "").strip()[:100], todas=todas)
+        limpias.append(regla)
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
     db = get_db_session()

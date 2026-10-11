@@ -2468,6 +2468,17 @@
                   <button id="ub-rango-btn" onclick="ubModoRango()" class="h-7 px-2.5 rounded-lg text-[11px] font-semibold border" style="border-color:#E2E8F0;background:#fff;color:#1d2140">↔ Rango</button>
                   <button onclick="ubLimpiarRepisa()" class="h-7 px-2.5 rounded-lg text-[11px] font-semibold border hover:bg-red-50" style="border-color:#E2E8F0;background:#fff;color:#EF4444">Vaciar repisa</button>
                 </div>
+                <div class="flex items-center gap-2 flex-wrap rounded-lg px-2.5 py-1.5" style="background:#fff;border:1px solid #E2E8F0">
+                  <i data-lucide="tag" style="width:13px;height:13px;color:#0F766E"></i>
+                  <span class="text-[11px] font-semibold" style="color:#475569">Categoría de esta repisa</span>
+                  <select id="ub-cat-sel" onchange="ubCatCambio()" style="font-size:12px;border:1px solid #E2E8F0;border-radius:8px;padding:3px 6px;background:#fff;color:#0F172A;max-width:200px"></select>
+                  <span id="ub-cat-nueva" class="hidden items-center gap-1">
+                    <input id="ub-cat-nombre" placeholder="Ej. Perfumería" style="font-size:12px;border:1px solid #CBD5E1;border-radius:8px;padding:3px 6px;width:130px" onkeydown="if(event.key==='Enter')ubCatCrear()">
+                    <button onclick="ubCatCrear()" class="h-6 px-2 rounded-md text-[11px] font-bold text-white" style="background:#0F766E">Crear</button>
+                    <button onclick="ubCatCancelar()" class="h-6 px-1.5 rounded-md text-[11px]" style="color:#94A3B8">✕</button>
+                  </span>
+                  <label id="ub-todas-lbl" class="flex items-center gap-1.5 text-[11px] ml-auto" style="color:#475569"><input type="checkbox" id="ub-todas" onchange="ubTodasCambio()"> Toda la categoría (sin letras)</label>
+                </div>
                 <div id="ub-teclado" class="grid gap-1" style="grid-template-columns:repeat(13,minmax(0,1fr))"></div>
                 <div class="flex items-center gap-3 flex-wrap text-[10px]" style="color:#64748B">
                   <span>Toca una letra para ponerla o quitarla.</span>
@@ -7704,11 +7715,18 @@ function _letraInicial(nombre) {
 // Reglas que le tocan al producto según su letra inicial ([] si ninguna).
 // Puede haber varias: p. ej. la F en el anaquel 1 al frente y también detrás.
 // La vitrina (productos sueltos) va primero, luego los anaqueles por letra.
+// Repisas con categoría: un producto de esa categoría va SOLO a ellas (la A de
+// Antibióticos no se mezcla con la A de Generales); "todas" = toda la categoría.
 function ubicacionesDe(p) {
   const id = p && p.id, l = _letraInicial(p && p.nombre), m = S.mapaUb || [];
+  const cat = p && p.categoria_id;
+  const porLetra = m.filter(r => (!r.tipo || r.tipo === 'letras')
+    && (!r.categoria || r.categoria === cat)
+    && ((r.todas && r.categoria) || (l && l >= r.desde && l <= (r.hasta || r.desde))));
+  const deSuCategoria = porLetra.filter(r => r.categoria);
   return [
     ...m.filter(r => r.tipo === 'productos' && id != null && (r.ids || []).includes(id)),
-    ...(l ? m.filter(r => (!r.tipo || r.tipo === 'letras') && l >= r.desde && l <= (r.hasta || r.desde)) : []),
+    ...(deSuCategoria.length ? deSuCategoria : porLetra.filter(r => !r.categoria)),
   ];
 }
 const _UB_LADO = { FRENTE: 'Frente', DETRAS: 'Detrás' };
@@ -7980,6 +7998,7 @@ async function openDondeEsta() {
       const rep = /^\d+$/.test(u.seccion || '') ? +u.seccion : 0;
       return tarjeta(c, `<span style="width:38px;height:38px;border-radius:99px;background:${c};color:#fff;font-size:20px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px ${c}33,0 0 14px ${c}88">${_ubEsc(u.anaquel)}</span>`, 'ANAQUEL', 'Núm. ' + u.anaquel) +
         (slot ? tarjeta('#0369A1', ico('#0369A1', 'layers'), 'FILA', _UB_ZONA[slot] || '', `<div style="font-size:10px;color:#64748B">${slot.endsWith('IZQ') ? 'lado izquierdo' : 'lado derecho'}</div>`) : '') +
+        (u.categoria_nombre ? tarjeta('#0F766E', ico('#0F766E', 'tag'), 'CATEGORÍA', u.categoria_nombre) : '') +
         (u.lado ? tarjeta(u.lado === 'DETRAS' ? '#B45309' : '#047857', ico(u.lado === 'DETRAS' ? '#B45309' : '#047857', u.lado === 'DETRAS' ? 'undo-2' : 'eye'), 'PARTE', _UB_LADO[u.lado] || u.lado, u.lado === 'DETRAS' ? '<div style="font-size:10px;color:#64748B">rodea el anaquel</div>' : '') : '') +
         (u.seccion ? (rep ? tarjeta(c, miniRepisas(rep, Math.max(n, rep), c), 'REPISA', `${rep} de ${Math.max(n, rep)}`, `<div style="font-size:10px;color:#64748B">${rep === 1 ? 'la de arriba' : rep === Math.max(n, rep) ? 'la de abajo' : 'contando desde arriba'}</div>`)
                             : tarjeta('#2e4a8a', ico('#2e4a8a', 'map-pin'), 'SECCIÓN', u.seccion)) : '');
@@ -16549,7 +16568,8 @@ function selectSettingsCat(cat) {
 // repisa y se pican letras en el teclado A–Z; al guardar se convierte todo en
 // reglas por rango de letras (lo mismo que usa F4).
 const _UB_ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-let _ubProds = [], _ubVit = [];
+let _ubProds = [], _ubVit = [], _ubCats = [];
+const _ubCatNombre = id => ((_ubCats.find(c => c.id === id) || {}).nombre) || '';
 // an: config de cada anaquel · asig: "anaquel|lado|repisa" -> Set de letras
 let _ub = { an: {}, asig: {}, sel: '1', activo: '', ultima: '', rango: false, inicio: '', extra: [], sucio: false };
 
@@ -16572,7 +16592,10 @@ function _ubRuns(set) {
 const _ubRangos = set => _ubRuns(set).map(([d, h]) => d === h ? d : `${d}–${h}`).join(', ');
 const _ubLetrasDe = (a, lado) => new Set(_ubSecs(a).flatMap(s => [...(_ub.asig[_ubKey(a, lado, s)] || [])]));
 function _ubMover(de, a) {
-  if (de === a || !_ub.asig[de]) return;
+  if (de === a) return;
+  if (_ub.cat && _ub.cat[de] && !_ub.cat[a]) { _ub.cat[a] = _ub.cat[de]; if (_ub.todas[de]) _ub.todas[a] = true; }
+  if (_ub.cat) { delete _ub.cat[de]; delete _ub.todas[de]; }
+  if (!_ub.asig[de]) return;
   _ub.asig[de].forEach(l => _ubSet(a).add(l));
   delete _ub.asig[de];
 }
@@ -16582,9 +16605,10 @@ function _ubNombre(k) {
 }
 
 async function openMapaUbEditor() {
-  const [pr] = await Promise.all([api('/productos/'), loadMapaUb()]);
+  const [pr, cr] = await Promise.all([api('/productos/'), api('/productos/categorias'), loadMapaUb()]);
   _ubProds = pr.ok ? await pr.json() : [];
-  const an = {}, asig = {}, extra = [];
+  _ubCats = cr.ok ? await cr.json() : [];
+  const an = {}, asig = {}, extra = [], cat = {}, todas = {};
   const guardados = S.mapaUb.filter(r => r.tipo === 'anaquel' && r.anaquel);
   if (guardados.length) guardados.forEach(r => { an[r.anaquel] = { zona: _UB_SLOTS.includes(r.zona) ? r.zona : '', doble: r.doble !== false, repisas: Math.max(1, +r.repisas || 1) }; });
   else for (let i = 1; i <= _UB_N_ANAQUELES; i++) an[i] = { zona: _UB_SLOT_DEF[i] || '', doble: true, repisas: 5 };
@@ -16601,10 +16625,12 @@ async function openMapaUbEditor() {
     const lado = cfg.doble ? (r.lado || 'FRENTE') : '';
     const sec = cfg.repisas > 1 ? String(Math.min(+r.seccion || 1, cfg.repisas)) : '';
     const k = _ubKey(r.anaquel, lado, sec);
+    if (r.categoria) cat[k] = r.categoria;
+    if (r.todas && r.categoria) { todas[k] = true; return; }
     asig[k] = asig[k] || new Set();
     for (let c = r.desde.charCodeAt(0); c <= (r.hasta || r.desde).charCodeAt(0); c++) asig[k].add(String.fromCharCode(c));
   });
-  _ub = { an, asig, sel: '', activo: '', ultima: '', rango: false, inicio: '', extra, sucio: false, vista: 'FRENTE' };
+  _ub = { an, asig, cat, todas, sel: '', activo: '', ultima: '', rango: false, inicio: '', extra, sucio: false, vista: 'FRENTE' };
   _ub.sel = _ubOrden()[0];
   _ubVit = ((S.mapaUb.find(r => r.tipo === 'productos') || {}).ids || []).slice();
   document.getElementById('ub-vit-q').value = '';
@@ -16646,7 +16672,7 @@ function _ubPlano3d() {
     _ubSecs(a).forEach(s => {
       const k = _ubKey(a, lado, s);
       marcas.push({ a, slot: cfg.zona, rep: s ? +s : 0, n: cfg.repisas, color: c, k, borde: sel, resalta: k === _ub.activo,
-                    detras: lado === 'DETRAS', label: _ubRangos(_ub.asig[k]), fs: 52, soloVisible: true });
+                    detras: lado === 'DETRAS', label: _ub.todas[k] ? _ubCatNombre(_ub.cat[k]).slice(0, 14) : _ubRangos(_ub.asig[k]), fs: 52, soloVisible: true });
     });
   });
   const faltan = _ubOrden().filter(a => !_ubQuad(a, _ub.an[a].zona));
@@ -16698,7 +16724,9 @@ function _ubEditor() {
       const k = _ubKey(a, lado, s), on = k === _ub.activo, ls = _ubRangos(_ub.asig[k]);
       return `<div class="ub-repisa" data-k="${_ubEsc(k)}" style="${on ? `background:${c}14;box-shadow:inset 4px 0 0 ${c}` : ''}">
         <span class="ub-num" style="${on ? `background:${c};color:#fff` : ''}">${s || '•'}</span>
-        ${ls ? `<span class="text-sm font-black truncate" style="color:${c}">${_ubEsc(ls)}</span>` : `<span class="text-[11px] whitespace-nowrap" style="color:${on ? c : '#CBD5E1'}">${on ? 'elige letras' : 'vacía'}</span>`}
+        ${_ub.todas[k] ? `<span class="text-xs font-bold truncate" style="color:${c}">Toda la categoría</span>`
+          : ls ? `<span class="text-sm font-black truncate" style="color:${c}">${_ubEsc(ls)}</span>` : `<span class="text-[11px] whitespace-nowrap" style="color:${on ? c : '#CBD5E1'}">${on ? 'elige letras' : 'vacía'}</span>`}
+        ${_ub.cat[k] ? `<span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded truncate" style="background:#CCFBF1;color:#0F766E;max-width:96px" title="${_ubEsc(_ubCatNombre(_ub.cat[k]))}">${_ubEsc(_ubCatNombre(_ub.cat[k]))}</span>` : ''}
       </div>`;
     }).join('');
     return `<div class="ub-card flex flex-col" style="${sombra}">${head}<div class="flex flex-col" style="flex:1">${filas}</div>${pie}</div>`;
@@ -16929,6 +16957,7 @@ function _ubTeclado() {
   const lugares = l => _ubTodas().filter(x => x !== k && _ub.asig[x] && _ub.asig[x].has(l));
   const conProd = {};
   _ubProds.forEach(p => { const l = _letraInicial(p.nombre); if (l) conProd[l] = (conProd[l] || 0) + 1; });
+  _ubCatPintar();
   document.getElementById('ub-teclado-tit').innerHTML =
     `Letras en: <span style="color:${c}">${_ubEsc(_ubNombre(k))}</span>` +
     (_ub.rango ? ` <span class="text-xs font-semibold" style="color:#B45309">— ${_ub.inicio ? `desde ${_ub.inicio}, ahora pica la última` : 'pica la primera letra del rango'}</span>` : '');
@@ -16965,7 +16994,60 @@ function ubLetra(l, shift) {
   _ubCambio();
 }
 function ubModoRango() { _ub.rango = !_ub.rango; _ub.inicio = ''; _ubTeclado(); }
-function ubLimpiarRepisa() { delete _ub.asig[_ub.activo]; _ubCambio(); }
+function ubLimpiarRepisa() { delete _ub.asig[_ub.activo]; delete _ub.cat[_ub.activo]; delete _ub.todas[_ub.activo]; _ubCambio(); }
+
+// ── Categoría de la repisa elegida ──
+function _ubCatPintar() {
+  const sel = document.getElementById('ub-cat-sel');
+  if (!sel) return;
+  const k = _ub.activo, c = _ub.cat[k] || '';
+  sel.innerHTML = '<option value="">Cualquier categoría</option>' +
+    _ubCats.map(x => `<option value="${x.id}"${x.id === c ? ' selected' : ''}>${_ubEsc(x.nombre)}</option>`).join('') +
+    '<option value="__nueva">+ Nueva categoría…</option>';
+  const t = document.getElementById('ub-todas');
+  t.checked = !!(c && _ub.todas[k]);
+  t.disabled = !c;
+  document.getElementById('ub-todas-lbl').style.opacity = c ? 1 : .45;
+  const tec = document.getElementById('ub-teclado');
+  tec.style.opacity = t.checked ? .35 : 1;
+  tec.style.pointerEvents = t.checked ? 'none' : '';
+}
+function ubCatCambio() {
+  const v = document.getElementById('ub-cat-sel').value, k = _ub.activo;
+  if (v === '__nueva') {
+    document.getElementById('ub-cat-sel').classList.add('hidden');
+    const n = document.getElementById('ub-cat-nueva'); n.classList.remove('hidden'); n.style.display = 'inline-flex';
+    document.getElementById('ub-cat-nombre').focus();
+    return;
+  }
+  if (v) _ub.cat[k] = +v; else { delete _ub.cat[k]; delete _ub.todas[k]; }
+  _ubCambio();
+}
+function ubCatCancelar() {
+  document.getElementById('ub-cat-nueva').style.display = 'none';
+  document.getElementById('ub-cat-sel').classList.remove('hidden');
+  _ubCatPintar();
+}
+async function ubCatCrear() {
+  const nombre = document.getElementById('ub-cat-nombre').value.trim();
+  if (!nombre) return;
+  try {
+    const c = await apiFetch('/productos/categorias', { method: 'POST', body: JSON.stringify({ nombre }) });
+    if (!_ubCats.some(x => x.id === c.id)) _ubCats.push(c);
+    _ubCats.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    _ub.cat[_ub.activo] = c.id;
+    document.getElementById('ub-cat-nombre').value = '';
+    ubCatCancelar();
+    _ubCambio();
+    toast(`Categoría "${c.nombre}" lista — asígnala a sus productos en Inventario`, 'success');
+  } catch (e) { toast(e.message || 'No se pudo crear la categoría', 'error'); }
+}
+function ubTodasCambio() {
+  const k = _ub.activo;
+  if (document.getElementById('ub-todas').checked && _ub.cat[k]) { _ub.todas[k] = true; delete _ub.asig[k]; }
+  else delete _ub.todas[k];
+  _ubCambio();
+}
 
 // ── Vitrina: lista de productos sueltos ──
 function ubVitPintar() {
@@ -17000,7 +17082,9 @@ function _ubLeerReglas() {
     out.push({ tipo: 'anaquel', anaquel: a, zona: cfg.zona, doble: cfg.doble, repisas: cfg.repisas });
     _ubVisibles(a).forEach(k => {
       const [, lado, sec] = k.split('|');
-      _ubRuns(_ub.asig[k]).forEach(([d, h]) => out.push({ tipo: 'letras', desde: d, hasta: h, anaquel: a, lado, seccion: sec }));
+      const cat = _ub.cat[k] || null, extra = cat ? { categoria: cat, categoria_nombre: _ubCatNombre(cat) } : {};
+      if (cat && _ub.todas[k]) { out.push({ tipo: 'letras', desde: 'A', hasta: 'Z', todas: true, anaquel: a, lado, seccion: sec, ...extra }); return; }
+      _ubRuns(_ub.asig[k]).forEach(([d, h]) => out.push({ tipo: 'letras', desde: d, hasta: h, anaquel: a, lado, seccion: sec, ...extra }));
     });
   });
   return out.concat(_ub.extra)

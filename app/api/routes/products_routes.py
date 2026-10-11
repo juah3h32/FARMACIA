@@ -369,6 +369,33 @@ def listar_categorias(payload: dict = Depends(get_current_api_user)):
         db.close()
 
 
+class CategoriaIn(BaseModel):
+    nombre: str
+
+
+@router.post("/categorias")
+def crear_categoria(body: CategoriaIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """Nueva categoría de productos (p. ej. Perfumería). Si ya existe con ese
+    nombre (sin importar mayúsculas), regresa la existente."""
+    _require_admin(payload)
+    nombre = " ".join((body.nombre or "").split())[:100]
+    if not nombre:
+        raise HTTPException(status_code=400, detail="Escribe el nombre de la categoría")
+    db = get_db_session()
+    try:
+        existe = db.query(Categoria).filter(func.lower(Categoria.nombre) == nombre.lower()).first()
+        if existe:
+            return {"id": existe.id, "nombre": existe.nombre}
+        c = Categoria(nombre=nombre)
+        db.add(c)
+        db.commit()
+        db.refresh(c)
+        _sync_bg(bg)
+        return {"id": c.id, "nombre": c.nombre}
+    finally:
+        db.close()
+
+
 def _sync_bg(bg: BackgroundTasks):
     import app.config as _cfg
     if _cfg.TURSO_SYNC:
