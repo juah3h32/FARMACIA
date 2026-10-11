@@ -60,12 +60,11 @@ def resumen(
         # (ItemVenta.costo_unitario), nunca Producto.precio_compra en vivo.
         venta_ids = [v.id for v in ventas]
         if venta_ids:
-            cost_rows = (
-                db.query(ItemVenta.cantidad, ItemVenta.costo_unitario)
-                .filter(ItemVenta.venta_id.in_(venta_ids))
-                .all()
-            )
-            total_costo = sum(r.cantidad * (r.costo_unitario or 0.0) for r in cost_rows)
+            items = db.query(ItemVenta).filter(ItemVenta.venta_id.in_(venta_ids)).all()
+            pids = {it.producto_id for it in items}
+            prods = {p.id: p for p in db.query(Producto).filter(Producto.id.in_(pids)).all()} if pids else {}
+            # _costo_item corrige ventas por pieza que guardaron el costo de la caja completa
+            total_costo = sum(_costo_item(it, prods.get(it.producto_id))[0] for it in items)
         else:
             total_costo = 0.0
         # Partial devoluciones in period (full returns excluded via estado=devolucion filter)
@@ -1462,3 +1461,520 @@ def exportar_inventario_excel(payload: dict = Depends(get_current_api_user)):
     finally:
         db.close()
 
+
+# ── PDF de ventas, ganancias e inversión ─────────────────────────────────────
+# Para el dueño: cuánto vendió, cuánto ganó (ventas − costo de lo vendido),
+# cuánto metió de inversión (compras de mercancía, pagos a proveedor: retiros
+# tipo "inversion" + gastos capturados) y cuánto sacó para él (retiros
+# "personal"), agrupado por semana, mes o día.
+
+_MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def _costo_item(it, prod) -> tuple[float, bool]:
+    """Costo de una línea vendida. Ventas por pieza de builds viejos guardaron el
+    costo de la CAJA completa por cada pieza (es_pieza=0, precio de pieza): se
+    divide entre las piezas por caja. Devuelve (costo_total, se_corrigio)."""
+    costo = it.costo_unitario or 0.0
+    upc = (prod.unidades_por_caja or 1) if prod else 1
+    if (not it.es_pieza and prod is not None and upc > 1 and costo > (it.precio_unitario or 0)
+            and (it.precio_unitario or 0) < (prod.precio_venta or 0) * 0.75):
+        return it.cantidad * costo / upc, True
+    return it.cantidad * costo, False
+
+
+def _clave_periodo(d: date, agrupar: str):
+    if agrupar == "mes":
+        return (d.year, d.month)
+    if agrupar == "dia":
+        return (d.year, d.month, d.day)
+    iso = d.isocalendar()
+    return (iso[0], iso[1])
+
+
+def _etiqueta_periodo(clave, agrupar: str, fi: date, ff: date) -> str:
+    if agrupar == "mes":
+        return f"{MESES_ES[clave[1] - 1]} {clave[0]}"
+    if agrupar == "dia":
+        return f"{clave[2]:02d} {_MES_CORTO[clave[1] - 1]} {clave[0]}"
+    lunes = date.fromisocalendar(clave[0], clave[1], 1)
+    ini, fin = max(lunes, fi), min(lunes + timedelta(days=6), ff)
+    if ini.month == fin.month:
+        return f"Sem {clave[1]} · {ini.day}–{fin.day} {_MES_CORTO[fin.month - 1]}"
+    return f"Sem {clave[1]} · {ini.day} {_MES_CORTO[ini.month - 1]}–{fin.day} {_MES_CORTO[fin.month - 1]}"
+
+
+_PDF_TIPOS = {"completo": "Ventas, ganancias e inversión", "ventas": "Reporte de ventas",
+              "ganancia": "Reporte de ganancias", "inversion": "Inversión y retiros"}
+
+
+def _build_finanzas_pdf_bytes(fecha_inicio: date, fecha_fin: date, agrupar: str = "semana", tipo: str = "completo") -> bytes:  # noqa: C901
+    """PDF para el dueño. tipo: completo | ventas | ganancia | inversion."""
+    import app.config as cfg
+    from app.database.models import RetiroCaja, Gasto
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether,
+                                    PageTemplate, Frame)
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+    if agrupar not in ("semana", "mes", "dia"):
+        agrupar = "semana"
+    if tipo not in _PDF_TIPOS:
+        tipo = "completo"
+    V = tipo in ("completo", "ventas")      # lleva ventas
+    G = tipo in ("completo", "ganancia")    # lleva ganancia
+    I = tipo in ("completo", "inversion")   # lleva inversión / retiros
+    W, H = letter
+    fi, ff = _rango(fecha_inicio, fecha_fin)
+    per_label = (fecha_inicio.strftime('%d/%m/%Y') if fecha_inicio == fecha_fin
+                 else f"{fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}")
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    nombre_per = {"semana": "semana", "mes": "mes", "dia": "día"}[agrupar]
+
+    NAVY = colors.HexColor("#1d2140")
+    INK, MUTED, LINE, SOFT = colors.HexColor("#0F172A"), colors.HexColor("#64748B"), colors.HexColor("#E2E8F0"), colors.HexColor("#F8FAFC")
+    C_VENTA, C_COSTO, C_GAN = colors.HexColor("#2E4A8A"), colors.HexColor("#D97706"), colors.HexColor("#15803D")
+    C_INV, C_GASTO, C_PERS, C_RESTO = colors.HexColor("#6D28D9"), colors.HexColor("#B45309"), colors.HexColor("#64748B"), colors.HexColor("#0891B2")
+    C_RED = colors.HexColor("#B91C1C")
+
+    base = getSampleStyleSheet()["Normal"]
+    _n = [0]
+    def sty(**kw):
+        _n[0] += 1
+        kw.setdefault("fontName", "Helvetica")
+        kw.setdefault("textColor", INK)
+        return ParagraphStyle(f"fz{_n[0]}", parent=base, **kw)
+    s_th = sty(fontSize=7, textColor=MUTED, fontName="Helvetica-Bold", leading=9)
+    s_thr = sty(fontSize=7, textColor=MUTED, fontName="Helvetica-Bold", leading=9, alignment=TA_RIGHT)
+    s_txt = sty(fontSize=8, leading=10.5)
+    s_num = sty(fontSize=8, leading=10.5, alignment=TA_RIGHT)
+    s_numb = sty(fontSize=8, leading=10.5, alignment=TA_RIGHT, fontName="Helvetica-Bold")
+    s_mut = sty(fontSize=7, textColor=MUTED, leading=9.5)
+    # keepWithNext: el título nunca se queda solo al pie de una página
+    s_h2 = sty(fontSize=11, fontName="Helvetica-Bold", leading=14, keepWithNext=1, spaceAfter=4)
+    s_h2sub = sty(fontSize=7.5, textColor=MUTED, leading=10, keepWithNext=1, spaceBefore=-3, spaceAfter=5)
+    money = lambda v: f"-${-v:,.2f}" if v < 0 else f"${v:,.2f}"
+    money0 = lambda v: f"-${-v:,.0f}" if v < 0 else f"${v:,.0f}"
+    cw = W - 3.0 * cm
+
+    # ── Datos ────────────────────────────────────────────────────────────────
+    db = get_db_session()
+    try:
+        ventas = (db.query(Venta)
+                  .options(selectinload(Venta.items), selectinload(Venta.usuario))
+                  .filter(Venta.creado_en >= fi, Venta.creado_en <= ff,
+                          Venta.estado == EstadoVenta.completada, Venta.eliminado.is_not(True))
+                  .order_by(Venta.creado_en).all())
+        prod_ids = {it.producto_id for v in ventas for it in v.items}
+        prods = {p.id: p for p in db.query(Producto).filter(Producto.id.in_(prod_ids)).all()} if prod_ids else {}
+        retiros = (db.query(RetiroCaja).options(selectinload(RetiroCaja.usuario))
+                   .filter(RetiroCaja.creado_en >= fi, RetiroCaja.creado_en <= ff)
+                   .order_by(RetiroCaja.creado_en).all())
+        gastos = (db.query(Gasto).options(selectinload(Gasto.usuario))
+                  .filter(Gasto.fecha >= fecha_inicio, Gasto.fecha <= fecha_fin)
+                  .order_by(Gasto.fecha).all())
+        dev_movs = db.query(MovimientoStock).filter(
+            MovimientoStock.tipo == TipoMovimiento.devolucion,
+            MovimientoStock.referencia_tipo == "devolucion",
+            MovimientoStock.creado_en >= fi, MovimientoStock.creado_en <= ff).all()
+        devoluciones = _valor_devoluciones(db, dev_movs)
+
+        per: dict = {}
+        def bucket(d):
+            k = _clave_periodo(d, agrupar)
+            return per.setdefault(k, {"ventas": 0.0, "costo": 0.0, "tickets": 0, "iva": 0.0,
+                                      "inversion": 0.0, "personal": 0.0, "gastos": 0.0})
+        por_prod: dict = {}
+        lineas_corregidas = 0
+        for v in ventas:
+            b = bucket(v.creado_en.date())
+            b["ventas"] += v.total or 0.0
+            b["iva"] += v.iva or 0.0
+            b["tickets"] += 1
+            for it in v.items:
+                c, corr = _costo_item(it, prods.get(it.producto_id))
+                lineas_corregidas += corr
+                b["costo"] += c
+                pp = por_prod.setdefault(it.producto_id, {"piezas": 0.0, "ventas": 0.0, "costo": 0.0})
+                pp["piezas"] += it.cantidad or 0
+                pp["ventas"] += it.subtotal or 0.0
+                pp["costo"] += c
+        for r in retiros:
+            bucket(r.creado_en.date())["inversion" if r.tipo == "inversion" else "personal"] += r.monto or 0.0
+        for g in gastos:
+            bucket(g.fecha)["gastos"] += g.monto or 0.0
+
+        tot = {k: sum(b[k] for b in per.values()) for k in ("ventas", "costo", "tickets", "iva", "inversion", "personal", "gastos")}
+        ventas_netas = tot["ventas"] - devoluciones
+        ganancia = ventas_netas - tot["iva"] - tot["costo"]
+        margen = (ganancia / ventas_netas * 100) if ventas_netas else 0.0
+        efectivo_resto = ventas_netas - tot["inversion"] - tot["gastos"] - tot["personal"]
+        ticket_prom = ventas_netas / tot["tickets"] if tot["tickets"] else 0.0
+        claves = sorted(per)
+
+        story = []
+
+        # ── Resumen en una frase ──
+        frase = ""
+        if V or G:
+            if not tot["tickets"]:
+                frase = "No hubo ventas en este periodo. "
+            elif G:
+                frase = (f"En este periodo vendiste <b>{money(ventas_netas)}</b> en {tot['tickets']} tickets "
+                         f"(promedio {money(ticket_prom)}) y la ganancia fue de <b><font color='#15803D'>{money(ganancia)}</font></b>, "
+                         f"un margen de {margen:.1f}%. ")
+            else:
+                frase = (f"En este periodo vendiste <b>{money(ventas_netas)}</b> en {tot['tickets']} tickets, "
+                         f"con un ticket promedio de <b>{money(ticket_prom)}</b>. ")
+        if I:
+            frase += (f"Invertiste <b>{money(tot['inversion'] + tot['gastos'])}</b> y retiraste <b>{money(tot['personal'])}</b> para ti; "
+                      f"del efectivo de las ventas quedan <b>{money(efectivo_resto)}</b>.")
+        story += [Paragraph(frase, sty(fontSize=10, leading=15)), Spacer(1, 0.45 * cm)]
+
+        # ── Tarjetas ──
+        def tarjeta(valor, titulo, nota, color):
+            t = Table([[Paragraph(titulo.upper(), sty(fontSize=6.5, textColor=MUTED, fontName="Helvetica-Bold", leading=8))],
+                       [Paragraph(valor, sty(fontSize=14, textColor=color, fontName="Helvetica-Bold", leading=17))],
+                       [Paragraph(nota, sty(fontSize=6.5, textColor=MUTED, leading=8.5))]],
+                      colWidths=[cw / 4 - 0.3 * cm])
+            t.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 3, color), ("BACKGROUND", (0, 0), (-1, -1), SOFT),
+                                   ("BOX", (0, 0), (-1, -1), 0.4, LINE),
+                                   ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                                   ("TOPPADDING", (0, 0), (0, 0), 7), ("BOTTOMPADDING", (0, -1), (-1, -1), 7),
+                                   ("TOPPADDING", (0, 1), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, 1), 1)]))
+            return t
+        def fila(items):
+            r = Table([[tarjeta(*i) for i in items]], colWidths=[cw / 4] * 4, hAlign="LEFT")
+            r.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0.3 * cm),
+                                   ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+            return r
+        k_ventas = (money(ventas_netas), "Ventas", f"{tot['tickets']} tickets", C_VENTA)
+        filas_kpi = []
+        if tipo == "ventas":
+            filas_kpi.append([k_ventas, (str(tot["tickets"]), "Tickets", "ventas realizadas", C_VENTA),
+                              (money(ticket_prom), "Ticket promedio", "por venta", C_COSTO),
+                              (money(devoluciones), "Devoluciones", "parciales del periodo", C_PERS)])
+        if G:
+            filas_kpi.append([k_ventas, (money(tot["costo"]), "Costo de lo vendido", "lo que costó la mercancía", C_COSTO),
+                              (money(ganancia), "Ganancia", "ventas − costo", C_GAN if ganancia >= 0 else C_RED),
+                              (f"{margen:.1f}%", "Margen", "ganas de cada $100 vendidos", C_GAN if margen >= 0 else C_RED)])
+        if I:
+            filas_kpi.append([(money(tot["inversion"]), "Inversión", "compras y pagos a proveedor", C_INV),
+                              (money(tot["gastos"]), "Gastos", "renta, luz, servicios", C_GASTO),
+                              (money(tot["personal"]), "Retiros personales", "lo que sacaste para ti", C_PERS),
+                              (money(efectivo_resto), "Efectivo restante", "ventas − todo lo que salió", C_RESTO if efectivo_resto >= 0 else C_RED)])
+        for i, items in enumerate(filas_kpi):
+            if i:
+                story.append(Spacer(1, 0.25 * cm))
+            story.append(fila(items))
+        story.append(Spacer(1, 0.55 * cm))
+
+        def seccion(titulo, sub=None):
+            out = [Paragraph(titulo, s_h2)]
+            if sub:
+                out.append(Paragraph(sub, s_h2sub))
+            return out
+
+        def tabla(data, widths, total=False):
+            esc = cw / sum(widths)   # que siempre ocupe todo el ancho de la hoja
+            t = Table(data, colWidths=[w * esc for w in widths], repeatRows=1, hAlign="LEFT")
+            st = [("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY), ("LINEBELOW", (0, 1), (-1, -1), 0.3, LINE),
+                  ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                  ("TOPPADDING", (0, 0), (-1, -1), 3.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.2),
+                  ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
+            if total:
+                st += [("LINEABOVE", (0, -1), (-1, -1), 0.8, NAVY), ("BACKGROUND", (0, -1), (-1, -1), SOFT)]
+            t.setStyle(TableStyle(st))
+            return t
+        th = lambda h, der=False: Paragraph(h, s_thr if der else s_th)
+
+        # ── ¿A dónde se fue el efectivo? (barra 100%) ──
+        if I and ventas_netas > 0:
+            partes = [("Inversión", tot["inversion"], C_INV), ("Gastos", tot["gastos"], C_GASTO),
+                      ("Retiros personales", tot["personal"], C_PERS), ("Queda", max(efectivo_resto, 0), C_RESTO)]
+            total_barra = sum(p[1] for p in partes) or 1
+            bh = 14
+            d = Drawing(cw, bh + 16)
+            x = 0
+            for nombre, val, col in partes:
+                if val <= 0:
+                    continue
+                w = cw * val / total_barra
+                d.add(Rect(x, 16, w, bh, fillColor=col, strokeColor=colors.white, strokeWidth=1))
+                if w > 40:
+                    d.add(String(x + w / 2, 20, f"{val / total_barra * 100:.0f}%", fontName="Helvetica-Bold", fontSize=7,
+                                 fillColor=colors.white, textAnchor="middle"))
+                x += w
+            lx = 0
+            for nombre, val, col in partes:
+                d.add(Rect(lx, 3, 7, 7, fillColor=col, strokeColor=None))
+                etiqueta = f"{nombre} {money0(val)}"
+                d.add(String(lx + 10, 3.5, etiqueta, fontName="Helvetica", fontSize=7, fillColor=MUTED))
+                lx += 10 + len(etiqueta) * 3.6 + 16
+            story += seccion("¿A dónde se fue el efectivo de las ventas?",
+                             "Del dinero que entró por ventas: cuánto se reinvirtió, se gastó, se retiró y cuánto queda.")
+            story.append(d)
+            if efectivo_resto < 0:
+                story.append(Paragraph(f"Salió {money(-efectivo_resto)} más de lo que entró por ventas en este periodo "
+                                       "(se usó efectivo de periodos anteriores).", sty(fontSize=7, textColor=C_RED, leading=9)))
+            story.append(Spacer(1, 0.5 * cm))
+
+        # ── Gráfica por periodo ──
+        series = []
+        if V or G:
+            series.append(("Ventas", [per[k]["ventas"] for k in claves], C_VENTA))
+        if G:
+            series.append(("Ganancia", [per[k]["ventas"] - per[k]["iva"] - per[k]["costo"] for k in claves], C_GAN))
+        if I:
+            series.append(("Inversión y gastos", [per[k]["inversion"] + per[k]["gastos"] for k in claves], C_INV))
+            series.append(("Retiros personales", [per[k]["personal"] for k in claves], C_PERS))
+        if len(claves) >= 2 and series:
+            etiquetas = []
+            for k in claves:
+                e = _etiqueta_periodo(k, agrupar, fecha_inicio, fecha_fin)
+                etiquetas.append(e.split(" · ")[0] if agrupar == "semana" else (e[:3] + " " + e[-2:] if agrupar == "mes" else e[:6]))
+            ch_h = 5.2 * cm
+            d = Drawing(cw, ch_h + 18)
+            bc = VerticalBarChart()
+            bc.x, bc.y, bc.width, bc.height = 38, 22, cw - 44, ch_h - 14
+            bc.data = [s[1] for s in series]
+            bc.groupSpacing = 6 if len(claves) < 12 else 3
+            bc.barSpacing = 0.5
+            for i, (_, _, col) in enumerate(series):
+                bc.bars[i].fillColor = col
+                bc.bars[i].strokeColor = None
+            bc.valueAxis.valueMin = min(0, min(min(s[1]) for s in series))
+            bc.valueAxis.valueMax = max(max(max(s[1]) for s in series), 1) * 1.08
+            bc.valueAxis.labels.fontName = "Helvetica"
+            bc.valueAxis.labels.fontSize = 6.5
+            bc.valueAxis.labels.fillColor = MUTED
+            bc.valueAxis.labelTextFormat = lambda v: f"${v / 1000:.1f}k" if abs(v) >= 1000 else f"${v:.0f}"
+            bc.valueAxis.strokeColor = LINE
+            bc.valueAxis.visibleGrid = True
+            bc.valueAxis.gridStrokeColor = LINE
+            bc.valueAxis.gridStrokeWidth = 0.4
+            bc.categoryAxis.categoryNames = etiquetas
+            bc.categoryAxis.labels.fontName = "Helvetica"
+            bc.categoryAxis.labels.fontSize = 6 if len(claves) > 10 else 6.5
+            bc.categoryAxis.labels.fillColor = MUTED
+            bc.categoryAxis.labels.angle = 45 if len(claves) > 12 else 0
+            bc.categoryAxis.labels.boxAnchor = "ne" if len(claves) > 12 else "n"
+            bc.categoryAxis.strokeColor = LINE
+            d.add(bc)
+            lx = cw - sum(10 + len(s[0]) * 3.7 + 14 for s in series)
+            for nombre, _, col in series:
+                d.add(Rect(lx, ch_h + 8, 7, 7, fillColor=col, strokeColor=None))
+                d.add(String(lx + 10, ch_h + 8.5, nombre, fontName="Helvetica", fontSize=7, fillColor=MUTED))
+                lx += 10 + len(nombre) * 3.7 + 14
+            tit_graf = {"completo": "Ventas, ganancia e inversión", "ventas": "Ventas", "ganancia": "Ventas y ganancia",
+                        "inversion": "Inversión, gastos y retiros"}[tipo]
+            story.append(KeepTogether(seccion(f"{tit_graf} por {nombre_per}") + [d]))
+            story.append(Spacer(1, 0.45 * cm))
+
+        # ── Tabla por periodo (columnas según el reporte) ──
+        def _g(b): return b["ventas"] - b["iva"] - b["costo"]
+        cols = []   # (título, valor por periodo, total, ancho cm, estilo)
+        if V or G:
+            cols.append(("Ventas", lambda b: money(b["ventas"]), money(ventas_netas), 2.3, None))
+        if tipo == "ventas":
+            cols += [("Tickets", lambda b: str(b["tickets"]), str(tot["tickets"]), 1.6, None),
+                     ("Ticket prom.", lambda b: money(b["ventas"] / b["tickets"]) if b["tickets"] else "—", money(ticket_prom), 2.2, None)]
+        if G:
+            cols += [("Costo", lambda b: money(b["costo"]), money(tot["costo"]), 2.2, None),
+                     ("Ganancia", lambda b: money(_g(b)), money(ganancia), 2.3, "gan"),
+                     ("Margen", lambda b: f"{_g(b) / b['ventas'] * 100:.1f}%" if b["ventas"] else "—", f"{margen:.1f}%", 1.5, None)]
+        if tipo == "completo":
+            cols.append(("Tickets", lambda b: str(b["tickets"]), str(tot["tickets"]), 1.4, None))
+        if I:
+            cols += [("Inversión", lambda b: money(b["inversion"]), money(tot["inversion"]), 2.1, None),
+                     ("Gastos", lambda b: money(b["gastos"]), money(tot["gastos"]), 1.9, None),
+                     ("Retiros pers.", lambda b: money(b["personal"]), money(tot["personal"]), 2.1, None)]
+        if claves:
+            ancho_per = max(3.4 * cm, cw - sum(c[3] for c in cols) * cm)
+            data = [[th("Periodo")] + [th(c[0], True) for c in cols]]
+            for k in claves:
+                b = per[k]
+                fila_t = [Paragraph(_etiqueta_periodo(k, agrupar, fecha_inicio, fecha_fin), s_txt)]
+                for c in cols:
+                    stl = (sty(fontSize=8, leading=10.5, alignment=TA_RIGHT, fontName="Helvetica-Bold",
+                               textColor=C_GAN if _g(b) >= 0 else C_RED) if c[4] == "gan" else s_num)
+                    fila_t.append(Paragraph(c[1](b), stl))
+                data.append(fila_t)
+            if devoluciones and (V or G):
+                data.append([Paragraph("Devoluciones", s_mut)] +
+                            [Paragraph(money(-devoluciones) if c[0] in ("Ventas", "Ganancia") else "", s_num) for c in cols])
+            data.append([Paragraph("<b>Total</b>", s_txt)] + [Paragraph(c[2], s_numb) for c in cols])
+            story += seccion(f"Detalle por {nombre_per}")
+            story += [tabla(data, [ancho_per] + [c[3] * cm for c in cols], total=True), Spacer(1, 0.55 * cm)]
+
+        # ── Inversión y gastos / retiros personales ──
+        if I:
+            inv = [r for r in retiros if r.tipo == "inversion"]
+            story += seccion(f"Inversión y gastos · {money(tot['inversion'] + tot['gastos'])}",
+                             "Retiros de caja marcados como inversión (compras de medicamento, pagos a proveedor) y gastos capturados.")
+            if inv or gastos:
+                data = [[th("Fecha"), th("Tipo"), th("Concepto"), th("Registró"), th("Monto", True)]]
+                filas = [(r.creado_en, "Inversión", r.concepto or "—", (r.usuario.nombre or r.usuario.username) if r.usuario else "—", r.monto or 0.0) for r in inv]
+                filas += [(datetime.combine(g.fecha, datetime.min.time()), f"Gasto · {g.categoria.value if g.categoria else 'otros'}", g.concepto or "—",
+                           (g.usuario.nombre or g.usuario.username) if g.usuario else "—", g.monto or 0.0) for g in gastos]
+                for f, t, c, u, mo in sorted(filas, key=lambda x: x[0]):
+                    data.append([Paragraph(f.strftime("%d/%m/%Y"), s_txt),
+                                 Paragraph(t, sty(fontSize=7, leading=9.5, textColor=C_INV if t == "Inversión" else C_GASTO, fontName="Helvetica-Bold")),
+                                 Paragraph(c, s_txt), Paragraph(u, s_mut), Paragraph(money(mo), s_numb)])
+                data.append([Paragraph("<b>Total</b>", s_txt), "", "", "", Paragraph(money(tot["inversion"] + tot["gastos"]), s_numb)])
+                story.append(tabla(data, [2.3 * cm, 2.9 * cm, 7.6 * cm, 2.9 * cm, 2.5 * cm], total=True))
+            else:
+                story.append(Paragraph("No hay inversión ni gastos registrados en este periodo.", s_mut))
+            story.append(Spacer(1, 0.55 * cm))
+
+            pers = [r for r in retiros if r.tipo != "inversion"]
+            story += seccion(f"Retiros personales · {money(tot['personal'])}", "Dinero que sacaste de la caja para ti, nómina u otros.")
+            if pers:
+                data = [[th("Fecha"), th("Concepto"), th("Registró"), th("Monto", True)]]
+                for r in pers:
+                    data.append([Paragraph(r.creado_en.strftime("%d/%m/%Y"), s_txt), Paragraph(r.concepto or "—", s_txt),
+                                 Paragraph((r.usuario.nombre or r.usuario.username) if r.usuario else "—", s_mut),
+                                 Paragraph(money(r.monto or 0.0), s_numb)])
+                data.append([Paragraph("<b>Total</b>", s_txt), "", "", Paragraph(money(tot["personal"]), s_numb)])
+                story.append(tabla(data, [2.3 * cm, 10.5 * cm, 2.9 * cm, 2.5 * cm], total=True))
+            else:
+                story.append(Paragraph("No hay retiros personales en este periodo.", s_mut))
+            story.append(Spacer(1, 0.55 * cm))
+
+        # ── Productos ──
+        if (V or G) and por_prod:
+            if G:
+                orden = lambda kv: kv[1]["ventas"] - kv[1]["costo"]
+                tit, campo = "Productos que más ganancia dejan", "Ganancia"
+            else:
+                orden = lambda kv: kv[1]["ventas"]
+                tit, campo = "Productos más vendidos", "Ventas"
+            top = sorted(por_prod.items(), key=orden, reverse=True)[:15]
+            mx = max(orden(kv) for kv in top) or 1
+            data = [[th("#"), th("Producto"), th("Vendidos", True), th("Ventas" if G else "Costo", True), th(campo, True), th("")]]
+            for i, kv in enumerate(top, 1):
+                pid, dd = kv
+                p = prods.get(pid)
+                val = orden(kv)
+                barra = Drawing(3.2 * cm, 7)
+                barra.add(Rect(0, 1, max(1, 3.2 * cm * max(val, 0) / mx), 5, fillColor=C_GAN if G else C_VENTA, strokeColor=None))
+                data.append([Paragraph(str(i), s_mut), Paragraph((p.nombre if p else f"Producto {pid}")[:46], s_txt),
+                             Paragraph(f"{dd['piezas']:g}", s_num), Paragraph(money(dd["ventas"] if G else dd["costo"]), s_num),
+                             Paragraph(money(val), s_numb), barra])
+            story.append(KeepTogether(seccion(tit) + [tabla(data, [0.7 * cm, 7.3 * cm, 1.8 * cm, 2.4 * cm, 2.4 * cm, 3.6 * cm])]))
+            story.append(Spacer(1, 0.55 * cm))
+
+        # ── Detalle de ventas (solo en el reporte de ventas) ──
+        if tipo == "ventas" and ventas:
+            story += seccion(f"Detalle de ventas · {len(ventas)} tickets")
+            data = [[th("Folio"), th("Fecha"), th("Cajero"), th("Pago"), th("Total", True)]]
+            for v in ventas:
+                data.append([Paragraph(str(v.folio or v.id), s_txt), Paragraph(v.creado_en.strftime("%d/%m/%Y %H:%M"), s_mut),
+                             Paragraph((v.usuario.nombre or v.usuario.username) if v.usuario else "—", s_mut),
+                             Paragraph(v.metodo_pago.value if v.metodo_pago else "—", s_mut), Paragraph(money(v.total or 0.0), s_numb)])
+            data.append([Paragraph("<b>Total</b>", s_txt), "", "", "", Paragraph(money(tot["ventas"]), s_numb)])
+            story += [tabla(data, [3 * cm, 3.6 * cm, 5.4 * cm, 3 * cm, 3.2 * cm], total=True), Spacer(1, 0.55 * cm)]
+
+        notas = []
+        if G:
+            notas.append("Ganancia = ventas − costo de la mercancía vendida (el costo que tenía cada producto al venderse)"
+                         + (" − devoluciones" if devoluciones else "") + (" − IVA" if tot["iva"] else "") + ".")
+            if lineas_corregidas:
+                notas.append(f"Se corrigió el costo de {lineas_corregidas} venta(s) por pieza que tenían guardado el costo de la caja completa.")
+        if I:
+            notas.append("Efectivo restante = ventas − inversión − gastos − retiros personales.")
+        if V and devoluciones:
+            notas.append(f"Devoluciones del periodo: {money(devoluciones)}.")
+        if notas:
+            nt = Table([[Paragraph("<br/>".join("• " + n for n in notas), s_mut)]], colWidths=[cw], hAlign="LEFT")
+            nt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), SOFT), ("BOX", (0, 0), (-1, -1), 0.4, LINE),
+                                    ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 6),
+                                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+            story.append(nt)
+    finally:
+        db.close()
+
+    logo = cfg.BASE_DIR / "app" / "web" / "logo.png"
+    BANDA = 3.0 * cm
+
+    def _pie(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(LINE)
+        canvas.setLineWidth(0.5)
+        canvas.line(1.5 * cm, 1.45 * cm, W - 1.5 * cm, 1.45 * cm)
+        canvas.setFont("Helvetica", 6.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(1.5 * cm, 1.1 * cm, f"Generado el {now_str}")
+        canvas.drawCentredString(W / 2, 1.1 * cm, f"{cfg.PHARMACY_NAME}  ·  {_PDF_TIPOS[tipo]}  ·  {per_label}")
+        canvas.drawRightString(W - 1.5 * cm, 1.1 * cm, f"Página {doc.page}")
+        canvas.restoreState()
+
+    def _portada(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(NAVY)
+        canvas.rect(0, H - BANDA, W, BANDA, stroke=0, fill=1)
+        if logo.exists():
+            try:
+                canvas.drawImage(str(logo), 1.5 * cm, H - BANDA + 0.85 * cm, width=4.6 * cm, height=1.28 * cm,
+                                 mask="auto", preserveAspectRatio=True, anchor="w")
+            except Exception:
+                pass
+        canvas.setFillColor(colors.white)
+        canvas.setFont("Helvetica-Bold", 15)
+        canvas.drawRightString(W - 1.5 * cm, H - 1.35 * cm, _PDF_TIPOS[tipo])
+        canvas.setFont("Helvetica", 9)
+        canvas.setFillColor(colors.HexColor("#C7D2FE"))
+        canvas.drawRightString(W - 1.5 * cm, H - 1.95 * cm, f"{per_label}  ·  por {nombre_per}")
+        canvas.setFont("Helvetica", 7)
+        canvas.drawRightString(W - 1.5 * cm, H - 2.45 * cm, cfg.PHARMACY_NAME)
+        canvas.restoreState()
+        _pie(canvas, doc)
+
+    buf = io.BytesIO()
+    from reportlab.platypus import BaseDocTemplate
+    doc = BaseDocTemplate(buf, pagesize=letter, title=f"{_PDF_TIPOS[tipo]} {per_label} — {cfg.PHARMACY_NAME}")
+    # Primera página con la banda azul; las demás con margen normal.
+    f1 = Frame(1.5 * cm, 2.0 * cm, cw, H - BANDA - 0.6 * cm - 2.0 * cm, id="f1", leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    f2 = Frame(1.5 * cm, 2.0 * cm, cw, H - 1.5 * cm - 2.0 * cm, id="f2", leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([PageTemplate(id="portada", frames=[f1], onPage=_portada, autoNextPageTemplate="resto"),
+                          PageTemplate(id="resto", frames=[f2], onPage=_pie)])
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/finanzas-pdf")
+def finanzas_pdf(
+    fecha_inicio: date = Query(...),
+    fecha_fin:    date = Query(...),
+    agrupar:      str = Query("semana"),
+    tipo:         str = Query("completo"),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    data = _build_finanzas_pdf_bytes(fecha_inicio, fecha_fin, agrupar, tipo)
+    filename = f"Reporte_{tipo}_{fecha_inicio}_{fecha_fin}.pdf"
+    return StreamingResponse(io.BytesIO(data), media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.post("/save-finanzas-pdf")
+def save_finanzas_pdf(
+    body: _SavePdfBody,
+    fecha_inicio: date = Query(...),
+    fecha_fin:    date = Query(...),
+    agrupar:      str = Query("semana"),
+    tipo:         str = Query("completo"),
+    payload: dict = Depends(get_current_api_user),
+):
+    _require_admin(payload)
+    if not body.path:
+        raise HTTPException(status_code=400, detail="path requerido")
+    data = _build_finanzas_pdf_bytes(fecha_inicio, fecha_fin, agrupar, tipo)
+    with open(body.path, "wb") as f:
+        f.write(data)
+    return {"ok": True, "path": body.path}

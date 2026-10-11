@@ -114,6 +114,8 @@ class Producto(Base):
     piezas_sueltas = Column(Integer, default=0)
     precio_tachado = Column(Float, nullable=True)  # precio "antes" para mostrar promo en la web
     destacado = Column(Boolean, default=False)     # aparece en sección de destacados/promos de la web
+    anaquel = Column(String(20))   # ubicación física en la farmacia: anaquel (1, 2, 3…)
+    seccion = Column(String(20))   # …y sección/repisa dentro de ese anaquel
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, default=_dt.now)
     actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)

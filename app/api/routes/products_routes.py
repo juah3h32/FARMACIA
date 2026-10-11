@@ -49,6 +49,14 @@ class ProductoIn(BaseModel):
     unidad_pieza: Optional[str] = "pieza"
     unidad_caja: Optional[str] = "caja"
     piezas_sueltas: int = Field(0, ge=0)
+    anaquel: Optional[str] = None
+    seccion: Optional[str] = None
+
+    @field_validator('anaquel', 'seccion', mode='before')
+    @classmethod
+    def _clean_ubicacion(cls, v):
+        v = str(v).strip().upper() if v is not None else None
+        return v or None
 
 
 class ProductoResponse(BaseModel):
@@ -79,6 +87,8 @@ class ProductoResponse(BaseModel):
     unidad_pieza: Optional[str] = "pieza"
     unidad_caja: Optional[str] = "caja"
     piezas_sueltas: int = 0
+    anaquel: Optional[str] = None
+    seccion: Optional[str] = None
     activo: bool
 
     class Config:
@@ -442,7 +452,10 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         from datetime import datetime as _dt_now
         was_fraccionada = p.venta_fraccionada
         precio_anterior = p.precio_venta
-        for k, v in body.model_dump(exclude={'stock', 'imagen_url', 'piezas_sueltas'}).items():
+        # anaquel/seccion solo si el cliente los mandó — un cliente viejo que no
+        # conoce esos campos no debe borrar la ubicación al editar el producto.
+        excluir = {'stock', 'imagen_url', 'piezas_sueltas'} | ({'anaquel', 'seccion'} - body.model_fields_set)
+        for k, v in body.model_dump(exclude=excluir).items():
             setattr(p, k, v)
         p.actualizado_en = _dt_now.now()  # guarantee bump so sync CASE WHEN keeps local
         if p.venta_fraccionada and not was_fraccionada and (p.stock or 0) > 0 and (p.piezas_sueltas or 0) == 0:

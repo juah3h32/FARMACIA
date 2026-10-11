@@ -1578,7 +1578,7 @@
             <div class="bg-white rounded-2xl border p-4 flex gap-2" style="border-color:#E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.03)">
               <div class="relative flex-1">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:14px;height:14px;color:#94A3B8"></i>
-                <input id="pos-search" type="text" placeholder="[F2/F3] Buscar producto o código de barras..."
+                <input id="pos-search" type="text" placeholder="[F2/F3] Buscar producto o código de barras...   ·   [F4] ¿Dónde está?"
                        class="w-full h-10 pl-9 pr-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#F8FAFF"
                        oninput="posSearch(this.value)"
                        onkeydown="posSearchKeydown(event)">
@@ -1809,27 +1809,23 @@
             <span class="text-xs" style="color:#64748B">Hasta</span>
             <input id="rep-hasta" type="date" class="h-8 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0" onchange="loadReports()">
           </div>
-          <div class="flex gap-1">
-            <button onclick="repPeriodo(0)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Hoy</button>
-            <button onclick="repPeriodo(7)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">7 días</button>
-            <button onclick="repPeriodo(-1)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Este mes</button>
-            <button onclick="repPeriodo(-2)"  class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#EEF1F9;color:#1d2140">Mes ant.</button>
-            <button onclick="repPeriodo(-99)" class="h-8 px-3 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style="background:#F5F3FF;color:#7C3AED">Todas</button>
+          <!-- Elegir un día, una semana o un mes en particular (con flechas para moverse) -->
+          <div class="flex items-center gap-1 rounded-xl p-1" style="background:#F1F5F9">
+            <div class="flex rounded-lg overflow-hidden" id="rep-modo-seg">
+              <button type="button" data-modo="dia" onclick="repModo('dia')" class="h-7 px-2.5 text-xs font-semibold">Día</button>
+              <button type="button" data-modo="semana" onclick="repModo('semana')" class="h-7 px-2.5 text-xs font-semibold" style="background:#1d2140;color:#fff">Semana</button>
+              <button type="button" data-modo="mes" onclick="repModo('mes')" class="h-7 px-2.5 text-xs font-semibold">Mes</button>
+            </div>
+            <button type="button" onclick="repMover(-1)" title="Anterior" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white" style="color:#1d2140"><i data-lucide="chevron-left" style="width:14px;height:14px"></i></button>
+            <input id="rep-pick-dia" type="date" class="h-7 px-2 rounded-lg text-xs border hidden" style="border-color:#E2E8F0" onchange="repDesdePicker()">
+            <input id="rep-pick-semana" type="week" class="h-7 px-2 rounded-lg text-xs border" style="border-color:#E2E8F0" onchange="repDesdePicker()">
+            <input id="rep-pick-mes" type="month" class="h-7 px-2 rounded-lg text-xs border hidden" style="border-color:#E2E8F0" onchange="repDesdePicker()">
+            <button type="button" onclick="repMover(1)" title="Siguiente" class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white" style="color:#1d2140"><i data-lucide="chevron-right" style="width:14px;height:14px"></i></button>
           </div>
-          <button onclick="loadReports()"
-                  class="h-9 px-4 rounded-xl text-sm font-semibold text-white flex items-center gap-2"
-                  style="background:#1d2140">
-            <i data-lucide="bar-chart-2" style="width:14px;height:14px"></i> Generar
-          </button>
-          <button onclick="exportCSV()"
-                  class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:bg-slate-50"
-                  style="border-color:#E2E8F0;color:#374151">
-            <i data-lucide="download" style="width:14px;height:14px;color:#22C55E"></i> CSV
-          </button>
-          <button onclick="exportVentasPDF()"
-                  class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:bg-slate-50"
-                  style="border-color:#E2E8F0;color:#374151">
-            <i data-lucide="file-text" style="width:14px;height:14px;color:#EF4444"></i> PDF
+          <button onclick="openExportarPDF()"
+                  class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 text-white hover:opacity-90"
+                  style="background:#4F46E5">
+            <i data-lucide="file-down" style="width:14px;height:14px"></i> Exportar PDF
           </button>
           <button onclick="openCierreResico()"
                   class="h-9 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors hover:opacity-90"
@@ -2193,12 +2189,51 @@
             <button id="settings-catbtn-datos" class="settings-cat-btn" onclick="selectSettingsCat('datos')">
               <i data-lucide="database-backup" style="width:16px;height:16px"></i> Datos
             </button>
+            <button id="settings-catbtn-anaqueles" class="settings-cat-btn" onclick="selectSettingsCat('anaqueles')">
+              <i data-lucide="map-pin" style="width:16px;height:16px"></i> Anaqueles
+            </button>
           </div>
 
           <!-- ── Contenido de la categoría seleccionada ────────── -->
           <div class="flex-1 min-w-0 flex flex-col gap-5">
 
         <div id="settings-cat-general" class="settings-cat-panel flex flex-col gap-5">
+        <style>#settings-cat-general .inp[readonly]{background:#F8FAFC;color:#475569;cursor:default;border-color:#F1F5F9}</style>
+
+        <!-- ── Sucursales que administro (selector del encabezado) ── -->
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#16A34A)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EFF6FF">
+              <i data-lucide="building-2" style="width:20px;height:20px;color:#2563EB"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-bold" style="color:#0F172A">Mis sucursales</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8">Cada sucursal tiene su propia base de datos e inventario · al registrarla aparece el selector arriba y cambias al instante</p>
+            </div>
+            <button id="sucn-toggle" onclick="sucAgregarToggle()" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border hover:bg-slate-50" style="border-color:#E2E8F0;color:#2563EB">
+              <i data-lucide="plus" style="width:13px;height:13px"></i> Agregar sucursal
+            </button>
+          </div>
+          <div class="p-6 flex flex-col gap-4">
+            <div id="suc-lista" class="flex flex-col gap-2 text-xs" style="color:#64748B">—</div>
+            <div id="sucn-box" class="hidden rounded-xl p-4" style="background:#F8FAFC;border:1px solid #E2E8F0">
+              <p class="text-xs font-bold mb-3" style="color:#374151">Agregar sucursal</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Nombre de la sucursal</label><input id="sucn-nombre" class="inp" placeholder="Ej. López Mateos"></div>
+                <div><label class="lbl">Dirección</label><input id="sucn-direccion" class="inp" placeholder="Calle, número, colonia"></div>
+                <div><label class="lbl">URL de su base de datos (Turso)</label><input id="sucn-url" class="inp" placeholder="libsql://farmacia-lopez-mateos-....turso.io"></div>
+                <div><label class="lbl">Token de su base de datos</label><input id="sucn-token" type="password" class="inp" placeholder="eyJhbGciOi..."></div>
+              </div>
+              <p class="text-xs mt-3" style="color:#94A3B8">Crea primero una base de datos <b>vacía</b> para la sucursal en turso.tech (Create Database) y copia su URL y un token. Al registrarla, si está vacía, se prepara sola con tu catálogo de productos (existencias en 0), categorías, proveedores y usuarios.</p>
+              <div class="flex justify-end mt-3">
+                <button id="sucn-btn" onclick="agregarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#2563EB">
+                  <i data-lucide="plus" style="width:14px;height:14px"></i> Agregar sucursal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- ── Sucursal ────────────────────────────────────────────
              Mismo nombre comercial y logo en todas las sucursales; aquí solo
@@ -2214,23 +2249,26 @@
               <p class="text-xs mt-0.5" style="color:#94A3B8">Nombre y dirección de esta sucursal · salen en el ticket · el nombre de la farmacia y el logo son los mismos en todas</p>
             </div>
             <span id="suc-clave" class="text-xs font-semibold px-2.5 py-1 rounded-full" style="background:#F1F5F9;color:#64748B" title="Clave de la sucursal de esta PC (setup.json). Cada sucursal sincroniza solo con su propia base de datos.">—</span>
+            <button id="suc-edit-btn" onclick="sucEditar(true)" class="h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border hover:bg-slate-50" style="border-color:#E2E8F0;color:#1d2140">
+              <i data-lucide="lock" style="width:13px;height:13px"></i> Editar
+            </button>
           </div>
           <div class="p-6 grid grid-cols-3 gap-3">
             <div>
               <label class="lbl">Nombre de la sucursal</label>
-              <input id="suc-nombre" class="inp" placeholder="Ej. 13 de Abril, López Mateos">
+              <input id="suc-nombre" class="inp" placeholder="Ej. 13 de Abril, López Mateos" readonly>
             </div>
             <div>
               <label class="lbl">Dirección</label>
-              <input id="suc-direccion" class="inp" placeholder="Calle, número, colonia, ciudad">
+              <input id="suc-direccion" class="inp" placeholder="Calle, número, colonia, ciudad" readonly>
             </div>
             <div>
               <label class="lbl">Teléfono</label>
-              <input id="suc-telefono" class="inp" placeholder="Teléfono de la sucursal">
+              <input id="suc-telefono" class="inp" placeholder="Teléfono de la sucursal" readonly>
             </div>
             <!-- Nube: la sucursal funciona local; al conectar la cuenta de Turso
                  se busca/crea SU base de datos (una sola vez) y se sube todo -->
-            <div class="col-span-3 rounded-xl p-4 flex flex-col gap-3" style="background:#F8FAFC;border:1px solid #E2E8F0">
+            <div id="suc-nube-box" class="hidden col-span-3 rounded-xl p-4 flex flex-col gap-3" style="background:#F8FAFC;border:1px solid #E2E8F0">
               <div class="flex items-center gap-2">
                 <i data-lucide="cloud" style="width:15px;height:15px;color:#2563EB"></i>
                 <p class="text-xs font-bold" style="color:#374151">Nube</p>
@@ -2249,41 +2287,12 @@
             </div>
             <div class="col-span-3 flex items-center justify-between">
               <p class="text-xs" style="color:#94A3B8">Farmacia: <b id="suc-farmacia" style="color:#374151">—</b></p>
-              <button onclick="guardarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#1d2140">
-                <i data-lucide="save" style="width:14px;height:14px"></i> Guardar sucursal
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Sucursales que administro (selector del encabezado) ── -->
-        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
-          <div class="h-1 w-full" style="background:linear-gradient(90deg,#2563EB,#16A34A)"></div>
-          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EFF6FF">
-              <i data-lucide="building-2" style="width:20px;height:20px;color:#2563EB"></i>
-            </div>
-            <div>
-              <h2 class="font-bold" style="color:#0F172A">Otras sucursales que administro</h2>
-              <p class="text-xs mt-0.5" style="color:#94A3B8">Cada sucursal tiene su propia base de datos e inventario · al registrarla aparece el selector arriba y cambias al instante</p>
-            </div>
-          </div>
-          <div class="p-6 flex flex-col gap-4">
-            <div id="suc-lista" class="flex flex-col gap-2 text-xs" style="color:#64748B">—</div>
-            <div class="rounded-xl p-4" style="background:#F8FAFC;border:1px solid #E2E8F0">
-              <p class="text-xs font-bold mb-3" style="color:#374151">Agregar sucursal</p>
-              <div class="grid grid-cols-2 gap-3">
-                <div><label class="lbl">Nombre de la sucursal</label><input id="sucn-nombre" class="inp" placeholder="Ej. López Mateos"></div>
-                <div><label class="lbl">Dirección</label><input id="sucn-direccion" class="inp" placeholder="Calle, número, colonia"></div>
-                <div><label class="lbl">URL de su base de datos (Turso)</label><input id="sucn-url" class="inp" placeholder="libsql://farmacia-lopez-mateos-....turso.io"></div>
-                <div><label class="lbl">Token de su base de datos</label><input id="sucn-token" type="password" class="inp" placeholder="eyJhbGciOi..."></div>
-              </div>
-              <p class="text-xs mt-3" style="color:#94A3B8">Crea primero una base de datos <b>vacía</b> para la sucursal en turso.tech (Create Database) y copia su URL y un token. Al registrarla, si está vacía, se prepara sola con tu catálogo de productos (existencias en 0), categorías, proveedores y usuarios.</p>
-              <div class="flex justify-end mt-3">
-                <button id="sucn-btn" onclick="agregarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#2563EB">
-                  <i data-lucide="plus" style="width:14px;height:14px"></i> Agregar sucursal
+              <span id="suc-acciones" class="hidden flex items-center gap-2">
+                <button onclick="sucEditar(false); cargarSucursal()" class="h-9 px-4 rounded-xl font-bold text-xs border hover:bg-slate-50" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+                <button onclick="guardarSucursal()" class="h-9 px-4 rounded-xl text-white font-bold text-xs flex items-center gap-2 hover:opacity-90" style="background:#1d2140">
+                  <i data-lucide="save" style="width:14px;height:14px"></i> Guardar sucursal
                 </button>
-              </div>
+              </span>
             </div>
           </div>
         </div>
@@ -2393,6 +2402,96 @@
         </div>
 
         </div><!-- /settings-cat-datos -->
+
+        <!-- ── Mapa de anaqueles: editor visual (plano 3D + teclado de letras) ── -->
+        <div id="settings-cat-anaqueles" class="settings-cat-panel hidden flex flex-col gap-5">
+        <style>
+          .ub3d-scene{perspective:1200px;perspective-origin:50% 0%;height:380px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:16px;background:radial-gradient(ellipse at 50% 0%,#E0E7FF,#F8FAFC 75%);border:1px solid #E2E8F0}
+          .ub3d-floor{position:relative;transform:rotateX(58deg) rotateZ(-14deg);transform-style:preserve-3d;border-radius:14px;background-color:#fff;background-image:linear-gradient(#EEF2F7 1px,transparent 1px),linear-gradient(90deg,#EEF2F7 1px,transparent 1px);background-size:26px 26px;box-shadow:0 40px 70px rgba(15,23,42,.18);margin-top:10px}
+          .ub3d-box{position:absolute;transform-style:preserve-3d;cursor:pointer;transition:transform .25s}
+          .ub3d-box:hover{transform:translateZ(8px)}
+          .ub3d-box.sel{transform:translateZ(14px)}
+          .ub3d-box .f{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800;color:#fff;overflow:hidden;white-space:nowrap;background:var(--c);padding:0 6px}
+          .ub3d-box .top{inset:0;transform:translateZ(var(--h));border-radius:3px;font-size:11px}
+          .ub3d-box .top b{font-size:24px;line-height:1}
+          .ub3d-box.sel .top{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--c)}
+          .ub3d-box .front{left:0;width:100%;height:var(--h);top:calc(100% - var(--h));transform-origin:bottom;transform:rotateX(-90deg);filter:brightness(.8);font-size:13px}
+          .ub3d-box .back{left:0;width:100%;height:var(--h);top:calc(var(--h) * -1);transform-origin:bottom;transform:rotateX(-90deg);filter:brightness(.65)}
+          .ub3d-box .left{top:0;height:100%;width:var(--h);left:calc(var(--h) * -1);transform-origin:right;transform:rotateY(90deg);filter:brightness(.7)}
+          .ub3d-box .right{top:0;height:100%;width:var(--h);left:100%;transform-origin:left;transform:rotateY(-90deg);filter:brightness(.7)}
+          .ub3d-box.vit .f{background:rgba(124,58,237,.35);border:1px solid rgba(124,58,237,.7);filter:none;color:#4C1D95}
+          .ub3d-box.vit .top{background:rgba(196,181,253,.55)}
+          .ub3d-lbl{position:absolute;text-align:center;font-size:13px;font-weight:900;letter-spacing:.12em;color:#94A3B8;pointer-events:none}
+          .ub-repisa{display:flex;align-items:center;gap:8px;min-height:34px;padding:3px 8px;border-bottom:6px solid #CBD5E1;cursor:pointer;transition:background .15s}
+          .ub-repisa:hover{background:#F8FAFC}
+          .ub-key{position:relative;height:40px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;font-weight:900;font-size:15px;color:#0F172A;cursor:pointer;transition:transform .08s}
+          .ub-key:active{transform:scale(.94)}
+          .ub-pulso{animation:ubPulso 1.2s ease-in-out infinite}@keyframes ubPulso{50%{stroke-opacity:.35}}
+          .ub-anillo{animation:ubAnillo 1.4s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes ubAnillo{0%{transform:scale(1);opacity:.9}100%{transform:scale(2);opacity:0}}
+          .ub-layout{display:grid;gap:20px;align-items:start;grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+          @media (max-width:1150px){.ub-layout{grid-template-columns:1fr}.ub-layout>div:first-child{position:static!important;max-width:560px}}
+          .ub-montante{width:12px;flex-shrink:0;background:repeating-linear-gradient(to bottom,#9CA3AF 0 9px,#4B5563 9px 13px);border-left:1px solid #6B7280;border-right:1px solid #6B7280}
+          .ub-repisa{border-bottom:1px solid #F1F5F9}
+          .ub-repisa:last-child{border-bottom:none}
+          .ub-card{min-width:0;border-radius:14px;overflow:hidden;background:#fff;border:1px solid #E2E8F0}
+          .ub-num{width:22px;height:22px;border-radius:7px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:#F1F5F9;color:#64748B}
+          .ub-step{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.22);color:#fff;font-weight:800;line-height:1}
+          .ub-step:hover{background:rgba(255,255,255,.38)}
+          .ub-seg{display:inline-flex;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
+          .ub-seg button{padding:4px 10px;font-size:11px;font-weight:700;color:#475569;background:#fff}
+          .ub-seg button.on{background:#1d2140;color:#fff}
+        </style>
+        <div class="bg-white rounded-2xl border overflow-hidden" style="border-color:#E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+          <div class="h-1 w-full" style="background:linear-gradient(90deg,#1d2140,#2563EB)"></div>
+          <div class="flex items-center gap-3 px-6 py-4 border-b" style="border-color:#F1F5F9">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#EEF1F9">
+              <i data-lucide="map-pin" style="width:20px;height:20px;color:#1d2140"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-bold" style="color:#0F172A">Mapa de anaqueles</h2>
+              <p class="text-xs mt-0.5" style="color:#94A3B8"><b>1.</b> Toca una repisa (en la imagen o en la lista) &nbsp;<b>2.</b> Pica sus letras &nbsp;<b>3.</b> Guarda. Cada producto se ubica solo por la primera letra de su nombre; en el punto de venta se consulta con <b>F4</b>.</p>
+            </div>
+          </div>
+          <div class="p-5 ub-layout">
+            <!-- Izquierda: imagen de referencia + resumen + guardar (se queda a la vista) -->
+            <div class="flex flex-col gap-3" style="position:sticky;top:8px">
+              <div id="ub-3d"></div>
+              <div id="ub-resumen" class="rounded-xl p-3 text-xs" style="background:#F8FAFC;border:1px solid #E2E8F0;color:#475569"></div>
+              <button id="ub-save-btn" onclick="saveMapaUb()" class="h-10 w-full rounded-xl text-sm font-bold text-white" style="background:#1d2140">Guardar mapa</button>
+            </div>
+            <!-- Derecha: anaqueles de la fila + teclado de letras + vitrina -->
+            <div class="flex flex-col gap-3" style="min-width:0">
+              <div id="ub-editor" class="flex flex-col gap-2"></div>
+              <div class="rounded-xl p-3 flex flex-col gap-2" style="background:#F8FAFC;border:1px solid #E2E8F0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div id="ub-teclado-tit" class="flex-1 text-xs font-bold" style="color:#0F172A;min-width:160px"></div>
+                  <button id="ub-rango-btn" onclick="ubModoRango()" class="h-7 px-2.5 rounded-lg text-[11px] font-semibold border" style="border-color:#E2E8F0;background:#fff;color:#1d2140">↔ Rango</button>
+                  <button onclick="ubLimpiarRepisa()" class="h-7 px-2.5 rounded-lg text-[11px] font-semibold border hover:bg-red-50" style="border-color:#E2E8F0;background:#fff;color:#EF4444">Vaciar repisa</button>
+                </div>
+                <div id="ub-teclado" class="grid gap-1" style="grid-template-columns:repeat(13,minmax(0,1fr))"></div>
+                <div class="flex items-center gap-3 flex-wrap text-[10px]" style="color:#64748B">
+                  <span>Toca una letra para ponerla o quitarla.</span>
+                  <span class="inline-flex items-center gap-1"><span style="width:7px;height:7px;border-radius:9px;background:#2563EB;display:inline-block"></span>ya está en otro lugar</span>
+                  <span class="inline-flex items-center gap-1"><span style="width:10px;height:10px;border-radius:3px;border:1.5px dashed #F59E0B;display:inline-block"></span>con productos y sin lugar</span>
+                </div>
+              </div>
+              <!-- Vitrina: productos sueltos (no van por orden de letra) -->
+              <div id="ub-vitrina" class="rounded-xl p-3 flex flex-col gap-2" style="background:#F5F3FF;border:1px solid #DDD6FE">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <i data-lucide="gem" style="width:14px;height:14px;color:#6D28D9"></i>
+                  <b style="color:#5B21B6;font-size:12px">Vitrina</b>
+                  <span class="text-[11px]" style="color:#7C3AED">Productos sueltos que están en la vitrina.</span>
+                </div>
+                <div class="relative">
+                  <input id="ub-vit-q" class="inp" style="height:34px" placeholder="Buscar producto para poner en la vitrina…" autocomplete="off" oninput="ubVitBuscar()">
+                  <div id="ub-vit-sug" class="hidden absolute left-0 right-0 mt-1 bg-white rounded-xl border overflow-hidden" style="border-color:#DDD6FE;z-index:20;box-shadow:0 12px 30px rgba(0,0,0,.12)"></div>
+                </div>
+                <div id="ub-vit-list" class="flex flex-wrap gap-1.5"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div><!-- /settings-cat-anaqueles -->
 
         <div id="settings-cat-integraciones" class="settings-cat-panel hidden flex flex-col gap-5">
 
@@ -3110,17 +3209,8 @@
             <button onclick="loadCajaAdmin()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EEF1F9;color:#1d2140;border:1px solid #C5CEDE">
               <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Actualizar
             </button>
-            <button id="caja-sync-btn" onclick="forzarSyncCaja()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#EFF6FF;color:#1d2140;border:1px solid #BFDBFE" title="Sincronizar con la nube">
-              <i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync
-            </button>
             <button onclick="cerrarTurnosViejos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA" title="Cerrar todos los turnos de días anteriores que quedaron abiertos">
               <i data-lucide="clock-x" style="width:13px;height:13px"></i> Cerrar turnos viejos
-            </button>
-            <button onclick="reconstruirHistoricos()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#FFF7ED;color:#D97706;border:1px solid #FDE68A" title="Sincroniza ventas de Turso y crea cortes para días sin turno registrado">
-              <i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos
-            </button>
-            <button onclick="verDiagnosticoTurso()" class="h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all hover:opacity-80" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" title="Ver diferencias local vs Turso">
-              <i data-lucide="database" style="width:13px;height:13px"></i> Diagnóstico Turso
             </button>
           </div>
         </div>
@@ -7588,6 +7678,377 @@ function posProductThumb(imgUrl, prodId) {
   return '<i data-lucide="pill" style="width:28px;height:28px;color:#2e4a8a"></i>';
 }
 
+// ── Ubicación física: anaquel + sección por letra inicial ──
+// Los anaqueles van en orden alfabético. En Configuración › Anaqueles se dice
+// qué letras van en cada uno y el sistema ubica solo cada producto por la
+// primera letra de su nombre. En el POS se consulta con F4 (no ensucia la
+// pantalla de venta): solo para cuando un cajero no sabe dónde está algo.
+function _ubEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+S.mapaUb = S.mapaUb || [];
+async function loadMapaUb() {
+  try {
+    const r = await api('/config/ubicaciones');
+    if (r.ok) { const d = await r.json(); S.mapaUb = d.reglas || []; await _ubCargarImagen(d.imagen); }
+  } catch (e) {}
+}
+
+// Primera letra del nombre sin acentos (Á→A, Ñ→N); se salta números/símbolos.
+function _letraInicial(nombre) {
+  const m = String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().match(/[A-Z]/);
+  return m ? m[0] : '';
+}
+
+// Reglas que le tocan al producto según su letra inicial ([] si ninguna).
+// Puede haber varias: p. ej. la F en el anaquel 1 al frente y también detrás.
+// La vitrina (productos sueltos) va primero, luego los anaqueles por letra.
+function ubicacionesDe(p) {
+  const id = p && p.id, l = _letraInicial(p && p.nombre), m = S.mapaUb || [];
+  return [
+    ...m.filter(r => r.tipo === 'productos' && id != null && (r.ids || []).includes(id)),
+    ...(l ? m.filter(r => (!r.tipo || r.tipo === 'letras') && l >= r.desde && l <= (r.hasta || r.desde)) : []),
+  ];
+}
+const _UB_LADO = { FRENTE: 'Frente', DETRAS: 'Detrás' };
+const _UB_ZONA = { IZQUIERDA: 'Izquierda', DERECHA: 'Derecha',
+  ADELANTE_IZQ: 'Adelante', ADELANTE_DER: 'Adelante', ATRAS_IZQ: 'Atrás', ATRAS_DER: 'Atrás' };
+const _UB_N_ANAQUELES = 4;
+// De qué lado del local está el anaquel ('' si no se ha dicho).
+function _ubZona(anaquel) {
+  return ((S.mapaUb || []).find(r => r.tipo === 'anaquel' && r.anaquel === anaquel) || {}).zona || '';
+}
+
+const _UB_COLOR = { '1': '#2563EB', '2': '#059669', '3': '#D97706', '4': '#DB2777', '5': '#0891B2', '6': '#65A30D',
+  '7': '#DC2626', '8': '#4F46E5', '9': '#CA8A04', '10': '#0F766E', '11': '#9333EA', '12': '#475569' };
+const _ubColor = a => _UB_COLOR[a] || '#475569';
+
+// ── Imagen de los anaqueles ──
+// De fábrica: render 3D de esta farmacia con 4 lugares fijos (fila de adelante/
+// atrás, izquierda/derecha). Cada sucursal puede subir SU imagen en
+// Configuración › Anaqueles y marcar las 4 esquinas de cada anaquel: con eso
+// las repisas se calculan solas (sin programar nada).
+const _UB_SLOTS = ['ATRAS_IZQ', 'ATRAS_DER', 'ADELANTE_IZQ', 'ADELANTE_DER'];
+const _UB_SLOT_DEF = { '1': 'ADELANTE_IZQ', '2': 'ADELANTE_DER', '3': 'ATRAS_IZQ', '4': 'ATRAS_DER' };
+const _UB_IMG_DEF = {
+  src: '/static/anaqueles-ref.jpg', w: 1536, h: 1024,
+  fr: [0, .16, .35, .555, .77, 1],   // altura de cada tabla cuando son 5 repisas (como en la imagen)
+  slots: {                           // esquinas: arriba-izq, arriba-der, abajo-der, abajo-izq
+    ATRAS_IZQ:    [[237, 118], [565, 100], [565, 590], [238, 610]],
+    ATRAS_DER:    [[592, 95],  [905, 82],  [905, 580], [592, 590]],
+    ADELANTE_IZQ: [[522, 296], [958, 270], [955, 905], [525, 940]],
+    ADELANTE_DER: [[993, 238], [1350, 205], [1345, 815], [995, 875]],
+  },
+  // Silueta de la fila de adelante: lo que tapa a la de atrás.
+  frente: [[445, 268], [960, 218], [1372, 188], [1372, 832], [960, 910], [520, 1004], [445, 918]],
+};
+// Imagen activa: la de fábrica o la de la sucursal ({src, w, h, anaqueles: {"1": esquinas}}).
+let _UB_IMG = _UB_IMG_DEF;
+const _ubPts = ps => ps.map(p => p.map(Math.round).join(',')).join(' ');
+const _ubLerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+// Esquinas del anaquel en la imagen activa (null si no aparece en ella).
+function _ubQuad(a, slot) {
+  if (_UB_IMG.anaqueles) return _UB_IMG.anaqueles[a] || null;
+  return (slot && _UB_IMG.slots[slot]) || null;
+}
+// Polígono de la repisa i (1 = arriba) de n dentro de unas esquinas; i = 0 → todo el anaquel.
+function _ubBanda(q, i, n) {
+  const [tl, tr, br, bl] = q;
+  if (!i) return q;
+  const fr = n === 5 && _UB_IMG.fr ? _UB_IMG.fr : Array.from({ length: n + 1 }, (_, k) => k / n);
+  const t0 = fr[i - 1], t1 = fr[i];
+  return [_ubLerp(tl, bl, t0), _ubLerp(tr, br, t0), _ubLerp(tr, br, t1), _ubLerp(tl, bl, t1)];
+}
+// Anaqueles de la sucursal (1–4 si todavía no se ha guardado el mapa).
+function _ubListaAnaqueles() {
+  const g = (S.mapaUb || []).filter(r => r.tipo === 'anaquel' && r.anaquel).map(r => r.anaquel);
+  return g.length ? g.sort((x, y) => (+x || 99) - (+y || 99)) : Array.from({ length: _UB_N_ANAQUELES }, (_, i) => String(i + 1));
+}
+// Lugar del anaquel (fila adelante/atrás + lado); '' si es "otro lugar".
+function _ubSlotDe(anaquel) {
+  const r = (S.mapaUb || []).find(x => x.tipo === 'anaquel' && x.anaquel === anaquel);
+  if (!r) return _UB_SLOT_DEF[anaquel] || '';
+  return _UB_SLOTS.includes(r.zona) ? r.zona : '';
+}
+function _ubRepisasDe(anaquel) {
+  const r = (S.mapaUb || []).find(x => x.tipo === 'anaquel' && x.anaquel === anaquel);
+  return r ? Math.max(1, +r.repisas || 1) : 5;
+}
+// Carga la imagen de la sucursal (solo si cambió). La guardada viaja como data URL;
+// se convierte a blob: para no meter megas de texto en cada repintado.
+async function _ubCargarImagen(meta) {
+  if (!meta) { _UB_IMG = _UB_IMG_DEF; S._ubImgVer = null; return; }
+  if (S._ubImgVer === meta.ver && _UB_IMG !== _UB_IMG_DEF) return;
+  let src = _UB_IMG_DEF.src;
+  if (meta.src !== 'default') {
+    try {
+      const r = await api('/config/ubicaciones/imagen');
+      if (!r.ok) return;
+      const data = (await r.json()).src;
+      if (S._ubImgBlob) URL.revokeObjectURL(S._ubImgBlob);
+      src = S._ubImgBlob = URL.createObjectURL(await (await fetch(data)).blob());
+    } catch (e) { return; }
+  }
+  _UB_IMG = { src, w: meta.w, h: meta.h, fr: meta.src === 'default' ? _UB_IMG_DEF.fr : null, anaqueles: meta.anaqueles || {}, propia: meta.src !== 'default' };
+  S._ubImgVer = meta.ver;
+}
+
+// Imagen con marcas encima.
+//   marcas:  [{a, slot, rep, n, color, label, resalta, detras, k, borde, fs, soloVisible}]
+//   opts.numeros: {anaquel: {num, color, slot, sel, enciende, apagado}} · opts.id: prefijo único (máscaras SVG)
+function _ubImagenHTML(marcas, opts = {}) {
+  const id = opts.id || 'ubimg', W = _UB_IMG.w, H = _UB_IMG.h;
+  const atras = slot => (slot || '').startsWith('ATRAS');
+  const q = m => _ubQuad(m.a, m.slot);
+  marcas = marcas.filter(q);
+  const nums = Object.entries(opts.numeros || {}).filter(([a, o]) => _ubQuad(a, o.slot));
+  // Lo que tapa a la fila de atrás: silueta fija en la imagen de fábrica; en una
+  // propia, los anaqueles de adelante (un poco más altos por la tabla de arriba).
+  const tapas = _UB_IMG.frente ? [_UB_IMG.frente]
+    : nums.filter(([a, o]) => !atras(o.slot)).map(([a, o]) => {
+        const [tl, tr, br, bl] = _ubQuad(a, o.slot), alto = (bl[1] - tl[1]) * .08;
+        return [[tl[0], tl[1] - alto], [tr[0], tr[1] - alto], br, bl];
+      });
+  const tapasSvg = color => tapas.map(t => `<polygon points="${_ubPts(t)}" fill="${color}"/>`).join('');
+  const hayResaltes = marcas.some(m => m.resalta);
+  const huecos = pred => marcas.filter(m => m.resalta && pred(m.slot)).map(m => `<polygon points="${_ubPts(_ubBanda(q(m), m.rep, m.n))}" fill="black"/>`).join('');
+  const poly = m => {
+    const pts = _ubPts(_ubBanda(q(m), m.rep, m.n));
+    const click = m.k ? ` data-k="${_ubEsc(m.k)}" style="cursor:pointer" pointer-events="all"` : '';
+    const fill = m.resalta ? (m.detras ? `url(#${id}-hatch)` : m.color + '55') : 'rgba(0,0,0,0)';
+    return `<polygon points="${pts}" fill="${fill}" stroke="${m.resalta || m.borde ? m.color : 'none'}" stroke-width="${m.resalta ? 7 : 4}" stroke-linejoin="round"${m.resalta ? ' class="ub-pulso"' : ''}${click}/>`;
+  };
+  const puestas = [];
+  const etiqueta = m => {
+    if (!m.label || (m.soloVisible && atras(m.slot) && tapas.length && m.rep > 2)) return '';
+    const b = _ubBanda(q(m), m.rep, m.n);
+    let x = (b[0][0] + b[1][0] + b[2][0] + b[3][0]) / 4, y = (b[0][1] + b[1][1] + b[2][1] + b[3][1]) / 4;
+    const fs = (m.fs || 34) * W / 1536, w = Math.max(60, m.label.length * fs * .58 + 28), h = fs * 1.6 + 6;
+    // Si choca con otra etiqueta ya puesta, se recorre abajo/arriba hasta quedar libre
+    const choca = yy => puestas.some(p => Math.abs(p.x - x) < (p.w + w) / 2 && Math.abs(p.y - yy) < h);
+    const y0 = y;
+    for (let k = 1; choca(y) && k < 12; k++) y = y0 + Math.ceil(k / 2) * h * (k % 2 ? 1 : -1);
+    puestas.push({ x, y, w });
+    return `<g pointer-events="none"><rect x="${x - w / 2}" y="${y - fs * .85}" width="${w}" height="${fs * 1.6}" rx="${fs * .5}" fill="${m.color}" stroke="#fff" stroke-width="4"/>
+      <text x="${x}" y="${y + fs * .3}" text-anchor="middle" font-size="${fs}" font-weight="900" fill="#fff" font-family="Segoe UI,Arial,sans-serif">${_ubEsc(m.label)}</text></g>`;
+  };
+  const e0 = (opts.escala || 1) * W / 1536;
+  const numeros = nums.map(([a, o]) => {
+    const [tl, tr] = _ubQuad(a, o.slot), e = e0;
+    const r = (o.sel ? 34 : 28) * e * (o.enciende ? 1.45 : 1);
+    const x = (tl[0] + tr[0]) / 2, y = Math.max(r + 8, Math.min(tl[1], tr[1]) - r - (atras(o.slot) ? 30 : 22) * e);
+    return `<g pointer-events="none" opacity="${o.apagado ? .35 : 1}">
+      ${o.enciende ? `<circle cx="${x}" cy="${y}" r="${r}" fill="${o.color}" class="ub-anillo"/><circle cx="${x}" cy="${y}" r="${r + 10 * e}" fill="none" stroke="${o.color}" stroke-width="${6 * e}" opacity=".5"/>` : ''}
+      <circle cx="${x}" cy="${y}" r="${r}" fill="${o.color}" stroke="#fff" stroke-width="${(o.enciende ? 7 : 5) * e}"${o.enciende ? ` style="filter:drop-shadow(0 0 14px ${o.color})"` : ''}/>
+      <text x="${x}" y="${y + r * .38}" text-anchor="middle" font-size="${r * 1.15}" font-weight="900" fill="#fff" font-family="Segoe UI,Arial,sans-serif">${_ubEsc(o.num)}</text></g>`;
+  }).join('');
+  const deAtras = marcas.filter(m => atras(m.slot)), deFrente = marcas.filter(m => !atras(m.slot));
+  return `<div style="position:relative;line-height:0">
+    <img src="${_UB_IMG.src}" alt="Anaqueles" style="width:100%;display:block;user-select:none" draggable="false">
+    <svg viewBox="0 0 ${W} ${H}" style="position:absolute;inset:0;width:100%;height:100%" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <mask id="${id}-tapa"><rect width="${W}" height="${H}" fill="white"/>${tapasSvg('black')}</mask>
+        <mask id="${id}-dim"><rect width="${W}" height="${H}" fill="white"/>${huecos(atras)}${tapasSvg('white')}${huecos(s => !atras(s))}</mask>
+        <pattern id="${id}-hatch" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="22" height="22" fill="rgba(180,83,9,.18)"/><rect width="9" height="22" fill="rgba(180,83,9,.45)"/></pattern>
+      </defs>
+      ${hayResaltes ? `<rect width="${W}" height="${H}" fill="rgba(15,23,42,${opts.dim ?? .45})" mask="url(#${id}-dim)" pointer-events="none"/>` : ''}
+      <g mask="url(#${id}-tapa)">${deAtras.map(poly).join('')}</g>
+      ${deFrente.map(poly).join('')}
+      ${deAtras.filter(m => m.resalta).map(m => `<polygon points="${_ubPts(_ubBanda(q(m), m.rep, m.n))}" fill="${m.color}26" stroke="${m.color}" stroke-width="5" stroke-dasharray="18 12" pointer-events="none"/>`).join('')}
+      ${numeros}
+      ${marcas.map(etiqueta).join('')}
+    </svg>
+  </div>`;
+}
+
+// F4 — "¿Dónde está?": consulta de emergencia. A la izquierda los resultados,
+// a la derecha la imagen de los anaqueles con la repisa marcada.
+async function openDondeEsta() {
+  const abierto = document.getElementById('_modal-donde-esta');
+  if (abierto) { abierto.remove(); return; }  // F4 otra vez lo cierra
+  if (!S.allProducts || !S.allProducts.length) {
+    try { const r = await api('/productos/'); if (r.ok) S.allProducts = await r.json(); } catch (e) {}
+  }
+  await loadMapaUb();  // siempre fresco: pudo cambiarse en Configuración u otra PC
+  const overlay = document.createElement('div');
+  overlay.id = '_modal-donde-esta';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.6);backdrop-filter:blur(6px)';
+  overlay.innerHTML = `
+    <style>.ub-pulso{animation:ubPulso 1.2s ease-in-out infinite}@keyframes ubPulso{50%{stroke-opacity:.35}}.ub-anillo{animation:ubAnillo 1.4s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes ubAnillo{0%{transform:scale(1);opacity:.9}100%{transform:scale(2);opacity:0}}</style>
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:940px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="padding:14px 18px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:10px">
+        <i data-lucide="map-pin" style="width:20px;height:20px;color:#1d2140;flex-shrink:0"></i>
+        <input id="_donde-q" class="inp" style="flex:1" placeholder="${(S.cart || []).length ? 'Ubicando lo que hay en tu carrito… o escribe para buscar otro producto' : '¿Dónde está…? Escribe el nombre del producto'}" autocomplete="off">
+        <button id="_donde-close" title="Cerrar (Esc)" style="width:30px;height:30px;border-radius:8px;border:none;background:#F1F5F9;color:#64748B;cursor:pointer;flex-shrink:0">✕</button>
+      </div>
+      <div style="display:flex;flex:1;min-height:0">
+        <div id="_donde-res" style="width:280px;flex-shrink:0;overflow-y:auto;padding:8px;border-right:1px solid #F1F5F9"></div>
+        <div id="_donde-img" style="flex:1;min-width:0;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div style="padding:8px 18px;border-top:1px solid #F1F5F9;font-size:11px;color:#94A3B8">↑ ↓ para cambiar de producto · Esc o F4 para cerrar</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  const q = document.getElementById('_donde-q');
+  const res = document.getElementById('_donde-res');
+  const img = document.getElementById('_donde-img');
+  let lista = [], idx = 0, modoCarrito = false;
+  // Lo que ya está en el carrito se ubica solo al abrir F4 (sin buscar).
+  const carrito = [...new Map((S.cart || []).filter(i => i && i.id != null)
+    .map(i => [i.id, (S.allProducts || []).find(p => p.id === i.id) || i])).values()];
+  const repDe = u => /^\d+$/.test(u.seccion || '') ? +u.seccion : 0;
+  const corto = t => t.length > 22 ? t.slice(0, 21) + '…' : t;
+  const caja = (lbl, val, color) => `<div style="flex-shrink:0;min-width:64px"><div style="font-size:10px;color:#64748B;font-weight:600">${lbl}</div><div style="font-size:24px;font-weight:900;color:${color};line-height:1.05">${_ubEsc(val)}</div></div>`;
+  const textoLugar = u => u.anaquel === 'VITRINA' ? 'Vitrina'
+    : ['Anaquel ' + u.anaquel, u.lado ? _UB_LADO[u.lado] : '', u.seccion ? (/^\d+$/.test(u.seccion) ? 'Repisa ' : '') + u.seccion : ''].filter(Boolean).join(' · ');
+  // encendidos: anaqueles donde está el producto elegido (su número se ilumina, los demás se apagan)
+  const numeros = (encendidos = []) => {
+    const o = {};
+    _ubListaAnaqueles().forEach(a => {
+      o[a] = { num: a, color: _ubColor(a), slot: _ubSlotDe(a), enciende: encendidos.includes(a), apagado: encendidos.length > 0 && !encendidos.includes(a) };
+    });
+    return o;
+  };
+  const bolita = a => `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:99px;background:${_ubColor(a)};color:#fff;font-size:11px;font-weight:900;flex-shrink:0">${_ubEsc(a)}</span>`;
+
+  const pintarCarrito = () => {
+    const grupos = {};
+    const filas = carrito.map(p => ({ p, us: ubicacionesDe(p) }));
+    filas.forEach(({ p, us }) => us.filter(u => u.anaquel !== 'VITRINA' && _ubQuad(u.anaquel, _ubSlotDe(u.anaquel))).forEach(u => {
+      const k = [u.anaquel, repDe(u), u.lado].join('|');
+      (grupos[k] = grupos[k] || { u, rep: repDe(u), nombres: [] }).nombres.push(p.nombre);
+    }));
+    const gs = Object.values(grupos);
+    const marcas = gs.map(g => ({ a: g.u.anaquel, slot: _ubSlotDe(g.u.anaquel), rep: g.rep, n: _ubRepisasDe(g.u.anaquel), color: _ubColor(g.u.anaquel),
+      resalta: true, detras: g.u.lado === 'DETRAS', fs: 30, label: g.nombres.length === 1 ? corto(g.nombres[0]) : `${g.nombres.length} productos` }));
+    // Orden de recorrido: anaquel, parte y repisa (de arriba hacia abajo); sin lugar al final
+    const orden = u => u ? (+u.anaquel || 99) * 1000 + (u.lado === 'DETRAS' ? 500 : 0) + repDe(u) : 1e9;
+    filas.sort((a, b) => orden(a.us.find(u => u.anaquel !== 'VITRINA') || a.us[0]) - orden(b.us.find(u => u.anaquel !== 'VITRINA') || b.us[0]));
+    img.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:34px;height:34px;border-radius:10px;background:#1d2140;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><i data-lucide="shopping-cart" style="width:17px;height:17px;color:#fff"></i></span>
+        <div style="flex:1;min-width:0"><p style="font-size:18px;font-weight:900;color:#0F172A;margin:0">Tu carrito</p>
+          <p style="font-size:12px;color:#94A3B8;margin:0">${carrito.length} producto${carrito.length === 1 ? '' : 's'} · en orden para irlos recogiendo</p></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px">
+        ${filas.map(({ p, us }) => {
+          const ans = [...new Set(us.filter(u => u.anaquel !== 'VITRINA').map(u => u.anaquel))];
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:12px;background:#F8FAFC;border:1px solid #E2E8F0">
+            ${ans.length ? ans.map(bolita).join('') : `<span style="width:20px;height:20px;border-radius:99px;background:${us.length ? '#6D28D9' : '#F59E0B'};flex-shrink:0"></span>`}
+            <div style="min-width:0;flex:1"><p style="font-size:12px;font-weight:700;color:#0F172A;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ubEsc(p.nombre)}</p>
+            <p style="font-size:10px;font-weight:600;margin:0;color:${us.length ? '#2e4a8a' : '#B45309'}">${us.length ? _ubEsc(us.map(textoLugar).join(' + ')) : 'Sin lugar asignado'}</p></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="border-radius:14px;overflow:hidden;border:1px solid #E2E8F0">${_ubImagenHTML(marcas, { id: 'ubf4', numeros: numeros([...new Set(gs.map(g => g.u.anaquel))]) })}</div>`;
+    icons();
+  };
+
+  const pintarImagen = () => {
+    if (idx === -1) { pintarCarrito(); return; }
+    const p = lista[idx];
+    if (!p) {
+      img.innerHTML = `<p style="font-size:13px;color:#64748B;margin:0">${S.mapaUb.length ? 'Busca un producto y aquí te marco la repisa donde está.' : '<span style="color:#B45309">Aún no hay mapa de anaqueles — un administrador lo configura en Configuración › Anaqueles</span>'}</p>
+        <div style="border-radius:14px;overflow:hidden;border:1px solid #E2E8F0">${_ubImagenHTML([], { id: 'ubf4', numeros: numeros() })}</div>`;
+      return;
+    }
+    const us = ubicacionesDe(p);
+    const enAnaquel = us.filter(u => u.anaquel !== 'VITRINA' && _ubQuad(u.anaquel, _ubSlotDe(u.anaquel)));
+    const marcas = enAnaquel.map(u => {
+      const rep = /^\d+$/.test(u.seccion || '') ? +u.seccion : 0;
+      return { a: u.anaquel, slot: _ubSlotDe(u.anaquel), rep, n: _ubRepisasDe(u.anaquel), color: _ubColor(u.anaquel), resalta: true,
+               detras: u.lado === 'DETRAS', label: `Anaquel ${u.anaquel}` + (rep ? ` · Repisa ${rep}` : '') + (u.lado === 'DETRAS' ? ' · por detrás' : '') +
+               (_ubSlotDe(u.anaquel).startsWith('ATRAS') ? ' (fila de atrás)' : '') };
+    });
+    const sub = [p.presentacion, p.concentracion, p.contenido].filter(Boolean).join(' · ');
+    const stock = p.stock || 0;
+    // Tarjetas de ubicación: Anaquel (número encendido) · Fila · Parte · Repisa (mini anaquel con la repisa marcada)
+    const tarjeta = (color, icono, lbl, val, extra = '') => `
+      <div style="min-width:0;display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;background:${color}0F;border:1px solid ${color}33;overflow:hidden">
+        ${icono}
+        <div style="min-width:0;flex:1"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#64748B">${lbl}</div>
+        <div style="font-size:16px;font-weight:900;color:${color};line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ubEsc(val)}</div>${extra}</div>
+      </div>`;
+    const ico = (color, nombre) => `<span style="width:34px;height:34px;border-radius:10px;background:${color};display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><i data-lucide="${nombre}" style="width:17px;height:17px;color:#fff"></i></span>`;
+    const miniRepisas = (rep, n, color) => `<span style="width:30px;height:36px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:2px;border-radius:6px;border:2px solid ${color}55">${
+      Array.from({ length: n }, (_, k) => `<span style="flex:1;border-radius:2px;background:${k + 1 === rep ? color : color + '22'}"></span>`).join('')}</span>`;
+    const filaTarjetas = u => {
+      if (u.anaquel === 'VITRINA') return tarjeta('#6D28D9', ico('#6D28D9', 'gem'), 'ESTÁ EN LA', 'Vitrina');
+      const c = _ubColor(u.anaquel), slot = _ubSlotDe(u.anaquel), n = _ubRepisasDe(u.anaquel);
+      const rep = /^\d+$/.test(u.seccion || '') ? +u.seccion : 0;
+      return tarjeta(c, `<span style="width:38px;height:38px;border-radius:99px;background:${c};color:#fff;font-size:20px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px ${c}33,0 0 14px ${c}88">${_ubEsc(u.anaquel)}</span>`, 'ANAQUEL', 'Núm. ' + u.anaquel) +
+        (slot ? tarjeta('#0369A1', ico('#0369A1', 'layers'), 'FILA', _UB_ZONA[slot] || '', `<div style="font-size:10px;color:#64748B">${slot.endsWith('IZQ') ? 'lado izquierdo' : 'lado derecho'}</div>`) : '') +
+        (u.lado ? tarjeta(u.lado === 'DETRAS' ? '#B45309' : '#047857', ico(u.lado === 'DETRAS' ? '#B45309' : '#047857', u.lado === 'DETRAS' ? 'undo-2' : 'eye'), 'PARTE', _UB_LADO[u.lado] || u.lado, u.lado === 'DETRAS' ? '<div style="font-size:10px;color:#64748B">rodea el anaquel</div>' : '') : '') +
+        (u.seccion ? (rep ? tarjeta(c, miniRepisas(rep, Math.max(n, rep), c), 'REPISA', `${rep} de ${Math.max(n, rep)}`, `<div style="font-size:10px;color:#64748B">${rep === 1 ? 'la de arriba' : rep === Math.max(n, rep) ? 'la de abajo' : 'contando desde arriba'}</div>`)
+                            : tarjeta('#2e4a8a', ico('#2e4a8a', 'map-pin'), 'SECCIÓN', u.seccion)) : '');
+    };
+    img.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="flex:1;min-width:0">
+          <p style="font-size:18px;font-weight:900;color:#0F172A;margin:0">${_ubEsc(p.nombre)}</p>
+          <p style="font-size:12px;color:#94A3B8;margin:2px 0 0">${_ubEsc(sub || p.nombre_generico || '')}</p>
+        </div>
+        <span style="flex-shrink:0;font-size:12px;font-weight:800;padding:5px 10px;border-radius:99px;background:${stock > 0 ? '#DCFCE7' : '#FEE2E2'};color:${stock > 0 ? '#15803D' : '#B91C1C'}">${stock > 0 ? 'Stock: ' + stock : 'Sin stock'}</span>
+      </div>
+      ${us.length ? us.map(u => `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">${filaTarjetas(u)}</div>`).join('')
+        : `<div style="padding:12px 14px;border-radius:14px;background:#FFFBEB;border:1px solid #FDE68A;font-size:13px;color:#B45309">La letra <b>${_ubEsc(_letraInicial(p.nombre) || '—')}</b> todavía no tiene anaquel (Configuración › Anaqueles).</div>`}
+      ${enAnaquel.some(u => u.lado === 'DETRAS') ? '<p style="font-size:12px;color:#B45309;margin:0">Rayado = está del otro lado del anaquel (rodéalo).</p>' : ''}
+      <div style="border-radius:14px;overflow:hidden;border:1px solid #E2E8F0">${_ubImagenHTML(marcas, { id: 'ubf4', numeros: numeros(enAnaquel.map(u => u.anaquel)) })}</div>`;
+    icons();
+  };
+
+  const pintarLista = () => {
+    if (!q.value.trim() && !modoCarrito) { res.innerHTML = '<p style="text-align:center;padding:28px 0;font-size:12px;color:#94A3B8">Escribe para buscar un producto</p>'; return; }
+    if (!lista.length) { res.innerHTML = '<p style="text-align:center;padding:28px 0;font-size:12px;color:#94A3B8">Sin resultados</p>'; return; }
+    const todos = [...new Set(carrito.flatMap(p => ubicacionesDe(p).filter(u => u.anaquel !== 'VITRINA').map(u => u.anaquel)))].sort();
+    res.innerHTML = (modoCarrito ? `
+      <p style="font-size:10px;font-weight:800;letter-spacing:.08em;color:#94A3B8;margin:6px 12px 6px">EN TU CARRITO</p>
+      <div data-i="-1" style="padding:9px 12px;border-radius:12px;cursor:pointer;margin-bottom:4px;${idx === -1 ? 'background:#1d2140;color:#fff' : 'background:#F8FAFC;color:#0F172A'}">
+        <p style="font-size:13px;font-weight:800;margin:0;display:flex;align-items:center;gap:6px"><span style="flex:1">Ver todo el carrito (${carrito.length})</span>${todos.map(bolita).join('')}</p>
+        <p style="font-size:11px;margin:2px 0 0;opacity:.75">Marca todas las repisas a la vez</p>
+      </div>` : '') + lista.map((p, i) => {
+      const us = ubicacionesDe(p);
+      const ans = [...new Set(us.filter(u => u.anaquel !== 'VITRINA').map(u => u.anaquel))];
+      return `<div data-i="${i}" style="padding:9px 12px;border-radius:12px;cursor:pointer;${i === idx ? 'background:#EEF1F9;box-shadow:inset 3px 0 0 #1d2140' : ''}">
+        <p style="font-size:13px;font-weight:700;color:#0F172A;margin:0;display:flex;align-items:center;gap:6px"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ubEsc(p.nombre)}</span>${ans.map(bolita).join('')}</p>
+        <p style="font-size:11px;margin:2px 0 0;color:${us.length ? '#2e4a8a' : '#B45309'};font-weight:600">${us.length ? _ubEsc(us.map(textoLugar).join('  +  ')) : 'Sin lugar asignado'}</p>
+      </div>`;
+    }).join('');
+    res.querySelectorAll('[data-i]').forEach(el => el.onclick = () => { idx = +el.dataset.i; pintarLista(); pintarImagen(); q.focus(); });
+    const sel = res.querySelector(`[data-i="${idx}"]`);
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
+  };
+
+  const buscar = () => {
+    const f = q.value.trim().toLowerCase();
+    modoCarrito = !f && carrito.length > 0;
+    lista = f ? (S.allProducts || []).filter(p =>
+      p.nombre.toLowerCase().includes(f) ||
+      (p.nombre_generico || '').toLowerCase().includes(f) ||
+      (p.codigo_barras || '').toLowerCase() === f
+    ).slice(0, 40) : (modoCarrito ? carrito : []);
+    idx = modoCarrito && carrito.length > 1 ? -1 : 0;
+    pintarLista(); pintarImagen();
+  };
+  q.addEventListener('input', buscar);
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && lista.length) {
+      e.preventDefault();
+      const ini = modoCarrito ? -1 : 0, total = lista.length - ini;   // en modo carrito, -1 = "todo el carrito"
+      idx = ((idx - ini + (e.key === 'ArrowDown' ? 1 : -1) + total) % total) + ini;
+      pintarLista(); pintarImagen();
+    }
+  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.getElementById('_donde-close').onclick = close;
+  buscar();
+  icons();
+  setTimeout(() => q.focus(), 30);
+}
+
 function renderPosGrid(prods) {
   const g=document.getElementById('pos-grid');
   if (!prods.length) { g.innerHTML='<p class="col-span-full text-center py-8 text-xs" style="color:#94A3B8">Sin productos</p>'; return; }
@@ -9066,6 +9527,7 @@ async function initReports() {
   const hoy=new Date(); const y=hoy.getFullYear(),m=hoy.getMonth();
   document.getElementById('rep-hasta').value=_fechaLocal(hoy);
   document.getElementById('rep-desde').value=_fechaLocal(new Date(y,m,1));
+  _repResaltar('mes'); _repPonerPicker(hoy);
   _repActiveTab = 'ventas';
   const isAdmin = S.user?.rol === 'admin';
   ['cortes','vencimientos'].forEach(t => {
@@ -9086,20 +9548,6 @@ async function initReports() {
   if (isAdmin) loadVencimientos('todos');
 }
 
-function repPeriodo(d) {
-  const hoy=new Date();
-  let desde,hasta=new Date();
-  if (d===0)        { desde=new Date(); }
-  else if (d===-1)  { desde=new Date(hoy.getFullYear(),hoy.getMonth(),1); }
-  else if (d===-2)  {
-    const pm=new Date(hoy.getFullYear(),hoy.getMonth(),0);
-    desde=new Date(hoy.getFullYear(),hoy.getMonth()-1,1); hasta=pm;
-  } else if (d===-99) { desde=new Date('2020-01-01'); }
-  else { desde=new Date(); desde.setDate(hasta.getDate()-d); }
-  document.getElementById('rep-desde').value=_fechaLocal(desde);
-  document.getElementById('rep-hasta').value=_fechaLocal(hasta);
-  loadReports();
-}
 
 async function openVentasCajeroModal() {
   const sel = document.getElementById('modal-vc-cajero');
@@ -10260,64 +10708,165 @@ async function confirmarAjusteFisico() {
   }
 }
 
-async function exportCSV() {
-  const desde=document.getElementById('rep-desde').value;
-  const hasta=document.getElementById('rep-hasta').value;
-  if (!desde||!hasta) { toast('Selecciona un rango de fechas','warning'); return; }
-  const res = await api(`/reportes/export-csv?fecha_inicio=${desde}&fecha_fin=${hasta}`);
-  if (!res.ok) { toast('Error al exportar','error'); return; }
-  const blob = await res.blob();
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `ventas_${desde}_${hasta}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('CSV descargado','success');
+
+// ── Elegir un día, una semana o un mes en particular ──
+let _repModo = 'semana';
+const _repIso = d => _fechaLocal(d);
+function _repSemanaDe(d) {           // "2026-W37" (semana ISO, lunes a domingo)
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dia = (t.getUTCDay() + 6) % 7;
+  t.setUTCDate(t.getUTCDate() - dia + 3);
+  const primerJueves = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const sem = 1 + Math.round(((t - primerJueves) / 864e5 - 3 + ((primerJueves.getUTCDay() + 6) % 7)) / 7);
+  return `${t.getUTCFullYear()}-W${String(sem).padStart(2, '0')}`;
+}
+function _repLunesDe(semana) {       // "2026-W37" -> Date del lunes
+  const [a, w] = semana.split('-W').map(Number);
+  const ene4 = new Date(a, 0, 4);
+  const lunes = new Date(ene4); lunes.setDate(ene4.getDate() - ((ene4.getDay() + 6) % 7) + (w - 1) * 7);
+  return lunes;
+}
+function _repResaltar(m) {
+  _repModo = m;
+  document.querySelectorAll('#rep-modo-seg button').forEach(b => {
+    const on = b.dataset.modo === m;
+    b.style.background = on ? '#1d2140' : 'transparent'; b.style.color = on ? '#fff' : '#475569';
+  });
+  ['dia', 'semana', 'mes'].forEach(x => document.getElementById('rep-pick-' + x).classList.toggle('hidden', x !== m));
+}
+function repModo(m) {
+  _repResaltar(m);
+  // Toma como referencia la fecha "desde" actual
+  const ref = document.getElementById('rep-desde').value ? new Date(document.getElementById('rep-desde').value + 'T12:00') : new Date();
+  _repPonerPicker(ref);
+  repDesdePicker();
+}
+function _repPonerPicker(ref) {
+  document.getElementById('rep-pick-dia').value = _repIso(ref);
+  document.getElementById('rep-pick-semana').value = _repSemanaDe(ref);
+  document.getElementById('rep-pick-mes').value = _repIso(ref).slice(0, 7);
+}
+function repDesdePicker() {
+  let desde, hasta;
+  if (_repModo === 'dia') {
+    const v = document.getElementById('rep-pick-dia').value; if (!v) return;
+    desde = hasta = new Date(v + 'T12:00');
+  } else if (_repModo === 'semana') {
+    const v = document.getElementById('rep-pick-semana').value; if (!v) return;
+    desde = _repLunesDe(v); hasta = new Date(desde); hasta.setDate(desde.getDate() + 6);
+  } else {
+    const v = document.getElementById('rep-pick-mes').value; if (!v) return;
+    const [a, m] = v.split('-').map(Number);
+    desde = new Date(a, m - 1, 1); hasta = new Date(a, m, 0);
+  }
+  document.getElementById('rep-desde').value = _repIso(desde);
+  document.getElementById('rep-hasta').value = _repIso(hasta);
+  loadReports();
+}
+function repMover(n) {
+  const d = new Date((document.getElementById('rep-desde').value || _repIso(new Date())) + 'T12:00');
+  if (_repModo === 'dia') d.setDate(d.getDate() + n);
+  else if (_repModo === 'semana') d.setDate(d.getDate() + 7 * n);
+  else d.setMonth(d.getMonth() + n, 1);
+  _repPonerPicker(d);
+  repDesdePicker();
 }
 
-async function exportVentasPDF() {
-  const desde = document.getElementById('rep-desde').value;
-  const hasta  = document.getElementById('rep-hasta').value;
+// ── Exportar PDF: tarjetas para escoger qué reporte ──
+const _PDF_TARJETAS = [
+  { tipo: 'completo',  icono: 'layers',        color: '#4F46E5', titulo: 'Todo junto',          texto: 'Ventas, ganancia, inversión y retiros en un solo reporte.' },
+  { tipo: 'ventas',    icono: 'shopping-cart', color: '#2E4A8A', titulo: 'Ventas',              texto: 'Cuánto vendiste, tickets, productos más vendidos y cada venta.' },
+  { tipo: 'ganancia',  icono: 'trending-up',   color: '#15803D', titulo: 'Ganancias',           texto: 'Ventas, costo, ganancia, margen y productos que más dejan.' },
+  { tipo: 'inversion', icono: 'landmark',      color: '#6D28D9', titulo: 'Inversión y retiros', texto: 'Compras, pagos a proveedor, gastos y lo que sacaste para ti.' },
+];
+let _pdfSel = { tipo: 'completo', agrupar: 'semana' };
+function openExportarPDF() {
+  const desde = document.getElementById('rep-desde').value, hasta = document.getElementById('rep-hasta').value;
   if (!desde || !hasta) { toast('Selecciona un período primero', 'warning'); return; }
-  const defaultName = `Ventas_${desde}_${hasta}.pdf`;
-  const qs = `fecha_inicio=${desde}&fecha_fin=${hasta}`;
+  document.getElementById('_modal-pdf')?.remove();
+  const fmt = v => new Date(v + 'T12:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  // Agrupar por defecto según el largo del periodo
+  const dias = (new Date(hasta) - new Date(desde)) / 864e5 + 1;
+  _pdfSel.agrupar = dias <= 14 ? 'dia' : dias <= 92 ? 'semana' : 'mes';
+  const ov = document.createElement('div');
+  ov.id = '_modal-pdf';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.55);backdrop-filter:blur(5px)';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:640px;box-shadow:0 30px 80px rgba(0,0,0,.3);overflow:hidden">
+      <div style="padding:18px 20px 12px;display:flex;align-items:flex-start;gap:12px">
+        <span style="width:40px;height:40px;border-radius:12px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i data-lucide="file-down" style="width:20px;height:20px;color:#4F46E5"></i></span>
+        <div style="flex:1"><b style="font-size:16px;color:#0F172A">Exportar PDF</b>
+          <p style="font-size:12px;color:#64748B;margin:2px 0 0">Periodo: <b style="color:#0F172A">${fmt(desde)}${desde !== hasta ? ' al ' + fmt(hasta) : ''}</b></p></div>
+        <button id="_pdf-x" style="width:30px;height:30px;border-radius:8px;border:none;background:#F1F5F9;color:#64748B;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:0 20px"><p style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#94A3B8;margin:0 0 8px">¿QUÉ QUIERES IMPRIMIR?</p>
+        <div id="_pdf-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
+        <p style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#94A3B8;margin:16px 0 8px">AGRUPAR POR</p>
+        <div id="_pdf-agr" style="display:inline-flex;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden"></div>
+      </div>
+      <div style="padding:16px 20px;margin-top:16px;border-top:1px solid #F1F5F9;display:flex;justify-content:flex-end;gap:8px">
+        <button id="_pdf-cancel" style="height:38px;padding:0 16px;border-radius:12px;border:1px solid #E2E8F0;background:#fff;color:#64748B;font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
+        <button id="_pdf-ok" style="height:38px;padding:0 20px;border-radius:12px;border:none;background:#4F46E5;color:#fff;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px"><i data-lucide="download" style="width:15px;height:15px"></i> Generar PDF</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const pintar = () => {
+    ov.querySelector('#_pdf-cards').innerHTML = _PDF_TARJETAS.map(t => {
+      const on = t.tipo === _pdfSel.tipo;
+      return `<button data-tipo="${t.tipo}" style="text-align:left;display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;cursor:pointer;border:2px solid ${on ? t.color : '#E2E8F0'};background:${on ? t.color + '0F' : '#fff'}">
+        <span style="width:34px;height:34px;border-radius:10px;background:${on ? t.color : t.color + '1A'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i data-lucide="${t.icono}" style="width:17px;height:17px;color:${on ? '#fff' : t.color}"></i></span>
+        <span style="flex:1;min-width:0"><b style="font-size:13px;color:#0F172A">${t.titulo}</b><br><span style="font-size:11px;color:#64748B;line-height:1.35">${t.texto}</span></span>
+        <span style="width:18px;height:18px;border-radius:99px;border:2px solid ${on ? t.color : '#CBD5E1'};background:${on ? t.color : '#fff'};box-shadow:inset 0 0 0 3px #fff;flex-shrink:0"></span>
+      </button>`;
+    }).join('');
+    ov.querySelector('#_pdf-agr').innerHTML = [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([v, t]) =>
+      `<button data-agr="${v}" style="height:32px;padding:0 16px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${_pdfSel.agrupar === v ? '#1d2140' : '#fff'};color:${_pdfSel.agrupar === v ? '#fff' : '#475569'}">${t}</button>`).join('');
+    ov.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { _pdfSel.tipo = b.dataset.tipo; pintar(); });
+    ov.querySelectorAll('[data-agr]').forEach(b => b.onclick = () => { _pdfSel.agrupar = b.dataset.agr; pintar(); });
+    icons();
+  };
+  const cerrar = () => ov.remove();
+  ov.querySelector('#_pdf-x').onclick = cerrar;
+  ov.querySelector('#_pdf-cancel').onclick = cerrar;
+  ov.addEventListener('click', e => { if (e.target === ov) cerrar(); });
+  ov.querySelector('#_pdf-ok').onclick = async () => { cerrar(); await exportFinanzasPDF(_pdfSel.tipo, _pdfSel.agrupar); };
+  pintar();
+}
 
-  // Desktop: native Save-As dialog
+async function exportFinanzasPDF(tipo = 'completo', agrupar = 'semana') {
+  const desde = document.getElementById('rep-desde').value;
+  const hasta = document.getElementById('rep-hasta').value;
+  if (!desde || !hasta) { toast('Selecciona un período primero', 'warning'); return; }
+  const nombres = { completo: 'Ventas_ganancias_inversion', ventas: 'Ventas', ganancia: 'Ganancias', inversion: 'Inversion_y_retiros' };
+  const defaultName = `${nombres[tipo] || 'Reporte'}_${desde}${desde !== hasta ? '_' + hasta : ''}.pdf`;
+  const qs = `fecha_inicio=${desde}&fecha_fin=${hasta}&agrupar=${agrupar}&tipo=${tipo}`;
+  // Escritorio: ventana nativa de "Guardar como"
   if (window.pywebview?.api?.get_pdf_save_path) {
     const savePath = await window.pywebview.api.get_pdf_save_path(defaultName);
     if (!savePath) return;
     toast('Generando PDF…', 'info');
     try {
-      const res = await fetch(`/api/reportes/save-pdf-to-path?${qs}`, {
+      const res = await fetch(`/api/reportes/save-finanzas-pdf?${qs}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${S.token}` },
         body: JSON.stringify({ path: savePath }),
       });
-      if (!res.ok) { toast('Error al guardar PDF', 'error'); return; }
+      if (!res.ok) { toast('No se pudo guardar el PDF', 'error'); return; }
       toast(`PDF guardado: ${savePath.split(/[\\/]/).pop()}`, 'success');
-    } catch(e) {
-      toast('Error de conexión', 'error');
-    }
+    } catch (e) { toast('Error de conexión', 'error'); }
     return;
   }
-
-  // Web fallback: blob download
-  toast('Generando PDF de ventas…', 'info');
+  // Web: descarga directa
+  toast('Generando PDF…', 'info');
   try {
-    const res = await api(`/reportes/export-pdf?${qs}`);
-    if (!res.ok) { toast('Error al generar PDF', 'error'); return; }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = defaultName;
-    a.click();
+    const res = await api(`/reportes/finanzas-pdf?${qs}`);
+    if (!res.ok) { toast('No se pudo generar el PDF', 'error'); return; }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = defaultName; a.click();
     URL.revokeObjectURL(url);
     toast('PDF descargado', 'success');
-  } catch(e) {
-    toast('Error de conexión', 'error');
-  }
+  } catch (e) { toast('Error de conexión', 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -10406,100 +10955,6 @@ async function cerrarTurnosViejos() {
       loadCajaAdmin();
     }
   });
-}
-
-async function reconstruirHistoricos() {
-  const btn = event?.currentTarget;
-  showConfirm({
-    title: 'Reconstruir históricos',
-    message: 'Sincroniza ventas desde Turso y crea cortes (08:00–21:00) para cada día con ventas sin turno registrado. También cierra turnos fantasma.\n\nPuede tardar unos segundos.',
-    confirmText: 'Reconstruir',
-    onConfirm: async () => {
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando y procesando...'; }
-      try {
-        const res = await api('/cortes/reconstruir-historicos', { method: 'POST' });
-        if (!res.ok) {
-          const e = await res.json().catch(()=>({}));
-          toast(e.detail || 'Error al reconstruir históricos','error');
-          return;
-        }
-        const d = await res.json();
-        const msg = `Reconstrucción completa: ${d.cortes_creados} corte(s) creado(s), ${d.cortes_phantom_cerrados} fantasma(s) cerrado(s)`;
-        toast(msg, 'success');
-        loadCajaAdmin();
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<i data-lucide="wand-2" style="width:13px;height:13px"></i> Reconstruir históricos';
-          lucide.createIcons();
-        }
-      }
-    }
-  });
-}
-
-async function verDiagnosticoTurso() {
-  const res = await api('/admin/turso-diagnostico');
-  if (!res.ok) { toast('Error al consultar diagnóstico','error'); return; }
-  const d = await res.json();
-  const money = v => typeof v === 'number' ? v : v;
-  let html = `<div style="font-family:monospace;font-size:13px;line-height:1.8">`;
-  html += `<p style="font-weight:bold;margin-bottom:8px">Sync activo: ${d.turso_sync_activo ? 'Sí' : 'No (Vercel usa Turso directo)'}</p>`;
-  html += `<table style="width:100%;border-collapse:collapse">`;
-  html += `<tr style="font-weight:bold;border-bottom:2px solid #E2E8F0"><td>Tabla</td><td>Local</td><td>Turso</td><td>Diff</td></tr>`;
-  for (const [tabla, info] of Object.entries(d.tablas)) {
-    const diff = info.diferencia;
-    const color = diff === 0 ? '#16A34A' : typeof diff === 'number' && diff > 0 ? '#D97706' : '#DC2626';
-    const icon  = diff === 0 ? '✓' : diff > 0 ? '⬆' : '⬇';
-    html += `<tr style="border-bottom:1px solid #F1F5F9">
-      <td style="padding:4px 8px 4px 0;color:#374151">${tabla}</td>
-      <td style="padding:4px 8px;text-align:right">${info.local}</td>
-      <td style="padding:4px 8px;text-align:right">${info.turso}</td>
-      <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${icon} ${diff}</td>
-    </tr>`;
-  }
-  html += `</table></div>`;
-  html += `<p style="font-size:11px;color:#94A3B8;margin-top:12px">Si Turso tiene más ventas → pulsa "Reconstruir históricos" para crear los cortes faltantes y sincronizar.</p>`;
-  // Show in a modal alert
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.6);backdrop-filter:blur(4px)';
-  overlay.innerHTML = `<div style="background:#fff;border-radius:20px;padding:28px;max-width:480px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,.25)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <span style="font-weight:700;font-size:15px;color:#0F172A">Diagnóstico Turso</span>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:#F1F5F9;cursor:pointer;font-size:16px"><i data-lucide="x" style="width:14px;height:14px"></i></button>
-    </div>
-    ${html}
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="this.closest('div[style*=fixed]').remove();forzarSyncCaja()" style="flex:1;height:36px;border-radius:10px;background:#1d2140;color:#fff;font-weight:600;font-size:13px;border:none;cursor:pointer">Sincronizar ahora</button>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;height:36px;border-radius:10px;background:#F1F5F9;color:#374151;font-weight:600;font-size:13px;border:none;cursor:pointer">Cerrar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-}
-
-async function forzarSyncCaja() {
-  const btn = document.getElementById('caja-sync-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:13px;height:13px"></i> Sincronizando...'; lucide.createIcons(); }
-  try {
-    const r = await api('/admin/db-sync', { method: 'POST' });
-    const data = r.ok ? await r.json().catch(()=>({})) : {};
-    if (r.ok && data.ok !== false) {
-      // Reset date range so retiros from other PCs are visible
-      const desdeEl = document.getElementById('caja-desde');
-      const hastaEl = document.getElementById('caja-hasta');
-      if (desdeEl) desdeEl.value = '';
-      if (hastaEl) hastaEl.value = '';
-      toast('Sincronización completada', 'success');
-      await loadCajaAdmin();
-    } else {
-      const msg = data.error || data.detail || 'Error al sincronizar';
-      toast(msg, 'error');
-    }
-  } catch(e) {
-    toast('Error de red al sincronizar', 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="cloud-upload" style="width:13px;height:13px"></i> Sync'; lucide.createIcons(); }
-  }
 }
 
 let _cajaVerTodoRetiros = false;  // true = el usuario pidió ver TODO el historial, sin límite de fecha
@@ -12492,6 +12947,10 @@ document.addEventListener('keydown', (e) => {
         if (el) { el.focus(); el.select(); }
       }, 80);
       break;
+    case 'F4':
+      e.preventDefault();
+      openDondeEsta();
+      break;
     case 'F5':
       e.preventDefault();
       if (S.cart && S.cart.length > 0) {
@@ -13366,6 +13825,23 @@ async function cargarSucursal() {
   document.getElementById('suc-telefono').value  = s.telefono || '';
   document.getElementById('suc-farmacia').textContent = s.nombre_farmacia || '';
   document.getElementById('suc-clave').textContent = 'Clave: ' + (s.clave || 'matriz');
+  sucEditar(false);
+}
+// Los datos de la sucursal quedan bloqueados; "Editar" los abre (y muestra la nube).
+function sucEditar(on) {
+  ['suc-nombre', 'suc-direccion', 'suc-telefono'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = !on;
+  });
+  document.getElementById('suc-nube-box')?.classList.toggle('hidden', !on);
+  document.getElementById('suc-acciones')?.classList.toggle('hidden', !on);
+  document.getElementById('suc-edit-btn')?.classList.toggle('hidden', on);
+  if (on) document.getElementById('suc-nombre')?.focus();
+}
+function sucAgregarToggle() {
+  const box = document.getElementById('sucn-box');
+  box.classList.toggle('hidden');
+  if (!box.classList.contains('hidden')) document.getElementById('sucn-nombre').focus();
 }
 // Ilustración de fachada de farmacia (SVG en línea) para las tarjetas de sucursal
 function _svgTienda(c, cOsc) {
@@ -16057,14 +16533,504 @@ async function probarConexionIntegracion(key, btnId, resultId) {
   }
 }
 
-const _SETTINGS_CATS = ['general', 'integraciones', 'datos'];
+const _SETTINGS_CATS = ['general', 'integraciones', 'datos', 'anaqueles'];
 
 function selectSettingsCat(cat) {
   _SETTINGS_CATS.forEach(c => {
     document.getElementById(`settings-cat-${c}`)?.classList.toggle('hidden', c !== cat);
     document.getElementById(`settings-catbtn-${c}`)?.classList.toggle('active', c === cat);
   });
+  if (cat === 'anaqueles') openMapaUbEditor();
   icons();
+}
+
+// ── Configuración › Anaqueles (editor visual) ────────────
+// Plano 3D del local + vista de frente del anaquel elegido. Se escoge una
+// repisa y se pican letras en el teclado A–Z; al guardar se convierte todo en
+// reglas por rango de letras (lo mismo que usa F4).
+const _UB_ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+let _ubProds = [], _ubVit = [];
+// an: config de cada anaquel · asig: "anaquel|lado|repisa" -> Set de letras
+let _ub = { an: {}, asig: {}, sel: '1', activo: '', ultima: '', rango: false, inicio: '', extra: [], sucio: false };
+
+const _ubKey = (a, lado, sec) => `${a}|${lado}|${sec}`;
+const _ubSecs = a => _ub.an[a].repisas > 1 ? Array.from({ length: _ub.an[a].repisas }, (_, i) => String(i + 1)) : [''];
+const _ubLados = a => _ub.an[a].doble ? ['FRENTE', 'DETRAS'] : [''];
+const _ubVisibles = a => _ubLados(a).flatMap(l => _ubSecs(a).map(s => _ubKey(a, l, s)));
+const _ubTodas = () => Object.keys(_ub.an).flatMap(_ubVisibles);
+const _ubSet = k => (_ub.asig[k] = _ub.asig[k] || new Set());
+
+// Letras -> tramos seguidos: [['A','F'], ['H','H']]
+function _ubRuns(set) {
+  const ls = [...(set || [])].sort(), out = [];
+  ls.forEach(l => {
+    const u = out[out.length - 1];
+    if (u && l.charCodeAt(0) === u[1].charCodeAt(0) + 1) u[1] = l; else out.push([l, l]);
+  });
+  return out;
+}
+const _ubRangos = set => _ubRuns(set).map(([d, h]) => d === h ? d : `${d}–${h}`).join(', ');
+const _ubLetrasDe = (a, lado) => new Set(_ubSecs(a).flatMap(s => [...(_ub.asig[_ubKey(a, lado, s)] || [])]));
+function _ubMover(de, a) {
+  if (de === a || !_ub.asig[de]) return;
+  _ub.asig[de].forEach(l => _ubSet(a).add(l));
+  delete _ub.asig[de];
+}
+function _ubNombre(k) {
+  const [a, lado, sec] = k.split('|');
+  return `Anaquel ${a}` + (lado ? ` · ${_UB_LADO[lado]}` : '') + (sec ? ` · Repisa ${sec}` : '');
+}
+
+async function openMapaUbEditor() {
+  const [pr] = await Promise.all([api('/productos/'), loadMapaUb()]);
+  _ubProds = pr.ok ? await pr.json() : [];
+  const an = {}, asig = {}, extra = [];
+  const guardados = S.mapaUb.filter(r => r.tipo === 'anaquel' && r.anaquel);
+  if (guardados.length) guardados.forEach(r => { an[r.anaquel] = { zona: _UB_SLOTS.includes(r.zona) ? r.zona : '', doble: r.doble !== false, repisas: Math.max(1, +r.repisas || 1) }; });
+  else for (let i = 1; i <= _UB_N_ANAQUELES; i++) an[i] = { zona: _UB_SLOT_DEF[i] || '', doble: true, repisas: 5 };
+  const letras = S.mapaUb.filter(r => !r.tipo || r.tipo === 'letras');
+  // Anaqueles que ya tienen letras pero no están dados de alta (mapas viejos): se agregan
+  letras.forEach(r => { if (!an[r.anaquel] && /^\d+$/.test(r.anaquel || '') && +r.anaquel <= 12)
+    an[r.anaquel] = { zona: _UB_SLOT_DEF[r.anaquel] || '', doble: true, repisas: 5 }; });
+  // Reglas que el editor no sabe dibujar (otro anaquel, sección con texto) se conservan tal cual.
+  const ok = r => an[r.anaquel] && (!r.seccion || /^\d+$/.test(r.seccion));
+  letras.filter(ok).forEach(r => { if (r.seccion) an[r.anaquel].repisas = Math.max(an[r.anaquel].repisas, Math.min(+r.seccion, 10)); });
+  letras.forEach(r => {
+    if (!ok(r)) { extra.push(r); return; }
+    const cfg = an[r.anaquel];
+    const lado = cfg.doble ? (r.lado || 'FRENTE') : '';
+    const sec = cfg.repisas > 1 ? String(Math.min(+r.seccion || 1, cfg.repisas)) : '';
+    const k = _ubKey(r.anaquel, lado, sec);
+    asig[k] = asig[k] || new Set();
+    for (let c = r.desde.charCodeAt(0); c <= (r.hasta || r.desde).charCodeAt(0); c++) asig[k].add(String.fromCharCode(c));
+  });
+  _ub = { an, asig, sel: '', activo: '', ultima: '', rango: false, inicio: '', extra, sucio: false, vista: 'FRENTE' };
+  _ub.sel = _ubOrden()[0];
+  _ubVit = ((S.mapaUb.find(r => r.tipo === 'productos') || {}).ids || []).slice();
+  document.getElementById('ub-vit-q').value = '';
+  ubPintar();
+}
+
+// Orden de las tarjetas: como se ven desde el mostrador (fila de atrás arriba), luego "otro lugar".
+function _ubOrden() {
+  const pos = a => { const i = _UB_SLOTS.indexOf(_ub.an[a].zona); return i < 0 ? 9 : i; };
+  return Object.keys(_ub.an).sort((x, y) => pos(x) - pos(y) || (+x || 99) - (+y || 99));
+}
+
+function ubPintar() {
+  if (!_ub.an[_ub.sel]) _ub.sel = _ubOrden()[0];
+  if (!_ubVisibles(_ub.sel).includes(_ub.activo)) {
+    const v = _ubVisibles(_ub.sel);
+    _ub.activo = v.find(k => k.split('|')[1] === (_ub.an[_ub.sel].doble ? (_ub.vista || 'FRENTE') : '')) || v[0];
+  }
+  _ubPlano3d();
+  _ubEditor();
+  _ubTeclado();
+  ubVitPintar();
+  ubResumen();
+  icons();
+}
+function _ubCambio() { _ub.sucio = true; ubPintar(); }
+
+// ── Imagen de la sucursal con las letras de cada repisa ──
+function _ubPlano3d() {
+  const el = document.getElementById('ub-3d');
+  if (!el) return;
+  const marcas = [], numeros = {};
+  _ubOrden().forEach(a => {
+    const cfg = _ub.an[a];
+    if (!_ubQuad(a, cfg.zona)) return;
+    const c = _ubColor(a), sel = _ub.sel === a;
+    const lado = cfg.doble ? (sel ? (_ub.vista || 'FRENTE') : 'FRENTE') : '';
+    numeros[a] = { num: a, color: c, sel, slot: cfg.zona };
+    _ubSecs(a).forEach(s => {
+      const k = _ubKey(a, lado, s);
+      marcas.push({ a, slot: cfg.zona, rep: s ? +s : 0, n: cfg.repisas, color: c, k, borde: sel, resalta: k === _ub.activo,
+                    detras: lado === 'DETRAS', label: _ubRangos(_ub.asig[k]), fs: 52, soloVisible: true });
+    });
+  });
+  const faltan = _ubOrden().filter(a => !_ubQuad(a, _ub.an[a].zona));
+  el.innerHTML = `<div class="rounded-2xl overflow-hidden" style="border:1px solid #E2E8F0">${_ubImagenHTML(marcas, { id: 'ubcfg', numeros, dim: .22, escala: 1.5 })}</div>
+    ${faltan.length ? `<div class="mt-2 rounded-lg px-3 py-2 text-[11px]" style="background:#FFFBEB;border:1px solid #FDE68A;color:#B45309">${faltan.length === 1 ? 'El anaquel ' + _ubEsc(faltan[0]) + ' no está marcado' : 'Los anaqueles ' + faltan.map(_ubEsc).join(', ') + ' no están marcados'} en la imagen. Usa <b>Imagen de mis anaqueles</b> para marcarlo${faltan.length === 1 ? '' : 's'}.</div>` : ''}
+    <div class="flex items-center gap-2 mt-2 flex-wrap">
+      <button id="ub-cal-btn" class="h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5" style="background:#EEF1F9;color:#1d2140;border:1px solid #DDE3F0"><i data-lucide="image" style="width:13px;height:13px"></i> Imagen de mis anaqueles</button>
+      <button id="ub-ir-vitrina" class="ml-auto h-7 px-3 rounded-lg text-xs font-semibold" style="background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE">Vitrina${_ubVit.length ? ' · ' + _ubVit.length : ''}</button>
+    </div>`;
+  el.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => {
+    _ub.activo = b.dataset.k; _ub.sel = b.dataset.k.split('|')[0]; _ub.inicio = ''; ubPintar();
+  }));
+  document.getElementById('ub-cal-btn').onclick = openUbCalibrar;
+  document.getElementById('ub-ir-vitrina').onclick = () => {
+    document.getElementById('ub-vitrina').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => document.getElementById('ub-vit-q').focus(), 300);
+  };
+}
+
+// ── Tarjetas de los anaqueles (cualquier cantidad y acomodo) ──
+const _UB_LUGARES = [['ADELANTE_IZQ', 'Adelante · izquierda'], ['ADELANTE_DER', 'Adelante · derecha'],
+                     ['ATRAS_IZQ', 'Atrás · izquierda'], ['ATRAS_DER', 'Atrás · derecha'], ['', 'Otro lugar']];
+function _ubEditor() {
+  const el = document.getElementById('ub-editor');
+  if (!el) return;
+  if (!_ub.an[_ub.sel].doble) _ub.vista = 'FRENTE';
+  const vista = _ub.vista || 'FRENTE';
+  const orden = _ubOrden(), ultimo = orden.slice().sort((x, y) => (+y || 0) - (+x || 0))[0];
+  const card = a => {
+    const cfg = _ub.an[a], c = _ubColor(a);
+    const lado = cfg.doble ? vista : '';
+    const head = `<div class="flex items-center gap-2 px-3 py-2" style="background:${c};color:#fff">
+        <b class="text-xs whitespace-nowrap">Anaquel ${_ubEsc(a)}</b>
+        <span class="ml-auto inline-flex items-center gap-1 text-[10px] whitespace-nowrap" style="opacity:.95">
+          <button data-r="-1" data-a="${_ubEsc(a)}" title="Quitar repisa" class="ub-step">−</button>
+          <b style="min-width:52px;text-align:center">${cfg.repisas} repisa${cfg.repisas === 1 ? '' : 's'}</b>
+          <button data-r="1" data-a="${_ubEsc(a)}" title="Agregar repisa" class="ub-step">+</button>
+        </span></div>`;
+    const pie = `<div class="flex items-center gap-2 px-3 py-1.5 text-[11px]" style="color:#64748B;border-top:1px solid #F1F5F9;background:#FAFBFC">
+        <label class="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" data-doble="${_ubEsc(a)}" ${cfg.doble ? 'checked' : ''}> Parte de atrás</label>
+        <select data-lugar="${_ubEsc(a)}" title="Dónde está este anaquel" class="ml-auto" style="font-size:11px;border:1px solid #E2E8F0;border-radius:6px;padding:1px 4px;background:#fff;color:#475569;max-width:118px">${_UB_LUGARES.map(([v, t]) => `<option value="${v}"${v === cfg.zona ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        ${a === ultimo && orden.length > 1 ? `<button data-quitar="${_ubEsc(a)}" title="Quitar este anaquel" class="w-5 h-5 rounded hover:bg-red-50 flex-shrink-0" style="color:#EF4444">✕</button>` : ''}
+      </div>`;
+    const sombra = _ub.sel === a ? `box-shadow:0 0 0 2px ${c}55,0 4px 14px rgba(15,23,42,.08)` : '';
+    if (vista === 'DETRAS' && !cfg.doble) {
+      return `<div class="ub-card flex flex-col" style="${sombra}">${head}<div class="flex-1 flex items-center justify-center text-xs text-center px-4" style="color:#94A3B8;min-height:120px;background:repeating-linear-gradient(45deg,#F8FAFC 0 10px,#F1F5F9 10px 20px)">Sin parte de atrás</div>${pie}</div>`;
+    }
+    const filas = _ubSecs(a).map(s => {
+      const k = _ubKey(a, lado, s), on = k === _ub.activo, ls = _ubRangos(_ub.asig[k]);
+      return `<div class="ub-repisa" data-k="${_ubEsc(k)}" style="${on ? `background:${c}14;box-shadow:inset 4px 0 0 ${c}` : ''}">
+        <span class="ub-num" style="${on ? `background:${c};color:#fff` : ''}">${s || '•'}</span>
+        ${ls ? `<span class="text-sm font-black truncate" style="color:${c}">${_ubEsc(ls)}</span>` : `<span class="text-[11px] whitespace-nowrap" style="color:${on ? c : '#CBD5E1'}">${on ? 'elige letras' : 'vacía'}</span>`}
+      </div>`;
+    }).join('');
+    return `<div class="ub-card flex flex-col" style="${sombra}">${head}<div class="flex flex-col" style="flex:1">${filas}</div>${pie}</div>`;
+  };
+  el.innerHTML = `
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="ub-seg"><button data-vista="FRENTE" class="${vista === 'FRENTE' ? 'on' : ''}">Viendo de frente</button><button data-vista="DETRAS" class="${vista === 'DETRAS' ? 'on' : ''}">Viendo por detrás</button></span>
+      <button id="ub-add-an" class="ml-auto h-7 px-3 rounded-lg text-[11px] font-bold border hover:bg-slate-50" style="border-color:#E2E8F0;color:#1d2140">+ Anaquel</button>
+    </div>
+    <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))">${orden.map(card).join('')}</div>
+    <p class="text-[10px]" style="color:#94A3B8">El número es la repisa: 1 = la de arriba. Toca una para elegir sus letras.</p>`;
+  el.querySelectorAll('[data-vista]').forEach(b => b.onclick = () => {
+    _ub.vista = b.dataset.vista;
+    if (_ub.vista === 'DETRAS' && !_ub.an[_ub.sel].doble) { _ub.an[_ub.sel].doble = true; _ubSecs(_ub.sel).forEach(s => _ubMover(_ubKey(_ub.sel, '', s), _ubKey(_ub.sel, 'FRENTE', s))); _ub.sucio = true; }
+    _ub.activo = ''; ubPintar();
+  });
+  el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { _ub.activo = b.dataset.k; _ub.sel = b.dataset.k.split('|')[0]; _ub.inicio = ''; ubPintar(); });
+  el.querySelectorAll('[data-lugar]').forEach(x => x.onchange = () => {
+    const a = x.dataset.lugar, z = x.value;
+    // Con la imagen de fábrica cada lugar es de un solo anaquel: se intercambian.
+    const otro = z && !_UB_IMG.anaqueles && Object.keys(_ub.an).find(o => o !== a && _ub.an[o].zona === z);
+    if (otro) _ub.an[otro].zona = _ub.an[a].zona;
+    _ub.an[a].zona = z; _ub.sel = a; _ubCambio();
+  });
+  el.querySelectorAll('[data-doble]').forEach(x => x.onchange = () => {
+    const a = x.dataset.doble, cfg = _ub.an[a];
+    // Al quitar/poner la parte de atrás, el frente conserva sus letras.
+    _ubSecs(a).forEach(s => x.checked ? _ubMover(_ubKey(a, '', s), _ubKey(a, 'FRENTE', s)) : _ubMover(_ubKey(a, 'FRENTE', s), _ubKey(a, '', s)));
+    cfg.doble = x.checked; _ub.activo = ''; _ubCambio();
+  });
+  el.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
+    const a = b.dataset.a, cfg = _ub.an[a];
+    const n = Math.max(1, Math.min(10, cfg.repisas + +b.dataset.r));
+    if (n === cfg.repisas) return;
+    // Al cambiar el número de repisas no se pierden letras: se juntan en la última.
+    _ubLados(a).forEach(l => {
+      if (cfg.repisas === 1) _ubMover(_ubKey(a, l, ''), _ubKey(a, l, '1'));
+      else for (let s = n + 1; s <= cfg.repisas; s++) _ubMover(_ubKey(a, l, String(s)), _ubKey(a, l, n === 1 ? '' : String(n)));
+      if (n === 1) _ubMover(_ubKey(a, l, '1'), _ubKey(a, l, ''));
+    });
+    cfg.repisas = n; _ub.sel = a; _ubCambio();
+  });
+  document.getElementById('ub-add-an').onclick = () => {
+    const nums = Object.keys(_ub.an).map(Number).filter(Boolean);
+    if (nums.length >= 12) { toast('Máximo 12 anaqueles', 'warning'); return; }
+    const a = String((nums.length ? Math.max(...nums) : 0) + 1);
+    const libre = !_UB_IMG.anaqueles ? _UB_SLOTS.find(z => !Object.values(_ub.an).some(o => o.zona === z)) : '';
+    _ub.an[a] = { zona: libre || '', doble: true, repisas: 5 };
+    _ub.sel = a; _ub.activo = ''; _ubCambio();
+    if (!_ubQuad(a, _ub.an[a].zona)) toast(`Anaquel ${a} agregado — márcalo en "Imagen de mis anaqueles" para verlo en la imagen`, 'info');
+  };
+  el.querySelectorAll('[data-quitar]').forEach(b => b.onclick = () => {
+    const a = b.dataset.quitar;
+    const conLetras = Object.keys(_ub.asig).some(k => k.startsWith(a + '|') && _ub.asig[k].size);
+    Object.keys(_ub.asig).filter(k => k.startsWith(a + '|')).forEach(k => delete _ub.asig[k]);
+    delete _ub.an[a];
+    if (_ub.sel === a) _ub.sel = '';
+    _ub.activo = ''; _ubCambio();
+    toast(`Anaquel ${a} quitado${conLetras ? ' (con sus letras)' : ''} — se aplica al guardar`, 'info');
+  });
+}
+
+// ── Imagen de mis anaqueles: subir la de la sucursal y marcar las esquinas ──
+// Se toca en la imagen: arriba-izquierda → arriba-derecha → abajo-derecha →
+// abajo-izquierda del espacio de repisas de cada anaquel. Los puntos se pueden
+// arrastrar para afinar. Las repisas se reparten solas entre esas esquinas.
+const _UB_ESQUINAS = ['arriba a la izquierda', 'arriba a la derecha', 'abajo a la derecha', 'abajo a la izquierda'];
+function openUbCalibrar() {
+  const anaqueles = _ubOrden();
+  const cal = {
+    src: _UB_IMG.src, w: _UB_IMG.w, h: _UB_IMG.h, nueva: null,
+    deFabrica: !_UB_IMG.propia,
+    q: Object.fromEntries(anaqueles.map(a => [a, (_ubQuad(a, _ub.an[a].zona) || []).map(p => p.slice())])),
+    sel: anaqueles.find(a => !_ubQuad(a, _ub.an[a].zona)) || anaqueles[0], arrastra: -1,
+  };
+  const ov = document.createElement('div');
+  ov.id = '_modal-ub-cal';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.6);backdrop-filter:blur(6px)';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:1080px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.3)">
+      <div style="padding:14px 18px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:10px">
+        <i data-lucide="image" style="width:20px;height:20px;color:#1d2140"></i>
+        <div style="flex:1"><b style="color:#0F172A">Imagen de mis anaqueles</b>
+          <p style="font-size:11px;color:#94A3B8;margin:0">Sube una foto o imagen de los anaqueles de esta sucursal y marca dónde está cada uno. Solo se hace una vez.</p></div>
+        <label class="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer" style="background:#1d2140;color:#fff"><i data-lucide="upload" style="width:13px;height:13px"></i> Subir imagen<input id="ub-cal-file" type="file" accept="image/*" style="display:none"></label>
+        <button id="ub-cal-x" style="width:30px;height:30px;border-radius:8px;border:none;background:#F1F5F9;color:#64748B;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex:1;min-height:0">
+        <div style="width:230px;flex-shrink:0;border-right:1px solid #F1F5F9;padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+          <p style="font-size:10px;font-weight:800;letter-spacing:.08em;color:#94A3B8;margin:2px 4px">ANAQUELES</p>
+          <div id="ub-cal-lista" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div style="flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+          <div id="ub-cal-paso" style="font-size:12px;color:#0F172A"></div>
+          <div id="ub-cal-lienzo" style="position:relative;line-height:0;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;user-select:none"></div>
+        </div>
+      </div>
+      <div style="padding:10px 18px;border-top:1px solid #F1F5F9;display:flex;align-items:center;gap:8px">
+        <button id="ub-cal-fabrica" class="h-9 px-3 rounded-xl text-xs font-semibold border" style="border-color:#E2E8F0;color:#64748B">Usar la imagen de fábrica</button>
+        <div style="flex:1"></div>
+        <button id="ub-cal-cancel" class="h-9 px-4 rounded-xl text-xs font-bold border" style="border-color:#E2E8F0;color:#64748B">Cancelar</button>
+        <button id="ub-cal-ok" class="h-9 px-5 rounded-xl text-xs font-bold text-white" style="background:#1d2140">Guardar imagen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  const lienzo = ov.querySelector('#ub-cal-lienzo');
+
+  const pintarLista = () => {
+    ov.querySelector('#ub-cal-lista').innerHTML = anaqueles.map(a => {
+      const n = cal.q[a].length, c = _ubColor(a), on = a === cal.sel;
+      const estado = n === 4 ? '<span style="color:#15803D">✓ marcado</span>' : n ? `<span style="color:#B45309">${n} de 4 esquinas</span>` : '<span style="color:#94A3B8">sin marcar</span>';
+      return `<button data-a="${_ubEsc(a)}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;text-align:left;border:1.5px solid ${on ? c : '#E2E8F0'};background:${on ? c + '12' : '#fff'};cursor:pointer">
+        <span style="width:24px;height:24px;border-radius:99px;background:${c};color:#fff;font-size:12px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${_ubEsc(a)}</span>
+        <span style="flex:1;min-width:0"><b style="font-size:12px;color:#0F172A">Anaquel ${_ubEsc(a)}</b><br><span style="font-size:10px">${estado}</span></span>
+        ${n ? `<span data-borrar="${_ubEsc(a)}" title="Borrar sus puntos" style="color:#EF4444;font-size:12px;padding:2px 4px">✕</span>` : ''}
+      </button>`;
+    }).join('');
+    ov.querySelectorAll('#ub-cal-lista [data-a]').forEach(b => b.onclick = e => {
+      if (e.target.dataset.borrar) cal.q[e.target.dataset.borrar] = [];
+      cal.sel = b.dataset.a; pintar();
+    });
+  };
+  const pintarSvg = () => {
+    const W = cal.w, H = cal.h, e = W / 1000, svg = lienzo.querySelector('svg');
+    svg.innerHTML = anaqueles.map(a => {
+      const ps = cal.q[a], c = _ubColor(a), on = a === cal.sel;
+      if (!ps.length) return '';
+      let g = '';
+      if (ps.length === 4) {
+        const n = (_ub.an[a] || {}).repisas || 5;
+        g += `<polygon points="${_ubPts(ps)}" fill="${c}${on ? '33' : '1F'}" stroke="${c}" stroke-width="${(on ? 4 : 2.5) * e}"/>`;
+        for (let i = 1; i < n; i++) g += `<line x1="${_ubLerp(ps[0], ps[3], i / n)[0]}" y1="${_ubLerp(ps[0], ps[3], i / n)[1]}" x2="${_ubLerp(ps[1], ps[2], i / n)[0]}" y2="${_ubLerp(ps[1], ps[2], i / n)[1]}" stroke="${c}" stroke-width="${1.5 * e}" stroke-dasharray="${6 * e} ${4 * e}"/>`;
+        const cx = (ps[0][0] + ps[1][0]) / 2, cy = (ps[0][1] + ps[1][1]) / 2;
+        g += `<circle cx="${cx}" cy="${cy}" r="${16 * e}" fill="${c}" stroke="#fff" stroke-width="${3 * e}"/><text x="${cx}" y="${cy + 6 * e}" text-anchor="middle" font-size="${17 * e}" font-weight="900" fill="#fff" font-family="Segoe UI,Arial">${_ubEsc(a)}</text>`;
+      } else {
+        g += `<polyline points="${_ubPts(ps)}" fill="none" stroke="${c}" stroke-width="${3 * e}" stroke-dasharray="${8 * e} ${5 * e}"/>`;
+      }
+      if (on) g += ps.map((p, i) => `<g data-p="${i}" style="cursor:grab"><circle cx="${p[0]}" cy="${p[1]}" r="${11 * e}" fill="#fff" stroke="${c}" stroke-width="${3.5 * e}"/><text x="${p[0]}" y="${p[1] + 4.5 * e}" text-anchor="middle" font-size="${12 * e}" font-weight="900" fill="${c}" font-family="Segoe UI,Arial" pointer-events="none">${i + 1}</text></g>`).join('');
+      return g;
+    }).join('');
+    const ps = cal.q[cal.sel] || [];
+    ov.querySelector('#ub-cal-paso').innerHTML = ps.length < 4
+      ? `<b style="color:${_ubColor(cal.sel)}">Anaquel ${_ubEsc(cal.sel)}</b> · toca la esquina <b>${_UB_ESQUINAS[ps.length]}</b> del espacio de sus repisas <span style="color:#94A3B8">(${ps.length + 1} de 4)</span>`
+      : `<b style="color:${_ubColor(cal.sel)}">Anaquel ${_ubEsc(cal.sel)}</b> listo. Arrastra los puntos para afinar, o elige otro anaquel a la izquierda.`;
+  };
+  const pintar = () => { pintarLista(); pintarSvg(); };
+  const pintarLienzo = () => {
+    lienzo.innerHTML = `<img src="${cal.src}" style="width:100%;display:block" draggable="false">
+      <svg viewBox="0 0 ${cal.w} ${cal.h}" style="position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none"></svg>`;
+    const svg = lienzo.querySelector('svg');
+    const punto = ev => { const r = svg.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * cal.w, (ev.clientY - r.top) / r.height * cal.h]; };
+    svg.addEventListener('pointerdown', ev => {
+      const h = ev.target.closest('[data-p]');
+      if (h) { cal.arrastra = +h.dataset.p; svg.setPointerCapture(ev.pointerId); return; }
+      const ps = cal.q[cal.sel];
+      if (ps.length < 4) {
+        ps.push(punto(ev));
+        // Al completar uno, pasa solo al siguiente que falte
+        if (ps.length === 4) cal.sel = anaqueles.find(a => cal.q[a].length < 4) || cal.sel;
+        pintar();
+      }
+    });
+    svg.addEventListener('pointermove', ev => {
+      if (cal.arrastra < 0) return;
+      cal.q[cal.sel][cal.arrastra] = punto(ev).map((v, i) => Math.max(0, Math.min(i ? cal.h : cal.w, v)));
+      pintarSvg();
+    });
+    svg.addEventListener('pointerup', () => { if (cal.arrastra >= 0) { cal.arrastra = -1; pintarLista(); } });
+    pintar();
+  };
+
+  ov.querySelector('#ub-cal-file').onchange = ev => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    const lector = new FileReader();
+    lector.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        // Se reduce a 1600 px de ancho máx. y se guarda en JPG (pesa poco y viaja bien a la nube)
+        const k = Math.min(1, 1600 / im.width), cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        cal.nueva = cv.toDataURL('image/jpeg', .82);
+        cal.src = cal.nueva; cal.w = cv.width; cal.h = cv.height; cal.deFabrica = false;
+        anaqueles.forEach(a => { cal.q[a] = []; });   // las esquinas viejas no sirven en otra imagen
+        cal.sel = anaqueles[0];
+        pintarLienzo();
+      };
+      im.src = lector.result;
+    };
+    lector.readAsDataURL(f);
+  };
+  ov.querySelector('#ub-cal-x').onclick = cerrar;
+  ov.querySelector('#ub-cal-cancel').onclick = cerrar;
+  ov.querySelector('#ub-cal-fabrica').onclick = async () => {
+    try {
+      await apiFetch('/config/ubicaciones/imagen', { method: 'DELETE' });
+      await _ubCargarImagen(null);
+      cerrar(); ubPintar();
+      toast('Se usa otra vez la imagen de fábrica', 'success');
+    } catch (e) { toast(e.message || 'No se pudo cambiar', 'error'); }
+  };
+  ov.querySelector('#ub-cal-ok').onclick = async () => {
+    const listos = Object.fromEntries(anaqueles.filter(a => cal.q[a].length === 4).map(a => [a, cal.q[a].map(p => p.map(v => Math.round(v * 10) / 10))]));
+    if (!Object.keys(listos).length) { toast('Marca al menos un anaquel', 'warning'); return; }
+    const btn = ov.querySelector('#ub-cal-ok');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      const d = await apiFetch('/config/ubicaciones/imagen', { method: 'POST', body: JSON.stringify({
+        src: cal.nueva || (cal.deFabrica ? 'default' : null), w: cal.w, h: cal.h, anaqueles: listos }) });
+      S._ubImgVer = null;
+      await _ubCargarImagen(d.imagen);
+      cerrar(); ubPintar();
+      const faltan = anaqueles.length - Object.keys(listos).length;
+      toast('Imagen guardada' + (faltan ? ` — ${faltan} anaquel${faltan === 1 ? '' : 'es'} sin marcar` : ''), 'success');
+    } catch (e) { toast(e.message || 'No se pudo guardar', 'error'); btn.disabled = false; btn.textContent = 'Guardar imagen'; }
+  };
+  pintarLienzo();
+  icons();
+}
+
+// ── Teclado A–Z ──
+function _ubTeclado() {
+  const el = document.getElementById('ub-teclado');
+  if (!el) return;
+  const k = _ub.activo, c = _ubColor(_ub.sel), mio = _ub.asig[k] || new Set();
+  const lugares = l => _ubTodas().filter(x => x !== k && _ub.asig[x] && _ub.asig[x].has(l));
+  const conProd = {};
+  _ubProds.forEach(p => { const l = _letraInicial(p.nombre); if (l) conProd[l] = (conProd[l] || 0) + 1; });
+  document.getElementById('ub-teclado-tit').innerHTML =
+    `Letras en: <span style="color:${c}">${_ubEsc(_ubNombre(k))}</span>` +
+    (_ub.rango ? ` <span class="text-xs font-semibold" style="color:#B45309">— ${_ub.inicio ? `desde ${_ub.inicio}, ahora pica la última` : 'pica la primera letra del rango'}</span>` : '');
+  const rb = document.getElementById('ub-rango-btn');
+  rb.style.background = _ub.rango ? '#FEF3C7' : '#fff';
+  rb.style.borderColor = _ub.rango ? '#F59E0B' : '#E2E8F0';
+  el.innerHTML = _UB_ABC.map(l => {
+    const on = mio.has(l), otros = lugares(l), n = conProd[l] || 0;
+    const borde = on ? c : (!otros.length && n ? '#F59E0B' : '#E2E8F0');
+    const tip = [on ? 'Aquí' : '', ...otros.map(_ubNombre)].filter(Boolean).join('\n') || 'Sin lugar';
+    return `<button class="ub-key" data-l="${l}" title="${_ubEsc(tip + (n ? `\n${n} producto(s)` : ''))}"
+      style="background:${on ? c : '#fff'};color:${on ? '#fff' : '#0F172A'};border-color:${borde};border-style:${!on && !otros.length && n ? 'dashed' : 'solid'};${_ub.inicio === l ? 'box-shadow:0 0 0 3px #F59E0B;' : ''}">${l}
+      <span style="position:absolute;left:0;right:0;bottom:4px;display:flex;justify-content:center;gap:2px">${otros.slice(0, 4).map(x => `<span style="width:6px;height:6px;border-radius:9px;background:${_ubColor(x.split('|')[0])}"></span>`).join('')}</span>
+      ${n ? `<span style="position:absolute;top:2px;right:5px;font-size:9px;font-weight:700;color:${on ? '#fff' : '#94A3B8'}">${n}</span>` : ''}
+    </button>`;
+  }).join('');
+  el.querySelectorAll('[data-l]').forEach(b => b.onclick = e => ubLetra(b.dataset.l, e.shiftKey));
+}
+
+function ubLetra(l, shift) {
+  const set = _ubSet(_ub.activo);
+  let desde = null;
+  if (_ub.rango) {
+    if (!_ub.inicio) { _ub.inicio = l; _ubTeclado(); return; }
+    desde = _ub.inicio; _ub.inicio = ''; _ub.rango = false;
+  } else if (shift && _ub.ultima) desde = _ub.ultima;
+  if (desde) {
+    const [x, y] = [desde, l].sort();
+    for (let c = x.charCodeAt(0); c <= y.charCodeAt(0); c++) set.add(String.fromCharCode(c));
+  } else {
+    set.has(l) ? set.delete(l) : set.add(l);
+  }
+  _ub.ultima = l;
+  _ubCambio();
+}
+function ubModoRango() { _ub.rango = !_ub.rango; _ub.inicio = ''; _ubTeclado(); }
+function ubLimpiarRepisa() { delete _ub.asig[_ub.activo]; _ubCambio(); }
+
+// ── Vitrina: lista de productos sueltos ──
+function ubVitPintar() {
+  const el = document.getElementById('ub-vit-list');
+  if (!el) return;
+  const nom = id => (_ubProds.find(p => p.id === id) || {}).nombre;
+  const ids = _ubVit.filter(id => nom(id));  // ignora productos borrados
+  el.innerHTML = ids.length
+    ? ids.map(id => `<span class="inline-flex items-center gap-1 rounded-lg pl-2.5 pr-1 py-1 text-xs font-semibold" style="background:#fff;border:1px solid #DDD6FE;color:#5B21B6">${_ubEsc(nom(id))}<button data-id="${id}" title="Quitar de la vitrina" class="w-5 h-5 rounded hover:bg-red-50" style="color:#EF4444">✕</button></span>`).join('')
+    : '<span class="text-xs" style="color:#A78BFA">Aún no hay productos en la vitrina</span>';
+  el.querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
+    _ubVit = _ubVit.filter(x => x !== +b.dataset.id); _ubCambio();
+  });
+}
+function ubVitBuscar() {
+  const q = document.getElementById('ub-vit-q'), sug = document.getElementById('ub-vit-sug');
+  const f = q.value.trim().toLowerCase();
+  const lista = f ? _ubProds.filter(p => !_ubVit.includes(p.id) &&
+    (p.nombre.toLowerCase().includes(f) || (p.codigo_barras || '').toLowerCase() === f)).slice(0, 8) : [];
+  sug.classList.toggle('hidden', !lista.length);
+  sug.innerHTML = lista.map(p => `<button data-id="${p.id}" class="w-full text-left px-3 py-2 text-xs hover:bg-violet-50" style="color:#0F172A"><b>${_ubEsc(p.nombre)}</b> <span style="color:#94A3B8">${_ubEsc([p.presentacion, p.concentracion].filter(Boolean).join(' · '))}</span></button>`).join('');
+  sug.querySelectorAll('button').forEach(b => b.onclick = () => {
+    _ubVit.push(+b.dataset.id); q.value = ''; sug.classList.add('hidden'); _ubCambio(); q.focus();
+  });
+}
+
+// Lo que se guarda: config de cada anaquel + reglas por tramo de letras + vitrina.
+function _ubLeerReglas() {
+  const out = [];
+  Object.keys(_ub.an).forEach(a => {
+    const cfg = _ub.an[a];
+    out.push({ tipo: 'anaquel', anaquel: a, zona: cfg.zona, doble: cfg.doble, repisas: cfg.repisas });
+    _ubVisibles(a).forEach(k => {
+      const [, lado, sec] = k.split('|');
+      _ubRuns(_ub.asig[k]).forEach(([d, h]) => out.push({ tipo: 'letras', desde: d, hasta: h, anaquel: a, lado, seccion: sec }));
+    });
+  });
+  return out.concat(_ub.extra)
+    .concat(_ubVit.length ? [{ tipo: 'productos', anaquel: 'VITRINA', lado: '', seccion: '', ids: _ubVit.slice() }] : []);
+}
+
+function ubResumen() {
+  const prev = S.mapaUb;
+  S.mapaUb = _ubLeerReglas();
+  const sin = _ubProds.filter(p => !ubicacionesDe(p).length);
+  S.mapaUb = prev;
+  const libres = _UB_ABC.filter(l => !_ubTodas().some(k => _ub.asig[k] && _ub.asig[k].has(l)));
+  const falta = [...new Set(sin.map(p => _letraInicial(p.nombre)).filter(Boolean))].sort();
+  const el = document.getElementById('ub-resumen');
+  if (el) el.innerHTML = `<b style="color:#0F172A">${_ubProds.length - sin.length} de ${_ubProds.length}</b> productos quedan ubicados.` +
+    (_ubVit.length ? ` <b style="color:#6D28D9">${_ubVit.length}</b> en la vitrina.` : '') +
+    (falta.length ? ` Letras con productos sin lugar: <b style="color:#B45309">${falta.join(', ')}</b>.` : '') +
+    (libres.length === 26 ? ' Empieza tocando un anaquel del plano.' : libres.length ? ` <span style="color:#94A3B8">Letras sin asignar: ${libres.join(' ')}</span>` : ' <b style="color:#047857">Todo el abecedario tiene lugar ✓</b>');
+  const btn = document.getElementById('ub-save-btn');
+  if (btn) { btn.textContent = _ub.sucio ? 'Guardar cambios •' : 'Guardar mapa'; btn.style.background = _ub.sucio ? '#2563EB' : '#1d2140'; }
+}
+
+async function saveMapaUb() {
+  try {
+    const d = await apiFetch('/config/ubicaciones', { method:'POST', body: JSON.stringify({ reglas: _ubLeerReglas() }) });
+    S.mapaUb = d.reglas || [];
+    _ub.sucio = false;
+    toast('Mapa de anaqueles guardado', 'success');
+    ubResumen();
+  } catch (e) { toast(e.message || 'No se pudo guardar', 'error'); }
 }
 
 function _setIntegMode(prefix, onVercel, ready) {

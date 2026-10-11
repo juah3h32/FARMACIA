@@ -558,3 +558,209 @@ def set_sucursal(body: SucursalIn, payload: dict = Depends(get_current_api_user)
         return {"ok": True, **_leer_sucursal(db)}
     finally:
         db.close()
+
+
+# ── Mapa de anaqueles ────────────────────────────────────────────────────────
+# Los anaqueles van por orden alfabético (A-C en un lado, D-F en otro…). En
+# vez de capturar la ubicación producto por producto, se definen rangos de
+# letras una sola vez y el POS (F4) calcula dónde está cada producto por la
+# primera letra de su nombre. Se guarda en `configuracion`, que ya se
+# sincroniza entre PCs/sucursal.
+
+_UBICACIONES_KEY = "mapa_ubicaciones"
+
+
+class ReglaUbicacion(BaseModel):
+    tipo: Optional[str] = None      # "letras" (default) o "productos" (vitrina)
+    ids: list[int] = []             # solo tipo "productos": ids de producto
+    desde: Optional[str] = None     # letra inicial
+    hasta: Optional[str] = None     # letra final, inclusive
+    anaquel: Optional[str] = None
+    lado: Optional[str] = None      # FRENTE / DETRAS (anaqueles de doble cara)
+    zona: Optional[str] = None      # solo tipo "anaquel": ADELANTE_IZQ / ADELANTE_DER / ATRAS_IZQ / ATRAS_DER
+    doble: Optional[bool] = None    # solo tipo "anaquel": tiene parte de atrás
+    repisas: Optional[int] = None   # solo tipo "anaquel": cuántas repisas tiene
+    seccion: Optional[str] = None
+
+
+class UbicacionesIn(BaseModel):
+    reglas: list[ReglaUbicacion] = []
+
+
+@router.get("/ubicaciones")
+def get_ubicaciones(payload: dict = Depends(get_current_api_user)):
+    # Cualquier usuario (el cajero la necesita en el POS); solo admin edita.
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        row = db.query(Configuracion).filter(Configuracion.clave == _UBICACIONES_KEY).first()
+        try:
+            reglas = json.loads(row.valor) if row and row.valor else []
+        except ValueError:
+            reglas = []
+        return {"reglas": reglas, "imagen": _imagen_meta(db)}
+    finally:
+        db.close()
+
+
+@router.post("/ubicaciones")
+def set_ubicaciones(body: UbicacionesIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    limpias = []
+    for i, r in enumerate(body.reglas, 1):
+        anaquel = (r.anaquel or "").strip().upper()[:20]
+        seccion = (r.seccion or "").strip().upper()[:20]
+        lado = (r.lado or "").strip().upper().replace("Á", "A")
+        if lado not in ("", "FRENTE", "DETRAS"):
+            raise HTTPException(status_code=400, detail=f"Regla {i}: el lado debe ser Frente o Detrás")
+        if r.tipo == "anaquel":
+            zona = (r.zona or "").strip().upper()
+            if zona not in ("", "IZQUIERDA", "DERECHA", "ADELANTE_IZQ", "ADELANTE_DER", "ATRAS_IZQ", "ATRAS_DER"):
+                raise HTTPException(status_code=400, detail=f"Anaquel {anaquel}: lugar no válido")
+            if anaquel:
+                limpias.append({"tipo": "anaquel", "anaquel": anaquel, "zona": zona,
+                                "doble": r.doble is not False,
+                                "repisas": max(1, min(10, r.repisas or 1))})
+            continue
+        if r.tipo == "productos":
+            # Productos sueltos (p. ej. la vitrina): no siguen el orden por letra.
+            ids = list(dict.fromkeys(int(x) for x in r.ids if int(x) > 0))
+            if ids:
+                limpias.append({"tipo": "productos", "anaquel": anaquel or "VITRINA",
+                                "lado": lado, "seccion": seccion, "ids": ids})
+            continue
+        if not anaquel and not seccion:
+            continue  # renglón vacío
+        desde = (r.desde or "").strip().upper()[:1]
+        hasta = (r.hasta or desde).strip().upper()[:1]
+        if not desde.isalpha() or not hasta.isalpha():
+            raise HTTPException(status_code=400, detail=f"Regla {i}: indica la letra inicial y final (A-Z)")
+        if desde > hasta:
+            desde, hasta = hasta, desde
+        limpias.append({"tipo": "letras", "desde": desde, "hasta": hasta,
+                        "anaquel": anaquel, "lado": lado, "seccion": seccion})
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    db = get_db_session()
+    try:
+        valor = json.dumps(limpias, ensure_ascii=False)
+        row = db.query(Configuracion).filter(Configuracion.clave == _UBICACIONES_KEY).first()
+        if row:
+            row.valor = valor
+        else:
+            db.add(Configuracion(clave=_UBICACIONES_KEY, valor=valor))
+        db.commit()
+        return {"ok": True, "reglas": limpias}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ── Imagen de los anaqueles (una por sucursal) ──────────────────────────────
+# Cada sucursal puede subir la foto/render de sus anaqueles y marcar las 4
+# esquinas de cada anaquel; F4 marca ahí la repisa. Sin imagen propia se usa la
+# de fábrica (/static/anaqueles-ref.jpg). Se guarda en `configuracion` (BD de
+# cada sucursal, se sincroniza). La imagen va aparte de la meta para que el GET
+# de /ubicaciones (que F4 pide cada vez) siga siendo ligero.
+
+_UB_IMG_KEY = "mapa_imagen"
+_UB_IMG_MAX = 3_000_000   # caracteres del data URL (~2.2 MB de imagen)
+
+
+class ImagenUbIn(BaseModel):
+    src: Optional[str] = None          # data URL nueva · "default" = la de fábrica · None = conservar la actual
+    w: int
+    h: int
+    anaqueles: dict[str, list[list[float]]] = {}   # "1": [[x,y] arriba-izq, arriba-der, abajo-der, abajo-izq]
+
+
+def _imagen_row(db):
+    from app.database.models import Configuracion
+    return db.query(Configuracion).filter(Configuracion.clave == _UB_IMG_KEY).first()
+
+
+def _imagen_meta(db):
+    row = _imagen_row(db)
+    if not row or not row.valor:
+        return None
+    try:
+        d = json.loads(row.valor)
+    except ValueError:
+        return None
+    return {"ver": d.get("ver"), "w": d.get("w"), "h": d.get("h"), "anaqueles": d.get("anaqueles") or {},
+            "src": "default" if d.get("src") == "default" else "propia"}
+
+
+@router.get("/ubicaciones/imagen")
+def get_imagen_ubicaciones(payload: dict = Depends(get_current_api_user)):
+    from app.database.connection import get_db_session
+    db = get_db_session()
+    try:
+        row = _imagen_row(db)
+        d = json.loads(row.valor) if row and row.valor else {}
+        return {"src": d.get("src") or "default"}
+    finally:
+        db.close()
+
+
+@router.post("/ubicaciones/imagen")
+def set_imagen_ubicaciones(body: ImagenUbIn, payload: dict = Depends(get_current_api_user)):
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    import time
+    from app.database.connection import get_db_session
+    from app.database.models import Configuracion
+    if not (0 < body.w <= 10000 and 0 < body.h <= 10000):
+        raise HTTPException(status_code=400, detail="Tamaño de imagen no válido")
+    anaqueles = {}
+    for k, pts in body.anaqueles.items():
+        k = str(k).strip().upper()[:20]
+        if not k or len(pts) != 4 or any(len(p) != 2 for p in pts):
+            raise HTTPException(status_code=400, detail=f"Anaquel {k}: marca sus 4 esquinas")
+        anaqueles[k] = [[round(max(0, min(body.w, float(x))), 1), round(max(0, min(body.h, float(y))), 1)] for x, y in pts]
+    db = get_db_session()
+    try:
+        row = _imagen_row(db)
+        src = body.src
+        if src is None:   # solo se movieron esquinas: se conserva la imagen guardada
+            src = (json.loads(row.valor).get("src") if row and row.valor else None) or "default"
+        elif src != "default":
+            if not src.startswith(("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")):
+                raise HTTPException(status_code=400, detail="La imagen debe ser JPG, PNG o WEBP")
+            if len(src) > _UB_IMG_MAX:
+                raise HTTPException(status_code=413, detail="La imagen es muy pesada")
+        valor = json.dumps({"ver": int(time.time() * 1000), "w": body.w, "h": body.h, "src": src, "anaqueles": anaqueles})
+        if row:
+            row.valor = valor
+        else:
+            db.add(Configuracion(clave=_UB_IMG_KEY, valor=valor))
+        db.commit()
+        return {"ok": True, "imagen": _imagen_meta(db)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/ubicaciones/imagen")
+def borrar_imagen_ubicaciones(payload: dict = Depends(get_current_api_user)):
+    """Vuelve a la imagen de fábrica."""
+    if payload.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.database.connection import get_db_session
+    db = get_db_session()
+    try:
+        row = _imagen_row(db)
+        if row:
+            row.valor = ""   # vaciar (no borrar): así el cambio también viaja a la nube
+            db.commit()
+        return {"ok": True}
+    finally:
+        db.close()

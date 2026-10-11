@@ -452,12 +452,12 @@ async def restaurar_backup_upload(
     if not magic.startswith(b"SQLite format 3"):
         import os; os.unlink(tmp_path)
         raise HTTPException(status_code=400, detail="El archivo no es una base de datos SQLite válida")
-    # Backup current DB before replacing
-    backup_path = cfg.DB_PATH.parent / f"farmacia_pre_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-    if cfg.DB_PATH.exists():
-        shutil.copy2(str(cfg.DB_PATH), str(backup_path))
-    shutil.move(tmp_path, str(cfg.DB_PATH))
-    return {"ok": True, "mensaje": "Base de datos restaurada. Reinicia la aplicación para aplicar los cambios.", "backup_previo": backup_path.name}
+    # No se reemplaza la BD con la app abierta (quedaría el -wal viejo y SQLite
+    # la vería dañada): se deja pendiente y se pone al reiniciar, antes de
+    # abrirla (connection._aplicar_restauracion_pendiente), apartando la actual
+    # con su -wal/-shm como farmacia_pre_restore_<fecha>.db.
+    shutil.move(tmp_path, str(cfg.DATA_DIR / "farmacia_restaurar.pendiente.db"))
+    return {"ok": True, "mensaje": "Respaldo listo. Reinicia la aplicación para aplicarlo (la base actual se guarda como respaldo).", "backup_previo": "farmacia_pre_restore_<fecha>.db"}
 
 
 # ── Estado de integraciones (campana de notificaciones) ─────────────────────

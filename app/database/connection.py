@@ -42,6 +42,27 @@ def _aplicar_cambio_de_sucursal_pendiente():
 _aplicar_cambio_de_sucursal_pendiente()
 
 
+def _aplicar_restauracion_pendiente():
+    """Un respaldo subido en Configuración › Datos (admin_routes restore-upload)
+    se deja como pendiente y se pone aquí, ANTES de abrir la BD. Reemplazar el
+    archivo con la app corriendo dejaba el -wal viejo junto a la BD nueva y
+    SQLite la veía dañada ("database disk image is malformed")."""
+    pendiente = cfg.DATA_DIR / "farmacia_restaurar.pendiente.db"
+    if not pendiente.exists() or cfg.USE_TURSO:
+        return
+    import time as _t
+    sello = _t.strftime("%Y%m%d_%H%M%S")
+    for sufijo in ("", "-wal", "-shm"):
+        f = cfg.DB_PATH.with_name(cfg.DB_PATH.name + sufijo)
+        if f.exists():
+            f.rename(cfg.DATA_DIR / f"farmacia_pre_restore_{sello}.db{sufijo}")
+    pendiente.rename(cfg.DB_PATH)
+    print(f"[Respaldo] BD restaurada — la anterior quedó como farmacia_pre_restore_{sello}.db")
+
+
+_aplicar_restauracion_pendiente()
+
+
 def _build_engine():
     if cfg.USE_TURSO:
         try:
@@ -187,6 +208,8 @@ def _migrate():
         ("items_venta",  "es_pieza",       "BOOLEAN DEFAULT 0"),
         ("retiros_caja", "actualizado_en", "TEXT"),
         ("ventas",       "referencia_pago", "VARCHAR(120)"),
+        ("productos",    "anaquel",         "VARCHAR(20)"),
+        ("productos",    "seccion",         "VARCHAR(20)"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
