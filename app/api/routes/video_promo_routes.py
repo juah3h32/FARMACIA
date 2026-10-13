@@ -110,7 +110,7 @@ class TerminalIn(BaseModel):
 class ConfigIn(BaseModel):
     seconds: int = 8
     intro: bool = True
-    quality: str = "Alta"
+    quality: str = "Máxima"
     repeat: int = 1
     default_style: str = "destacado"
     footer_left: str = ""
@@ -141,7 +141,7 @@ def guardar_config(body: ConfigIn, payload: dict = Depends(get_current_api_user)
     c = body.dict()
     c["seconds"] = max(4, min(15, c["seconds"]))
     c["repeat"] = max(1, min(10, c["repeat"]))
-    if c["quality"] not in ("Ligera", "Alta", "Máxima"): c["quality"] = "Alta"
+    c["quality"] = "Máxima"                      # siempre máxima calidad
     if c["default_style"] not in _svc().ESTILOS: c["default_style"] = "destacado"
     if not c["out_dir"]: c.pop("out_dir")
     if c["drive_auto"] is None: c.pop("drive_auto")

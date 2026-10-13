@@ -4026,8 +4026,9 @@
                     <div class="flex items-center gap-2 flex-1"><input id="mkv-c-seconds" type="range" min="4" max="15" step="1" class="flex-1" style="accent-color:#3373B9" oninput="document.getElementById('mkv-sec-lbl').textContent=this.value+' s'" onchange="mkvConfig()"><span id="mkv-sec-lbl" class="text-sm font-bold w-10" style="color:#243366"></span></div>
                   </div>
                   <div class="mkv-row"><span class="mkv-lbl">Calidad</span>
-                    <div id="mkv-calidad" class="flex rounded-lg p-0.5" style="background:#EEF2F8"></div>
-                    <input id="mkv-c-quality" type="hidden">
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-full" style="background:#ECFDF5;color:#15803D">Máxima · Full HD 1080p</span>
+                    <span class="text-[10px]" style="color:#94A3B8">Siempre al máximo; es lo que reproduce tu Roku.</span>
+                    <input id="mkv-c-quality" type="hidden" value="Máxima">
                   </div>
                   <div class="mkv-row"><span class="mkv-lbl">Repetir el video</span>
                     <select id="mkv-c-repeat" class="mkv-inp" style="width:80px" onchange="mkvConfig()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select>
@@ -14484,7 +14485,7 @@ async function loadVideoPromo() {
     document.getElementById('mkv-c-seconds').value = c.seconds;
     document.getElementById('mkv-sec-lbl').textContent = c.seconds + ' s';
     document.getElementById('mkv-c-repeat').value  = String(c.repeat);
-    mkvCalidad(c.quality, false);
+    document.getElementById('mkv-c-quality').value = 'Máxima';
     document.getElementById('mkv-c-style').value   = c.default_style;
     document.getElementById('mkv-c-intro').checked = !!c.intro;
     document.getElementById('mkv-c-fl').value  = c.footer_left || '';
@@ -15007,12 +15008,6 @@ function mkvContador() {
 }
 
 // ajustes
-function mkvCalidad(q, guardar = true) {
-  document.getElementById('mkv-c-quality').value = q;
-  document.getElementById('mkv-calidad').innerHTML = ['Ligera', 'Alta', 'Máxima'].map(x =>
-    `<button onclick="mkvCalidad('${x}')" class="mkv-seg ${x === q ? 'on' : ''}">${x}</button>`).join('');
-  if (guardar) mkvConfig();
-}
 function _mkvConfigBody() {
   return {
     seconds: parseInt(document.getElementById('mkv-c-seconds').value) || 8,

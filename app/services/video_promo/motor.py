@@ -330,7 +330,7 @@ def paste(fr, layer, x, y, a=1.0, scale=1.0, anchor='mm'):
     if layer is None: return
     if scale != 1.0:
         if scale <= 0.01: return
-        layer = layer.resize((max(1, int(layer.width * scale)), max(1, int(layer.height * scale))), Image.BILINEAR)
+        layer = layer.resize((max(1, int(layer.width * scale)), max(1, int(layer.height * scale))), Image.BICUBIC)
     layer = with_alpha(layer, a)
     if layer is None: return
     if anchor == 'mm': x, y = x - layer.width // 2, y - layer.height // 2
@@ -452,7 +452,10 @@ def build_wave():
     dr.text((40, 238), CONFIG.get('footer_left', ''), font=font(BOLD, 26), fill=(255, 255, 255, 255), anchor='lm')
     return wave
 
-QUALITY = {'Máxima': (15, 'slow'), 'Alta': (18, 'medium'), 'Ligera': (23, 'medium')}
+# Siempre máxima calidad: Full HD 1080p, H.264 perfil High ajustado para gráficos/animación.
+# (El Roku Express 3960MX de la farmacia reproduce hasta 1080p; 4K no se vería mejor ahí.)
+CRF_MAX, PRESET_MAX = 14, 'slow'
+QUALITY = {'Máxima': (CRF_MAX, PRESET_MAX), 'Alta': (CRF_MAX, PRESET_MAX), 'Ligera': (CRF_MAX, PRESET_MAX)}
 
 def export_images(products, config, folder, progress=None, t=4.0):
     """Guarda una imagen JPG 1920x1080 por producto (para WhatsApp, Facebook, impresión)."""
@@ -500,6 +503,8 @@ def preview(product, config, t=4.0):
 def _encoder(path, crf, preset, log):
     return subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(), '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}',
                              '-r', str(FPS), '-i', '-', '-c:v', 'libx264', '-preset', preset, '-crf', str(crf),
+                             '-tune', 'animation', '-profile:v', 'high', '-level', '4.1',
+                             '-maxrate', '20M', '-bufsize', '40M',          # nítido y seguro para el Roku
                              '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path],
                             stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log,
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -514,7 +519,7 @@ def generate(products, config, out_path, progress=None, cancelled=lambda: False)
     S = SLIDE
     total = ni + n * len(products); done = 0
     log = open(os.path.join(LOG_DIR, 'ffmpeg_log.txt'), 'w')
-    crf, preset = QUALITY.get(config.get('quality', 'Alta'), QUALITY['Alta'])
+    crf, preset = CRF_MAX, PRESET_MAX                    # siempre máxima calidad
     repeat = max(1, int(config.get('repeat', 1) or 1))
     final_path = out_path
     if repeat > 1:                     # intro y productos por separado; luego se unen: intro + productos x N

@@ -32,7 +32,7 @@ TERMINAL_DEFAULT = dict(
     chips=['Débito', 'Crédito', 'Sin contacto'],
 )
 DEFAULT_CONFIG = dict(
-    seconds=8, intro=True, quality='Alta', repeat=1, default_style='destacado',
+    seconds=8, intro=True, quality='Máxima', repeat=1, default_style='destacado',
     footer_left='FARMACIA EBENEZER  ·  Cerca de ti, como una roca firme',
     footer_right='Precios sujetos a cambio sin previo aviso. Consulte a su médico.',
     out_dir=str(OUT_DIR_DEFAULT),
@@ -71,6 +71,7 @@ def cargar_proyecto():
     if 'disenos' not in (d.get('config', {}).get('terminal') or {}):      # proyectos de antes: un solo diseño
         conf['terminal']['disenos'] = [conf['terminal'].get('diseno') or 'terminal']
     if conf.get('default_style') not in ESTILOS: conf['default_style'] = 'destacado'
+    conf['quality'] = 'Máxima'                     # siempre máxima calidad
     items = [dict(ITEM_DEFAULT, **it) for it in d.get('items', []) if it.get('producto_id')]
     for it in items:                       # el estilo clásico se retiró
         if it.get('style') not in ESTILOS: it['style'] = 'destacado'
