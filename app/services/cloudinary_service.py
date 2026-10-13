@@ -334,6 +334,13 @@ def upload_product_image(file_path: str, product_id) -> str:
     filename = f"producto_{product_id}"
     if not _cloudinary_configured():
         return _save_local(file_path, "medicamentos", filename)
+    # Cada producto tiene UNA foto en Cloudinary (identificador fijo producto_{id}). Si la foto
+    # que se quiere subir es exactamente la misma que ya tiene, no se vuelve a subir.
+    import hashlib
+    huella = hashlib.md5(Path(file_path).read_bytes()).hexdigest()
+    manifest = _load_manifest()
+    if manifest.get(f"{filename}#huella") == huella and str(manifest.get(filename, "")).startswith("http"):
+        return manifest[filename]
     _configure()
     try:
         size = _STANDARD_SIZE["medicamentos"]
@@ -359,6 +366,7 @@ def upload_product_image(file_path: str, product_id) -> str:
             _save_local(file_path, "medicamentos", filename)
             manifest = _load_manifest()
             manifest[filename] = url
+            manifest[f"{filename}#huella"] = huella
             _save_manifest(manifest)
         except Exception:
             pass
@@ -391,7 +399,7 @@ def delete_product_image(product_id) -> None:
     filename = f"producto_{product_id}"
     _delete_local("medicamentos", filename)
     manifest = _load_manifest()
-    if manifest.pop(filename, None) is not None:
+    if (manifest.pop(filename, None), manifest.pop(f"{filename}#huella", None)) != (None, None):
         _save_manifest(manifest)
     if not _cloudinary_configured():
         return
