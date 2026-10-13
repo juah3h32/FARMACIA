@@ -419,7 +419,8 @@ def render(L, p, t):
 
 def render_intro(t):
     fr = Image.new('RGBA', (W, H), (255, 255, 255, 255))
-    fr.alpha_composite(WAVE, (0, H - 260))
+    a = appear(t, 0.2, 0.6)                    # la ola sube al empezar (igual que el Generador de Promos)
+    fr.alpha_composite(WAVE, (0, int(H - 260 + 260 * (1 - a))))
     cx, cy = W / 2, H / 2 - 50
     pop = ease_out_back((t - 0.1) / 0.9, 1.3)
     fade_out = ease_in_cubic((t - 2.3) / 0.7)              # al final: zoom suave y se desvanece

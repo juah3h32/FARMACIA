@@ -211,9 +211,11 @@ def render_destacado(L, p, t):
     out = ease_in_cubic((t - (S - 0.55)) / 0.55); vis = 1 - out
     col = L['col']
     # franjas de color que entran por los lados
-    k = ease_out_cubic(t / 0.6)
-    fr.alpha_composite(L['band_l'], (int(-150 * (1 - k)), 0))
-    fr.alpha_composite(L['band_r'], (int(W - 150 + 150 * (1 - k)), 170))
+    # entran por los lados y al final salen igual (no se quedan pegadas al pasar al otro producto)
+    k = ease_out_cubic(t / 0.6) * vis
+    if k > 0.005:
+        fr.alpha_composite(M.with_alpha(L['band_l'], min(1, k * 1.5)), (int(-150 * (1 - k)), 0))
+        fr.alpha_composite(M.with_alpha(L['band_r'], min(1, k * 1.5)), (int(W - 150 + 150 * (1 - k)), 170))
     # círculo y producto
     dx = -300 * out
     a = ease_out_back((t - 0.1) / 0.8, 1.4)
