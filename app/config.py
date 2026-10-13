@@ -191,3 +191,5 @@ FACTURACOM_SECRET_KEY = _load_key("FACTURACOM_SECRET_KEY", "facturacom_secret.ke
 
 
 OPENAI_API_KEY = _load_key("OPENAI_API_KEY", "openai.key")
+# Claude (Anthropic): descripción corta del video promocional (Marketing → Video promocional)
+ANTHROPIC_API_KEY = _load_key("ANTHROPIC_API_KEY", "anthropic.key")

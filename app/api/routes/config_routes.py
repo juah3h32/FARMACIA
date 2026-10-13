@@ -33,6 +33,7 @@ _INTEGRACIONES_MAP = {
     "turso_database_url":   ("TURSO_DATABASE_URL",   "turso_url.key",        False),
     "turso_auth_token":     ("TURSO_AUTH_TOKEN",      "turso.key",            True),
     "openai_api_key":       ("OPENAI_API_KEY",        "openai.key",           True),
+    "anthropic_api_key":    ("ANTHROPIC_API_KEY",     "anthropic.key",        True),
     "cloudinary_cloud_name": ("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud.key", False),
     "cloudinary_api_key":   ("CLOUDINARY_API_KEY",    "cloudinary_api.key",   True),
     "cloudinary_api_secret": ("CLOUDINARY_API_SECRET", "cloudinary_secret.key", True),
@@ -60,6 +61,7 @@ class IntegracionesIn(BaseModel):
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
     removebg_api_key: str = ""
+    anthropic_api_key: str = ""
     removebg_auto: bool = False
 
 

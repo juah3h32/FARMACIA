@@ -2,6 +2,7 @@
 
 import escpos
 import os
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 escpos_dir = os.path.dirname(escpos.__file__)
 cap_json = os.path.join(escpos_dir, 'capabilities.json')
@@ -9,13 +10,13 @@ cap_json = os.path.join(escpos_dir, 'capabilities.json')
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=collect_dynamic_libs('imageio_ffmpeg'),
     datas=[
         ('app/web', 'app/web'),
         ('assets', 'assets'),
         ('Font Montserrat', 'Font Montserrat'),
         (cap_json, 'escpos'),
-    ],
+    ] + collect_data_files('imageio_ffmpeg', include_py_files=False),
     hiddenimports=[
         'uvicorn', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto',
         'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto',
@@ -38,6 +39,11 @@ a = Analysis(
         'openai', 'openai.resources', 'openai.resources.chat',
         'openai.resources.chat.completions',
         'httpx', 'httpcore',
+        # Marketing → Video promocional
+        'app.api.routes.video_promo_routes',
+        'app.services.video_promo.servicio', 'app.services.video_promo.motor',
+        'app.services.video_promo.estilos', 'app.services.video_promo.ia',
+        'imageio_ffmpeg', 'anthropic',
     ],
     hookspath=[],
     hooksconfig={},

@@ -1059,6 +1059,31 @@
   .page[data-page="settings"].active { display:block !important; overflow-y:auto; overflow-x:hidden; }
   .page[data-page="reports"].active { overflow-y:auto; overflow-x:hidden; }
   .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
+  .mkv-chip { height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; }
+  .mkv-chip:hover { filter:brightness(.96); }
+  .mkv-dark { height:36px; padding:0 12px; border-radius:10px; font-size:13px; background:#2E3F7A; border:1px solid #4A5C99; color:#fff; outline:none; }
+  .mkv-dark::placeholder { color:#9AA8D0; }
+  .mkv-dark:focus { border-color:#AFC0E8; }
+  .mkv-sb { height:32px; border-radius:8px; font-size:12px; font-weight:700; background:#2E3F7A; color:#fff; }
+  .mkv-sb:hover { background:#3B4E8F; }
+  .mkv-sb-del:hover { background:#9B2C2C; }
+  .mkv-sb-out { height:30px; border-radius:8px; font-size:12px; color:#fff; border:1px solid #4A5C99; }
+  .mkv-sb-out:hover { background:#2E3F7A; }
+  .mkv-scroll::-webkit-scrollbar { width:6px; } .mkv-scroll::-webkit-scrollbar-thumb { background:#4A5C99; border-radius:3px; }
+  .mkv-tab { height:32px; padding:0 22px; border-radius:9px; font-size:13px; font-weight:700; color:#64748B; }
+  .mkv-tab.on { background:#243366; color:#fff; }
+  .mkv-seg { height:30px; padding:0 12px; border-radius:7px; font-size:12px; font-weight:700; color:#475569; }
+  .mkv-seg.on { background:#243366; color:#fff; }
+  .mkv-fila:hover { background:#2E3F7A; } .mkv-fila.sel { background:#3373B9; }
+  .mkv-pan { display:none; }
+  .mkv-pan.on { display:flex; }
+  .mkv-lbl { display:block; font-size:12px; font-weight:700; color:#64748B; margin-bottom:4px; }
+  .mkv-row { display:flex; align-items:center; gap:10px; } .mkv-row > .mkv-lbl { width:150px; margin:0; flex-shrink:0; }
+  .mkv-inp { height:36px; padding:0 10px; border-radius:8px; border:1px solid #DCE3EE; background:#F8FAFD; font-size:13px; color:#0F172A; outline:none; }
+  .mkv-inp:focus { border-color:#3373B9; background:#fff; }
+  .mkv-switch { appearance:none; -webkit-appearance:none; width:38px; height:20px; border-radius:999px; background:#CBD5E1; position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
+  .mkv-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .2s; }
+  .mkv-switch:checked { background:#16A34A; } .mkv-switch:checked::after { left:20px; }
   .nav-item { transition:background .15s,color .15s,box-shadow .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
   .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
@@ -3506,6 +3531,9 @@
           <button id="mkt-tab-manual" onclick="mktSwitchTab('manual')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
             style="background:transparent;color:#64748B"><i data-lucide="book-open" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Manual PDF</button>
+          <button id="mkt-tab-video" onclick="mktSwitchTab('video')"
+            class="flex-1 h-11 text-sm font-semibold transition-all"
+            style="background:transparent;color:#64748B"><i data-lucide="clapperboard" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Video promocional</button>
         </div>
 
         <!-- ── PDF Panel ── -->
@@ -3755,6 +3783,315 @@
                 <i data-lucide="download" style="width:18px;height:18px"></i>
                 Descargar Manual PDF
               </button>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Catálogo en tarjetas para elegir productos del video -->
+        <div id="mkv-cat" class="fixed inset-0 z-50 items-center justify-center p-6" style="display:none;background:rgba(15,23,42,.55)" onclick="if(event.target===this)mkvCatCerrar()">
+          <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden w-full h-full" style="max-width:1400px;max-height:900px">
+            <div class="flex items-center gap-3 px-5 py-4 border-b flex-wrap" style="border-color:#E2E8F0">
+              <p class="text-lg font-extrabold mr-2" style="color:#243366">Catálogo de productos</p>
+              <input id="mkv-cat-q" class="mkv-inp" style="width:280px" placeholder="🔍 Buscar por nombre, genérico o código…" oninput="mkvCatPintar()">
+              <select id="mkv-cat-orden" class="mkv-inp" style="width:210px" onchange="mkvCatPintar()">
+                <option value="asc">Precio: menor a mayor</option>
+                <option value="desc">Precio: mayor a menor</option>
+                <option value="nombre">Nombre (A-Z)</option>
+              </select>
+              <div class="flex items-center gap-1 text-xs" style="color:#64748B">
+                $<input id="mkv-cat-min" type="number" min="0" class="mkv-inp" style="width:80px" placeholder="mín" oninput="mkvCatPintar()">
+                –<input id="mkv-cat-max" type="number" min="0" class="mkv-inp" style="width:80px" placeholder="máx" oninput="mkvCatPintar()">
+              </div>
+              <label class="flex items-center gap-2 text-xs cursor-pointer select-none" style="color:#334155">
+                <input id="mkv-cat-sinfoto" type="checkbox" class="mkv-switch" onchange="mkvCatPintar()"> Mostrar también sin foto
+              </label>
+              <div class="flex-1"></div>
+              <button onclick="mkvCatCerrar()" class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#64748B">✕</button>
+            </div>
+            <div id="mkv-cat-grid" class="flex-1 overflow-y-auto p-5 grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));align-content:start;background:#F4F7FC"></div>
+            <div class="flex items-center gap-3 px-5 py-3 border-t" style="border-color:#E2E8F0">
+              <p id="mkv-cat-info" class="text-xs flex-1" style="color:#64748B"></p>
+              <button onclick="mkvCatSelTodos()" class="h-10 px-4 rounded-xl text-xs font-bold" style="background:#EEF2F8;color:#243366">Seleccionar los que se ven</button>
+              <button onclick="mkvCatSel.clear();mkvCatPintar()" class="h-10 px-4 rounded-xl text-xs font-bold" style="background:#EEF2F8;color:#243366">Limpiar</button>
+              <button id="mkv-cat-ok" onclick="mkvCatAgregar()" class="h-10 px-5 rounded-xl text-sm font-bold text-white" style="background:#16A34A">Agregar al video</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Video promocional (pantalla de la farmacia) — mismo diseño que el Generador de Promos ── -->
+        <div id="mkt-panel-video" class="hidden flex-1 overflow-hidden rounded-2xl" style="display:none;background:#EEF2F8">
+          <!-- Barra lateral: productos del video -->
+          <div class="flex flex-col flex-shrink-0 overflow-hidden" style="width:290px;background:#243366">
+            <div class="bg-white rounded-2xl mx-4 mt-4 mb-1 flex items-center justify-center" style="height:78px">
+              <img src="/api/marketing/video/logo" alt="Farmacia Ebenezer" style="max-height:58px;max-width:220px;object-fit:contain"
+                   onerror="this.outerHTML='<span class=&quot;text-base font-extrabold&quot; style=&quot;color:#243366&quot;>FARMACIA EBENEZER</span>'">
+            </div>
+            <p class="text-center text-xs mb-3" style="color:#AFC0E8">Generador de promociones</p>
+            <div class="flex items-center gap-2 px-4">
+              <p class="text-lg font-bold text-white">Productos</p>
+              <span id="mkv-count" class="text-[11px] font-bold px-2 py-0.5 rounded-lg" style="background:#AFC0E8;color:#243366">0</span>
+            </div>
+            <div class="relative px-4 mt-2">
+              <input id="mkv-buscar" class="mkv-dark w-full" placeholder="🔍  Buscar en inventario para agregar…" oninput="mkvBuscar()" autocomplete="off">
+              <div id="mkv-resultados" class="hidden absolute left-4 right-4 top-full mt-1 bg-white rounded-xl border shadow-2xl z-30 overflow-y-auto" style="border-color:#E2E8F0;max-height:340px"></div>
+            </div>
+            <div class="px-4 mt-2">
+              <button onclick="mkvCatAbrir()" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90" style="background:#fff;color:#243366">
+                <i data-lucide="layout-grid" style="width:16px;height:16px"></i> Ver catálogo y elegir varios
+              </button>
+            </div>
+            <p class="text-[10px] text-center mt-1 mb-2" style="color:#9AA8D0">Solo se pueden agregar productos con foto</p>
+            <div id="mkv-term" class="px-2 pb-1"></div>
+            <div id="mkv-lista" class="flex-1 overflow-y-auto px-2 flex flex-col gap-1 mkv-scroll"></div>
+            <div class="flex gap-1 px-4 pt-2">
+              <button onclick="mkvMover(_mkv.sel,-1)" class="mkv-sb flex-1" title="Subir">▲</button>
+              <button onclick="mkvMover(_mkv.sel,1)" class="mkv-sb flex-1" title="Bajar">▼</button>
+              <button onclick="mkvQuitar(_mkv.sel)" class="mkv-sb mkv-sb-del" style="flex:2">Quitar</button>
+            </div>
+            <div class="flex gap-1 px-4 pt-1 pb-4">
+              <button onclick="mkvTodos(true)" class="mkv-sb-out flex-1">Activar todos</button>
+              <button onclick="mkvTodos(false)" class="mkv-sb-out flex-1">Desactivar todos</button>
+            </div>
+          </div>
+
+          <!-- Área principal -->
+          <div class="flex-1 flex flex-col gap-3 p-3 overflow-hidden min-w-0">
+            <!-- Encabezado del producto -->
+            <div class="bg-white rounded-2xl flex items-center gap-4 px-5 flex-shrink-0" style="height:76px">
+              <div class="flex-1 min-w-0">
+                <p id="mkv-ed-nombre" class="text-xl font-extrabold truncate" style="color:#243366">Agrega tus productos</p>
+                <p id="mkv-ed-precio" class="text-xs truncate" style="color:#64748B"></p>
+              </div>
+              <div id="mkv-head-ctrl" class="flex items-center gap-4">
+                <div id="mkv-head-estilo">
+                  <div class="flex items-center justify-between mb-1">
+                    <p class="text-[10px] font-bold" style="color:#64748B">Estilo de animación</p>
+                    <label class="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer select-none" style="color:#243366" title="Al elegir un estilo se cambia en todos los productos del video">
+                      <input id="mkv-estilo-todos" type="checkbox" class="mkv-switch" style="transform:scale(.8)" onchange="mkvEstiloTodosPref(this.checked)"> Aplicar a todos
+                    </label>
+                  </div>
+                  <div id="mkv-estilos" class="flex rounded-lg p-0.5" style="background:#EEF2F8"></div>
+                </div>
+                <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
+                  <input id="mkv-en-video" type="checkbox" class="mkv-switch" onchange="mkvEnVideo(this.checked)"> En el video
+                </label>
+                <button id="mkv-btn-ia" onclick="mkvIA(true)" class="h-10 px-5 rounded-xl text-sm font-bold text-white flex items-center gap-2 hover:opacity-90" style="background:#7C3AED">
+                  ✨ Llenar con IA
+                </button>
+              </div>
+            </div>
+
+            <div class="flex-1 flex gap-3 min-h-0">
+              <!-- Pestañas: Producto / Precio / Ajustes -->
+              <div class="bg-white rounded-2xl flex flex-col flex-1 min-w-0 overflow-hidden">
+                <div class="flex justify-center pt-3">
+                  <div class="flex rounded-xl p-1" style="background:#EEF2F8">
+                    <button id="mkv-tab-terminal" onclick="mkvTab('terminal')" class="mkv-tab" style="display:none">💳 Terminal</button>
+                    <button id="mkv-tab-producto" onclick="mkvTab('producto')" class="mkv-tab">Producto</button>
+                    <button id="mkv-tab-precio" onclick="mkvTab('precio')" class="mkv-tab">Precio</button>
+                    <button id="mkv-tab-ajustes" onclick="mkvTab('ajustes')" class="mkv-tab">Ajustes</button>
+                  </div>
+                </div>
+
+                <div id="mkv-vacio" class="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center">
+                  <i data-lucide="clapperboard" style="width:44px;height:44px;color:#CBD5E1"></i>
+                  <p class="text-sm font-semibold" style="color:#64748B">Busca productos de tu inventario en la barra azul y agrégalos al video</p>
+                  <p class="text-xs" style="color:#94A3B8">La IA escribe la descripción corta una sola vez por producto; tú no tienes que escribir nada.</p>
+                </div>
+
+                <!-- Producto -->
+                <div id="mkv-pan-producto" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3">
+                  <div class="rounded-xl flex items-center gap-4 p-3" style="background:#F4F7FC">
+                    <div class="bg-white rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style="width:150px;height:100px">
+                      <img id="mkv-thumb" class="w-full h-full object-contain" alt="">
+                    </div>
+                    <div class="min-w-0">
+                      <p id="mkv-inv-info" class="text-xs" style="color:#64748B"></p>
+                      <p class="text-[11px] mt-1" style="color:#94A3B8">La foto y el nombre se cambian en Inventario.</p>
+                      <p id="mkv-ia-estado" class="text-xs font-bold mt-2" style="color:#7C3AED"></p>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Descripción (franja de color)</label>
+                    <input id="mkv-desc" class="mkv-inp w-full" maxlength="80" placeholder="La IA la escribe automáticamente" oninput="mkvCampo('desc', this.value)">
+                    <p class="text-[10px] mt-1" style="color:#9CA3AF">Una frase corta, máximo ~60 letras.</p>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Beneficios (palomitas)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                      <input id="mkv-b0" class="mkv-inp" maxlength="30" oninput="mkvBen(0, this.value)">
+                      <input id="mkv-b1" class="mkv-inp" maxlength="30" oninput="mkvBen(1, this.value)">
+                      <input id="mkv-b2" class="mkv-inp" maxlength="30" oninput="mkvBen(2, this.value)">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Precio -->
+                <div id="mkv-pan-precio" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3">
+                  <div class="rounded-2xl px-5 py-3" style="background:#FEF2F2">
+                    <p class="text-xs font-bold" style="color:#DC2626">PRECIO (de tu inventario)</p>
+                    <div class="flex items-end gap-4">
+                      <p class="font-extrabold leading-none" style="color:#DC2626;font-size:52px"><span style="font-size:34px">$</span><span id="mkv-precio-grande">0</span></p>
+                      <div class="pb-1">
+                        <p class="text-[11px]" style="color:#64748B">por</p>
+                        <select id="mkv-unit" class="mkv-inp" style="width:120px" onchange="mkvCampo('unit', this.value)">
+                          <option value="">—</option><option>c/u</option><option>caja</option><option>pza</option><option>frasco</option><option>sobre</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p class="text-[11px] mt-1" style="color:#94A3B8">Para cambiar el precio, edítalo en Inventario y el video lo toma solo.</p>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Precio anterior (tachado, opcional)</label>
+                    <input id="mkv-old" class="mkv-inp" style="width:200px" placeholder="Opcional" oninput="mkvCampo('old_price', this.value)">
+                  </div>
+                  <label id="mkv-pieza-wrap" class="flex items-center gap-2 text-sm cursor-pointer" style="color:#334155">
+                    <input id="mkv-pieza" type="checkbox" class="mkv-switch" onchange="mkvCampo('show_piece', this.checked)"> <span id="mkv-pieza-txt">Mostrar precio por pieza (etiqueta amarilla)</span>
+                  </label>
+                  <div>
+                    <label class="mkv-lbl">Etiqueta de promoción (sobre el producto)</label>
+                    <input id="mkv-tag" class="mkv-inp" style="width:260px" maxlength="20" placeholder="Opcional: OFERTA, 2x1…" oninput="mkvCampo('tag', this.value)">
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                      <button onclick="mkvTag('OFERTA')" class="mkv-chip">OFERTA</button>
+                      <button onclick="mkvTag('2x1')" class="mkv-chip">2x1</button>
+                      <button onclick="mkvTag('3x2')" class="mkv-chip">3x2</button>
+                      <button onclick="mkvTag('NUEVO')" class="mkv-chip">NUEVO</button>
+                      <button onclick="mkvTag('DESCUENTO')" class="mkv-chip">DESCUENTO</button>
+                      <button onclick="mkvTag('')" class="mkv-chip" style="background:#F3F4F6;color:#64748B">Ninguna</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Terminal: anuncio de pago con tarjeta -->
+                <div id="mkv-pan-terminal" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3">
+                  <div class="rounded-xl p-3 flex items-center gap-3" style="background:#EEF4FC">
+                    <span style="font-size:30px">💳</span>
+                    <p class="text-xs" style="color:#334155">Anuncio animado de tu terminal de pago: una tarjeta se acerca, la pantalla dice <b>APROBADO</b> y aparecen las tarjetas que aceptas. Puedes meterlo en el video de promociones o generar un video solo de esto.</p>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Diseños del anuncio (puedes marcar varios)</label>
+                    <div id="mkv-t-disenos" class="grid grid-cols-4 gap-2"></div>
+                    <p id="mkv-t-dis-txt" class="text-[11px] mt-1" style="color:#64748B"></p>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Título</label>
+                    <input id="mkv-t-titulo" class="mkv-inp w-full" maxlength="60" oninput="mkvTerm('titulo', this.value)">
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Frase de abajo</label>
+                    <input id="mkv-t-sub" class="mkv-inp w-full" maxlength="120" oninput="mkvTerm('subtitulo', this.value)">
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Tarjetas que aceptas</label>
+                    <div id="mkv-t-marcas" class="flex flex-wrap gap-2"></div>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">Palomitas</label>
+                    <div class="grid grid-cols-3 gap-2">
+                      <input id="mkv-t-c0" class="mkv-inp" maxlength="20" oninput="mkvTermChip(0, this.value)">
+                      <input id="mkv-t-c1" class="mkv-inp" maxlength="20" oninput="mkvTermChip(1, this.value)">
+                      <input id="mkv-t-c2" class="mkv-inp" maxlength="20" oninput="mkvTermChip(2, this.value)">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="mkv-lbl">¿Dónde sale en el video de promociones?</label>
+                    <div class="flex items-center gap-3 flex-wrap">
+                      <div id="mkv-t-pos" class="flex rounded-lg p-0.5" style="background:#EEF2F8"></div>
+                      <span id="mkv-t-cada-wrap" class="flex items-center gap-2 text-xs" style="color:#64748B">cada
+                        <select id="mkv-t-cada" class="mkv-inp" style="width:70px" onchange="mkvTerm('cada', parseInt(this.value))"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select> productos</span>
+                    </div>
+                  </div>
+                  <button id="mkv-btn-term" onclick="mkvGenerar(true)" class="h-11 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 hover:opacity-90 mt-1" style="background:#243366">
+                    🎬 Generar video solo de tarjetas (con los diseños marcados)
+                  </button>
+                </div>
+
+                <!-- Ajustes -->
+                <div id="mkv-pan-ajustes" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-2">
+                  <p class="text-base font-bold" style="color:#243366">Inteligencia artificial (Claude) <span id="mkv-ia-badge" class="text-xs ml-1"></span></p>
+                  <p class="text-xs" style="color:#64748B">La IA escribe la descripción y los beneficios de cada producto NUEVO, una sola vez. Generar videos nunca gasta IA.</p>
+                  <div class="flex gap-2 items-center">
+                    <input id="mkv-clave" type="password" class="mkv-inp flex-1" placeholder="Clave sk-ant-…">
+                    <button onclick="mkvGuardarClave()" class="h-9 px-4 rounded-lg text-white font-bold text-xs" style="background:#7C3AED">Guardar clave</button>
+                  </div>
+                  <p class="text-[10px]" style="color:#9CA3AF">Consíguela en console.anthropic.com → API Keys. Sin clave, la descripción se arma con los datos de tu inventario.</p>
+                  <button onclick="mkvIATodos()" class="h-9 rounded-lg text-white font-bold text-xs self-start px-4" style="background:#7C3AED">✨ Llenar con IA todos los productos</button>
+
+                  <p class="text-base font-bold mt-3" style="color:#243366">Video</p>
+                  <div class="mkv-row"><span class="mkv-lbl">Segundos por producto</span>
+                    <div class="flex items-center gap-2 flex-1"><input id="mkv-c-seconds" type="range" min="4" max="15" step="1" class="flex-1" style="accent-color:#3373B9" oninput="document.getElementById('mkv-sec-lbl').textContent=this.value+' s'" onchange="mkvConfig()"><span id="mkv-sec-lbl" class="text-sm font-bold w-10" style="color:#243366"></span></div>
+                  </div>
+                  <div class="mkv-row"><span class="mkv-lbl">Calidad</span>
+                    <div id="mkv-calidad" class="flex rounded-lg p-0.5" style="background:#EEF2F8"></div>
+                    <input id="mkv-c-quality" type="hidden">
+                  </div>
+                  <div class="mkv-row"><span class="mkv-lbl">Repetir el video</span>
+                    <select id="mkv-c-repeat" class="mkv-inp" style="width:80px" onchange="mkvConfig()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select>
+                    <span class="text-[10px]" style="color:#9CA3AF">Ej. 5 = el mismo video 5 veces seguidas</span>
+                  </div>
+                  <div class="mkv-row"><span class="mkv-lbl">Estilo para nuevos</span>
+                    <select id="mkv-c-style" class="mkv-inp" style="width:140px" onchange="mkvConfig()"><option value="destacado">Destacado</option><option value="cortinilla">Cortinilla</option><option value="minimal">Minimal</option></select>
+                    <button onclick="mkvEstiloTodos()" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#1F2937">Aplicar a todos</button>
+                  </div>
+
+                  <p class="text-base font-bold mt-3" style="color:#243366">Textos y carpeta</p>
+                  <div class="mkv-row"><span class="mkv-lbl">Pie izquierdo</span><input id="mkv-c-fl" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
+                  <div class="mkv-row"><span class="mkv-lbl">Pie derecho</span><input id="mkv-c-fr" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
+                  <div class="mkv-row"><span class="mkv-lbl">Guardar videos en</span><input id="mkv-c-out" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
+
+                  <p class="text-base font-bold mt-3" style="color:#243366">Google Drive (pantalla de la farmacia)</p>
+                  <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
+                    <input id="mkv-d-on" type="checkbox" class="mkv-switch" onchange="mkvDrive()"> Subir cada video a Google Drive al generarlo
+                  </label>
+                  <div id="mkv-d-wrap" class="flex flex-col gap-1">
+                    <div class="mkv-row"><span class="mkv-lbl">Carpeta de Drive</span><input id="mkv-c-drive" class="mkv-inp flex-1" placeholder="G:\Mi unidad\Videos Roku" onchange="mkvDrive()">
+                      <button onclick="mkvDriveDetectar()" class="h-9 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#1F2937">Detectar</button></div>
+                    <p id="mkv-d-msg" class="text-[11px]" style="color:#64748B"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Columna derecha: vista previa y exportar -->
+              <div class="flex flex-col gap-3 flex-shrink-0 overflow-y-auto" style="width:480px">
+                <div class="bg-white rounded-2xl p-4 flex flex-col gap-2">
+                  <div class="flex items-center justify-between">
+                    <p class="text-base font-bold" style="color:#243366">Vista previa</p>
+                    <button onclick="mkvPreview()" class="h-8 px-3 rounded-lg text-xs font-bold text-white" style="background:#3373B9">Actualizar</button>
+                  </div>
+                  <div class="rounded-xl overflow-hidden flex items-center justify-center border" style="background:#fff;border-color:#E2E8F0;aspect-ratio:16/9">
+                    <img id="mkv-preview" class="w-full h-full object-contain hidden" alt="">
+                    <span id="mkv-preview-msg" class="text-xs" style="color:#94A3B8">Selecciona un producto</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs" style="color:#64748B">Momento de la animación</span>
+                    <input id="mkv-t" type="range" min="0" max="8" step="0.1" value="4" class="flex-1" style="accent-color:#3373B9" oninput="mkvPreviewLuego(250)">
+                  </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 flex flex-col gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="mkv-lbl" style="margin:0">Nombre del video</span>
+                    <input id="mkv-nombre" class="mkv-inp flex-1">
+                  </div>
+                  <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
+                    <input id="mkv-c-intro" type="checkbox" class="mkv-switch" onchange="mkvConfig()"> Intro con el logo al inicio
+                    <span class="text-[10px]" style="color:#94A3B8">(si repites el video, sale una sola vez)</span>
+                  </label>
+                  <p id="mkv-resumen" class="text-xs" style="color:#64748B"></p>
+                  <button id="mkv-btn-generar" onclick="mkvGenerar()" class="rounded-xl font-extrabold text-white flex items-center justify-center gap-3 hover:opacity-90" style="height:56px;font-size:18px;background:#16A34A">
+                    🎬 GENERAR VIDEO
+                  </button>
+                  <div class="h-2 rounded-full overflow-hidden" style="background:#E2E8F0"><div id="mkv-barra" class="h-full" style="width:0;background:#16A34A;transition:width .3s"></div></div>
+                  <p id="mkv-estado" class="text-xs" style="color:#64748B">Listo.</p>
+                  <div class="flex gap-2">
+                    <button id="mkv-btn-cancelar" onclick="mkvCancelar()" class="hidden h-8 px-3 rounded-lg text-xs font-bold" style="background:#FEE2E2;color:#DC2626">Cancelar</button>
+                    <div class="flex-1"></div>
+                    <button onclick="mkvAbrir('carpeta')" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#243366">📂 Abrir carpeta</button>
+                    <button onclick="mkvAbrir('video')" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#243366">▶ Ver último video</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -14062,7 +14399,7 @@ function _mktUpdateDescStatus() {
 }
 
 function mktSwitchTab(tab) {
-  const tabs = ['pdf', 'promo', 'manual'];
+  const tabs = ['pdf', 'promo', 'manual', 'video'];
   tabs.forEach(t => {
     const pan = document.getElementById(`mkt-panel-${t}`);
     const btn = document.getElementById(`mkt-tab-${t}`);
@@ -14073,6 +14410,7 @@ function mktSwitchTab(tab) {
     btn.style.background = active ? '#1d2140' : 'transparent';
     btn.style.color      = active ? '#fff'    : '#64748B';
   });
+  if (tab === 'video') loadVideoPromo();
   // Mostrar versión actual en el panel del manual
   if (tab === 'manual') {
     const vEl = document.getElementById('mkt-manual-version');
@@ -14100,6 +14438,605 @@ async function mktDescargarManual() {
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i> Descargar Manual PDF'; lucide.createIcons(); }
   }
+}
+
+
+// ── Marketing → Video promocional ─────────────────────────────────────────────
+// Productos del inventario + descripción corta de la IA (Claude, una vez por producto)
+// → video 1920x1080 para la pantalla de la farmacia. Generar el video no gasta IA.
+const MKV_ESTILOS = [
+  { k:'destacado',  l:'Destacado' },
+  { k:'cortinilla', l:'Cortinilla' },
+  { k:'minimal',    l:'Minimal' },
+];
+let _mkv = { config:{}, items:[], sel:-1, iaLista:false, cargado:false, tab:'producto', term:false };
+let _mkvTermT = null, _mkvTermVer = null;   // diseño que se ve en la vista previa
+const MKV_MARCAS = [{ k:'visa', l:'Visa' }, { k:'mastercard', l:'Mastercard' }, { k:'amex', l:'American Express' }, { k:'carnet', l:'Carnet' }];
+const MKV_DISENOS = [
+  { k:'terminal', l:'Terminal',   d:'Tarjeta que toca la terminal' },
+  { k:'persona',  l:'Persona',    d:'Alguien paga: "¡Pago aplicado!"' },
+  { k:'abanico',  l:'Abanico',    d:'Las tarjetas se abren en abanico' },
+  { k:'contacto', l:'Sin contacto', d:'Ondas y "Pago aprobado"' },
+];
+let _mkvEstiloTodos = true;
+try { _mkvEstiloTodos = localStorage.getItem('mkv_estilo_todos') !== '0'; } catch (_) {}
+function mkvEstiloTodosPref(v) { _mkvEstiloTodos = v; try { localStorage.setItem('mkv_estilo_todos', v ? '1' : '0'); } catch (_) {} }
+const MKV_POS = [{ k:'inicio', l:'Al inicio' }, { k:'final', l:'Al final' }, { k:'intercalado', l:'Entre productos' }];
+let _mkvSaveT = null, _mkvPrevT = null, _mkvPrevTok = 0, _mkvPoll = null, _mkvIAcola = [], _mkvIAcorriendo = false;
+
+async function loadVideoPromo() {
+  try {
+    const d = await apiFetch('/marketing/video');
+    _mkv.config = d.config; _mkv.items = d.items; _mkv.iaLista = d.ia_lista; _mkv.cargado = true;
+    if (_mkv.sel >= _mkv.items.length) _mkv.sel = _mkv.items.length - 1;
+    if (_mkv.sel < 0 && _mkv.items.length) _mkv.sel = 0;
+    const c = d.config;
+    document.getElementById('mkv-c-seconds').value = c.seconds;
+    document.getElementById('mkv-sec-lbl').textContent = c.seconds + ' s';
+    document.getElementById('mkv-c-repeat').value  = String(c.repeat);
+    mkvCalidad(c.quality, false);
+    document.getElementById('mkv-c-style').value   = c.default_style;
+    document.getElementById('mkv-c-intro').checked = !!c.intro;
+    document.getElementById('mkv-c-fl').value  = c.footer_left || '';
+    document.getElementById('mkv-c-fr').value  = c.footer_right || '';
+    document.getElementById('mkv-c-out').value = c.out_dir || '';
+    _mkv.driveSug = d.drive_sugerido || '';
+    document.getElementById('mkv-d-on').checked = !!c.drive_dir;
+    document.getElementById('mkv-c-drive').value = c.drive_dir || _mkv.driveSug;
+    mkvDrivePintar();
+    document.getElementById('mkv-t').max = c.seconds;
+    document.getElementById('mkv-t').value = c.seconds / 2;
+    const nom = document.getElementById('mkv-nombre');
+    if (!nom.value) nom.value = `PROMOS_${_fechaLocal(new Date())}`;
+    mkvBadgeIA();
+    mkvTab(_mkv.tab);
+    if (d.tarea && d.tarea.state === 'trabajando') mkvSeguir();
+    // productos que aún no tienen descripción: la IA los llena sola
+    _mkv.items.forEach(it => { if (_mkvSinTextoIA(it)) mkvEncolarIA(it.producto_id); });
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function _mkvSinTextoIA(it) { return !it.desc && (!it.ia_desc || it.ia_origen === 'inventario'); }
+function mkvIATodos() {
+  if (!_mkv.iaLista) { toast('Primero guarda tu clave de Claude', 'warning'); return; }
+  const pend = _mkv.items.filter(_mkvSinTextoIA);
+  if (!pend.length) { toast('Todos los productos ya tienen descripción de la IA', 'info'); return; }
+  pend.forEach(it => mkvEncolarIA(it.producto_id));
+  toast(`La IA está escribiendo ${pend.length} descripciones…`, 'info');
+}
+function mkvBadgeIA() {
+  const b = document.getElementById('mkv-ia-badge');
+  b.textContent = _mkv.iaLista ? '· conectada ✓' : '· sin configurar';
+  b.style.color = _mkv.iaLista ? '#16A34A' : '#DC2626';
+}
+
+function _mkvEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _mkvPrecio(v) { return v == null ? '' : '$' + (Math.round(v) === v ? v : Number(v).toFixed(2)); }
+
+function mkvRender() {
+  const list = document.getElementById('mkv-lista');
+  const on = _mkv.items.filter(i => i.enabled);
+  document.getElementById('mkv-count').textContent = _mkv.items.length;
+  if (!_mkv.items.length) {
+    list.innerHTML = '<p class="text-xs text-center p-4" style="color:#9AA8D0">Aún no hay productos en el video.<br>Búscalos arriba para agregarlos.</p>';
+  } else {
+    list.innerHTML = _mkv.items.map((it, i) => {
+      const sel = i === _mkv.sel && !_mkv.term;
+      const ico = { destacado:'★', cortinilla:'◧', minimal:'○' }[it.style] || '★';
+      let det;
+      if (_mkvIAcola.includes(it.producto_id)) det = '<span style="color:#D8B4FE">✨ la IA está escribiendo…</span>';
+      else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">⚠ sin foto</span>';
+      else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>`;
+      const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" onerror="this.style.display='none'">` : '';
+      return `<div onclick="mkvSel(${i})" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}" style="opacity:${it.enabled ? 1 : .45}">
+        <input type="checkbox" ${it.enabled && it.tiene_foto ? 'checked' : ''} ${it.tiene_foto ? '' : 'disabled title="Sin foto"'} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvToggle(${i},this.checked)">
+        <div class="w-12 h-12 rounded-lg bg-white flex-shrink-0 overflow-hidden flex items-center justify-center">${img}</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[13px] font-bold truncate text-white">${ico} ${_mkvEsc(it.nombre)}</p>
+          <p class="text-xs truncate">${det}</p>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  // fila fija del anuncio de terminal
+  const T = _mkv.config.terminal || {};
+  document.getElementById('mkv-term').innerHTML = `<div onclick="mkvSelTerminal()" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${_mkv.term ? ' sel' : ''}" style="border:1px dashed #4A5C99;opacity:${T.enabled ? 1 : .55}">
+      <input type="checkbox" ${T.enabled ? 'checked' : ''} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvTerm('enabled', this.checked)">
+      <div class="w-12 h-12 rounded-lg bg-white flex-shrink-0 flex items-center justify-center" style="font-size:26px">💳</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13px] font-bold truncate text-white">Terminal · Pago con tarjeta</p>
+        <p class="text-xs truncate" style="color:${_mkv.term ? '#DBEAFE' : '#93C5FD'}">${T.enabled ? `${nDisT(T)} · ${(MKV_POS.find(x => x.k === T.posicion) || MKV_POS[0]).l}` : 'No sale en el video'}</p>
+      </div>
+    </div>`;
+  let nTerm = 0;
+  const nDis = (T.disenos || []).length || 1;
+  if (T.enabled) nTerm = (T.posicion === 'intercalado' && on.length) ? 1 + Math.floor((on.length - 1) / Math.max(1, T.cada || 3)) : nDis;
+  const secs = (on.length + nTerm) * (_mkv.config.seconds || 8) + (_mkv.config.intro ? 3 : 0);
+  const tot = secs * (_mkv.config.repeat || 1);
+  const sinFoto = on.filter(i => !i.tiene_foto).length;
+  const res = document.getElementById('mkv-resumen');
+  res.textContent = `${on.length} productos${nTerm ? ' + terminal' : ''} · duración ${Math.floor(tot / 60)} min ${Math.round(tot % 60)} s` + (sinFoto ? ` · ⚠ ${sinFoto} sin foto (no saldrán)` : '');
+  res.style.color = sinFoto ? '#DC2626' : '#64748B';
+  mkvEditor();
+}
+
+function mkvTab(t) {
+  _mkv.tab = t;
+  ['terminal', 'producto', 'precio', 'ajustes'].forEach(k => document.getElementById(`mkv-tab-${k}`).classList.toggle('on', k === t));
+  mkvRender();
+}
+function mkvSelTerminal() {
+  _mkv.term = true;
+  if (_mkv.tab !== 'ajustes') _mkv.tab = 'terminal';
+  mkvTab(_mkv.tab);
+}
+function mkvEnVideo(v) {
+  if (_mkv.term) mkvTerm('enabled', v); else mkvToggle(_mkv.sel, v);
+}
+// anuncio de terminal: se guarda dentro de los ajustes del video
+function mkvTerm(k, v) {
+  _mkv.config.terminal = Object.assign({}, _mkv.config.terminal, { [k]: v });
+  clearTimeout(_mkvTermT);
+  _mkvTermT = setTimeout(() => apiFetch('/marketing/video/config', { method:'PUT', body: JSON.stringify(_mkvConfigBody()) })
+    .catch(e => toast(e.message, 'error')), 500);
+  if (k === 'enabled' || k === 'posicion' || k === 'cada' || k === 'marcas' || k === 'disenos') mkvRender();
+  else mkvPreviewLuego(700);
+}
+function nDisT(T) { const n = (T.disenos || []).length || 1; return n === 1 ? '1 diseño' : `${n} diseños`; }
+function mkvTermDiseno(k) {
+  const T = _mkv.config.terminal || {};
+  const sel = [...(T.disenos || [T.diseno || 'terminal'])];
+  const i = sel.indexOf(k);
+  if (i >= 0) {
+    if (sel.length === 1) { _mkvTermVer = k; mkvRender(); return; }   // siempre queda al menos uno
+    sel.splice(i, 1);
+    _mkvTermVer = _mkvTermVer === k ? sel[0] : _mkvTermVer;
+  } else { sel.push(k); _mkvTermVer = k; }
+  mkvTerm('disenos', MKV_DISENOS.map(x => x.k).filter(x => sel.includes(x)));
+}
+function mkvTermChip(n, v) {
+  const c = [...((_mkv.config.terminal || {}).chips || [])]; while (c.length < 3) c.push('');
+  c[n] = v; mkvTerm('chips', c);
+}
+function mkvTermMarca(k) {
+  const m = [...((_mkv.config.terminal || {}).marcas || [])];
+  const i = m.indexOf(k); if (i >= 0) m.splice(i, 1); else m.push(k);
+  mkvTerm('marcas', MKV_MARCAS.map(x => x.k).filter(x => m.includes(x)));
+}
+function mkvEditorTerminal() {
+  const T = _mkv.config.terminal || {};
+  document.getElementById('mkv-ed-nombre').textContent = '💳 Terminal · Pago con tarjeta';
+  document.getElementById('mkv-ed-precio').textContent = 'Anuncio: aceptamos todas las tarjetas';
+  document.getElementById('mkv-en-video').checked = !!T.enabled;
+  const fo = document.activeElement && document.activeElement.id;
+  if (fo !== 'mkv-t-titulo') document.getElementById('mkv-t-titulo').value = T.titulo || '';
+  if (fo !== 'mkv-t-sub') document.getElementById('mkv-t-sub').value = T.subtitulo || '';
+  [0, 1, 2].forEach(k => { if (fo !== `mkv-t-c${k}`) document.getElementById(`mkv-t-c${k}`).value = (T.chips || [])[k] || ''; });
+  document.getElementById('mkv-t-marcas').innerHTML = MKV_MARCAS.map(m => {
+    const on = (T.marcas || []).includes(m.k);
+    return `<button onclick="mkvTermMarca('${m.k}')" class="h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:${on ? '#243366' : '#F1F5F9'};color:${on ? '#fff' : '#94A3B8'}">${on ? '✓' : '+'} ${m.l}</button>`;
+  }).join('');
+  const sel = T.disenos || [T.diseno || 'terminal'];
+  if (!sel.includes(_mkvTermVer)) _mkvTermVer = sel[0];
+  document.getElementById('mkv-t-disenos').innerHTML = MKV_DISENOS.map(x => {
+    const on = sel.includes(x.k), ver = _mkvTermVer === x.k;
+    return `<div class="rounded-xl p-2 border-2 flex flex-col gap-1" style="border-color:${on ? '#243366' : '#E2E8F0'};background:${on ? '#EEF2F8' : '#fff'}">
+       <button onclick="mkvTermDiseno('${x.k}')" class="text-left">
+         <p class="text-xs font-bold flex items-center gap-1" style="color:${on ? '#243366' : '#94A3B8'}"><span class="w-4 h-4 rounded flex items-center justify-center text-[10px] text-white" style="background:${on ? '#16A34A' : '#CBD5E1'}">${on ? '✓' : ''}</span>${x.l}</p>
+         <p class="text-[10px] leading-tight mt-0.5" style="color:#64748B">${x.d}</p></button>
+       <button onclick="_mkvTermVer='${x.k}';mkvEditorTerminal()" class="h-6 rounded-md text-[10px] font-bold" style="background:${ver ? '#3373B9' : '#E5EAF3'};color:${ver ? '#fff' : '#243366'}">${ver ? '👁 En vista previa' : 'Ver'}</button>
+     </div>`;
+  }).join('');
+  document.getElementById('mkv-t-dis-txt').textContent = sel.length > 1
+    ? `Saldrán ${sel.length} anuncios de tarjeta, uno de cada diseño${T.posicion === 'intercalado' ? ' (se turnan entre los productos)' : ''}.`
+    : 'Marca varios para hacer una promo con distintos anuncios.';
+  document.getElementById('mkv-t-pos').innerHTML = MKV_POS.map(x =>
+    `<button onclick="mkvTerm('posicion','${x.k}')" class="mkv-seg ${T.posicion === x.k ? 'on' : ''}">${x.l}</button>`).join('');
+  document.getElementById('mkv-t-cada').value = String(T.cada || 3);
+  document.getElementById('mkv-t-cada-wrap').style.display = T.posicion === 'intercalado' ? 'flex' : 'none';
+  mkvPreviewLuego(50);
+}
+
+function mkvEditor() {
+  const term = _mkv.term;
+  if (term && _mkv.tab !== 'ajustes') _mkv.tab = 'terminal';
+  if (!term && _mkv.tab === 'terminal') _mkv.tab = 'producto';
+  ['terminal', 'producto', 'precio', 'ajustes'].forEach(k => document.getElementById(`mkv-tab-${k}`).classList.toggle('on', k === _mkv.tab));
+  document.getElementById('mkv-tab-terminal').style.display = term ? '' : 'none';
+  document.getElementById('mkv-tab-producto').style.display = term ? 'none' : '';
+  document.getElementById('mkv-tab-precio').style.display = term ? 'none' : '';
+  document.getElementById('mkv-head-estilo').style.display = term ? 'none' : '';
+  document.getElementById('mkv-btn-ia').style.display = term ? 'none' : '';
+  document.getElementById('mkv-pan-terminal').classList.toggle('on', term && _mkv.tab === 'terminal');
+  if (term) {
+    document.getElementById('mkv-vacio').style.display = 'none';
+    ['producto', 'precio'].forEach(k => document.getElementById(`mkv-pan-${k}`).classList.remove('on'));
+    document.getElementById('mkv-pan-ajustes').classList.toggle('on', _mkv.tab === 'ajustes');
+    document.getElementById('mkv-head-ctrl').style.visibility = 'visible';
+    mkvEditorTerminal();
+    return;
+  }
+  const it = _mkv.items[_mkv.sel];
+  const tab = _mkv.tab;
+  document.getElementById('mkv-vacio').style.display = (!it && tab !== 'ajustes') ? 'flex' : 'none';
+  ['producto', 'precio', 'ajustes'].forEach(k =>
+    document.getElementById(`mkv-pan-${k}`).classList.toggle('on', k === tab && (k === 'ajustes' || !!it)));
+  document.getElementById('mkv-head-ctrl').style.visibility = it ? 'visible' : 'hidden';
+  if (!it) {
+    document.getElementById('mkv-ed-nombre').textContent = 'Agrega tus productos';
+    document.getElementById('mkv-ed-precio').textContent = 'Búscalos en la barra azul de la izquierda';
+    document.getElementById('mkv-preview').classList.add('hidden');
+    const msg = document.getElementById('mkv-preview-msg'); msg.textContent = 'Selecciona un producto'; msg.classList.remove('hidden');
+    return;
+  }
+  const est = (MKV_ESTILOS.find(e => e.k === it.style) || MKV_ESTILOS[0]).l;
+  document.getElementById('mkv-ed-nombre').textContent = it.nombre;
+  document.getElementById('mkv-ed-precio').textContent = `Producto ${_mkv.sel + 1} de ${_mkv.items.length}  ·  ${est}  ·  ${_mkvPrecio(it.precio)}${it.unit ? ' ' + it.unit : ''}`;
+  document.getElementById('mkv-estilos').innerHTML = MKV_ESTILOS.map(e =>
+    `<button onclick="mkvCampo('style','${e.k}')" class="mkv-seg ${it.style === e.k ? 'on' : ''}">${e.l}</button>`).join('');
+  document.getElementById('mkv-en-video').checked = !!it.enabled;
+  document.getElementById('mkv-estilo-todos').checked = _mkvEstiloTodos;
+  // Producto
+  const th = document.getElementById('mkv-thumb');
+  th.style.display = it.imagen_url ? '' : 'none';
+  if (it.imagen_url && th.getAttribute('src') !== it.imagen_url) th.src = it.imagen_url;
+  document.getElementById('mkv-inv-info').innerHTML = `<b style="color:#243366;font-size:13px">${_mkvEsc(it.nombre)}</b><br>Precio en inventario: ${_mkvPrecio(it.precio)}` +
+    (it.precio_pieza ? `<br>Por pieza: ${_mkvPrecio(it.precio_pieza)}` : '') +
+    (it.tiene_foto ? '' : '<br><span style="color:#DC2626;font-weight:700">⚠ Sin foto: agrégala en Inventario</span>');
+  const enCola = _mkvIAcola.includes(it.producto_id);
+  document.getElementById('mkv-ia-estado').textContent = enCola ? '✨ La IA está escribiendo la descripción…'
+    : it.desc ? '✓ Descripción escrita por ti'
+    : it.ia_origen === 'inventario' ? (_mkv.iaLista ? 'Descripción del inventario · usa "Llenar con IA" para mejorarla'
+                                                    : 'Descripción tomada del inventario · agrega tu clave de Claude (Ajustes) para que la IA la escriba')
+    : (it.ia_desc ? '✓ Descripción de la IA' : '');
+  document.getElementById('mkv-desc').value = it.desc || it.ia_desc || '';
+  const bens = (it.bens || []).some(b => b) ? it.bens : (it.ia_bens || ['', '', '']);
+  [0, 1, 2].forEach(k => document.getElementById(`mkv-b${k}`).value = bens[k] || '');
+  // Precio
+  document.getElementById('mkv-precio-grande').textContent = _mkvPrecio(it.precio).replace('$', '') || '0';
+  const old = document.getElementById('mkv-old');
+  old.value = it.old_price || ''; old.placeholder = it.precio_tachado ? `Del inventario: ${_mkvPrecio(it.precio_tachado)}` : 'Opcional';
+  document.getElementById('mkv-unit').value = it.unit || '';
+  document.getElementById('mkv-pieza').checked = it.show_piece !== false;
+  document.getElementById('mkv-pieza-wrap').style.display = it.precio_pieza ? 'flex' : 'none';
+  document.getElementById('mkv-pieza-txt').textContent = `Mostrar precio por pieza: ${_mkvPrecio(it.precio_pieza)} (etiqueta amarilla)`;
+  document.getElementById('mkv-tag').value = it.tag || '';
+  icons();
+  mkvPreviewLuego(50);
+}
+
+function mkvSel(i) { _mkv.sel = i; _mkv.term = false; mkvRender(); }
+function mkvToggle(i, v) {
+  const it = _mkv.items[i]; if (!it) return;
+  if (v && !it.tiene_foto) { toast('Este producto no tiene foto. Agrégala en Inventario para usarlo en el video.', 'warning'); v = false; }
+  it.enabled = v; mkvGuardar(); mkvRender();
+}
+function mkvTodos(v) { _mkv.items.forEach(it => it.enabled = v && it.tiene_foto); mkvGuardar(); mkvRender(); }
+function mkvEstiloTodos() {
+  const st = document.getElementById('mkv-c-style').value;
+  _mkv.items.forEach(it => it.style = st); mkvGuardar(); mkvRender(); toast('Estilo aplicado a todos', 'success');
+}
+function mkvMover(i, d) {
+  if (_mkv.term) return;
+  const j = i + d; if (i < 0 || j < 0 || j >= _mkv.items.length) return;
+  [_mkv.items[i], _mkv.items[j]] = [_mkv.items[j], _mkv.items[i]];
+  if (_mkv.sel === i) _mkv.sel = j; else if (_mkv.sel === j) _mkv.sel = i;
+  mkvGuardar(); mkvRender();
+}
+function mkvQuitar(i) {
+  if (_mkv.term) { toast('La terminal no se quita: apágala con su casilla', 'info'); return; }
+  if (!_mkv.items[i]) return;
+  _mkv.items.splice(i, 1);
+  if (_mkv.sel >= _mkv.items.length) _mkv.sel = _mkv.items.length - 1;
+  mkvGuardar(); mkvRender();
+}
+function mkvCampo(k, v) {
+  const it = _mkv.items[_mkv.sel]; if (!it) return;
+  if (k === 'style' && _mkvEstiloTodos && _mkv.items.length > 1) {
+    _mkv.items.forEach(x => x.style = v);
+    toast(`Estilo ${(MKV_ESTILOS.find(e => e.k === v) || {}).l || ''} aplicado a los ${_mkv.items.length} productos`, 'success');
+  }
+  it[k] = v; mkvGuardar(); mkvPreviewLuego(700);
+  if (k === 'style') mkvRender();
+}
+function mkvBen(n, v) {
+  const it = _mkv.items[_mkv.sel]; if (!it) return;
+  if (!(it.bens || []).some(b => b)) it.bens = [...(it.ia_bens || ['', '', ''])];
+  it.bens[n] = v; mkvGuardar(); mkvPreviewLuego(700);
+}
+function mkvTag(t) { document.getElementById('mkv-tag').value = t; mkvCampo('tag', t); }
+
+function _mkvItemBody(it) {
+  return { producto_id: it.producto_id, style: it.style, enabled: it.enabled, desc: it.desc || '', bens: it.bens || ['', '', ''],
+           tag: it.tag || '', old_price: String(it.old_price || ''), show_piece: it.show_piece !== false, unit: it.unit || '' };
+}
+function mkvGuardar() {
+  clearTimeout(_mkvSaveT);
+  _mkvSaveT = setTimeout(() => {
+    api('/marketing/video/items', { method:'PUT', body: JSON.stringify(_mkv.items.map(_mkvItemBody)) });
+  }, 500);
+}
+
+// buscar productos del inventario (usa la lista que ya carga Marketing)
+function mkvBuscar() {
+  const q = document.getElementById('mkv-buscar').value.trim().toLowerCase();
+  const box = document.getElementById('mkv-resultados');
+  if (!q) { box.classList.add('hidden'); return; }
+  const ya = new Set(_mkv.items.map(i => i.producto_id));
+  const res = (_mktProds || []).filter(p => p.activo !== false && !ya.has(p.id) &&
+    ((p.nombre || '').toLowerCase().includes(q) || (p.nombre_generico || '').toLowerCase().includes(q) || (p.codigo_barras || '').includes(q))).slice(0, 30);
+  box.innerHTML = res.length ? res.map(p => `
+    <div onclick="${p.imagen_url ? `mkvAgregar(${p.id})` : ''}" class="flex items-center gap-2 px-3 py-2 ${p.imagen_url ? 'cursor-pointer hover:bg-slate-50' : ''}" style="${p.imagen_url ? '' : 'opacity:.5'}" title="${p.imagen_url ? '' : 'Sin foto: agrégala en Inventario'}">
+      <div class="w-8 h-8 rounded-md border bg-white overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">${p.imagen_url ? `<img src="${_mkvEsc(p.imagen_url)}" class="w-full h-full object-contain">` : ''}</div>
+      <div class="flex-1 min-w-0"><p class="text-xs font-semibold truncate" style="color:#0F172A">${_mkvEsc(p.nombre)}</p>
+        <p class="text-[10px]" style="color:${p.imagen_url ? '#64748B' : '#DC2626'}">${_mkvPrecio(p.precio_venta)}${p.imagen_url ? '' : ' · sin foto'}</p></div>
+    </div>`).join('') : '<p class="text-xs p-3" style="color:#94A3B8">Sin resultados</p>';
+  box.classList.remove('hidden');
+}
+document.addEventListener('click', e => {
+  const box = document.getElementById('mkv-resultados');
+  if (box && !box.contains(e.target) && e.target.id !== 'mkv-buscar') box.classList.add('hidden');
+});
+
+// ── catálogo en tarjetas ──
+const mkvCatSel = new Set();
+async function mkvCatAbrir() {
+  if (!(_mktProds || []).length) { try { await loadMarketing(); } catch (_) {} }   // inventario aún sin cargar
+  mkvCatSel.clear();
+  const m = document.getElementById('mkv-cat'); m.style.display = 'flex';
+  document.getElementById('mkv-cat-q').value = '';
+  mkvCatPintar();
+  setTimeout(() => document.getElementById('mkv-cat-q').focus(), 50);
+}
+function mkvCatCerrar() { document.getElementById('mkv-cat').style.display = 'none'; }
+function _mkvCatLista() {
+  const q = document.getElementById('mkv-cat-q').value.trim().toLowerCase();
+  const orden = document.getElementById('mkv-cat-orden').value;
+  const mn = parseFloat(document.getElementById('mkv-cat-min').value), mx = parseFloat(document.getElementById('mkv-cat-max').value);
+  const sinFoto = document.getElementById('mkv-cat-sinfoto').checked;
+  let l = (_mktProds || []).filter(p => p.activo !== false && (sinFoto || p.imagen_url) &&
+    (!q || (p.nombre || '').toLowerCase().includes(q) || (p.nombre_generico || '').toLowerCase().includes(q) || (p.codigo_barras || '').includes(q)) &&
+    (isNaN(mn) || (p.precio_venta || 0) >= mn) && (isNaN(mx) || (p.precio_venta || 0) <= mx));
+  if (orden === 'nombre') l.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  else l.sort((a, b) => ((a.precio_venta || 0) - (b.precio_venta || 0)) * (orden === 'desc' ? -1 : 1));
+  return l;
+}
+function mkvCatPintar() {
+  const ya = new Set(_mkv.items.map(i => i.producto_id));
+  const l = _mkvCatLista();
+  const grid = document.getElementById('mkv-cat-grid');
+  grid.innerHTML = l.length ? l.slice(0, 400).map(p => {
+    const foto = !!p.imagen_url, en = ya.has(p.id), sel = mkvCatSel.has(p.id);
+    const borde = sel ? '#16A34A' : en ? '#93C5FD' : '#E2E8F0';
+    const click = foto && !en ? `mkvCatToggle(${p.id})` : '';
+    return `<div onclick="${click}" class="bg-white rounded-2xl border-2 p-2 flex flex-col gap-1 relative ${click ? 'cursor-pointer hover:shadow-md' : ''}" style="border-color:${borde};${foto ? '' : 'opacity:.5'}">
+      <div class="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white" style="background:${sel ? '#16A34A' : en ? '#3373B9' : foto ? '#CBD5E1' : 'transparent'}">${sel ? '✓' : en ? '★' : ''}</div>
+      <div class="rounded-xl flex items-center justify-center overflow-hidden" style="height:120px;background:#F8FAFC">
+        ${foto ? `<img src="${_mkvEsc(p.imagen_url)}" loading="lazy" class="max-w-full max-h-full object-contain">` : '<span class="text-[11px] font-bold" style="color:#DC2626">Sin foto</span>'}
+      </div>
+      <p class="text-xs font-bold leading-tight" style="color:#0F172A;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px">${_mkvEsc(p.nombre)}</p>
+      <div class="flex items-center justify-between">
+        <p class="text-base font-extrabold" style="color:#243366">${_mkvPrecio(p.precio_venta)}</p>
+        <p class="text-[10px] font-bold" style="color:${en ? '#3373B9' : foto ? '#94A3B8' : '#DC2626'}">${en ? 'Ya en el video' : foto ? '' : 'Agrega foto en Inventario'}</p>
+      </div>
+    </div>`;
+  }).join('') : '<p class="text-sm p-6" style="color:#94A3B8">No hay productos con esos filtros</p>';
+  const conFoto = l.filter(p => p.imagen_url).length;
+  document.getElementById('mkv-cat-info').textContent =
+    `${l.length} productos${l.length > 400 ? ' (se muestran 400; usa el buscador)' : ''} · ${conFoto} con foto · ${mkvCatSel.size} seleccionados`;
+  const ok = document.getElementById('mkv-cat-ok');
+  ok.textContent = mkvCatSel.size ? `Agregar ${mkvCatSel.size} al video` : 'Agregar al video';
+  ok.style.opacity = mkvCatSel.size ? 1 : .5;
+}
+function mkvCatToggle(id) { if (mkvCatSel.has(id)) mkvCatSel.delete(id); else mkvCatSel.add(id); mkvCatPintar(); }
+function mkvCatSelTodos() {
+  const ya = new Set(_mkv.items.map(i => i.producto_id));
+  _mkvCatLista().slice(0, 400).forEach(p => { if (p.imagen_url && !ya.has(p.id)) mkvCatSel.add(p.id); });
+  mkvCatPintar();
+}
+function mkvCatAgregar() {
+  if (!mkvCatSel.size) { toast('Toca las tarjetas de los productos que quieres en el video', 'info'); return; }
+  const ids = _mkvCatLista().map(p => p.id).filter(id => mkvCatSel.has(id));   // en el orden que se ven
+  let n = 0;
+  ids.forEach(id => { if (mkvAgregar(id, true)) n++; });
+  mkvCatCerrar();
+  if (n) {
+    toast(`${n} productos agregados al video`, 'success');
+    mkvGuardar(); mkvRender();
+    if (!_mkv.iaLista) setTimeout(loadVideoPromo, 800);
+  }
+}
+
+function mkvAgregar(id, varios = false) {
+  const p = (_mktProds || []).find(x => x.id === id); if (!p) return false;
+  if (!p.imagen_url) { toast('Este producto no tiene foto. Agrégala en Inventario para poder usarlo en el video.', 'warning'); return false; }
+  if (_mkv.items.some(i => i.producto_id === id)) return false;
+  _mkv.items.push({ producto_id: p.id, style: _mkv.config.default_style || 'destacado', enabled: true, desc: '', bens: ['', '', ''],
+                    tag: '', old_price: '', show_piece: true, unit: '', nombre: p.nombre, precio: p.precio_venta,
+                    imagen_url: p.imagen_url || '', tiene_foto: !!p.imagen_url, precio_tachado: p.precio_tachado,
+                    precio_pieza: p.venta_fraccionada ? p.precio_pieza : null, ia_desc: '', ia_bens: ['', '', ''] });
+  _mkv.sel = _mkv.items.length - 1; _mkv.term = false;
+  if (_mkv.iaLista) mkvEncolarIA(p.id);
+  if (varios) return true;
+  document.getElementById('mkv-buscar').value = ''; document.getElementById('mkv-resultados').classList.add('hidden');
+  mkvGuardar(); mkvRender();
+  if (!_mkv.iaLista) setTimeout(loadVideoPromo, 800);          // trae la descripción armada con el inventario
+  return true;
+}
+
+// IA: la descripción corta se pide una sola vez por producto (el servidor la guarda en caché)
+function mkvEncolarIA(id) {
+  if (!_mkv.iaLista || _mkvIAcola.includes(id)) return;
+  _mkvIAcola.push(id); mkvRender(); _mkvSiguienteIA();
+}
+async function _mkvSiguienteIA() {
+  if (_mkvIAcorriendo || !_mkvIAcola.length) return;
+  _mkvIAcorriendo = true;
+  const id = _mkvIAcola[0];
+  try {
+    const r = await apiFetch(`/marketing/video/ia/${id}`, { method:'POST' });
+    _mkv.items.filter(i => i.producto_id === id).forEach(i => { i.ia_desc = r.desc; i.ia_bens = r.bens; i.ia_origen = 'ia'; });
+  } catch (e) {
+    toast(e.message, 'error'); _mkvIAcola = [];
+  }
+  _mkvIAcola = _mkvIAcola.filter(x => x !== id);
+  _mkvIAcorriendo = false;
+  mkvRender(); _mkvSiguienteIA();
+}
+async function mkvIA(forzar) {
+  const it = _mkv.items[_mkv.sel]; if (!it) return;
+  if (!_mkv.iaLista) { toast('Agrega tu clave de Claude en la pestaña Ajustes', 'warning'); mkvTab('ajustes'); return; }
+  const btn = document.getElementById('mkv-btn-ia'); btn.disabled = true;
+  try {
+    const r = await apiFetch(`/marketing/video/ia/${it.producto_id}?forzar=${forzar ? 'true' : 'false'}`, { method:'POST' });
+    it.ia_desc = r.desc; it.ia_bens = r.bens; it.ia_origen = 'ia'; it.desc = ''; it.bens = ['', '', ''];
+    mkvGuardar(); mkvEditor(); toast('Descripción lista', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  btn.disabled = false;
+}
+
+// vista previa (dibujada por el mismo motor del video)
+function mkvPreviewLuego(ms) { clearTimeout(_mkvPrevT); _mkvPrevT = setTimeout(mkvPreview, ms); }
+async function mkvPreview() {
+  const it = _mkv.items[_mkv.sel];
+  const img = document.getElementById('mkv-preview'), msg = document.getElementById('mkv-preview-msg');
+  if (_mkv.term) return _mkvPintarPreview('/marketing/video/vista-previa-terminal',
+    { terminal: Object.assign({}, _mkv.config.terminal, { diseno: _mkvTermVer || (_mkv.config.terminal.disenos || [])[0] || 'terminal' }) });
+  if (!it) return;
+  if (!it.tiene_foto) { img.classList.add('hidden'); msg.textContent = 'Este producto no tiene foto en el inventario'; msg.classList.remove('hidden'); return; }
+  const tok = ++_mkvPrevTok;
+  msg.textContent = 'Dibujando…';
+  try {
+    const res = await api('/marketing/video/vista-previa', { method:'POST',
+      body: JSON.stringify({ item: _mkvItemBody(it), t: parseFloat(document.getElementById('mkv-t').value) }) });
+    if (tok !== _mkvPrevTok) return;
+    if (!res.ok) { let d = 'Error'; try { d = (await res.json()).detail; } catch(_) {} msg.textContent = d; img.classList.add('hidden'); msg.classList.remove('hidden'); return; }
+    const url = URL.createObjectURL(await res.blob());
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    img.dataset.url = url; img.src = url;
+    img.classList.remove('hidden'); msg.classList.add('hidden');
+  } catch (e) { msg.textContent = 'No se pudo dibujar la vista previa'; }
+}
+
+async function _mkvPintarPreview(url, body) {
+  const img = document.getElementById('mkv-preview'), msg = document.getElementById('mkv-preview-msg');
+  const tok = ++_mkvPrevTok;
+  msg.textContent = 'Dibujando…';
+  try {
+    const res = await api(url, { method:'POST', body: JSON.stringify(Object.assign(body, { t: parseFloat(document.getElementById('mkv-t').value) })) });
+    if (tok !== _mkvPrevTok) return;
+    if (!res.ok) { let d = 'Error'; try { d = (await res.json()).detail; } catch(_) {} msg.textContent = d; img.classList.add('hidden'); msg.classList.remove('hidden'); return; }
+    const u = URL.createObjectURL(await res.blob());
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    img.dataset.url = u; img.src = u;
+    img.classList.remove('hidden'); msg.classList.add('hidden');
+  } catch (e) { msg.textContent = 'No se pudo dibujar la vista previa'; }
+}
+
+// Google Drive para escritorio: el video se copia a la carpeta sincronizada y Drive lo sube solo
+function mkvDrivePintar() {
+  const on = document.getElementById('mkv-d-on').checked;
+  document.getElementById('mkv-d-wrap').style.display = on ? 'flex' : 'none';
+  const m = document.getElementById('mkv-d-msg');
+  m.textContent = _mkv.driveSug
+    ? `✓ Google Drive para escritorio encontrado. Los videos se copian ahí y Drive los sube solos; tu canal de Roku los toma de "Videos Roku".`
+    : '⚠ No encuentro Google Drive para escritorio en esta PC. Instálalo (drive.google.com/download), inicia sesión y pulsa "Detectar".';
+  m.style.color = _mkv.driveSug ? '#16A34A' : '#B45309';
+}
+async function mkvDriveDetectar() {
+  try {
+    const d = await apiFetch('/marketing/video');
+    _mkv.driveSug = d.drive_sugerido || '';
+    if (_mkv.driveSug) { document.getElementById('mkv-c-drive').value = _mkv.driveSug; toast('Carpeta de Drive encontrada', 'success'); mkvDrive(); }
+    else toast('No encuentro Google Drive para escritorio en esta PC', 'warning');
+    mkvDrivePintar();
+  } catch (e) { toast(e.message, 'error'); }
+}
+function mkvDrive() { mkvDrivePintar(); mkvConfig(); }
+
+// ajustes
+function mkvCalidad(q, guardar = true) {
+  document.getElementById('mkv-c-quality').value = q;
+  document.getElementById('mkv-calidad').innerHTML = ['Ligera', 'Alta', 'Máxima'].map(x =>
+    `<button onclick="mkvCalidad('${x}')" class="mkv-seg ${x === q ? 'on' : ''}">${x}</button>`).join('');
+  if (guardar) mkvConfig();
+}
+function _mkvConfigBody() {
+  return {
+    seconds: parseInt(document.getElementById('mkv-c-seconds').value) || 8,
+    repeat:  parseInt(document.getElementById('mkv-c-repeat').value) || 1,
+    quality: document.getElementById('mkv-c-quality').value,
+    default_style: document.getElementById('mkv-c-style').value,
+    intro: document.getElementById('mkv-c-intro').checked,
+    footer_left:  document.getElementById('mkv-c-fl').value,
+    footer_right: document.getElementById('mkv-c-fr').value,
+    out_dir: document.getElementById('mkv-c-out').value.trim(),
+    drive_dir: document.getElementById('mkv-d-on').checked ? document.getElementById('mkv-c-drive').value.trim() : '',
+    terminal: _mkv.config.terminal,
+  };
+}
+async function mkvConfig() {
+  const body = _mkvConfigBody();
+  try {
+    _mkv.config = await apiFetch('/marketing/video/config', { method:'PUT', body: JSON.stringify(body) });
+    document.getElementById('mkv-sec-lbl').textContent = _mkv.config.seconds + ' s';
+    const tEl = document.getElementById('mkv-t');
+    tEl.max = _mkv.config.seconds; tEl.value = _mkv.config.seconds / 2;   // a la mitad: todo visible
+    mkvRender();
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function mkvGuardarClave() {
+  const k = document.getElementById('mkv-clave').value.trim();
+  if (!k) return;
+  try {
+    await apiFetch('/marketing/video/clave', { method:'PUT', body: JSON.stringify({ api_key: k }) });
+    document.getElementById('mkv-clave').value = '';
+    _mkv.iaLista = true; mkvBadgeIA(); toast('Clave de Claude guardada', 'success');
+    _mkv.items.forEach(it => { if (_mkvSinTextoIA(it)) mkvEncolarIA(it.producto_id); });
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// generar video
+async function mkvGenerar(soloTerminal = false) {
+  if (!soloTerminal && _mkvIAcola.length) { toast('Espera a que la IA termine las descripciones', 'warning'); return; }
+  _mkv.items.forEach(it => { if (!it.tiene_foto) it.enabled = false; });     // sin foto no entran al video
+  try {
+    clearTimeout(_mkvTermT);
+    await apiFetch('/marketing/video/config', { method:'PUT', body: JSON.stringify(_mkvConfigBody()) });
+    await api('/marketing/video/items', { method:'PUT', body: JSON.stringify(_mkv.items.map(_mkvItemBody)) });
+    const nombre = soloTerminal ? `PAGO_CON_TARJETA_${_fechaLocal(new Date())}` : document.getElementById('mkv-nombre').value.trim();
+    await apiFetch('/marketing/video/generar', { method:'POST', body: JSON.stringify({ nombre, solo_terminal: soloTerminal }) });
+    mkvSeguir();
+  } catch (e) { toast(e.message, 'error'); }
+}
+function mkvSeguir() {
+  const btn = document.getElementById('mkv-btn-generar'), can = document.getElementById('mkv-btn-cancelar');
+  const bt2 = document.getElementById('mkv-btn-term');
+  btn.disabled = true; btn.style.opacity = .6; can.classList.remove('hidden');
+  bt2.disabled = true; bt2.style.opacity = .6;
+  clearInterval(_mkvPoll);
+  _mkvPoll = setInterval(async () => {
+    try {
+      const t = await apiFetch('/marketing/video/progreso');
+      document.getElementById('mkv-barra').style.width = `${Math.round((t.pct || 0) * 100)}%`;
+      document.getElementById('mkv-estado').textContent = t.state === 'trabajando' ? `Generando… ${Math.round((t.pct || 0) * 100)}% · ${t.msg}` : t.msg;
+      if (t.state !== 'trabajando') {
+        clearInterval(_mkvPoll); btn.disabled = false; btn.style.opacity = 1; can.classList.add('hidden');
+        bt2.disabled = false; bt2.style.opacity = 1;
+        if (t.state === 'listo') {
+          const drv = (t.msg || '').includes('Drive');
+          toast(t.drive ? 'Video listo y copiado a Google Drive' : 'Video listo', drv && !t.drive ? 'warning' : 'success');
+          document.getElementById('mkv-estado').textContent = `✅ Guardado en ${t.file}` + (t.drive ? ' · ☁ copiado a Google Drive' : (drv ? ` · ⚠ ${t.msg}` : ''));
+        }
+        if (t.state === 'error') toast(t.error || 'Error generando el video', 'error');
+      }
+    } catch (e) { clearInterval(_mkvPoll); btn.disabled = false; btn.style.opacity = 1; bt2.disabled = false; bt2.style.opacity = 1; }
+  }, 700);
+}
+async function mkvCancelar() { await api('/marketing/video/cancelar', { method:'POST' }); }
+async function mkvAbrir(que) {
+  try { await apiFetch('/marketing/video/abrir', { method:'POST', body: JSON.stringify({ que }) }); }
+  catch (e) { toast(e.message, 'error'); }
 }
 
 async function loadMarketing() {
