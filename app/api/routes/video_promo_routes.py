@@ -52,6 +52,24 @@ def logo():
     return FileResponse(str(LOGO), media_type="image/png")
 
 
+# ── tipo de medicamento de cada producto (filtro del catálogo: tos, gripe, dolor…) ──
+@router.get("/usos")
+def usos(payload: dict = Depends(get_current_api_user)):
+    _admin(payload)
+    s = _svc()
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    from sqlalchemy.orm import joinedload
+    db = get_db_session()
+    try:
+        prods = db.query(Producto).options(joinedload(Producto.categoria)).filter(Producto.activo == True).all()
+        mapa = {p.id: s.usos_producto(p) for p in prods}
+    finally:
+        db.close()
+    grupos = [{"k": k, "l": l, "i": i} for k, l, i, _ in s.USOS] + [{"k": "otros", "l": "Otros", "i": "📦"}]
+    return {"grupos": grupos, "productos": mapa}
+
+
 # ── estado del proyecto ───────────────────────────────────────────────────────
 @router.get("")
 def estado(payload: dict = Depends(get_current_api_user)):
@@ -74,7 +92,7 @@ def estado(payload: dict = Depends(get_current_api_user)):
                           precio_tachado=p.precio_tachado, precio_pieza=p.precio_pieza if p.venta_fraccionada else None))
     return {"config": proy["config"], "items": items, "estilos": s.ESTILOS,
             "ia_lista": bool(getattr(cfg, "ANTHROPIC_API_KEY", "")), "tarea": s.estado_tarea(),
-            "drive_sugerido": s.drive_sugerido()}
+            "drive_sugerido": s.drive_sugerido(), "drive_destino": s.carpeta_drive(proy["config"])}
 
 
 class TerminalIn(BaseModel):
@@ -98,7 +116,8 @@ class ConfigIn(BaseModel):
     footer_left: str = ""
     footer_right: str = ""
     out_dir: str = ""
-    drive_dir: Optional[str] = None         # None = no cambiar; "" = no copiar a Drive
+    drive_dir: Optional[str] = None         # None = no cambiar; "" = usar la carpeta que se detecte
+    drive_auto: Optional[bool] = None
     terminal: Optional[TerminalIn] = None
 
 
@@ -125,6 +144,7 @@ def guardar_config(body: ConfigIn, payload: dict = Depends(get_current_api_user)
     if c["quality"] not in ("Ligera", "Alta", "Máxima"): c["quality"] = "Alta"
     if c["default_style"] not in _svc().ESTILOS: c["default_style"] = "destacado"
     if not c["out_dir"]: c.pop("out_dir")
+    if c["drive_auto"] is None: c.pop("drive_auto")
     if c["drive_dir"] is None: c.pop("drive_dir")
     else: c["drive_dir"] = c["drive_dir"].strip().strip('"')
     if body.terminal is None: c.pop("terminal")

@@ -451,55 +451,6 @@ def build_wave():
     dr.text((40, 238), CONFIG.get('footer_left', ''), font=font(BOLD, 26), fill=(255, 255, 255, 255), anchor='lm')
     return wave
 
-# ---------- transición tipo cortina (y bucle sin brinco) ----------
-TR = 0.55                 # duración de cada mitad de la cortina (tapar / destapar)
-CURTAIN = None
-_C_SKEW, _C_E = 170, 44
-
-
-def build_curtain():
-    """Cortina blanca inclinada con orillas azul marino y azul (se dibuja una vez, con antialias)."""
-    s = 2
-    wb = W + _C_SKEW + 30
-    cw = 2 * _C_E + wb + _C_SKEW
-    im = Image.new('RGBA', (cw * s, H * s), (0, 0, 0, 0)); dr = ImageDraw.Draw(im)
-    def band(x0, x1, col):            # franja inclinada entre x0 y x1 (medido abajo)
-        dr.polygon([((x0 + _C_SKEW) * s, 0), ((x1 + _C_SKEW) * s, 0), (x1 * s, H * s), (x0 * s, H * s)], fill=col)
-    L0, R0 = _C_E, _C_E + wb
-    band(L0 - 36, L0 - 22, BLUE + (255,)); band(L0 - 16, L0, NAVY + (255,))
-    band(L0, R0, (255, 255, 255, 255))
-    band(R0, R0 + 16, NAVY + (255,)); band(R0 + 22, R0 + 36, BLUE + (255,))
-    return im.resize((cw, H), Image.LANCZOS)
-
-
-def _paste_x(fr, layer, ox):
-    x0 = int(round(ox))
-    if x0 >= W or x0 + layer.width <= 0: return
-    src = layer.crop((max(0, -x0), 0, min(layer.width, W - x0), H))
-    fr.alpha_composite(src, (max(0, x0), 0))
-
-
-def curtain(frame, t, S, logo_pos=None):
-    """Tapa al final (t > S-TR) y destapa al inicio (t < TR) de cada cuadro; la ola y el logo quedan fijos."""
-    full = -_C_E - _C_SKEW                       # cortina cubriendo toda la pantalla
-    if t > S - TR:
-        k = ease_in_out((t - (S - TR)) / TR); ox = (W + 10) + (full - (W + 10)) * k
-    elif t < TR:
-        k = ease_in_out(t / TR); ox = full + (-CURTAIN.width - 10 - full) * k
-    else:
-        return frame
-    fr = frame.convert('RGBA')
-    _paste_x(fr, CURTAIN, ox)
-    fr.alpha_composite(WAVE, (0, H - 260))
-    if logo_pos is not None: draw_logo(fr, logo_pos)
-    return fr.convert('RGB')
-
-
-def ease_in_out(x):
-    x = min(max(x, 0), 1)
-    return x * x * (3 - 2 * x)
-
-
 QUALITY = {'Máxima': (15, 'slow'), 'Alta': (18, 'medium'), 'Ligera': (23, 'medium')}
 
 def export_images(products, config, folder, progress=None, t=4.0):
@@ -536,8 +487,6 @@ def _setup(config):
     SLIDE = float(config.get('seconds', 8))
     load_logo(config.get('logo'))
     WAVE = build_wave()
-    global CURTAIN
-    if CURTAIN is None: CURTAIN = build_curtain()
 
 def preview(product, config, t=4.0):
     """Devuelve un cuadro (imagen PIL) del producto ya animado."""
@@ -562,7 +511,6 @@ def generate(products, config, out_path, progress=None, cancelled=lambda: False)
     intro = bool(config.get('intro', True)) and LOGO_BIG is not None
     n = int(SLIDE * FPS); ni = int(INTRO * FPS) if intro else 0
     S = SLIDE
-    globals()['SLIDE'] = S + 0.5         # los estilos ya no se desvanecen al final: la cortina los tapa
     total = ni + n * len(products); done = 0
     log = open(os.path.join(LOG_DIR, 'ffmpeg_log.txt'), 'w')
     crf, preset = QUALITY.get(config.get('quality', 'Alta'), QUALITY['Alta'])
@@ -579,7 +527,7 @@ def generate(products, config, out_path, progress=None, cancelled=lambda: False)
             pi = _encoder(intro_path, crf, preset, log); procs.append(pi)
             for i in range(ni):
                 if cancelled(): raise KeyboardInterrupt
-                pi.stdin.write(curtain(render_intro(i / FPS), i / FPS, INTRO).tobytes()); done += 1
+                pi.stdin.write(render_intro(i / FPS).tobytes()); done += 1
                 if progress and i % 10 == 0: progress(done, total, 'Intro con logo')
             if repeat > 1:
                 pi.stdin.close(); pi.wait()
@@ -599,11 +547,10 @@ def generate(products, config, out_path, progress=None, cancelled=lambda: False)
                 a_in = 1.0 if prev == pos[j] else ease_out_cubic(t / 0.5)
                 a_out = 1.0 if nxt == pos[j] else 1 - ease_in_cubic((t - (S - 0.5)) / 0.5)
                 LOGO_ALPHA = min(a_in, a_out)
-                pb.stdin.write(curtain(R(L, p, t), t, S, pos[j]).tobytes()); done += 1
+                pb.stdin.write(R(L, p, t).tobytes()); done += 1
                 if progress and i % 10 == 0: progress(done, total, p['name'])
         pb.stdin.close(); pb.wait()
     except KeyboardInterrupt:
-        globals()['SLIDE'] = S
         for pr in procs:
             try: pr.stdin.close()
             except Exception: pass
@@ -613,7 +560,6 @@ def generate(products, config, out_path, progress=None, cancelled=lambda: False)
             try: os.remove(f)
             except OSError: pass
         return False
-    globals()['SLIDE'] = S
     log.close()
     if any(pr.returncode != 0 for pr in procs): raise RuntimeError('ffmpeg falló, revisa ffmpeg_log.txt')
     if repeat > 1:

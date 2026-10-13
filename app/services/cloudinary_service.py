@@ -190,6 +190,146 @@ def sync_product_images_locally(progress_cb=None) -> int:
     return downloaded
 
 
+# ── Cloudinary es la copia maestra de las fotos de producto ──────────────────
+# Cada foto vive en Cloudinary con nombre fijo FARMACIA/PRODUCTOS/producto_{id}. Si en otra
+# PC se cambia la foto, Cloudinary tiene la versión nueva aunque la fila del producto en esta
+# PC tenga una fecha de modificación más reciente (p. ej. por una venta). Por eso la foto NO
+# se decide por fechas de la fila: se le pregunta a Cloudinary cuál es la versión vigente.
+import re as _re
+import time as _time
+from datetime import datetime as _dt, timezone as _tz
+
+_PROD_PREFIX = "FARMACIA/PRODUCTOS/producto_"
+_last_cloud_check = 0.0
+_cloud_cache: dict = {}
+
+
+def _version(url: str) -> int | None:
+    m = _re.search(r"/v(\d+)/", url or "")
+    return int(m.group(1)) if m else None
+
+
+def cloudinary_product_images(max_age: float = 0) -> dict:
+    """{producto_id: {"url", "version", "creado"}} de las fotos en Cloudinary (una consulta por
+    cada 500 fotos). Con max_age > 0 reusa la última respuesta si es más reciente que eso."""
+    global _last_cloud_check, _cloud_cache
+    if max_age and _time.time() - _last_cloud_check < max_age:
+        return _cloud_cache
+    if not _cloudinary_configured():
+        return {}
+    _configure()
+    import cloudinary.api
+    out, cursor = {}, None
+    while True:
+        kw = dict(type="upload", prefix=_PROD_PREFIX, max_results=500)
+        if cursor:
+            kw["next_cursor"] = cursor
+        res = cloudinary.api.resources(**kw)
+        for r in res.get("resources", []):
+            pid = r["public_id"][len(_PROD_PREFIX):]
+            if pid.isdigit():
+                creado = r.get("created_at") or ""
+                try:
+                    ts = _dt.fromisoformat(creado.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    ts = 0
+                out[int(pid)] = {"url": r["secure_url"], "version": int(r.get("version") or 0), "creado": ts}
+        cursor = res.get("next_cursor")
+        if not cursor:
+            break
+    _cloud_cache, _last_cloud_check = out, _time.time()
+    return out
+
+
+def reconcile_with_cloudinary(max_age: float = 0) -> int:
+    """Cloudinary manda: si la foto de un producto en Cloudinary es distinta (otra versión) de la
+    que tiene esta PC, esta PC toma la de Cloudinary sin importar fechas. La única excepción es
+    una foto guardada aquí sin conexión que sea MÁS nueva que la de Cloudinary (esa se sube
+    después con upload_pending_local_images). Devuelve cuántos productos cambiaron."""
+    nube = cloudinary_product_images(max_age)
+    if not nube:
+        return 0
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    db = get_db_session()
+    cambiados = 0
+    try:
+        for prod in db.query(Producto).filter(Producto.id.in_(list(nube))).all():
+            c = nube[prod.id]
+            url = prod.imagen_url or ""
+            if url.startswith("http") and _version(url) == c["version"]:
+                continue                                   # ya tiene la versión vigente
+            local = local_path_for_url(url)
+            if local is not None and local.stat().st_mtime > c["creado"]:
+                continue                                   # foto local más nueva: se sube después
+            prod.imagen_url = c["url"]
+            cambiados += 1
+        if cambiados:
+            db.commit()
+    finally:
+        db.close()
+    return cambiados
+
+
+def local_path_for_url(url: str) -> Path | None:
+    """Ruta en disco de una foto guardada localmente (imagen_url tipo /uploads/imagenes/...)."""
+    if not url or url.startswith("http"):
+        return None
+    p = cfg.DATA_DIR / url.lstrip("/")
+    return p if p.is_file() else None
+
+
+def upload_pending_local_images(progress_cb=None) -> int:
+    """Sube a Cloudinary las fotos de producto que solo existen en esta PC (se guardaron
+    sin conexión o sin Cloudinary) y actualiza el producto con la URL de Cloudinary — así
+    la foto queda en la nube para las demás cajas y Cloudinary vuelve a ser la copia maestra.
+    Devuelve cuántas se subieron. Sin Cloudinary configurado o sin internet no hace nada."""
+    if not _cloudinary_configured():
+        return 0
+    import shutil
+    import tempfile
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+
+    db = get_db_session()
+    try:
+        locales = db.query(Producto).filter(Producto.imagen_url.like("/uploads/%")).all()
+        if not locales:
+            return 0
+        try:
+            nube = cloudinary_product_images(max_age=60)
+        except Exception:
+            return 0                                  # sin conexión con Cloudinary: se reintenta luego
+        subidas = 0
+        for i, prod in enumerate(locales):
+            src = local_path_for_url(prod.imagen_url)
+            if src is None:
+                continue
+            if prod.id in nube and nube[prod.id]["creado"] >= src.stat().st_mtime:
+                continue                              # Cloudinary tiene una foto más nueva: no se pisa
+            # copia temporal: upload_product_image reescribe la copia local con el mismo nombre
+            tmp = Path(tempfile.mkdtemp()) / src.name
+            shutil.copyfile(src, tmp)
+            try:
+                url = upload_product_image(str(tmp), prod.id)
+            finally:
+                shutil.rmtree(tmp.parent, ignore_errors=True)
+            if url.startswith("http"):           # se subió (si no hay internet regresa la ruta local)
+                prod.imagen_url = url
+                db.commit()
+                subidas += 1
+            else:
+                break                            # sin conexión: se reintenta en la siguiente pasada
+            if progress_cb:
+                try:
+                    progress_cb(i + 1, len(locales))
+                except Exception:
+                    pass
+        return subidas
+    finally:
+        db.close()
+
+
 def upload_product_image(file_path: str, product_id) -> str:
     filename = f"producto_{product_id}"
     if not _cloudinary_configured():

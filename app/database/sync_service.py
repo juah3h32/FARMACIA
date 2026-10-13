@@ -1212,12 +1212,28 @@ def _sync_product_images_bg() -> None:
     with _image_sync_state_lock:
         _image_sync_state.update(running=True, done=0, total=0)
     try:
-        from app.services.cloudinary_service import sync_product_images_locally
+        from app.services.cloudinary_service import sync_product_images_locally, upload_pending_local_images
 
         def _progress(done, total):
             with _image_sync_state_lock:
                 _image_sync_state.update(done=done, total=total)
 
+        # 1) Cloudinary manda: si la foto cambió allá (p. ej. desde otra PC), esta PC toma la nueva
+        try:
+            from app.services.cloudinary_service import reconcile_with_cloudinary
+            rc = reconcile_with_cloudinary(max_age=30)
+            if rc:
+                print(f"[Sync] {rc} foto(s) de producto actualizadas desde Cloudinary")
+        except Exception as e:
+            print(f"[Sync] No se pudo consultar Cloudinary: {e}")
+        # 2) las fotos que solo están en esta PC (y son más nuevas) suben a Cloudinary
+        try:
+            up = upload_pending_local_images(progress_cb=_progress)
+            if up:
+                print(f"[Sync] {up} foto(s) de producto subidas a Cloudinary desde esta PC")
+        except Exception as e:
+            print(f"[Sync] Error subiendo fotos locales a Cloudinary: {e}")
+        # 3) se bajan las de Cloudinary nuevas o cambiadas y reemplazan la copia local
         n = sync_product_images_locally(progress_cb=_progress)
         if n:
             print(f"[Sync] {n} imagen(es) de producto descargadas para respaldo local")
@@ -1311,11 +1327,22 @@ def start_image_watch(interval: int = 12) -> threading.Thread:
     de Turso — se decidió así explícitamente en vez de un canal en tiempo real."""
     def _loop():
         time.sleep(15)  # dejar que termine el sync inicial primero
+        ultima_nube = 0.0
         while True:
             try:
                 _check_new_product_images()
             except Exception as e:
                 print(f"[Sync] Error en chequeo rápido de fotos: {e}")
+            # cada ~90 s se compara contra Cloudinary (la copia maestra de las fotos): si en otra
+            # PC cambiaron una foto, aquí se toma la nueva y se descarga — sin depender de fechas
+            if time.time() - ultima_nube >= 90:
+                ultima_nube = time.time()
+                try:
+                    from app.services.cloudinary_service import reconcile_with_cloudinary
+                    if reconcile_with_cloudinary():
+                        threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
+                except Exception as e:
+                    print(f"[Sync] No se pudo consultar Cloudinary: {e}")
             time.sleep(interval)
 
     t = threading.Thread(target=_loop, daemon=True, name="ImgWatch")

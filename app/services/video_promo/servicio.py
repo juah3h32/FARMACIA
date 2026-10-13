@@ -36,7 +36,8 @@ DEFAULT_CONFIG = dict(
     footer_left='FARMACIA EBENEZER  ·  Cerca de ti, como una roca firme',
     footer_right='Precios sujetos a cambio sin previo aviso. Consulte a su médico.',
     out_dir=str(OUT_DIR_DEFAULT),
-    drive_dir='',                # carpeta de Google Drive para escritorio (ej. G:\\Mi unidad\\Videos Roku)
+    drive_auto=True,             # si la PC tiene Google Drive con la carpeta "Videos Roku", se copia ahí sola
+    drive_dir='',                # carpeta de Google Drive elegida a mano (vacío = la que se detecte) (ej. G:\\Mi unidad\\Videos Roku)
 )
 ITEM_DEFAULT = dict(producto_id=None, style='destacado', enabled=True, desc='', bens=['', '', ''], tag='',
                     old_price='', show_piece=True, unit='')
@@ -137,7 +138,17 @@ def texto_inventario(prod):
     import re
     d = re.split(r'(?<=[.!?])\s', ' '.join((prod.descripcion or '').split()))[0].strip()
     if len(d) > 60:
-        d = d[:60].rsplit(' ', 1)[0].rstrip(',;:') + '.'
+        partes, corto = re.split(r'(?<=[,;:])\s', d), ''
+        for p_ in partes:                      # junta trozos completos (separados por coma) mientras quepan
+            if len((corto + ' ' + p_).strip()) > 60: break
+            corto = (corto + ' ' + p_).strip()
+        if len(corto) < 18:                    # sin comas útiles: corta por palabras y quita las sueltas del final
+            pal = d[:60].split()[:-1]
+            while pal and pal[-1].lower().strip(',;:') in ('de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'y', 'o',
+                                                            'que', 'es', 'con', 'para', 'en', 'por', 'a', 'al', 'se'):
+                pal.pop()
+            corto = ' '.join(pal)
+        d = corto.rstrip(',;: ') + '.'
     if not d:
         gen = (prod.nombre_generico or '').strip().capitalize()
         con = (prod.concentracion or '').strip()
@@ -159,22 +170,52 @@ def texto_inventario(prod):
     return {'desc': d, 'bens': (bens + ['', '', ''])[:3]}
 
 
+IMG_MANIFEST = IMG_DIR / '_fotos.json'          # producto_id -> URL de Cloudinary de la copia guardada
+
+
+def _respaldo_pos(prod_id):
+    """Copia local que guarda el POS (uploads/imagenes/medicamentos/producto_{id}.*)."""
+    d = Path(cfg.DATA_DIR) / 'uploads' / 'imagenes' / 'medicamentos'
+    return next((str(f) for f in sorted(d.glob(f'producto_{prod_id}.*'))), None) if d.is_dir() else None
+
+
 def imagen_local(prod):
-    """Ruta local de la foto del producto (descarga y guarda en caché las que están en la nube)."""
+    """Foto del producto para el video. Cloudinary es la copia de calidad: se descarga y, si la foto
+    cambió en Cloudinary, se reemplaza la copia guardada. Sin internet se usa la última copia que haya."""
     url = (prod.imagen_url or '').strip()
     if not url: return None
     if url.startswith(('http://', 'https://')):
         ext = os.path.splitext(url.split('?')[0])[1].lower()
         ext = ext if ext in ('.png', '.jpg', '.jpeg', '.webp') else '.png'
-        dest = IMG_DIR / (hashlib.sha1(url.encode()).hexdigest()[:20] + ext)
-        if not dest.exists():
+        man = _read(IMG_MANIFEST, {})
+        actual = next(iter(sorted(IMG_DIR.glob(f'producto_{prod.id}.*'))), None)
+        if actual is not None and man.get(str(prod.id)) == url:
+            return str(actual)                    # ya está la versión más nueva
+        try:
             req = urllib.request.Request(url, headers={'User-Agent': 'FarmaciaPOS'})
             with urllib.request.urlopen(req, timeout=30) as r:
-                dest.write_bytes(r.read())
-        return str(dest)
-    for cand in (Path(url), Path(cfg.DATA_DIR) / url, Path(cfg.BASE_DIR) / url):
+                datos = r.read()
+            for viejo in IMG_DIR.glob(f'producto_{prod.id}.*'):     # se reemplaza la copia anterior
+                viejo.unlink(missing_ok=True)
+            dest = IMG_DIR / f'producto_{prod.id}{ext}'
+            dest.write_bytes(datos)
+            man[str(prod.id)] = url
+            _write(IMG_MANIFEST, man)
+            return str(dest)
+        except Exception:
+            # sin internet: la copia que haya (aunque sea la anterior) o el respaldo del POS
+            return str(actual) if actual is not None else _respaldo_pos(prod.id)
+    # foto que solo está en esta PC (/uploads/...): se sube a Cloudinary en la siguiente sincronización
+    for cand in (Path(cfg.DATA_DIR) / url.lstrip('/\\'), Path(url), Path(cfg.BASE_DIR) / url.lstrip('/\\')):
         if cand.is_file(): return str(cand)
-    return None
+    return _respaldo_pos(prod.id)
+
+
+def limpiar_fotos_viejas():
+    """Borra copias del formato anterior (nombres por hash) que ya no se usan."""
+    for f in IMG_DIR.iterdir():
+        if f.is_file() and not f.name.startswith(('producto_', '_')):
+            f.unlink(missing_ok=True)
 
 
 def slide(prod, item, cache=None):
@@ -253,7 +294,17 @@ def vista_previa(prod, item, conf, t=4.0):
         return motor.preview(p, motor_config(conf), t)
 
 
-def drive_sugerido():
+def carpeta_drive(conf):
+    """Carpeta de Drive a donde se copia el video ('' = no se sube)."""
+    if not conf.get('drive_auto', True):
+        return ''
+    manual = (conf.get('drive_dir') or '').strip()
+    if manual:
+        return manual
+    return drive_sugerido(solo_existente=True)
+
+
+def drive_sugerido(solo_existente=False):
     """Busca la carpeta "Videos Roku" de Google Drive para escritorio (G:\\Mi unidad\\Videos Roku, etc.)."""
     import string
     raices = [Path(f'{d}:\\') for d in string.ascii_uppercase if d not in 'AB']
@@ -266,6 +317,8 @@ def drive_sugerido():
                     return str(base / 'Videos Roku')
             except OSError:
                 continue
+    if solo_existente:
+        return ''
     for r in raices:                           # Drive instalado pero sin la carpeta: sugerir "Mi unidad"
         for unidad in ('Mi unidad', 'My Drive'):
             try:
@@ -318,10 +371,11 @@ def generar(slides, conf, nombre):
                 ok = motor.generate(slides, motor_config(conf), str(out), prog, lambda: _job['cancel'])
                 _job.update(state='listo' if ok else 'cancelado', pct=1.0 if ok else 0.0,
                             msg='Video listo' if ok else 'Cancelado', drive='')
-                if ok and (conf.get('drive_dir') or '').strip():
-                    _job['msg'] = 'Copiando a Google Drive…'
+                destino = carpeta_drive(conf)
+                if ok and destino:
+                    _job['msg'] = 'Subiendo a Google Drive…'
                     try:
-                        _job['drive'] = copiar_a_drive(str(out), conf['drive_dir'])
+                        _job['drive'] = copiar_a_drive(str(out), destino)
                         _job['msg'] = 'Video listo · copiado a Google Drive (se sube solo)'
                     except Exception as e:
                         _job['msg'] = f'Video listo, pero no se pudo copiar a Google Drive: {e}'
@@ -329,3 +383,86 @@ def generar(slides, conf, nombre):
                 _job.update(state='error', error=str(e), msg='Error')
     threading.Thread(target=work, daemon=True).start()
     return str(out)
+
+
+# ───────────────────────── tipo de medicamento (para filtrar el catálogo) ─────────────────────────
+# Se deduce del nombre, ingrediente activo, descripción y categoría del inventario (sin IA).
+USOS = [
+    ('gripe', 'Gripe y resfriado', '🤧', ['fenilefrina', 'pseudoefedrina', 'clorfenamina', 'gripe', 'gripa', 'resfriado',
+                                          'antigripal', 'congestion nasal', 'descongestion', 'desenfriol', 'tabcin', 'xl-3',
+                                          'xl3', 'next', 'contac', 'catarro']),
+    ('tos', 'Tos', '😮‍💨', ['dextrometorfano', 'ambroxol', 'bromhexina', 'guaifenesina', 'carbocisteina', 'acetilcisteina',
+                          'benzonatato', 'tos', 'antitusiv', 'expectorante', 'mucolitic', 'flemas', 'broxol',
+                          'histiacil', 'pulmonar', 'bronquio']),
+    ('dolor', 'Dolor y fiebre', '🤕', ['paracetamol', 'acetaminofen', 'ibuprofeno', 'naproxeno', 'diclofenaco', 'ketorolaco',
+                                       'metamizol', 'aspirina', 'acetilsalicilico', 'ketoprofeno', 'meloxicam', 'celecoxib',
+                                       'tramadol', 'piroxicam', 'nimesulida', 'analgesic', 'antiinflamatori', 'dolor',
+                                       'fiebre', 'migrana', 'jaqueca', 'cafiaspirina', 'neomelubrina']),
+    ('alergia', 'Alergias', '🌼', ['loratadina', 'cetirizina', 'desloratadina', 'fexofenadina', 'levocetirizina', 'difenhidramina',
+                                   'alergi', 'antihistamin', 'rinitis', 'comezon', 'urticaria']),
+    ('estomago', 'Estómago y digestión', '🫄', ['omeprazol', 'pantoprazol', 'esomeprazol', 'ranitidina', 'butilhioscina',
+                                               'hioscina', 'loperamida', 'metoclopramida', 'subsalicilato', 'simeticona',
+                                               'antiacido', 'gastri', 'colitis', 'diarrea', 'nausea', 'vomito', 'estomac',
+                                               'agruras', 'acidez', 'sal de uvas', 'pepto', 'electrolit', 'suero oral',
+                                               'lactobacil', 'estrenimiento', 'senosido', 'laxante', 'parasit', 'albendazol',
+                                               'nitazoxanida', 'metronidazol']),
+    ('infeccion', 'Infecciones (antibióticos)', '💊', ['amoxicilina', 'ampicilina', 'cefalexina', 'ciprofloxacino', 'azitromicina',
+                                                      'claritromicina', 'cloranfenicol', 'trimetoprim', 'sulfametoxazol',
+                                                      'nitrofurantoina', 'penicilina', 'dicloxacilina', 'gentamicina',
+                                                      'ceftriaxona', 'levofloxacino', 'doxiciclina', 'clindamicina',
+                                                      'antibiotic', 'infeccion', 'bencilpenicilina', 'ampigrin']),
+    ('corazon', 'Presión, corazón y colesterol', '❤️', ['losartan', 'enalapril', 'captopril', 'amlodipino', 'metoprolol',
+                                                        'telmisartan', 'hidroclorotiazida', 'nifedipino', 'atorvastatina',
+                                                        'pravastatina', 'simvastatina', 'rosuvastatina', 'clopidogrel',
+                                                        'hipertension', 'presion arterial', 'colesterol', 'hipolipemiante',
+                                                        'trigliceridos', 'bezafibrato', 'atorlip']),
+    ('diabetes', 'Diabetes', '🩸', ['metformina', 'glibenclamida', 'glimepirida', 'sitagliptina', 'insulina', 'diabet',
+                                    'glucosa', 'dapagliflozina', 'pioglitazona']),
+    ('vitaminas', 'Vitaminas y suplementos', '🍊', ['vitamina', 'complejo b', 'acido folico', 'multivitamin', 'suplemento',
+                                                   'omega', 'calcio', 'hierro', 'zinc', 'magnesio', 'colageno', 'electrolitos']),
+    ('piel', 'Piel', '🧴', ['crema', 'pomada', 'unguento', 'dermat', 'clotrimazol', 'ketoconazol', 'miconazol', 'terbinafina',
+                            'hidrocortisona', 'betametasona', 'acne', 'hongos', 'piel', 'quemadura', 'rozadura', 'emoliente',
+                            'aceite de oliv', 'vaselina']),
+    ('ojos', 'Ojos y oídos', '👁️', ['oftalm', 'gotas para los ojos', 'lagrima', 'colirio', 'conjuntivitis', 'otico', 'oidos',
+                                     'nafazolina', 'tobramicina']),
+    ('curacion', 'Curación y primeros auxilios', '🩹', ['gasa', 'venda', 'guante', 'jeringa', 'alcohol', 'agua oxigenada',
+                                                       'algodon', 'curita', 'cubrebocas', 'micropore', 'isodine', 'antisept',
+                                                       'aposito', 'cinta', 'termometro', 'plastic world']),
+    ('personal', 'Cuidado personal y bebé', '🧼', ['shampoo', 'jabon', 'desodorante', 'panal', 'toalla', 'pasta dental',
+                                                  'cepillo', 'bebe', 'biberon', 'condon', 'preservativo', 'protector solar']),
+]
+_USO_CATEGORIA = {'antibioticos': 'infeccion', 'vitaminas y suplementos': 'vitaminas', 'material de curacion': 'curacion',
+                  'cuidado personal': 'personal', 'productos de bebe': 'personal', 'dermatologia': 'piel',
+                  'oftalmologia': 'ojos'}
+
+
+def _sin_acentos(t):
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', (t or '').lower()) if unicodedata.category(c) != 'Mn')
+
+
+def usos_producto(prod):
+    """Lista de usos (claves de USOS) de un producto, deducida de sus datos del inventario."""
+    import re
+    def limpio(t):
+        return ' ' + re.sub(r'[^a-z0-9]+', ' ', _sin_acentos(t)) + ' '
+    desc = (prod.descripcion or '')[:170]                 # solo el inicio: "para qué sirve"
+    nombre = limpio(' '.join(str(x or '') for x in (prod.nombre, prod.nombre_generico, prod.marca, prod.presentacion)))
+    texto = nombre + limpio(desc)
+    out = []
+    for k, _, _, palabras in USOS:
+        donde = nombre if k in ('curacion', 'personal') else texto
+        # la palabra debe empezar donde empieza una palabra; las cortas (tos, gasa, zinc…) deben ser completas
+        if any(re.search(r'(?<![a-z0-9])' + re.escape(p.strip()) + (r'(?![a-z])' if len(p.strip()) <= 4 else ''), donde)
+               for p in palabras):
+            out.append(k)
+    cat = _sin_acentos(getattr(getattr(prod, 'categoria', None), 'nombre', '') or '')
+    if cat in _USO_CATEGORIA and _USO_CATEGORIA[cat] not in out:
+        out.append(_USO_CATEGORIA[cat])
+    return out or ['otros']
+
+
+try:
+    limpiar_fotos_viejas()
+except Exception:
+    pass
