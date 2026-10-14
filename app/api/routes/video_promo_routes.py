@@ -66,7 +66,7 @@ def usos(payload: dict = Depends(get_current_api_user)):
         mapa = {p.id: s.usos_producto(p) for p in prods}
     finally:
         db.close()
-    grupos = [{"k": k, "l": l, "i": i} for k, l, i, _ in s.USOS] + [{"k": "otros", "l": "Otros", "i": "📦"}]
+    grupos = [{"k": k, "l": l, "i": i} for k, l, i, _ in s.USOS] + [{"k": "otros", "l": "Otros", "i": ""}]
     return {"grupos": grupos, "productos": mapa}
 
 
@@ -78,6 +78,10 @@ def estado(payload: dict = Depends(get_current_api_user)):
     proy = s.cargar_proyecto()
     prods = _productos({it["producto_id"] for it in proy["items"]})
     cache = s.ia_cache()
+    try:
+        cambios = s.cambios_de_precio(proy, prods)
+    except Exception:
+        cambios = []
     items = []
     for it in proy["items"]:
         p = prods.get(it["producto_id"])
@@ -87,12 +91,13 @@ def estado(payload: dict = Depends(get_current_api_user)):
         origen = "ia" if c else "inventario"          # sin IA: descripción armada con los datos del inventario
         c = c or s.texto_inventario(p)
         items.append(dict(it, nombre=p.nombre, precio=p.precio_venta, imagen_url=p.imagen_url or "",
-                          tiene_foto=bool(p.imagen_url), activo=bool(p.activo),
+                          tiene_foto=bool(p.imagen_url), activo=bool(p.activo), foto_chica=s.foto_chica(p),
                           ia_desc=c.get("desc", ""), ia_bens=c.get("bens", ["", "", ""]), ia_origen=origen,
                           precio_tachado=p.precio_tachado, precio_pieza=p.precio_pieza if p.venta_fraccionada else None))
     return {"config": proy["config"], "items": items, "estilos": s.ESTILOS,
             "ia_lista": bool(getattr(cfg, "ANTHROPIC_API_KEY", "")), "tarea": s.estado_tarea(),
-            "drive_sugerido": s.drive_sugerido(), "drive_destino": s.carpeta_drive(proy["config"])}
+            "drive_sugerido": s.drive_sugerido(), "drive_destino": s.carpeta_drive(proy["config"]),
+            "cambios_precio": cambios}
 
 
 class TerminalIn(BaseModel):
@@ -107,6 +112,27 @@ class TerminalIn(BaseModel):
     chips: list[str] = []
 
 
+class ServiciosIn(BaseModel):
+    enabled: bool = False
+    posicion: str = "final"           # inicio | final
+    titulo: str = ""
+    lineas: list[str] = []
+    horario: str = ""
+    whatsapp: str = ""
+    qr: str = ""                       # liga para el QR (vacío = WhatsApp con el número)
+
+
+def _servicios_limpio(sv: ServiciosIn) -> dict:
+    d = sv.dict()
+    if d["posicion"] not in ("inicio", "final"): d["posicion"] = "final"
+    d["titulo"] = d["titulo"].strip()[:60] or "Te atendemos como en casa"
+    d["lineas"] = ([x.strip()[:40] for x in d["lineas"]] + ["", "", "", ""])[:4]
+    d["horario"] = d["horario"].strip()[:50]
+    d["whatsapp"] = d["whatsapp"].strip()[:20]
+    d["qr"] = d["qr"].strip()[:200]
+    return d
+
+
 class ConfigIn(BaseModel):
     seconds: int = 8
     intro: bool = True
@@ -119,6 +145,10 @@ class ConfigIn(BaseModel):
     drive_dir: Optional[str] = None         # None = no cambiar; "" = usar la carpeta que se detecte
     drive_auto: Optional[bool] = None
     terminal: Optional[TerminalIn] = None
+    servicios: Optional[ServiciosIn] = None
+    drive_reemplazar: Optional[bool] = None
+    auto_noche: Optional[bool] = None
+    auto_hora: Optional[int] = None
 
 
 def _terminal_limpio(t: TerminalIn) -> dict:
@@ -149,6 +179,11 @@ def guardar_config(body: ConfigIn, payload: dict = Depends(get_current_api_user)
     else: c["drive_dir"] = c["drive_dir"].strip().strip('"')
     if body.terminal is None: c.pop("terminal")
     else: c["terminal"] = _terminal_limpio(body.terminal)
+    if body.servicios is None: c.pop("servicios")
+    else: c["servicios"] = _servicios_limpio(body.servicios)
+    for k in ("drive_reemplazar", "auto_noche", "auto_hora"):
+        if c[k] is None: c.pop(k)
+    if "auto_hora" in c: c["auto_hora"] = max(0, min(23, c["auto_hora"]))
     return _svc().guardar_proyecto(config=c)["config"]
 
 
@@ -162,12 +197,16 @@ class ItemIn(BaseModel):
     old_price: str = ""
     show_piece: bool = True
     unit: str = ""
+    seconds: int = 0                 # 0 = los segundos generales
 
 
 @router.put("/items")
 def guardar_items(items: list[ItemIn], payload: dict = Depends(get_current_api_user)):
     _admin(payload)
-    _svc().guardar_proyecto(items=[i.dict() for i in items])
+    lista = [i.dict() for i in items]
+    for it in lista:
+        it["seconds"] = 0 if not it["seconds"] else max(3, min(15, it["seconds"]))
+    _svc().guardar_proyecto(items=lista)
     return {"ok": True}
 
 
@@ -231,6 +270,65 @@ def vista_previa_terminal(body: PreviewTerminalIn, payload: dict = Depends(get_c
     return StreamingResponse(buf, media_type="image/jpeg")
 
 
+class PreviewServiciosIn(BaseModel):
+    servicios: ServiciosIn
+    t: float = 4.0
+
+
+@router.post("/vista-previa-servicios")
+def vista_previa_servicios(body: PreviewServiciosIn, payload: dict = Depends(get_current_api_user)):
+    _admin(payload)
+    s = _svc()
+    try:
+        img = s.vista_previa_servicios(_servicios_limpio(body.servicios), s.cargar_proyecto()["config"], body.t)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo dibujar la vista previa: {e}")
+    buf = io.BytesIO()
+    img.resize((960, 540)).save(buf, "JPEG", quality=88)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/jpeg")
+
+
+class VivoIn(BaseModel):
+    item: Optional[ItemIn] = None
+    terminal: Optional[TerminalIn] = None
+    servicios: Optional[ServiciosIn] = None
+
+
+@router.post("/vivo")
+def vivo(body: VivoIn, payload: dict = Depends(get_current_api_user)):
+    """Prepara la vista previa en movimiento; devuelve la dirección del video en vivo (MJPEG)."""
+    _admin(payload)
+    s = _svc()
+    conf = s.cargar_proyecto()["config"]
+    if body.terminal is not None:
+        p = s.slide_terminal(_terminal_limpio(body.terminal), body.terminal.diseno)
+    elif body.servicios is not None:
+        p = s.slide_servicios(_servicios_limpio(body.servicios))
+    elif body.item is not None:
+        prod = _productos({body.item.producto_id}).get(body.item.producto_id)
+        if not prod:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        p = s.slide(prod, body.item.dict())
+        if not p["file"]:
+            raise HTTPException(status_code=400, detail="Este producto no tiene foto. Agrégala en Inventario.")
+    else:
+        raise HTTPException(status_code=400, detail="Nada que mostrar")
+    return {"url": f"/api/marketing/video/vivo/{s.vivo_registrar(p, conf)}"}
+
+
+@router.get("/vivo/{tok}")
+def vivo_stream(tok: str):
+    """La animación al ritmo real. No pide sesión: la clave es de un solo uso y dura 2 minutos."""
+    s = _svc()
+    if tok not in s._vivo:
+        raise HTTPException(status_code=404, detail="La vista previa expiró")
+    return StreamingResponse(s.vivo_cuadros(tok), media_type="multipart/x-mixed-replace; boundary=frame",
+                             headers={"Cache-Control": "no-store"})
+
+
 # ── generar video ─────────────────────────────────────────────────────────────
 class GenerarIn(BaseModel):
     nombre: Optional[str] = None
@@ -245,33 +343,20 @@ def generar(body: GenerarIn, payload: dict = Depends(get_current_api_user)):
     if body.solo_terminal:
         try:
             out = s.generar(s.anuncios_terminal(proy["config"]["terminal"]), proy["config"],
-                            body.nombre or "PAGO_CON_TARJETA")
+                            body.nombre or "PAGO_CON_TARJETA", "tarjetas")
         except RuntimeError as e:
             raise HTTPException(status_code=409, detail=str(e))
         return {"archivo": out}
     items = [it for it in proy["items"] if it.get("enabled", True)]
-    if not items and not proy["config"]["terminal"].get("enabled"):
+    c = proy["config"]
+    if not items and not c["terminal"].get("enabled") and not c["servicios"].get("enabled"):
         raise HTTPException(status_code=400, detail="Agrega al menos un producto al video.")
-    prods = _productos({it["producto_id"] for it in items})
-    cache = s.ia_cache()
-    slides, sin_foto = [], []
-    for it in items:
-        p = prods.get(it["producto_id"])
-        if not p:
-            continue
-        try:
-            sl = s.slide(p, it, cache)
-        except Exception:
-            sl = None
-        if not sl or not sl["file"]:
-            sin_foto.append(p.nombre); continue
-        slides.append(sl)
+    slides, precios, sin_foto = s.armar_slides(proy)
     if sin_foto:
         raise HTTPException(status_code=400, detail="Estos productos no tienen foto (agrégala en Inventario o quítalos del video): "
                                                     + ", ".join(sin_foto[:8]))
-    slides = s.con_terminal(slides, proy["config"])
     try:
-        out = s.generar(slides, proy["config"], body.nombre)
+        out = s.generar(slides, c, body.nombre, "promos", precios)
     except RuntimeError as e:
         raise HTTPException(status_code=409, detail=str(e))
     return {"archivo": out}
@@ -334,3 +419,12 @@ def guardar_clave(body: ClaveIn, payload: dict = Depends(get_current_api_user)):
     (cfg.DATA_DIR / "anthropic.key").write_text(k, encoding="utf-8")
     cfg.ANTHROPIC_API_KEY = k
     return {"ok": True}
+
+
+# revisión nocturna: si cambió algún precio, el video de promociones se genera solo (solo en escritorio)
+if not cfg._ON_VERCEL:
+    try:
+        from app.services.video_promo import servicio as _s
+        _s.iniciar_programador()
+    except Exception as _e:
+        print(f"[Video] No se pudo iniciar la revisión nocturna: {_e}")

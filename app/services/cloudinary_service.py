@@ -31,7 +31,23 @@ _LOCAL_SUBDIR = {
 # descargado de Cloudinary) se adaptan a este cuadrado — así se ven todas del
 # mismo tamaño en el catálogo sin importar la foto original que suba cada
 # quien, y sobre fondo blanco parejo (ver _fit_white_square).
-_STANDARD_SIZE = {"medicamentos": 800, "perfiles": 300}
+_STANDARD_SIZE = {"medicamentos": 1200, "perfiles": 300}
+
+
+def _recortar_margen(img: Image.Image, margen: float = 0.06) -> Image.Image:
+    """Quita el margen blanco alrededor del producto (deja un respiro de `margen`).
+    Antes una foto con mucho blanco alrededor dejaba el producto chiquito en el cuadro
+    y en el video de la tele se veía borroso al agrandarlo."""
+    rgb = img.convert("RGB")
+    gris = rgb.convert("L").point(lambda v: 255 if v < 238 else 0)
+    bb = gris.getbbox()
+    if not bb:
+        return rgb
+    w, h = bb[2] - bb[0], bb[3] - bb[1]
+    if w * h > rgb.width * rgb.height * 0.85:          # ya casi no tiene margen
+        return rgb
+    m = int(max(w, h) * margen)
+    return rgb.crop((max(0, bb[0] - m), max(0, bb[1] - m), min(rgb.width, bb[2] + m), min(rgb.height, bb[3] + m)))
 
 
 def _fit_white_square(img: Image.Image, size: int) -> Image.Image:
@@ -43,10 +59,22 @@ def _fit_white_square(img: Image.Image, size: int) -> Image.Image:
     que en una con fondo normal. Además deja TODAS las fotos —tengan o no
     fondo removido— sobre el mismo fondo blanco parejo."""
     img = img.convert("RGB")
-    img.thumbnail((size, size), Image.LANCZOS)
+    if size >= 800:                                    # fotos de producto: sin margen blanco de sobra
+        img = _recortar_margen(img)
+        k = size / max(img.width, img.height)          # el producto llena el cuadro (también si viene chica)
+        img = img.resize((max(1, round(img.width * k)), max(1, round(img.height * k))), Image.LANCZOS)
+    else:
+        img.thumbnail((size, size), Image.LANCZOS)
     canvas = Image.new("RGB", (size, size), (255, 255, 255))
     offset = ((size - img.width) // 2, (size - img.height) // 2)
     canvas.paste(img, offset)
+    if size >= 800:
+        # fondo blanco parejo: lo casi blanco (gris claro de la foto) se vuelve blanco puro,
+        # así todas las fotos del inventario se ven iguales
+        r, g, b = canvas.split()
+        from PIL import ImageChops
+        claro = ImageChops.darker(ImageChops.darker(r, g), b).point(lambda v: 255 if v >= 242 else 0)
+        canvas.paste((255, 255, 255), (0, 0), claro)
     return canvas
 
 
@@ -59,7 +87,7 @@ def _standardize_image_bytes(raw: bytes, size: int) -> bytes | None:
         img = Image.open(io.BytesIO(raw))
         img = _fit_white_square(img, size)
         out = io.BytesIO()
-        img.save(out, format="JPEG", quality=88)
+        img.save(out, format="JPEG", quality=92)
         return out.getvalue()
     except Exception:
         return None
@@ -342,10 +370,19 @@ def upload_product_image(file_path: str, product_id) -> str:
     if manifest.get(f"{filename}#huella") == huella and str(manifest.get(filename, "")).startswith("http"):
         return manifest[filename]
     _configure()
+    import tempfile
+    lista = None
     try:
         size = _STANDARD_SIZE["medicamentos"]
+        # se sube ya sin margen blanco y en tamaño grande: así el producto se ve nítido en el video
+        lista = _standardize_image_bytes(Path(file_path).read_bytes(), size)
+        subir = file_path
+        if lista:
+            t = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+            t.write(lista); t.close()
+            subir = t.name
         result = cloudinary.uploader.upload(
-            file_path,
+            subir,
             folder="FARMACIA/PRODUCTOS",
             public_id=filename,
             overwrite=True,
@@ -355,9 +392,12 @@ def upload_product_image(file_path: str, product_id) -> str:
             # producto (mismo criterio que _fit_white_square para la copia
             # local) — así la copia maestra en Cloudinary ya viene consistente,
             # sin depender de que cloudinaryThumb() la recorte al vuelo en el front.
-            transformation=[{"width": size, "height": size, "crop": "pad", "background": "white"}],
+            transformation=[{"width": size, "height": size, "crop": "pad", "background": "white", "quality": 92}],
         )
         url = result["secure_url"]
+        if lista and subir != file_path:
+            try: Path(subir).unlink()
+            except OSError: pass
         # Guardar también una copia local del respaldo — así esta misma PC no
         # tiene que re-descargar de Cloudinary la foto que ella misma subió, y
         # sync_product_images_locally() no la vuelve a bajar en otras PCs que ya
@@ -373,7 +413,58 @@ def upload_product_image(file_path: str, product_id) -> str:
         return url
     except Exception:
         # Sin internet / Cloudinary caído — no perder la imagen, guardarla local.
+        if lista and subir != file_path:
+            try: Path(subir).unlink()
+            except OSError: pass
         return _save_local(file_path, "medicamentos", filename)
+
+
+def ajustar_fotos_existentes(progress_cb=None) -> int:
+    """Pasa TODAS las fotos de producto de Cloudinary por el mismo ajuste que las nuevas
+    (sin margen blanco, producto centrado y del mismo tamaño, fondo blanco parejo, 1200x1200)
+    y las vuelve a subir con el mismo nombre. Devuelve cuántas se ajustaron."""
+    import tempfile
+    nube = cloudinary_product_images()
+    if not nube:
+        return 0
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    db = get_db_session()
+    hechas = 0
+    try:
+        for n, (pid, c) in enumerate(sorted(nube.items())):
+            try:
+                raw = requests.get(c["url"], timeout=30).content
+                data = _standardize_image_bytes(raw, _STANDARD_SIZE["medicamentos"])
+                if not data:
+                    continue
+                t = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg"); t.write(data); t.close()
+                try:
+                    res = cloudinary.uploader.upload(t.name, folder="FARMACIA/PRODUCTOS", public_id=f"producto_{pid}",
+                                                     overwrite=True, resource_type="image")
+                finally:
+                    Path(t.name).unlink(missing_ok=True)
+                url = res["secure_url"]
+                prod = db.query(Producto).filter(Producto.id == pid).first()
+                if prod is not None:
+                    prod.imagen_url = url
+                    db.commit()
+                local = cfg.DATA_DIR / "uploads" / "imagenes" / "medicamentos" / f"producto_{pid}.jpg"
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_bytes(data)
+                manifest = _load_manifest()
+                manifest[f"producto_{pid}"] = url
+                manifest.pop(f"producto_{pid}#huella", None)
+                _save_manifest(manifest)
+                hechas += 1
+            except Exception as e:
+                print(f"[Fotos] No se pudo ajustar producto_{pid}: {e}")
+            if progress_cb:
+                try: progress_cb(n + 1, len(nube))
+                except Exception: pass
+    finally:
+        db.close()
+    return hechas
 
 
 def upload_profile_photo(file_path: str, user_id) -> str:

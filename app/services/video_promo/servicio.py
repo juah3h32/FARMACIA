@@ -4,6 +4,7 @@ Toma los productos del inventario (nombre, precio, foto, presentación), les agr
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -12,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 import app.config as cfg
+from PIL import Image
 from . import motor
 from . import ia
 
@@ -31,6 +33,12 @@ TERMINAL_DEFAULT = dict(
     marcas=['visa', 'mastercard', 'amex', 'carnet'],
     chips=['Débito', 'Crédito', 'Sin contacto'],
 )
+SERVICIOS_DEFAULT = dict(
+    enabled=False, posicion='final',
+    titulo='Te atendemos como en casa',
+    lineas=['Toma de presión arterial', 'Medición de glucosa', 'Inyecciones', ''],
+    horario='', whatsapp='', qr='',
+)
 DEFAULT_CONFIG = dict(
     seconds=8, intro=True, quality='Máxima', repeat=1, default_style='destacado',
     footer_left='FARMACIA EBENEZER  ·  Cerca de ti, como una roca firme',
@@ -38,11 +46,29 @@ DEFAULT_CONFIG = dict(
     out_dir=str(OUT_DIR_DEFAULT),
     drive_auto=True,             # si la PC tiene Google Drive con la carpeta "Videos Roku", se copia ahí sola
     drive_dir='',                # carpeta de Google Drive elegida a mano (vacío = la que se detecte) (ej. G:\\Mi unidad\\Videos Roku)
+    drive_reemplazar=True,       # el video nuevo reemplaza al anterior en Drive (el viejo pasa a "Anteriores")
+    drive_ultimos={},            # {'promos': 'PROMOS_….mp4', 'tarjetas': '…'}: último video copiado de cada tipo
+    precios_video={},            # {producto_id: precio} con los que se hizo el último video de promociones
+    auto_noche=True,             # si cambió algún precio, se genera de nuevo solo en la noche
+    auto_hora=22,
+    auto_ultimo='',              # fecha de la última generación automática
+    ms_cuadro=0,                 # cuánto tardó cada cuadro la última vez (para estimar el tiempo)
 )
 ITEM_DEFAULT = dict(producto_id=None, style='destacado', enabled=True, desc='', bens=['', '', ''], tag='',
-                    old_price='', show_piece=True, unit='')
+                    old_price='', show_piece=True, unit='', seconds=0)
 
 _lock = threading.Lock()          # el motor usa estado global: una sola tarea a la vez
+_job_lock = threading.Lock()      # revisar y marcar "trabajando" en un solo paso (doble clic)
+
+
+class _Ocupado:
+    """Vista previa: si se está generando un video no se queda esperando (no traba el POS)."""
+    def __enter__(self):
+        if not _lock.acquire(timeout=2):
+            raise ValueError('Se está generando un video; la vista previa vuelve al terminar.')
+
+    def __exit__(self, *a):
+        _lock.release()
 _job = dict(state='idle', pct=0.0, msg='', file='', error='', cancel=False)
 
 for d in (BASE, IMG_DIR):
@@ -68,6 +94,9 @@ def cargar_proyecto():
     d = _read(PROYECTO, {})
     conf = dict(DEFAULT_CONFIG, **d.get('config', {}))
     conf['terminal'] = dict(TERMINAL_DEFAULT, **(conf.get('terminal') or {}))
+    conf['servicios'] = dict(SERVICIOS_DEFAULT, **(conf.get('servicios') or {}))
+    conf['terminal']['disenos'] = [x for x in conf['terminal'].get('disenos') or [] if x != 'persona'] or ['terminal']
+    if conf['terminal'].get('diseno') == 'persona': conf['terminal']['diseno'] = 'terminal'
     if 'disenos' not in (d.get('config', {}).get('terminal') or {}):      # proyectos de antes: un solo diseño
         conf['terminal']['disenos'] = [conf['terminal'].get('diseno') or 'terminal']
     if conf.get('default_style') not in ESTILOS: conf['default_style'] = 'destacado'
@@ -212,6 +241,24 @@ def imagen_local(prod):
     return _respaldo_pos(prod.id)
 
 
+def foto_chica(prod):
+    """True si el producto ocupa muy pocos píxeles en su foto (se verá borroso en la tele).
+    Solo revisa la copia que ya está en esta PC (no descarga nada)."""
+    act = next(iter(sorted(IMG_DIR.glob(f'producto_{prod.id}.*'))), None) or (
+        Path(_respaldo_pos(prod.id)) if _respaldo_pos(prod.id) else None)
+    if act is None:
+        return False
+    try:
+        im = Image.open(act)
+        im.draft('L', (im.width // 2, im.height // 2))
+        g = im.convert('L')
+        k = im.width / g.width if g.width else 1
+        bb = g.point(lambda v: 255 if v < 238 else 0).getbbox()
+        return bool(bb) and max(bb[2] - bb[0], bb[3] - bb[1]) * k < 320
+    except Exception:
+        return False
+
+
 def limpiar_fotos_viejas():
     """Borra copias del formato anterior (nombres por hash) que ya no se usan."""
     for f in IMG_DIR.iterdir():
@@ -230,6 +277,13 @@ def slide(prod, item, cache=None):
     old = str(item.get('old_price') or '').strip().lstrip('$')
     if not old and prod.precio_tachado and prod.precio_tachado > prod.precio_venta:
         old = _fmt(prod.precio_tachado)
+    tag = (item.get('tag') or '').strip()
+    try:
+        ahorro = float(old) - float(prod.precio_venta or 0) if old else 0
+    except ValueError:
+        ahorro = 0
+    if not tag and ahorro >= 1:
+        tag = 'AHORRA $' + _fmt(ahorro)                 # sello automático con lo que se ahorra
     extra = None
     if item.get('show_piece', True) and prod.venta_fraccionada and (prod.precio_pieza or 0) > 0:
         extra = ['$' + _fmt(prod.precio_pieza), 'c/u']
@@ -237,8 +291,8 @@ def slide(prod, item, cache=None):
         file=imagen_local(prod) or '', name=prod.nombre, sub=prod.nombre_generico or '',
         pres=[pres1, _unidades(prod.contenido) if _unidades(prod.contenido) not in pres1 else ''], desc=(item.get('desc') or c.get('desc') or '').strip(),
         bens=(list(bens) + ['', '', ''])[:3], price=_fmt(prod.precio_venta), unit=item.get('unit') or '',
-        old_price=old, tag=item.get('tag') or '', extra=extra, style=item.get('style') or 'destacado',
-        color=None, color2=None,
+        old_price=old, tag=tag, extra=extra, style=item.get('style') or 'destacado',
+        color=None, color2=None, seconds=int(item.get('seconds') or 0),
     )
 
 
@@ -271,6 +325,26 @@ def con_terminal(slides, conf):
     return ads + list(slides)
 
 
+def slide_servicios(serv):
+    s = dict(SERVICIOS_DEFAULT, **(serv or {}))
+    return dict(style='servicios', name='Servicios', titulo=s['titulo'], lineas=s['lineas'], horario=s['horario'],
+                whatsapp=s['whatsapp'], qr=s['qr'])
+
+
+def con_anuncios(slides, conf):
+    """Tarjetas + servicios en el lugar elegido."""
+    out = con_terminal(slides, conf)
+    s = conf.get('servicios') or {}
+    if s.get('enabled'):
+        out = [slide_servicios(s)] + out if s.get('posicion') == 'inicio' else out + [slide_servicios(s)]
+    return out
+
+
+def vista_previa_servicios(serv, conf, t=4.0):
+    with _Ocupado():
+        return motor.preview(slide_servicios(serv), motor_config(conf), t)
+
+
 def anuncios_terminal(term):
     """Un anuncio por cada diseño elegido (Terminal, Persona, Abanico, Sin contacto)."""
     t = dict(TERMINAL_DEFAULT, **(term or {}))
@@ -278,7 +352,7 @@ def anuncios_terminal(term):
 
 
 def vista_previa_terminal(term, conf, t=4.0):
-    with _lock:
+    with _Ocupado():
         return motor.preview(slide_terminal(term), motor_config(conf), t)
 
 
@@ -291,7 +365,7 @@ def vista_previa(prod, item, conf, t=4.0):
     p = slide(prod, item)
     if not p['file']:
         raise ValueError('Este producto no tiene foto. Agrégala en Inventario.')
-    with _lock:
+    with _Ocupado():
         return motor.preview(p, motor_config(conf), t)
 
 
@@ -344,24 +418,58 @@ def copiar_a_drive(archivo, carpeta):
     return str(final)
 
 
+def retirar_anterior(carpeta, nombre_viejo, nombre_nuevo):
+    """Mueve el video anterior a "Anteriores" (dentro de la misma carpeta): la tele ya no lo pasa, pero no se borra."""
+    if not nombre_viejo or nombre_viejo == nombre_nuevo:
+        return ''
+    viejo = Path(carpeta) / nombre_viejo
+    if not viejo.is_file():
+        return ''
+    dest = Path(carpeta) / 'Anteriores'
+    dest.mkdir(exist_ok=True)
+    final = dest / nombre_viejo
+    if final.exists():
+        final = dest / f'{viejo.stem}_{datetime.now():%H%M%S}{viejo.suffix}'
+    os.replace(viejo, final)
+    return str(final)
+
+
 def estado_tarea():
-    return {k: v for k, v in _job.items() if k != 'cancel'}
+    d = {k: v for k, v in _job.items() if k not in ('cancel', 'inicio')}
+    if _job.get('state') == 'trabajando' and _job.get('inicio'):
+        pasado = time.time() - _job['inicio']
+        d['transcurrido'] = int(pasado)
+        if 0.05 < _job.get('pct', 0) < 0.999:
+            d['restante'] = int(pasado * (1 - _job['pct']) / _job['pct'])
+    return d
+
+
+def estimar_segundos(slides, conf):
+    """Cuánto tardará en generarse (según la última vez en esta PC)."""
+    ms = float(conf.get('ms_cuadro') or 0) or 22.0
+    cuadros = motor.cuadros_totales(slides, dict(conf, logo=str(LOGO)))
+    return int(cuadros * ms / 1000) + 3
 
 
 def cancelar():
     _job['cancel'] = True
 
 
-def generar(slides, conf, nombre):
-    """Arranca la generación en segundo plano. slides: fichas ya armadas (con foto)."""
-    if _job['state'] == 'trabajando':
-        raise RuntimeError('Ya se está generando un video.')
+def generar(slides, conf, nombre, tipo='promos', precios=None, automatico=False):
+    """Arranca la generación en segundo plano. slides: fichas ya armadas (con foto).
+    tipo: 'promos' o 'tarjetas' (en Drive, cada video nuevo reemplaza al anterior del mismo tipo).
+    precios: {producto_id: precio} con que se hace (para avisar cuando cambien)."""
     out_dir = Path(conf.get('out_dir') or OUT_DIR_DEFAULT)
     out_dir.mkdir(parents=True, exist_ok=True)
-    nombre = (nombre or f'PROMOS_{datetime.now():%Y-%m-%d}').strip()
+    nombre = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', (nombre or '').strip()).strip(' .') or f'PROMOS_{datetime.now():%Y-%m-%d}'
     if not nombre.lower().endswith('.mp4'): nombre += '.mp4'
     out = out_dir / nombre
-    _job.update(state='trabajando', pct=0.0, msg='Preparando…', file=str(out), error='', cancel=False)
+    tmp = out.with_name(out.stem + '.generando.mp4')   # el video anterior no se toca hasta que el nuevo esté completo
+    with _job_lock:
+        if _job['state'] == 'trabajando':
+            raise RuntimeError('Ya se está generando un video.')
+        _job.update(state='trabajando', pct=0.0, msg='Preparando…', file=str(out), error='', cancel=False, drive='',
+                    inicio=time.time(), automatico=automatico)
 
     def prog(d, t, msg):
         _job['pct'] = d / max(t, 1); _job['msg'] = msg
@@ -369,19 +477,42 @@ def generar(slides, conf, nombre):
     def work():
         with _lock:
             try:
-                ok = motor.generate(slides, motor_config(conf), str(out), prog, lambda: _job['cancel'])
-                _job.update(state='listo' if ok else 'cancelado', pct=1.0 if ok else 0.0,
-                            msg='Video listo' if ok else 'Cancelado', drive='')
+                t0 = time.time()
+                ok = motor.generate(slides, motor_config(conf), str(tmp), prog, lambda: _job['cancel'])
+                if not ok:
+                    _job.update(state='cancelado', pct=0.0, msg='Cancelado')
+                    return
+                os.replace(tmp, out)
+                cambios = {}
+                cuadros = motor.cuadros_totales(slides, motor_config(conf))
+                if cuadros:
+                    cambios['ms_cuadro'] = round((time.time() - t0) * 1000 / cuadros, 1)
+                if precios is not None:
+                    cambios['precios_video'] = {str(k): v for k, v in precios.items()}
+                msg = 'Video listo'
                 destino = carpeta_drive(conf)
-                if ok and destino:
-                    _job['msg'] = 'Subiendo a Google Drive…'
+                if destino:
+                    _job.update(pct=1.0, msg='Copiando a Google Drive…')
                     try:
                         _job['drive'] = copiar_a_drive(str(out), destino)
-                        _job['msg'] = 'Video listo · copiado a Google Drive (se sube solo)'
+                        msg = 'Video listo · copiado a Google Drive (se sube solo)'
+                        ult = dict(cargar_proyecto()['config'].get('drive_ultimos') or {})
+                        if conf.get('drive_reemplazar', True) and retirar_anterior(destino, ult.get(tipo), out.name):
+                            msg += ' · el video anterior pasó a "Anteriores"'
+                        ult[tipo] = out.name
+                        cambios['drive_ultimos'] = ult
                     except Exception as e:
-                        _job['msg'] = f'Video listo, pero no se pudo copiar a Google Drive: {e}'
+                        msg = f'Video listo, pero no se pudo copiar a Google Drive: {e}'
+                try:
+                    guardar_proyecto(config=cambios)
+                except Exception:
+                    pass
+                _job.update(state='listo', pct=1.0, msg=msg)      # "listo" hasta el final (ya con Drive)
             except Exception as e:
                 _job.update(state='error', error=str(e), msg='Error')
+            finally:
+                try: tmp.unlink(missing_ok=True)
+                except OSError: pass
     threading.Thread(target=work, daemon=True).start()
     return str(out)
 
@@ -389,47 +520,47 @@ def generar(slides, conf, nombre):
 # ───────────────────────── tipo de medicamento (para filtrar el catálogo) ─────────────────────────
 # Se deduce del nombre, ingrediente activo, descripción y categoría del inventario (sin IA).
 USOS = [
-    ('gripe', 'Gripe y resfriado', '🤧', ['fenilefrina', 'pseudoefedrina', 'clorfenamina', 'gripe', 'gripa', 'resfriado',
+    ('gripe', 'Gripe y resfriado', '', ['fenilefrina', 'pseudoefedrina', 'clorfenamina', 'gripe', 'gripa', 'resfriado',
                                           'antigripal', 'congestion nasal', 'descongestion', 'desenfriol', 'tabcin', 'xl-3',
                                           'xl3', 'next', 'contac', 'catarro']),
-    ('tos', 'Tos', '😮‍💨', ['dextrometorfano', 'ambroxol', 'bromhexina', 'guaifenesina', 'carbocisteina', 'acetilcisteina',
+    ('tos', 'Tos', '', ['dextrometorfano', 'ambroxol', 'bromhexina', 'guaifenesina', 'carbocisteina', 'acetilcisteina',
                           'benzonatato', 'tos', 'antitusiv', 'expectorante', 'mucolitic', 'flemas', 'broxol',
                           'histiacil', 'pulmonar', 'bronquio']),
-    ('dolor', 'Dolor y fiebre', '🤕', ['paracetamol', 'acetaminofen', 'ibuprofeno', 'naproxeno', 'diclofenaco', 'ketorolaco',
+    ('dolor', 'Dolor y fiebre', '', ['paracetamol', 'acetaminofen', 'ibuprofeno', 'naproxeno', 'diclofenaco', 'ketorolaco',
                                        'metamizol', 'aspirina', 'acetilsalicilico', 'ketoprofeno', 'meloxicam', 'celecoxib',
                                        'tramadol', 'piroxicam', 'nimesulida', 'analgesic', 'antiinflamatori', 'dolor',
                                        'fiebre', 'migrana', 'jaqueca', 'cafiaspirina', 'neomelubrina']),
-    ('alergia', 'Alergias', '🌼', ['loratadina', 'cetirizina', 'desloratadina', 'fexofenadina', 'levocetirizina', 'difenhidramina',
+    ('alergia', 'Alergias', '', ['loratadina', 'cetirizina', 'desloratadina', 'fexofenadina', 'levocetirizina', 'difenhidramina',
                                    'alergi', 'antihistamin', 'rinitis', 'comezon', 'urticaria']),
-    ('estomago', 'Estómago y digestión', '🫄', ['omeprazol', 'pantoprazol', 'esomeprazol', 'ranitidina', 'butilhioscina',
+    ('estomago', 'Estómago y digestión', '', ['omeprazol', 'pantoprazol', 'esomeprazol', 'ranitidina', 'butilhioscina',
                                                'hioscina', 'loperamida', 'metoclopramida', 'subsalicilato', 'simeticona',
                                                'antiacido', 'gastri', 'colitis', 'diarrea', 'nausea', 'vomito', 'estomac',
                                                'agruras', 'acidez', 'sal de uvas', 'pepto', 'electrolit', 'suero oral',
                                                'lactobacil', 'estrenimiento', 'senosido', 'laxante', 'parasit', 'albendazol',
                                                'nitazoxanida', 'metronidazol']),
-    ('infeccion', 'Infecciones (antibióticos)', '💊', ['amoxicilina', 'ampicilina', 'cefalexina', 'ciprofloxacino', 'azitromicina',
+    ('infeccion', 'Infecciones (antibióticos)', '', ['amoxicilina', 'ampicilina', 'cefalexina', 'ciprofloxacino', 'azitromicina',
                                                       'claritromicina', 'cloranfenicol', 'trimetoprim', 'sulfametoxazol',
                                                       'nitrofurantoina', 'penicilina', 'dicloxacilina', 'gentamicina',
                                                       'ceftriaxona', 'levofloxacino', 'doxiciclina', 'clindamicina',
                                                       'antibiotic', 'infeccion', 'bencilpenicilina', 'ampigrin']),
-    ('corazon', 'Presión, corazón y colesterol', '❤️', ['losartan', 'enalapril', 'captopril', 'amlodipino', 'metoprolol',
+    ('corazon', 'Presión, corazón y colesterol', '', ['losartan', 'enalapril', 'captopril', 'amlodipino', 'metoprolol',
                                                         'telmisartan', 'hidroclorotiazida', 'nifedipino', 'atorvastatina',
                                                         'pravastatina', 'simvastatina', 'rosuvastatina', 'clopidogrel',
                                                         'hipertension', 'presion arterial', 'colesterol', 'hipolipemiante',
                                                         'trigliceridos', 'bezafibrato', 'atorlip']),
-    ('diabetes', 'Diabetes', '🩸', ['metformina', 'glibenclamida', 'glimepirida', 'sitagliptina', 'insulina', 'diabet',
+    ('diabetes', 'Diabetes', '', ['metformina', 'glibenclamida', 'glimepirida', 'sitagliptina', 'insulina', 'diabet',
                                     'glucosa', 'dapagliflozina', 'pioglitazona']),
-    ('vitaminas', 'Vitaminas y suplementos', '🍊', ['vitamina', 'complejo b', 'acido folico', 'multivitamin', 'suplemento',
+    ('vitaminas', 'Vitaminas y suplementos', '', ['vitamina', 'complejo b', 'acido folico', 'multivitamin', 'suplemento',
                                                    'omega', 'calcio', 'hierro', 'zinc', 'magnesio', 'colageno', 'electrolitos']),
-    ('piel', 'Piel', '🧴', ['crema', 'pomada', 'unguento', 'dermat', 'clotrimazol', 'ketoconazol', 'miconazol', 'terbinafina',
+    ('piel', 'Piel', '', ['crema', 'pomada', 'unguento', 'dermat', 'clotrimazol', 'ketoconazol', 'miconazol', 'terbinafina',
                             'hidrocortisona', 'betametasona', 'acne', 'hongos', 'piel', 'quemadura', 'rozadura', 'emoliente',
                             'aceite de oliv', 'vaselina']),
-    ('ojos', 'Ojos y oídos', '👁️', ['oftalm', 'gotas para los ojos', 'lagrima', 'colirio', 'conjuntivitis', 'otico', 'oidos',
+    ('ojos', 'Ojos y oídos', '', ['oftalm', 'gotas para los ojos', 'lagrima', 'colirio', 'conjuntivitis', 'otico', 'oidos',
                                      'nafazolina', 'tobramicina']),
-    ('curacion', 'Curación y primeros auxilios', '🩹', ['gasa', 'venda', 'guante', 'jeringa', 'alcohol', 'agua oxigenada',
+    ('curacion', 'Curación y primeros auxilios', '', ['gasa', 'venda', 'guante', 'jeringa', 'alcohol', 'agua oxigenada',
                                                        'algodon', 'curita', 'cubrebocas', 'micropore', 'isodine', 'antisept',
                                                        'aposito', 'cinta', 'termometro', 'plastic world']),
-    ('personal', 'Cuidado personal y bebé', '🧼', ['shampoo', 'jabon', 'desodorante', 'panal', 'toalla', 'pasta dental',
+    ('personal', 'Cuidado personal y bebé', '', ['shampoo', 'jabon', 'desodorante', 'panal', 'toalla', 'pasta dental',
                                                   'cepillo', 'bebe', 'biberon', 'condon', 'preservativo', 'protector solar']),
 ]
 _USO_CATEGORIA = {'antibioticos': 'infeccion', 'vitaminas y suplementos': 'vitaminas', 'material de curacion': 'curacion',
@@ -467,3 +598,141 @@ try:
     limpiar_fotos_viejas()
 except Exception:
     pass
+
+
+# ───────────────────────── armar el video desde el inventario ─────────────────────────
+def productos_por_id(ids):
+    from app.database.connection import get_db_session
+    from app.database.models import Producto
+    db = get_db_session()
+    try:
+        prods = db.query(Producto).filter(Producto.id.in_(list(ids))).all() if ids else []
+        for p in prods: db.expunge(p)
+        return {p.id: p for p in prods}
+    finally:
+        db.close()
+
+
+def armar_slides(proy):
+    """(fichas, precios, sin_foto) de los productos marcados, con tarjetas y servicios en su lugar."""
+    items = [it for it in proy['items'] if it.get('enabled', True)]
+    prods = productos_por_id({it['producto_id'] for it in items})
+    cache = ia_cache()
+    slides, precios, sin_foto = [], {}, []
+    for it in items:
+        p = prods.get(it['producto_id'])
+        if not p:
+            continue
+        try:
+            sl = slide(p, it, cache)
+        except Exception:
+            sl = None
+        if not sl or not sl['file']:
+            sin_foto.append(p.nombre); continue
+        slides.append(sl)
+        precios[p.id] = float(p.precio_venta or 0)
+    return con_anuncios(slides, proy['config']), precios, sin_foto
+
+
+def cambios_de_precio(proy, prods=None):
+    """Productos del video cuyo precio cambió desde el último video: [{id, nombre, antes, ahora}]."""
+    ant = proy['config'].get('precios_video') or {}
+    if not ant:
+        return []
+    ids = [it['producto_id'] for it in proy['items'] if it.get('enabled', True)]
+    prods = prods or productos_por_id(set(ids))
+    out = []
+    for i in ids:
+        p = prods.get(i)
+        if p is None or str(i) not in ant:
+            continue
+        if abs(float(p.precio_venta or 0) - float(ant[str(i)])) >= 0.005:
+            out.append(dict(id=i, nombre=p.nombre, antes=float(ant[str(i)]), ahora=float(p.precio_venta or 0)))
+    return out
+
+
+# ───────────────────────── generación automática en la noche ─────────────────────────
+def _revisar_noche():
+    proy = cargar_proyecto()
+    c = proy['config']
+    hoy = f'{datetime.now():%Y-%m-%d}'
+    if not c.get('auto_noche', True) or datetime.now().hour != int(c.get('auto_hora') or 22) or c.get('auto_ultimo') == hoy:
+        return
+    if _job['state'] == 'trabajando' or not carpeta_drive(c):      # solo en la PC que sube a la tele
+        return
+    if not cambios_de_precio(proy):
+        return
+    guardar_proyecto(config={'auto_ultimo': hoy})
+    slides, precios, _ = armar_slides(proy)
+    if slides:
+        print(f'[Video] Cambiaron precios: se genera el video de promociones automáticamente ({hoy})')
+        generar(slides, c, f'PROMOS_{hoy}', 'promos', precios, automatico=True)
+
+
+_programador = None
+
+
+def iniciar_programador():
+    """Revisa cada minuto si toca generar el video en la noche (si cambió algún precio)."""
+    global _programador
+    if _programador is not None:
+        return
+
+    def loop():
+        time.sleep(90)
+        while True:
+            try:
+                _revisar_noche()
+            except Exception as e:
+                print(f'[Video] Revisión nocturna: {e}')
+            time.sleep(60)
+    _programador = threading.Thread(target=loop, daemon=True, name='VideoNoche')
+    _programador.start()
+
+
+# ───────────────────────── vista previa en movimiento (tiempo real) ─────────────────────────
+_vivo = {}
+
+
+def vivo_registrar(p, conf):
+    """Guarda la ficha y devuelve una clave de un solo uso para ver la animación en movimiento."""
+    import secrets
+    ahora = time.time()
+    for k in [k for k, v in _vivo.items() if v[2] < ahora]:
+        _vivo.pop(k, None)
+    tok = secrets.token_urlsafe(18)
+    _vivo[tok] = (p, motor_config(conf), ahora + 120)
+    return tok
+
+
+def vivo_cuadros(tok, fps=12, vueltas=3):
+    """Cuadros JPEG (960x540) de la animación, al ritmo real, en formato MJPEG."""
+    import io
+    d = _vivo.pop(tok, None)
+    if not d or d[2] < time.time():
+        return
+    p, conf, _ = d
+    with _Ocupado():
+        motor._setup(conf)
+        motor.LOGO_ALPHA = 1.0
+        S = motor.segundos_de(p)
+        L, R = motor.build_any(p)
+    n = int(S * fps)
+    for v in range(vueltas):
+        t0 = time.time()
+        for i in range(n):
+            t = i / fps
+            if not _lock.acquire(timeout=2):
+                return                                  # se empezó a generar un video
+            try:
+                motor.SLIDE = S; motor.LOGO_ALPHA = 1.0
+                fr = R(L, p, t)
+            finally:
+                _lock.release()
+            buf = io.BytesIO()
+            fr.resize((960, 540), Image.BILINEAR).save(buf, 'JPEG', quality=82)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ' + str(buf.tell()).encode()
+                   + b'\r\n\r\n' + buf.getvalue() + b'\r\n')
+            espera = t0 + (i + 1) / fps - time.time()
+            if espera > 0:
+                time.sleep(espera)

@@ -158,7 +158,15 @@ def cut_cached(path):
     k = (path, os.path.getmtime(path))
     if k not in _cut_cache:
         if len(_cut_cache) > 40: _cut_cache.clear()
-        _cut_cache[k] = cut_white(Image.open(path))
+        im = cut_white(Image.open(path))
+        lado = max(im.size)
+        if lado < 900:                     # foto chica: se agranda con calidad y un toque de nitidez
+            f = 900 / lado
+            im = im.resize((round(im.width * f), round(im.height * f)), Image.LANCZOS)
+            a = im.split()[3]
+            im = im.convert('RGB').filter(ImageFilter.UnsharpMask(radius=1.6, percent=70, threshold=2)).convert('RGBA')
+            im.putalpha(a)
+        _cut_cache[k] = im
     return _cut_cache[k]
 
 def with_alpha(layer, a):
@@ -480,7 +488,7 @@ def build_any(p):
     'terminal' es el anuncio de pago con tarjeta."""
     from . import estilos
     st = p.get('style')
-    if st not in ('destacado', 'cortinilla', 'minimal', 'terminal'): st = 'destacado'
+    if st not in ('destacado', 'cortinilla', 'minimal', 'terminal', 'servicios'): st = 'destacado'
     return getattr(estilos, 'build_' + st)(p), getattr(estilos, 'render_' + st)
 
 LOG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -505,81 +513,215 @@ def _encoder(path, crf, preset, log):
                              '-r', str(FPS), '-i', '-', '-c:v', 'libx264', '-preset', preset, '-crf', str(crf),
                              '-tune', 'animation', '-profile:v', 'high', '-level', '4.1',
                              '-maxrate', '20M', '-bufsize', '40M',          # nítido y seguro para el Roku
+                             '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int',
+                             '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+                             '-x264-params', 'colorprim=bt709:transfer=bt709:colormatrix=bt709',
                              '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path],
                             stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log,
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
+def segundos_de(p):
+    """Segundos que dura un producto: los suyos (si se eligieron) o los generales."""
+    try:
+        s = float(p.get('seconds') or 0)
+    except (TypeError, ValueError):
+        s = 0
+    return max(3.0, min(20.0, s)) if s else SLIDE
+
+
+# ── generación por partes: cada producto se dibuja y codifica en su propio proceso (todos los núcleos)
+#    y al final se unen sin volver a comprimir. Misma calidad, varias veces más rápido.
+_PROG = None          # contador compartido de cuadros por parte (multiprocessing.Array)
+_CANCEL = None        # evento compartido para cancelar
+
+
+def _init_worker(prog, cancel):
+    global _PROG, _CANCEL
+    _PROG, _CANCEL = prog, cancel
+
+
+def _parte(job):
+    """Dibuja y codifica una parte (la entrada o un producto) en su propio MP4. Corre en otro proceso
+    (o en este, si no se pudo usar varios). Devuelve la ruta del MP4."""
+    global SLIDE, LOGO_ALPHA
+    idx, kind, p, config, path, prev, nxt = job
+    _setup(config)
+    log = open(path + '.log', 'w')
+    pr = _encoder(path, CRF_MAX, PRESET_MAX, log)
+    try:
+        if kind == 'intro':
+            todo = int(INTRO * FPS)
+        else:
+            SLIDE = segundos_de(p)
+            S = SLIDE
+            L, R = build_any(p)
+            me = logo_pos_for(p.get('style') or 'destacado')
+            prev = tuple(prev) if prev else None
+            nxt = tuple(nxt) if nxt else None
+            todo = int(S * FPS)
+        for i in range(todo):
+            if _CANCEL is not None and _CANCEL.is_set():
+                raise KeyboardInterrupt
+            t = i / FPS
+            if kind == 'intro':
+                fr = render_intro(t)
+            else:
+                a_in = 1.0 if prev == tuple(me) else ease_out_cubic(t / 0.5)     # el logo aparece suave si cambia de lugar
+                a_out = 1.0 if nxt == tuple(me) else 1 - ease_in_cubic((t - (S - 0.5)) / 0.5)
+                LOGO_ALPHA = min(a_in, a_out)
+                fr = R(L, p, t)
+            pr.stdin.write(fr.tobytes())
+            if _PROG is not None and i % 5 == 4:
+                _PROG[idx] = i + 1
+        pr.stdin.close(); pr.wait()
+        if _PROG is not None:
+            _PROG[idx] = todo
+        if pr.returncode != 0:
+            raise RuntimeError(f'ffmpeg falló; detalles en {path}.log')
+    except BaseException:
+        try: pr.stdin.close()
+        except Exception: pass
+        try: pr.kill(); pr.wait()
+        except Exception: pass
+        raise
+    finally:
+        log.close()
+    try: os.remove(path + '.log')
+    except OSError: pass
+    return path
+
+
+def cuadros_totales(products, config):
+    S = float(config.get('seconds', 8))
+    intro = bool(config.get('intro', True)) and bool(config.get('logo')) and os.path.isfile(config.get('logo') or '')
+    tot = int(INTRO * FPS) if intro else 0
+    for p in products:
+        s = float(p.get('seconds') or 0)
+        tot += int((max(3.0, min(20.0, s)) if s else S) * FPS)
+    return tot
+
+
+def _procesos(n):
+    return max(1, min(n, (os.cpu_count() or 2) // 2, 6))
+
+
 def generate(products, config, out_path, progress=None, cancelled=lambda: False):
     """Genera el MP4. progress(cuadro_actual, total, texto). Devuelve False si se canceló.
+    Cada producto se dibuja en paralelo en su propia parte y al final se unen (sin recomprimir).
     Si el video se repite, la entrada con el logo sale UNA sola vez al principio."""
+    import shutil, tempfile, time
+    from concurrent.futures import ProcessPoolExecutor
     _setup(config)
     intro = bool(config.get('intro', True)) and LOGO_BIG is not None
-    n = int(SLIDE * FPS); ni = int(INTRO * FPS) if intro else 0
-    S = SLIDE
-    total = ni + n * len(products); done = 0
-    log = open(os.path.join(LOG_DIR, 'ffmpeg_log.txt'), 'w')
-    crf, preset = CRF_MAX, PRESET_MAX                    # siempre máxima calidad
     repeat = max(1, int(config.get('repeat', 1) or 1))
-    final_path = out_path
-    if repeat > 1:                     # intro y productos por separado; luego se unen: intro + productos x N
-        intro_path = out_path[:-4] + '_intro_tmp.mp4'
-        body_path = out_path[:-4] + '_tmp.mp4'
-    else:
-        intro_path = body_path = out_path
-    procs = []
+    pos = [logo_pos_for(p.get('style') or 'destacado') for p in products]
+    carpeta = tempfile.mkdtemp(prefix='video_', dir=os.path.dirname(os.path.abspath(out_path)))
+    jobs = []
+    if intro:
+        jobs.append(['intro', None, None, None])
+    for j, p in enumerate(products):
+        prev = pos[j - 1] if j > 0 else None          # después de la entrada el logo aparece suave
+        nxt = pos[j + 1] if j + 1 < len(products) else (pos[0] if not intro else None)
+        if j == 0 and not intro: prev = pos[-1]          # bucle: el último cuadro enlaza con el primero
+        jobs.append(['prod', p, prev, nxt])
+    jobs = [(i, k, p, dict(CONFIG), os.path.join(carpeta, f'parte_{i:03d}.mp4'), prev, nxt)
+            for i, (k, p, prev, nxt) in enumerate(jobs)]
+    largos = [int(INTRO * FPS) if k == 'intro' else int(segundos_de(p) * FPS) for _, k, p, *_ in jobs]
+    total = sum(largos)
+    nombres = ['Intro con logo' if k == 'intro' else (p.get('name') or 'producto') for _, k, p, *_ in jobs]
+
+    def limpiar():
+        shutil.rmtree(carpeta, ignore_errors=True)
+
     try:
-        if ni:
-            pi = _encoder(intro_path, crf, preset, log); procs.append(pi)
-            for i in range(ni):
+        n = _procesos(len(jobs))
+        hecho = False
+        if n > 1:
+            import multiprocessing as mp
+            ctx = mp.get_context('spawn')
+            prog = ctx.Array('i', len(jobs), lock=False)
+            cancel = ctx.Event()
+            try:
+                with ProcessPoolExecutor(n, mp_context=ctx, initializer=_init_worker, initargs=(prog, cancel)) as ex:
+                    futs = [ex.submit(_parte, j) for j in jobs]
+                    while not all(f.done() for f in futs):
+                        if cancelled():
+                            cancel.set()
+                        err = next((f for f in futs if f.done() and f.exception() is not None), None)
+                        if err is not None:
+                            cancel.set()
+                            for f in futs: f.cancel()
+                            i = futs.index(err)
+                            raise RuntimeError(f'No se pudo generar ({nombres[i]}): {err.exception()}')
+                        if progress:
+                            d = sum(prog[:])
+                            activos = [nombres[i] for i, f in enumerate(futs) if f.running() and prog[i] < largos[i]]
+                            progress(d, total, ('Dibujando ' + ', '.join(activos[:2])) if activos else 'Terminando…')
+                        time.sleep(0.4)
+                    if cancel.is_set() and cancelled():
+                        raise KeyboardInterrupt
+                    for i, f in enumerate(futs):
+                        if f.exception() is not None:
+                            raise RuntimeError(f'No se pudo generar ({nombres[i]}): {f.exception()}')
+                hecho = True
+            except (RuntimeError, KeyboardInterrupt):
+                raise
+            except Exception as e:                       # no se pudo usar varios procesos: se hace uno por uno
+                print(f'[Video] Sin procesos en paralelo ({e}); se genera uno por uno')
+                _setup(config)
+        if not hecho:
+            global _PROG, _CANCEL
+            _PROG, _CANCEL = None, None
+            hechos = 0
+            for i, job in enumerate(jobs):
                 if cancelled(): raise KeyboardInterrupt
-                pi.stdin.write(render_intro(i / FPS).tobytes()); done += 1
-                if progress and i % 10 == 0: progress(done, total, 'Intro con logo')
-            if repeat > 1:
-                pi.stdin.close(); pi.wait()
-        pb = pi if (ni and repeat == 1) else _encoder(body_path, crf, preset, log)
-        if pb not in procs: procs.append(pb)
-        global LOGO_ALPHA
-        pos = [logo_pos_for(p.get('style') or 'destacado') for p in products]
-        for j, p in enumerate(products):
-            if progress: progress(done, total, 'Preparando ' + p['name'])
-            L, R = build_any(p)
-            prev = pos[j - 1] if j > 0 else None          # después de la entrada el logo aparece suave
-            nxt = pos[j + 1] if j + 1 < len(products) else (pos[0] if not ni else None)
-            if j == 0 and not ni: prev = pos[-1]           # bucle: el último cuadro enlaza con el primero
-            for i in range(n):
-                if cancelled(): raise KeyboardInterrupt
-                t = i / FPS
-                a_in = 1.0 if prev == pos[j] else ease_out_cubic(t / 0.5)
-                a_out = 1.0 if nxt == pos[j] else 1 - ease_in_cubic((t - (S - 0.5)) / 0.5)
-                LOGO_ALPHA = min(a_in, a_out)
-                pb.stdin.write(R(L, p, t).tobytes()); done += 1
-                if progress and i % 10 == 0: progress(done, total, p['name'])
-        pb.stdin.close(); pb.wait()
-    except KeyboardInterrupt:
-        for pr in procs:
-            try: pr.stdin.close()
-            except Exception: pass
-            pr.kill(); pr.wait()
-        log.close()
-        for f in {intro_path, body_path}:
-            try: os.remove(f)
-            except OSError: pass
-        return False
-    log.close()
-    if any(pr.returncode != 0 for pr in procs): raise RuntimeError('ffmpeg falló, revisa ffmpeg_log.txt')
-    if repeat > 1:
-        if progress: progress(total, total, f'Repitiendo {repeat} veces...')
-        lista = out_path[:-4] + '_lista.txt'
+
+                class _Vigila:                            # progreso y cancelar mientras se dibuja esta parte
+                    def __init__(s): s.v = [0] * len(jobs)
+                    def __setitem__(s, k, v):
+                        s.v[k] = v
+                        if progress and v % 10 == 0: progress(hechos + v, total, nombres[i])
+                    def __getitem__(s, k): return s.v[k]
+
+                class _Cancel:
+                    def is_set(s): return cancelled()
+                _PROG, _CANCEL = _Vigila(), _Cancel()
+                try:
+                    _parte(job)
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    raise RuntimeError(f'No se pudo generar ({nombres[i]}): {e}') from e
+                finally:
+                    _PROG, _CANCEL = None, None
+                hechos += largos[i]
+        # unir: entrada (una vez) + productos (las veces que se repita), sin volver a comprimir
+        if progress: progress(total, total, 'Uniendo el video…')
+        partes = [j[4] for j in jobs]
+        orden = ([partes[0]] if intro else []) + (partes[1:] if intro else partes) * repeat
+        lista = os.path.join(carpeta, 'lista.txt')
         with open(lista, 'w', encoding='utf-8') as f:
-            for path in ([intro_path] if ni else []) + [body_path] * repeat:
+            for path in orden:
                 f.write("file '" + path.replace('\\', '/').replace("'", "'\\''") + "'\n")
         r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), '-y', '-f', 'concat', '-safe', '0', '-i', lista,
-                            '-c', 'copy', '-movflags', '+faststart', final_path],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        for f in (lista, body_path) + ((intro_path,) if ni else ()):
-            try: os.remove(f)
+                            '-c', 'copy', '-movflags', '+faststart', out_path],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        if r.returncode != 0:
+            try:
+                with open(os.path.join(LOG_DIR, 'ffmpeg_log.txt'), 'wb') as f: f.write(r.stderr or b'')
             except OSError: pass
-        if r.returncode != 0: raise RuntimeError('No se pudo repetir el video')
+            raise RuntimeError('No se pudo unir el video; detalles en ' + os.path.join(LOG_DIR, 'ffmpeg_log.txt'))
+    except KeyboardInterrupt:
+        limpiar()
+        try: os.remove(out_path)
+        except OSError: pass
+        return False
+    except BaseException:
+        limpiar()
+        try: os.remove(out_path)
+        except OSError: pass
+        raise
+    limpiar()
     if progress: progress(total, total, 'Listo')
     return True

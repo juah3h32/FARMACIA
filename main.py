@@ -1,3 +1,8 @@
+# Primero que todo: el video promocional usa varios procesos para generar más rápido; en el .exe
+# cada proceso hijo se queda aquí (no vuelve a abrir el POS).
+import multiprocessing
+multiprocessing.freeze_support()
+
 import threading
 import socket
 import time

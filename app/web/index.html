@@ -1061,20 +1061,24 @@
   .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
   .mkv-chip { height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; }
   .mkv-chip:hover { filter:brightness(.96); }
-  .mkv-dark { height:36px; padding:0 12px; border-radius:10px; font-size:13px; background:#2E3F7A; border:1px solid #4A5C99; color:#fff; outline:none; }
+  .mkv-dark { height:38px; padding:0 12px; border-radius:11px; font-size:13px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#fff; outline:none; }
   .mkv-dark::placeholder { color:#9AA8D0; }
   .mkv-dark:focus { border-color:#AFC0E8; }
-  .mkv-sb { height:32px; border-radius:8px; font-size:12px; font-weight:700; background:#2E3F7A; color:#fff; }
-  .mkv-sb:hover { background:#3B4E8F; }
+  .mkv-sb { height:34px; border-radius:10px; font-size:12px; font-weight:700; background:rgba(255,255,255,.09); color:#fff; }
+  .mkv-sb:hover { background:rgba(255,255,255,.16); }
   .mkv-sb-del:hover { background:#9B2C2C; }
-  .mkv-sb-out { height:30px; border-radius:8px; font-size:12px; color:#fff; border:1px solid #4A5C99; }
-  .mkv-sb-out:hover { background:#2E3F7A; }
+  .mkv-sb-out { height:32px; border-radius:10px; font-size:12px; font-weight:600; color:#C9D6F2; border:1px solid rgba(255,255,255,.14); }
+  .mkv-sb-out:hover { background:rgba(255,255,255,.08); color:#fff; }
   .mkv-scroll::-webkit-scrollbar { width:6px; } .mkv-scroll::-webkit-scrollbar-thumb { background:#4A5C99; border-radius:3px; }
   .mkv-tab { height:32px; padding:0 22px; border-radius:9px; font-size:13px; font-weight:700; color:#64748B; }
   .mkv-tab.on { background:#243366; color:#fff; }
   .mkv-seg { height:30px; padding:0 12px; border-radius:7px; font-size:12px; font-weight:700; color:#475569; }
   .mkv-seg.on { background:#243366; color:#fff; }
-  .mkv-fila:hover { background:#2E3F7A; } .mkv-fila.sel { background:#3373B9; }
+  .mkv-x { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#AFC0E8; opacity:0; flex-shrink:0; transition:opacity .15s, background .15s; }
+  .mkv-fila:hover .mkv-x, .mkv-fila.sel .mkv-x { opacity:1; } .mkv-x:hover { background:#DC2626; color:#fff; }
+  .mkv-fila { transition:background .15s; } .mkv-fila:hover { background:rgba(255,255,255,.07); }
+  .mkv-fila.sel { background:#3373B9; box-shadow:inset 3px 0 0 #AFC0E8, 0 6px 14px rgba(10,20,50,.25); }
+  .mkv-fila.off p { color:#8A98C7 !important; } .mkv-fila.off p span { color:#8A98C7 !important; }
   .mkv-chk { width:22px; height:22px; border-radius:50%; background:#EEF4FC; color:#3373B9; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .mkv-pan { display:none; }
   .mkv-pan.on { display:flex; }
@@ -1085,6 +1089,17 @@
   .mkv-switch { appearance:none; -webkit-appearance:none; width:38px; height:20px; border-radius:999px; background:#CBD5E1; position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
   .mkv-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .2s; }
   .mkv-switch:checked { background:#16A34A; } .mkv-switch:checked::after { left:20px; }
+  .mkv-card { background:#fff; border:1px solid #E6EBF3; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .mkv-card-h { display:flex; align-items:center; gap:12px; }
+  .mkv-ico { width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .mkv-card-t { font-size:15px; font-weight:800; color:#243366; line-height:1.25; }
+  .mkv-card-s { font-size:11.5px; color:#64748B; line-height:1.35; }
+  .mkv-opt { display:flex; align-items:center; gap:12px; padding-top:10px; border-top:1px solid #F0F3F8; }
+  .mkv-opt-t { font-size:13px; font-weight:700; color:#1E293B; }
+  .mkv-opt-d { font-size:11px; color:#94A3B8; line-height:1.35; }
+  .mkv-pill { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:999px; font-size:12px; font-weight:800; white-space:nowrap; }
+  .mkv-btn2 { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; background:#EEF2F8; color:#243366; white-space:nowrap; flex-shrink:0; }
+  .mkv-btn2:hover { filter:brightness(.96); }
   .nav-item { transition:background .15s,color .15s,box-shadow .15s; border-radius:10px; }
   .nav-item:hover { background:rgba(255,255,255,.07); color:#E2E8F0 !important; }
   .nav-item.active { background:rgba(96,165,250,.18) !important; color:#fff !important; box-shadow:inset 3px 0 0 #60A5FA; }
@@ -3790,8 +3805,8 @@
 
 
         <!-- Catálogo en tarjetas para elegir productos del video -->
-        <div id="mkv-cat" class="fixed inset-0 z-50 items-center justify-center p-6" style="display:none;background:rgba(15,23,42,.55)" onclick="if(event.target===this)mkvCatCerrar()">
-          <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden w-full h-full" style="max-width:1400px;max-height:900px">
+        <div id="mkv-cat" class="fixed inset-0 items-center justify-center p-6" style="display:none;z-index:9000;background:rgba(17,26,56,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)" onclick="if(event.target===this)mkvCatCerrar()">
+          <div class="bg-white rounded-3xl flex flex-col overflow-hidden w-full h-full" style="max-width:1400px;max-height:900px;box-shadow:0 30px 80px rgba(10,18,45,.45)">
             <div class="flex items-center gap-3 px-5 py-4 border-b flex-wrap" style="border-color:#E2E8F0">
               <p class="text-lg font-extrabold mr-2" style="color:#243366">Catálogo de productos</p>
               <input id="mkv-cat-q" class="mkv-inp" style="width:280px" placeholder="Buscar por nombre, genérico o código…" oninput="mkvCatPintar()">
@@ -3825,31 +3840,30 @@
         <!-- ── Video promocional (pantalla de la farmacia) — mismo diseño que el Generador de Promos ── -->
         <div id="mkt-panel-video" class="hidden flex-1 overflow-hidden rounded-2xl" style="display:none;background:#EEF2F8">
           <!-- Barra lateral: productos del video -->
-          <div class="flex flex-col flex-shrink-0 overflow-hidden" style="width:290px;background:#243366">
-            <div class="bg-white rounded-2xl mx-4 mt-4 mb-1 flex items-center justify-center" style="height:78px">
-              <img src="/api/marketing/video/logo" alt="Farmacia Ebenezer" style="max-height:58px;max-width:220px;object-fit:contain"
-                   onerror="this.outerHTML='<span class=&quot;text-base font-extrabold&quot; style=&quot;color:#243366&quot;>FARMACIA EBENEZER</span>'">
-            </div>
-            <p class="text-center text-xs mb-3" style="color:#AFC0E8">Generador de promociones</p>
-            <div class="flex items-center gap-2 px-4">
-              <p class="text-lg font-bold text-white">Productos</p>
-              <span id="mkv-count" class="text-[11px] font-bold px-2 py-0.5 rounded-lg" style="background:#AFC0E8;color:#243366">0</span>
+          <div class="flex flex-col flex-shrink-0 overflow-hidden" style="width:290px;background:linear-gradient(180deg,#273870 0%,#1F2D5C 100%)">
+            <div class="px-4 pt-4 pb-1 flex items-center gap-3">
+              <span class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.1);color:#fff"><i data-lucide="clapperboard" style="width:18px;height:18px"></i></span>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold uppercase tracking-widest" style="color:#AFC0E8">Generador de promociones</p>
+                <p class="text-base font-extrabold text-white flex items-center gap-2">Productos del video <span id="mkv-count" class="text-[11px] font-bold px-2 py-0.5 rounded-full" style="background:#3373B9;color:#fff">0</span></p>
+              </div>
             </div>
             <div class="relative px-4 mt-2">
-              <input id="mkv-buscar" class="mkv-dark w-full" placeholder="Buscar en inventario para agregar…" oninput="mkvBuscar()" autocomplete="off">
+              <i data-lucide="search" class="absolute pointer-events-none" style="width:15px;height:15px;left:28px;top:11px;color:#9AA8D0"></i>
+              <input id="mkv-buscar" class="mkv-dark w-full" style="padding-left:34px" placeholder="Buscar en inventario…" oninput="mkvBuscar()" autocomplete="off">
               <div id="mkv-resultados" class="hidden absolute left-4 right-4 top-full mt-1 bg-white rounded-xl border shadow-2xl z-30 overflow-y-auto" style="border-color:#E2E8F0;max-height:340px"></div>
             </div>
             <div class="px-4 mt-2">
-              <button onclick="mkvCatAbrir()" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90" style="background:#fff;color:#243366">
+              <button onclick="mkvCatAbrir()" title="Solo se pueden agregar productos con foto" class="w-full h-10 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90" style="background:#3373B9;color:#fff;box-shadow:0 6px 16px rgba(10,20,50,.25)">
                 <i data-lucide="layout-grid" style="width:16px;height:16px"></i> Ver catálogo y elegir varios
               </button>
             </div>
-            <p class="text-[10px] text-center mt-1 mb-2" style="color:#9AA8D0">Solo se pueden agregar productos con foto</p>
+            <div class="h-3"></div>
             <div id="mkv-term" class="px-2 pb-1"></div>
             <div id="mkv-lista" class="flex-1 overflow-y-auto px-2 flex flex-col gap-1 mkv-scroll"></div>
-            <div class="flex gap-1 px-4 pt-2">
-              <button onclick="mkvMover(_mkv.sel,-1)" class="mkv-sb flex-1" title="Subir">▲</button>
-              <button onclick="mkvMover(_mkv.sel,1)" class="mkv-sb flex-1" title="Bajar">▼</button>
+            <div class="flex gap-1 px-4 pt-3 mt-1" style="border-top:1px solid rgba(255,255,255,.08)">
+              <button onclick="mkvMover(_mkv.sel,-1)" class="mkv-sb flex-1 flex items-center justify-center" title="Subir"><i data-lucide="chevron-up" style="width:18px;height:18px"></i></button>
+              <button onclick="mkvMover(_mkv.sel,1)" class="mkv-sb flex-1 flex items-center justify-center" title="Bajar"><i data-lucide="chevron-down" style="width:18px;height:18px"></i></button>
               <button onclick="mkvQuitar(_mkv.sel)" class="mkv-sb mkv-sb-del" style="flex:2">Quitar</button>
             </div>
             <div class="flex gap-1 px-4 pt-1 pb-4">
@@ -3861,7 +3875,7 @@
           <!-- Área principal -->
           <div class="flex-1 flex flex-col gap-3 p-3 overflow-hidden min-w-0">
             <!-- Encabezado del producto -->
-            <div class="bg-white rounded-2xl flex items-center gap-4 px-5 flex-shrink-0" style="height:76px">
+            <div class="bg-white rounded-2xl flex items-center gap-4 px-5 flex-shrink-0" style="height:66px">
               <div class="flex-1 min-w-0">
                 <p id="mkv-ed-nombre" class="text-xl font-extrabold truncate" style="color:#243366">Agrega tus productos</p>
                 <p id="mkv-ed-precio" class="text-xs truncate" style="color:#64748B"></p>
@@ -3879,20 +3893,26 @@
                 <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
                   <input id="mkv-en-video" type="checkbox" class="mkv-switch" onchange="mkvEnVideo(this.checked)"> En el video
                 </label>
-                <button id="mkv-btn-ia" onclick="mkvIA(true)" class="h-10 px-5 rounded-xl text-sm font-bold text-white flex items-center gap-2 hover:opacity-90" style="background:#7C3AED">
+                <button id="mkv-btn-ia" onclick="mkvIA(true)" class="h-9 px-4 rounded-xl text-sm font-bold text-white flex items-center gap-2 hover:opacity-90" style="background:#7C3AED">
                   <i data-lucide="sparkles" style="width:16px;height:16px"></i> Llenar con IA
                 </button>
               </div>
             </div>
 
             <div class="flex-1 flex gap-3 min-h-0">
-              <!-- Pestañas: Producto / Precio / Ajustes -->
-              <div class="bg-white rounded-2xl flex flex-col flex-1 min-w-0 overflow-hidden">
-                <div class="flex justify-center pt-3">
-                  <div class="flex rounded-xl p-1" style="background:#EEF2F8">
+              <!-- Tarjeta flotante: Producto / Ajustes / Terminal (se abre desde la esquina de la vista previa) -->
+              <div id="mkv-editor" class="bg-white rounded-2xl flex-col overflow-hidden"
+                   style="display:none;position:fixed;top:132px;right:36px;width:470px;max-height:calc(100vh - 160px);z-index:8500;box-shadow:0 24px 60px rgba(10,18,45,.35);border:1px solid #E2E8F0;animation:pageIn .18s ease both">
+                <div class="flex items-center gap-2 px-4 pt-3 pb-1" style="background:#F4F7FB">
+                  <i data-lucide="sliders-horizontal" style="width:16px;height:16px;color:#3373B9"></i>
+                  <p id="mkv-editor-tit" class="text-sm font-extrabold flex-1 truncate" style="color:#243366">Editar</p>
+                  <button onclick="mkvEditorCerrar()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white" style="color:#64748B" title="Cerrar"><i data-lucide="x" style="width:17px;height:17px"></i></button>
+                </div>
+                <div class="flex justify-center py-2" style="background:#F4F7FB">
+                  <div class="flex rounded-xl p-1" style="background:#E6ECF5">
                     <button id="mkv-tab-terminal" onclick="mkvTab('terminal')" class="mkv-tab" style="display:none">Terminal</button>
                     <button id="mkv-tab-producto" onclick="mkvTab('producto')" class="mkv-tab">Producto</button>
-                    <button id="mkv-tab-precio" onclick="mkvTab('precio')" class="mkv-tab">Precio</button>
+                    <button id="mkv-tab-precio" onclick="mkvTab('precio')" class="mkv-tab">Producto</button>
                     <button id="mkv-tab-ajustes" onclick="mkvTab('ajustes')" class="mkv-tab">Ajustes</button>
                   </div>
                 </div>
@@ -3904,66 +3924,95 @@
                 </div>
 
                 <!-- Producto -->
-                <div id="mkv-pan-producto" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3">
-                  <div class="rounded-2xl flex items-center gap-4 p-3 border" style="background:#F8FAFD;border-color:#E2E8F0">
-                    <div class="bg-white rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden border" style="width:132px;height:96px;border-color:#EEF2F8">
-                      <img id="mkv-thumb" class="w-full h-full object-contain p-1" alt="">
+                <div id="mkv-pan-producto" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3" style="background:#F4F7FB">
+                  <section class="mkv-card" style="flex-direction:row;align-items:center;gap:16px">
+                    <div class="rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden p-2" style="width:120px;height:96px;background:#EEF3FA">
+                      <img id="mkv-thumb" class="w-full h-full object-contain" style="mix-blend-mode:multiply" alt="">
                     </div>
                     <div class="min-w-0 flex-1">
                       <p id="mkv-inv-info" class="text-xs leading-relaxed" style="color:#64748B"></p>
-                      <p class="text-[10px] mt-1" style="color:#94A3B8">Foto, nombre y precio se cambian en Inventario.</p>
+                      <p class="mkv-opt-d mt-1 flex items-center gap-1"><i data-lucide="info" style="width:12px;height:12px"></i> Foto, nombre y precio se cambian en Inventario.</p>
                     </div>
-                  </div>
-                  <div class="rounded-2xl border p-3 flex flex-col gap-2" style="border-color:#E2E8F0">
-                    <div class="flex items-center justify-between gap-2">
-                      <label class="mkv-lbl" style="margin:0">Descripción</label>
-                      <span id="mkv-ia-estado" class="text-[10px] font-bold px-2 py-1 rounded-full"></span>
+                  </section>
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#E8F0FB;color:#3373B9"><i data-lucide="align-left" style="width:18px;height:18px"></i></span>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Descripción</p></div>
+                      <span id="mkv-ia-estado" class="text-[10px] font-bold px-2.5 py-1 rounded-full"></span>
                     </div>
-                    <textarea id="mkv-desc" rows="2" class="mkv-inp w-full" style="height:auto;padding:8px 10px;resize:none;line-height:1.35" maxlength="80" placeholder="La IA la escribe automáticamente" oninput="mkvCampo('desc', this.value);mkvContador()"></textarea>
-                    <p class="text-[10px] text-right -mt-1"><span id="mkv-desc-n" style="color:#94A3B8">0/60</span></p>
-                    <label class="mkv-lbl" style="margin:0">Palomitas (beneficios)</label>
-                    <div class="flex flex-col gap-1.5">
+                    <textarea id="mkv-desc" rows="2" class="mkv-inp w-full" style="height:auto;padding:10px 12px;resize:none;line-height:1.4" maxlength="80" placeholder="La IA la escribe automáticamente" oninput="mkvCampo('desc', this.value);mkvContador()"></textarea>
+                    <p class="text-[10px] text-right -mt-2"><span id="mkv-desc-n" style="color:#94A3B8">0/60</span></p>
+                  </section>
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#E7F7EE;color:#16A34A"><i data-lucide="list-checks" style="width:18px;height:18px"></i></span>
+                      <div><p class="mkv-card-t">Palomitas</p></div>
+                    </div>
+                    <div class="flex flex-col gap-2">
                       <div class="flex items-center gap-2"><span class="mkv-chk"><i data-lucide="check" style="width:12px;height:12px"></i></span><input id="mkv-b0" class="mkv-inp flex-1" maxlength="30" placeholder="Beneficio 1" oninput="mkvBen(0, this.value)"></div>
                       <div class="flex items-center gap-2"><span class="mkv-chk"><i data-lucide="check" style="width:12px;height:12px"></i></span><input id="mkv-b1" class="mkv-inp flex-1" maxlength="30" placeholder="Beneficio 2" oninput="mkvBen(1, this.value)"></div>
                       <div class="flex items-center gap-2"><span class="mkv-chk"><i data-lucide="check" style="width:12px;height:12px"></i></span><input id="mkv-b2" class="mkv-inp flex-1" maxlength="30" placeholder="Beneficio 3 (opcional)" oninput="mkvBen(2, this.value)"></div>
                     </div>
-                  </div>
+                  </section>
                 </div>
 
                 <!-- Precio -->
-                <div id="mkv-pan-precio" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3">
-                  <div class="rounded-2xl px-5 py-3" style="background:#FEF2F2">
-                    <p class="text-xs font-bold" style="color:#DC2626">PRECIO (de tu inventario)</p>
-                    <div class="flex items-end gap-4">
-                      <p class="font-extrabold leading-none" style="color:#DC2626;font-size:52px"><span style="font-size:34px">$</span><span id="mkv-precio-grande">0</span></p>
-                      <div class="pb-1">
-                        <p class="text-[11px]" style="color:#64748B">por</p>
-                        <select id="mkv-unit" class="mkv-inp" style="width:120px" onchange="mkvCampo('unit', this.value)">
+                <div id="mkv-pan-precio" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3" style="background:#F4F7FB">
+                  <section class="mkv-card" style="background:linear-gradient(135deg,#243366,#3373B9);border:none">
+                    <div class="flex items-center gap-4">
+                      <div class="rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden p-2" style="width:116px;height:116px;background:#fff">
+                        <img id="mkv-thumb2" class="w-full h-full object-contain" alt="">
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-[11px] font-bold uppercase tracking-wider" style="color:#AFC0E8" title="Foto, nombre y precio se cambian en Inventario">Precio</p>
+                        <p class="font-extrabold leading-none text-white mt-1" style="font-size:42px"><span style="font-size:24px;vertical-align:12px">$</span><span id="mkv-precio-grande">0</span></p>
+                        <p id="mkv-ia-linea" class="text-[11px] mt-1 flex items-center gap-1" style="color:#DDD6FE"></p>
+                        <p id="mkv-foto-aviso" class="hidden text-[11px] mt-1.5 font-bold rounded-lg px-2 py-1" style="background:#FEF3C7;color:#92400E">Foto pequeña: se verá borrosa en la tele. Sube una foto más grande en Inventario.</p>
+                      </div>
+                      <div class="flex-shrink-0">
+                        <p class="text-[11px] font-bold mb-1" style="color:#AFC0E8">Precio por</p>
+                        <select id="mkv-unit" class="mkv-inp" style="width:100px;background:#fff" onchange="mkvCampo('unit', this.value)">
                           <option value="">—</option><option>c/u</option><option>caja</option><option>pza</option><option>frasco</option><option>sobre</option>
                         </select>
                       </div>
                     </div>
-                    <p class="text-[11px] mt-1" style="color:#94A3B8">Para cambiar el precio, edítalo en Inventario y el video lo toma solo.</p>
-                  </div>
-                  <div>
-                    <label class="mkv-lbl">Precio anterior (tachado, opcional)</label>
-                    <input id="mkv-old" class="mkv-inp" style="width:200px" placeholder="Opcional" oninput="mkvCampo('old_price', this.value)">
-                  </div>
-                  <label id="mkv-pieza-wrap" class="flex items-center gap-2 text-sm cursor-pointer" style="color:#334155">
-                    <input id="mkv-pieza" type="checkbox" class="mkv-switch" onchange="mkvCampo('show_piece', this.checked)"> <span id="mkv-pieza-txt">Mostrar precio por pieza (etiqueta amarilla)</span>
-                  </label>
-                  <div>
-                    <label class="mkv-lbl">Etiqueta de promoción (sobre el producto)</label>
-                    <input id="mkv-tag" class="mkv-inp" style="width:260px" maxlength="20" placeholder="Opcional: OFERTA, 2x1…" oninput="mkvCampo('tag', this.value)">
-                    <div class="flex flex-wrap gap-1.5 mt-2">
+                  </section>
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#FDECEC;color:#DC2626"><i data-lucide="badge-percent" style="width:18px;height:18px"></i></span>
+                      <div><p class="mkv-card-t">Oferta</p></div>
+                    </div>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Precio anterior</p><p class="mkv-opt-d">Sale tachado. Si no eliges etiqueta, aparece "AHORRA $…".</p></div>
+                      <input id="mkv-old" class="mkv-inp" style="width:170px" placeholder="Opcional" oninput="mkvCampo('old_price', this.value)">
+                    </div>
+                    <label id="mkv-pieza-wrap" class="mkv-opt cursor-pointer select-none">
+                      <div class="flex-1 min-w-0"><p id="mkv-pieza-txt" class="mkv-opt-t">Mostrar precio por pieza</p><p class="mkv-opt-d">Etiqueta amarilla junto al producto.</p></div>
+                      <input id="mkv-pieza" type="checkbox" class="mkv-switch" onchange="mkvCampo('show_piece', this.checked)">
+                    </label>
+                  </section>
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#FEF3C7;color:#B45309"><i data-lucide="tag" style="width:18px;height:18px"></i></span>
+                      <div><p class="mkv-card-t">Etiqueta de promoción</p></div>
+                    </div>
+                    <input id="mkv-tag" class="mkv-inp w-full" maxlength="20" placeholder="Opcional: OFERTA, 2x1…" oninput="mkvCampo('tag', this.value)">
+                    <div class="flex flex-wrap gap-1.5">
                       <button onclick="mkvTag('OFERTA')" class="mkv-chip">OFERTA</button>
                       <button onclick="mkvTag('2x1')" class="mkv-chip">2x1</button>
                       <button onclick="mkvTag('3x2')" class="mkv-chip">3x2</button>
                       <button onclick="mkvTag('NUEVO')" class="mkv-chip">NUEVO</button>
                       <button onclick="mkvTag('DESCUENTO')" class="mkv-chip">DESCUENTO</button>
-                      <button onclick="mkvTag('')" class="mkv-chip" style="background:#F3F4F6;color:#64748B">Ninguna</button>
+                      <button onclick="mkvTag('')" class="mkv-chip" style="background:#F1F5F9;color:#64748B">Ninguna</button>
                     </div>
-                  </div>
+                  </section>
+                  <section class="mkv-card">
+                    <div class="mkv-opt" style="border:none;padding:0">
+                      <span class="mkv-ico" style="background:#E8F0FB;color:#3373B9"><i data-lucide="timer" style="width:18px;height:18px"></i></span>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Duración en el video</p><p class="mkv-card-s">Dale más segundos a tus productos estrella.</p></div>
+                      <select id="mkv-secs" class="mkv-inp" style="width:190px" onchange="mkvCampo('seconds', parseInt(this.value) || 0)"></select>
+                    </div>
+                  </section>
                 </div>
 
                 <!-- Terminal: anuncio de pago con tarjeta -->
@@ -4011,59 +4060,140 @@
                 </div>
 
                 <!-- Ajustes -->
-                <div id="mkv-pan-ajustes" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-2">
-                  <p class="text-base font-bold" style="color:#243366">Inteligencia artificial (Claude) <span id="mkv-ia-badge" class="text-xs ml-1"></span></p>
-                  <p class="text-xs" style="color:#64748B">La IA escribe la descripción y los beneficios de cada producto NUEVO, una sola vez. Generar videos nunca gasta IA.</p>
-                  <div class="flex gap-2 items-center">
-                    <input id="mkv-clave" type="password" class="mkv-inp flex-1" placeholder="Clave sk-ant-…">
-                    <button onclick="mkvGuardarClave()" class="h-9 px-4 rounded-lg text-white font-bold text-xs" style="background:#7C3AED">Guardar clave</button>
-                  </div>
-                  <p class="text-[10px]" style="color:#9CA3AF">Consíguela en console.anthropic.com → API Keys. Sin clave, la descripción se arma con los datos de tu inventario.</p>
-                  <button onclick="mkvIATodos()" class="h-9 rounded-lg text-white font-bold text-xs self-start px-4" style="background:#7C3AED">Llenar con IA todos los productos</button>
+                <div id="mkv-pan-ajustes" class="mkv-pan flex-1 overflow-y-auto p-4 flex-col gap-3" style="background:#F4F7FB">
+                  <!-- Video -->
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#E8F0FB;color:#3373B9"><i data-lucide="clapperboard" style="width:18px;height:18px"></i></span>
+                      <div><p class="mkv-card-t">Video</p><p class="mkv-card-s">Duración, calidad y estilo de los productos</p></div>
+                    </div>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Segundos por producto</p><p class="mkv-opt-d">Cada producto puede tener los suyos en la pestaña Precio.</p></div>
+                      <div class="flex items-center gap-2" style="width:230px"><input id="mkv-c-seconds" type="range" min="4" max="15" step="1" class="flex-1" style="accent-color:#3373B9" oninput="document.getElementById('mkv-sec-lbl').textContent=this.value+' s'" onchange="mkvConfig()"><span id="mkv-sec-lbl" class="mkv-pill" style="background:#E8F0FB;color:#243366;min-width:46px;text-align:center"></span></div>
+                    </div>
+                    <label class="mkv-opt cursor-pointer select-none">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Entrada con el logo</p><p class="mkv-opt-d">Al inicio del video, una sola vez.</p></div>
+                      <input id="mkv-c-intro" type="checkbox" class="mkv-switch" onchange="mkvConfig()">
+                    </label>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Calidad</p><p class="mkv-opt-d">Siempre al máximo; es lo que reproduce tu Roku.</p></div>
+                      <span class="mkv-pill" style="background:#ECFDF5;color:#15803D"><i data-lucide="badge-check" style="width:14px;height:14px"></i> Máxima · Full HD 1080p</span>
+                      <input id="mkv-c-quality" type="hidden" value="Máxima">
+                    </div>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Estilo para productos nuevos</p><p class="mkv-opt-d">El que tendrán al agregarlos.</p></div>
+                      <select id="mkv-c-style" class="mkv-inp" style="width:130px" onchange="mkvConfig()"><option value="destacado">Destacado</option><option value="cortinilla">Cortinilla</option><option value="minimal">Minimal</option></select>
+                      <button onclick="mkvEstiloTodos()" class="mkv-btn2">Aplicar a todos</button>
+                    </div>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Repetir el video</p><p class="mkv-opt-d">Para la tele déjalo en 1: el Roku ya lo repite solo.</p></div>
+                      <select id="mkv-c-repeat" class="mkv-inp" style="width:80px" onchange="mkvConfig()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select>
+                    </div>
+                  </section>
 
-                  <p class="text-base font-bold mt-3" style="color:#243366">Video</p>
-                  <div class="mkv-row"><span class="mkv-lbl">Segundos por producto</span>
-                    <div class="flex items-center gap-2 flex-1"><input id="mkv-c-seconds" type="range" min="4" max="15" step="1" class="flex-1" style="accent-color:#3373B9" oninput="document.getElementById('mkv-sec-lbl').textContent=this.value+' s'" onchange="mkvConfig()"><span id="mkv-sec-lbl" class="text-sm font-bold w-10" style="color:#243366"></span></div>
-                  </div>
-                  <div class="mkv-row"><span class="mkv-lbl">Calidad</span>
-                    <span class="text-xs font-bold px-2.5 py-1 rounded-full" style="background:#ECFDF5;color:#15803D">Máxima · Full HD 1080p</span>
-                    <span class="text-[10px]" style="color:#94A3B8">Siempre al máximo; es lo que reproduce tu Roku.</span>
-                    <input id="mkv-c-quality" type="hidden" value="Máxima">
-                  </div>
-                  <div class="mkv-row"><span class="mkv-lbl">Repetir el video</span>
-                    <select id="mkv-c-repeat" class="mkv-inp" style="width:80px" onchange="mkvConfig()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select>
-                    <span class="text-[10px]" style="color:#9CA3AF">Ej. 5 = el mismo video 5 veces seguidas</span>
-                  </div>
-                  <div class="mkv-row"><span class="mkv-lbl">Estilo para nuevos</span>
-                    <select id="mkv-c-style" class="mkv-inp" style="width:140px" onchange="mkvConfig()"><option value="destacado">Destacado</option><option value="cortinilla">Cortinilla</option><option value="minimal">Minimal</option></select>
-                    <button onclick="mkvEstiloTodos()" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#1F2937">Aplicar a todos</button>
-                  </div>
+                  <!-- Anuncio de servicios -->
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#E7F7EE;color:#16A34A"><i data-lucide="qr-code" style="width:18px;height:18px"></i></span>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Anuncio de servicios y WhatsApp</p><p class="mkv-card-s">Tus servicios, horario y un código QR para que te escriban</p></div>
+                      <input id="mkv-s-on" type="checkbox" class="mkv-switch" onchange="mkvServ()" title="Agregar al video">
+                    </div>
+                    <div id="mkv-s-campos" class="flex flex-col gap-3">
+                      <div><label class="mkv-lbl">Título</label><input id="mkv-s-titulo" class="mkv-inp w-full" maxlength="60" oninput="mkvServLuego()"></div>
+                      <div><label class="mkv-lbl">Servicios (hasta 4)</label>
+                        <div class="grid grid-cols-2 gap-2">
+                          <input id="mkv-s-l0" class="mkv-inp" maxlength="40" placeholder="Ej. Toma de presión" oninput="mkvServLuego()">
+                          <input id="mkv-s-l1" class="mkv-inp" maxlength="40" placeholder="Ej. Medición de glucosa" oninput="mkvServLuego()">
+                          <input id="mkv-s-l2" class="mkv-inp" maxlength="40" placeholder="Ej. Inyecciones" oninput="mkvServLuego()">
+                          <input id="mkv-s-l3" class="mkv-inp" maxlength="40" placeholder="Ej. Servicio a domicilio" oninput="mkvServLuego()">
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div><label class="mkv-lbl">Horario</label><input id="mkv-s-horario" class="mkv-inp w-full" maxlength="50" placeholder="Ej. Lunes a domingo · 8 a 22 h" oninput="mkvServLuego()"></div>
+                        <div><label class="mkv-lbl">WhatsApp (el QR abre el chat)</label><input id="mkv-s-wa" class="mkv-inp w-full" maxlength="20" placeholder="10 dígitos · vacío = tu logo" oninput="mkvServLuego()"></div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="mkv-lbl" style="margin:0">Sale</span>
+                        <select id="mkv-s-pos" class="mkv-inp" style="width:120px" onchange="mkvServ()"><option value="inicio">Al inicio</option><option value="final">Al final</option></select>
+                        <div class="flex-1"></div>
+                        <button onclick="mkvServVer()" class="mkv-btn2"><i data-lucide="eye" style="width:14px;height:14px"></i> Ver en la vista previa</button>
+                      </div>
+                    </div>
+                  </section>
 
-                  <p class="text-base font-bold mt-3" style="color:#243366">Textos y carpeta</p>
-                  <div class="mkv-row"><span class="mkv-lbl">Pie izquierdo</span><input id="mkv-c-fl" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
-                  <div class="mkv-row"><span class="mkv-lbl">Pie derecho</span><input id="mkv-c-fr" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
-                  <div class="mkv-row"><span class="mkv-lbl">Guardar videos en</span><input id="mkv-c-out" class="mkv-inp flex-1" onchange="mkvConfig()"></div>
+                  <!-- Google Drive -->
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#FFF4E5;color:#D97706"><i data-lucide="cloud-upload" style="width:18px;height:18px"></i></span>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Google Drive y la tele</p><p id="mkv-d-msg" class="mkv-card-s"></p></div>
+                    </div>
+                    <label class="mkv-opt cursor-pointer select-none">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Subir solo a Drive</p><p class="mkv-opt-d">En la PC que tenga Google Drive para escritorio con la carpeta "Videos Roku".</p></div>
+                      <input id="mkv-d-on" type="checkbox" class="mkv-switch" onchange="mkvDrive()">
+                    </label>
+                    <label class="mkv-opt cursor-pointer select-none">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">El video nuevo reemplaza al anterior</p><p class="mkv-opt-d">El viejo pasa a "Anteriores" y la tele ya no lo pasa (no se borra).</p></div>
+                      <input id="mkv-d-reemp" type="checkbox" class="mkv-switch" onchange="mkvConfig()">
+                    </label>
+                    <div class="mkv-opt">
+                      <div class="flex-1 min-w-0"><p class="mkv-opt-t">Si cambia un precio, generarlo solo</p><p class="mkv-opt-d">Con el POS abierto, en la PC que sube a Drive.</p></div>
+                      <select id="mkv-a-hora" class="mkv-inp" style="width:88px" onchange="mkvConfig()"></select>
+                      <input id="mkv-a-noche" type="checkbox" class="mkv-switch" onchange="mkvConfig()">
+                    </div>
+                    <details class="text-xs" style="color:#64748B">
+                      <summary class="cursor-pointer font-semibold">Usar otra carpeta de Drive</summary>
+                      <input id="mkv-c-drive" class="mkv-inp w-full mt-2" placeholder="Vacío = G:\Mi unidad\Videos Roku (se detecta sola)" onchange="mkvDrive()">
+                    </details>
+                  </section>
 
-                  <p class="text-base font-bold mt-3" style="color:#243366">Google Drive (pantalla de la farmacia)</p>
-                  <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
-                    <input id="mkv-d-on" type="checkbox" class="mkv-switch" onchange="mkvDrive()"> Subir automáticamente a Drive en la PC que tenga Google Drive
-                  </label>
-                  <p id="mkv-d-msg" class="text-[11px]" style="color:#64748B"></p>
-                  <details class="text-xs" style="color:#64748B">
-                    <summary class="cursor-pointer">Usar otra carpeta de Drive</summary>
-                    <div class="mkv-row mt-2"><span class="mkv-lbl">Carpeta</span><input id="mkv-c-drive" class="mkv-inp flex-1" placeholder="Vacío = G:\Mi unidad\Videos Roku (se detecta sola)" onchange="mkvDrive()"></div>
-                  </details>
+                  <!-- Textos y carpeta -->
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#EEF2F8;color:#243366"><i data-lucide="type" style="width:18px;height:18px"></i></span>
+                      <div><p class="mkv-card-t">Textos, nombre y carpeta</p><p class="mkv-card-s">La franja azul de abajo y dónde se guarda el video</p></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div><label class="mkv-lbl">Pie izquierdo</label><input id="mkv-c-fl" class="mkv-inp w-full" onchange="mkvConfig()"></div>
+                      <div><label class="mkv-lbl">Pie derecho</label><input id="mkv-c-fr" class="mkv-inp w-full" onchange="mkvConfig()"></div>
+                    </div>
+                    <div class="grid gap-2" style="grid-template-columns:1fr 1.4fr">
+                      <div><label class="mkv-lbl">Nombre del video</label><input id="mkv-nombre" class="mkv-inp w-full"></div>
+                      <div><label class="mkv-lbl">Guardar videos en</label><input id="mkv-c-out" class="mkv-inp w-full" onchange="mkvConfig()"></div>
+                    </div>
+                  </section>
+
+                  <!-- Inteligencia artificial -->
+                  <section class="mkv-card">
+                    <div class="mkv-card-h">
+                      <span class="mkv-ico" style="background:#F3EEFE;color:#7C3AED"><i data-lucide="sparkles" style="width:18px;height:18px"></i></span>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Inteligencia artificial (Claude) <span id="mkv-ia-badge" class="text-xs ml-1"></span></p>
+                        <p class="mkv-card-s">Escribe la descripción y los beneficios de cada producto nuevo, una sola vez. Generar videos nunca gasta IA.</p></div>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                      <input id="mkv-clave" type="password" class="mkv-inp flex-1" placeholder="Clave sk-ant-…">
+                      <button onclick="mkvGuardarClave()" class="mkv-btn2" style="background:#7C3AED;color:#fff">Guardar clave</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <p class="mkv-opt-d flex-1">Consíguela en console.anthropic.com → API Keys. Sin clave, la descripción se arma con los datos de tu inventario.</p>
+                      <button onclick="mkvIATodos()" class="mkv-btn2" style="background:#F3EEFE;color:#6D28D9"><i data-lucide="wand-sparkles" style="width:14px;height:14px"></i> Llenar todos con IA</button>
+                    </div>
+                  </section>
                 </div>
               </div>
 
               <!-- Columna derecha: vista previa y exportar -->
-              <div class="flex flex-col gap-3 flex-shrink-0 overflow-y-auto" style="width:480px">
-                <div class="bg-white rounded-2xl p-4 flex flex-col gap-2">
+              <div class="flex flex-col gap-3 flex-1 min-w-0 min-h-0">
+                <div class="bg-white rounded-2xl p-4 flex flex-col gap-2 flex-1 min-h-0">
                   <div class="flex items-center justify-between">
                     <p class="text-base font-bold" style="color:#243366">Vista previa</p>
-                    <button onclick="mkvPreview()" class="h-8 px-3 rounded-lg text-xs font-bold text-white" style="background:#3373B9">Actualizar</button>
+                    <div class="flex gap-2">
+                      <button onclick="mkvEditorAbrir('precio')" class="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:#EEF2F8;color:#243366" title="Precio, oferta, etiqueta y duración"><i data-lucide="sliders-horizontal" style="width:13px;height:13px"></i> Editar</button>
+                      <button onclick="mkvEditorAbrir('ajustes')" class="h-8 w-8 rounded-lg flex items-center justify-center" style="background:#EEF2F8;color:#243366" title="Ajustes del video"><i data-lucide="settings" style="width:15px;height:15px"></i></button>
+                      <button id="mkv-vivo-btn" onclick="mkvVivo()" class="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:#16A34A;color:#fff"><i data-lucide="play" style="width:13px;height:13px"></i> En movimiento</button>
+                      <button onclick="mkvPreview()" class="h-8 px-3 rounded-lg text-xs font-bold text-white" style="background:#3373B9">Actualizar</button>
+                    </div>
                   </div>
-                  <div class="rounded-xl overflow-hidden flex items-center justify-center border" style="background:#fff;border-color:#E2E8F0;aspect-ratio:16/9">
+                  <div class="rounded-xl overflow-hidden flex items-center justify-center border flex-1 min-h-0" style="background:#F4F7FB;border-color:#E2E8F0">
                     <img id="mkv-preview" class="w-full h-full object-contain hidden" alt="">
                     <span id="mkv-preview-msg" class="text-xs" style="color:#94A3B8">Selecciona un producto</span>
                   </div>
@@ -4073,34 +4203,29 @@
                   </div>
                 </div>
 
-                <div class="bg-white rounded-2xl p-4 flex flex-col gap-3">
-                  <div class="flex items-center justify-between">
-                    <p class="text-base font-bold" style="color:#243366">Generar video</p>
-                    <p id="mkv-resumen" class="text-[11px] font-bold px-2.5 py-1 rounded-full" style="background:#EEF2F8;color:#243366"></p>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="mkv-lbl" style="margin:0;width:auto">Nombre</span>
-                    <input id="mkv-nombre" class="mkv-inp flex-1">
-                  </div>
-                  <label class="flex items-center gap-2 text-sm cursor-pointer select-none" style="color:#334155">
-                    <input id="mkv-c-intro" type="checkbox" class="mkv-switch" onchange="mkvConfig()"> Intro con el logo
-                    <span class="text-[10px]" style="color:#94A3B8">(una sola vez aunque repitas el video)</span>
-                  </label>
-                  <div id="mkv-drive-linea" class="rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"></div>
-                  <button id="mkv-btn-generar" onclick="mkvGenerar()" class="rounded-xl font-extrabold text-white flex items-center justify-center gap-3 hover:opacity-90" style="height:56px;font-size:18px;background:#16A34A">
-                    <i data-lucide="clapperboard" style="width:20px;height:20px"></i> GENERAR VIDEO
+                <div id="mkv-cambios" class="hidden rounded-xl px-3 py-2 text-xs font-semibold flex items-start gap-2 flex-shrink-0" style="background:#FFF7ED;color:#B45309"></div>
+                <!-- Barra de abajo: generar y ver videos (sin ventana aparte) -->
+                <div class="bg-white rounded-2xl px-4 py-3 flex items-center gap-4 flex-shrink-0">
+                  <button id="mkv-btn-generar" onclick="mkvGenerar()" class="rounded-xl font-extrabold text-white flex items-center justify-center gap-2 hover:opacity-95 flex-shrink-0"
+                          style="height:52px;padding:0 26px;font-size:16px;background:linear-gradient(135deg,#16A34A,#22C55E);box-shadow:0 8px 20px rgba(22,163,74,.25)">
+                    <i data-lucide="clapperboard" style="width:20px;height:20px"></i> Generar video
                   </button>
-                  <div class="relative h-5 rounded-full overflow-hidden" style="background:#EEF2F8">
-                    <div id="mkv-barra" class="h-full" style="width:0;background:linear-gradient(90deg,#16A34A,#22C55E);transition:width .3s"></div>
-                    <span id="mkv-pct" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold" style="color:#243366"></span>
+                  <button id="mkv-btn-cancelar" onclick="mkvCancelar()" class="hidden h-10 px-4 rounded-xl text-xs font-bold flex-shrink-0" style="background:#FEE2E2;color:#DC2626">Cancelar</button>
+                  <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <p id="mkv-resumen" class="text-xs font-semibold truncate flex-1" style="color:#64748B"></p>
+                      <span id="mkv-pct" class="text-xs font-extrabold flex-shrink-0" style="color:#16A34A"></span>
+                    </div>
+                    <div class="relative h-2 rounded-full overflow-hidden" style="background:#EEF2F8">
+                      <div id="mkv-barra" class="h-full" style="width:0;background:linear-gradient(90deg,#16A34A,#22C55E);transition:width .3s"></div>
+                    </div>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <p id="mkv-estado" class="text-[11px] truncate flex-1" style="color:#64748B">Listo.</p>
+                      <div id="mkv-drive-linea" class="rounded-lg px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1.5 flex-shrink-0 truncate" style="max-width:55%"></div>
+                    </div>
                   </div>
-                  <p id="mkv-estado" class="text-xs -mt-1" style="color:#64748B">Listo.</p>
-                  <div class="flex gap-2">
-                    <button id="mkv-btn-cancelar" onclick="mkvCancelar()" class="hidden h-8 px-3 rounded-lg text-xs font-bold" style="background:#FEE2E2;color:#DC2626">Cancelar</button>
-                    <div class="flex-1"></div>
-                    <button onclick="mkvAbrir('carpeta')" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#243366"><span class="flex items-center gap-1.5"><i data-lucide="folder-open" style="width:13px;height:13px"></i> Abrir carpeta</span></button>
-                    <button onclick="mkvAbrir('video')" class="h-8 px-3 rounded-lg text-xs font-bold" style="background:#E5EAF3;color:#243366"><span class="flex items-center gap-1.5"><i data-lucide="play" style="width:13px;height:13px"></i> Ver último video</span></button>
-                  </div>
+                  <button onclick="mkvAbrir('carpeta')" class="mkv-btn2 flex-shrink-0" style="height:44px"><i data-lucide="folder-open" style="width:16px;height:16px"></i> Mis videos</button>
+                  <button onclick="mkvAbrir('video')" class="mkv-btn2 flex-shrink-0" style="height:44px"><i data-lucide="play-circle" style="width:16px;height:16px"></i> Ver último</button>
                 </div>
               </div>
             </div>
@@ -14460,12 +14585,11 @@ const MKV_ESTILOS = [
   { k:'cortinilla', l:'Cortinilla' },
   { k:'minimal',    l:'Minimal' },
 ];
-let _mkv = { config:{}, items:[], sel:-1, iaLista:false, cargado:false, tab:'producto', term:false };
+let _mkv = { config:{}, items:[], sel:-1, iaLista:false, cargado:false, tab:'precio', term:false };
 let _mkvTermT = null, _mkvTermVer = null;   // diseño que se ve en la vista previa
 const MKV_MARCAS = [{ k:'visa', l:'Visa' }, { k:'mastercard', l:'Mastercard' }, { k:'amex', l:'American Express' }, { k:'carnet', l:'Carnet' }];
 const MKV_DISENOS = [
   { k:'terminal', l:'Terminal',   d:'Tarjeta que toca la terminal' },
-  { k:'persona',  l:'Persona',    d:'Alguien paga: "¡Pago aplicado!"' },
   { k:'abanico',  l:'Abanico',    d:'Las tarjetas se abren en abanico' },
   { k:'contacto', l:'Sin contacto', d:'Ondas y "Pago aprobado"' },
 ];
@@ -14494,6 +14618,21 @@ async function loadVideoPromo() {
     _mkv.driveSug = d.drive_sugerido || ''; _mkv.driveDestino = d.drive_destino || '';
     document.getElementById('mkv-d-on').checked = c.drive_auto !== false;
     document.getElementById('mkv-c-drive').value = c.drive_dir || '';
+    document.getElementById('mkv-d-reemp').checked = c.drive_reemplazar !== false;
+    document.getElementById('mkv-a-noche').checked = c.auto_noche !== false;
+    const hs = document.getElementById('mkv-a-hora');
+    hs.innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, '0')}:00</option>`).join('');
+    hs.value = String(c.auto_hora ?? 22);
+    const sv = c.servicios || {};
+    document.getElementById('mkv-s-on').checked = !!sv.enabled;
+    document.getElementById('mkv-s-titulo').value = sv.titulo || '';
+    [0, 1, 2, 3].forEach(k => document.getElementById(`mkv-s-l${k}`).value = (sv.lineas || [])[k] || '');
+    document.getElementById('mkv-s-horario').value = sv.horario || '';
+    document.getElementById('mkv-s-wa').value = sv.whatsapp || '';
+    document.getElementById('mkv-s-pos').value = sv.posicion || 'final';
+    _mkvServCampos();
+    _mkv.cambios = d.cambios_precio || [];
+    mkvCambiosPintar();
     mkvDrivePintar();
     document.getElementById('mkv-t').max = c.seconds;
     document.getElementById('mkv-t').value = c.seconds / 2;
@@ -14536,15 +14675,17 @@ function mkvRender() {
       let det;
       if (_mkvIAcola.includes(it.producto_id)) det = '<span style="color:#D8B4FE">La IA está escribiendo…</span>';
       else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">Sin foto</span>';
-      else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>`;
-      const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" onerror="this.style.display='none'">` : '';
-      return `<div onclick="mkvSel(${i})" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}" style="opacity:${it.enabled ? 1 : .45}">
+      else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>` +
+        (it.foto_chica ? ' <span style="color:#FCD34D" title="La foto es pequeña: se verá borrosa en la tele. Sube una más grande en Inventario.">· Foto pequeña</span>' : '');
+      const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" style="mix-blend-mode:multiply;${it.enabled ? '' : 'filter:grayscale(1);opacity:.55'}" onerror="this.style.display='none'">` : '';
+      return `<div onclick="mkvSel(${i})" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}${it.enabled ? '' : ' off'}">
         <input type="checkbox" ${it.enabled && it.tiene_foto ? 'checked' : ''} ${it.tiene_foto ? '' : 'disabled title="Sin foto"'} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvToggle(${i},this.checked)">
-        <div class="w-12 h-12 rounded-lg bg-white flex-shrink-0 overflow-hidden flex items-center justify-center">${img}</div>
+        <div class="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center p-1" style="background:${it.enabled ? '#E9EFF9' : '#AEBBDB'}">${img}</div>
         <div class="flex-1 min-w-0">
           <p class="text-[12px] font-bold text-white leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${_mkvEsc(it.nombre)}</p>
           <p class="text-xs truncate">${det}</p>
         </div>
+        <button onclick="event.stopPropagation();mkvQuitar(${i}, true)" class="mkv-x" title="Quitar de la lista"><i data-lucide="x" style="width:15px;height:15px"></i></button>
       </div>`;
     }).join('');
   }
@@ -14561,23 +14702,28 @@ function mkvRender() {
   let nTerm = 0;
   const nDis = (T.disenos || []).length || 1;
   if (T.enabled) nTerm = (T.posicion === 'intercalado' && on.length) ? 1 + Math.floor((on.length - 1) / Math.max(1, T.cada || 3)) : nDis;
-  const secs = (on.length + nTerm) * (_mkv.config.seconds || 8) + (_mkv.config.intro ? 3 : 0);
-  const tot = secs * (_mkv.config.repeat || 1);
+  const gen = _mkv.config.seconds || 8, nServ = (_mkv.config.servicios || {}).enabled ? 1 : 0;
+  const cuerpo = on.reduce((a, i) => a + (i.seconds || gen), 0) + (nTerm + nServ) * gen;
+  const secs = cuerpo + (_mkv.config.intro ? 3 : 0);
+  const tot = cuerpo * (_mkv.config.repeat || 1) + (_mkv.config.intro ? 3 : 0);
+  const tarda = Math.round(secs * 30 * (_mkv.config.ms_cuadro || 22) / 1000) + 3;
   const sinFoto = on.filter(i => !i.tiene_foto).length;
   const res = document.getElementById('mkv-resumen');
-  res.textContent = `${on.length} productos${nTerm ? ' + terminal' : ''} · duración ${Math.floor(tot / 60)} min ${Math.round(tot % 60)} s` + (sinFoto ? ` · ${sinFoto} sin foto (no saldrán)` : '');
+  res.textContent = `${on.length} productos${nTerm ? ' + terminal' : ''}${nServ ? ' + servicios' : ''} · dura ${Math.floor(tot / 60)} min ${Math.round(tot % 60)} s · se hace en ~${_mkvDur(tarda)}` + (sinFoto ? ` · ${sinFoto} sin foto (no saldrán)` : '');
   res.style.color = sinFoto ? '#DC2626' : '#64748B';
   mkvEditor();
   icons();
 }
 
 function mkvTab(t) {
+  if (t === 'producto') t = 'precio';          // descripción y palomitas las escribe la IA (no se editan aquí)
   _mkv.tab = t;
   ['terminal', 'producto', 'precio', 'ajustes'].forEach(k => document.getElementById(`mkv-tab-${k}`).classList.toggle('on', k === t));
   mkvRender();
 }
 function mkvSelTerminal() {
-  _mkv.term = true;
+  _mkv.term = true; _mkvPrevModo = '';
+  mkvEditorAbrir();
   if (_mkv.tab !== 'ajustes') _mkv.tab = 'terminal';
   mkvTab(_mkv.tab);
 }
@@ -14651,10 +14797,10 @@ function mkvEditorTerminal() {
 function mkvEditor() {
   const term = _mkv.term;
   if (term && _mkv.tab !== 'ajustes') _mkv.tab = 'terminal';
-  if (!term && _mkv.tab === 'terminal') _mkv.tab = 'producto';
+  if (!term && (_mkv.tab === 'terminal' || _mkv.tab === 'producto')) _mkv.tab = 'precio';
   ['terminal', 'producto', 'precio', 'ajustes'].forEach(k => document.getElementById(`mkv-tab-${k}`).classList.toggle('on', k === _mkv.tab));
   document.getElementById('mkv-tab-terminal').style.display = term ? '' : 'none';
-  document.getElementById('mkv-tab-producto').style.display = term ? 'none' : '';
+  document.getElementById('mkv-tab-producto').style.display = 'none';
   document.getElementById('mkv-tab-precio').style.display = term ? 'none' : '';
   document.getElementById('mkv-head-estilo').style.display = term ? 'none' : '';
   document.getElementById('mkv-btn-ia').style.display = term ? 'none' : '';
@@ -14664,11 +14810,13 @@ function mkvEditor() {
     ['producto', 'precio'].forEach(k => document.getElementById(`mkv-pan-${k}`).classList.remove('on'));
     document.getElementById('mkv-pan-ajustes').classList.toggle('on', _mkv.tab === 'ajustes');
     document.getElementById('mkv-head-ctrl').style.visibility = 'visible';
+    document.getElementById('mkv-editor-tit').textContent = _mkv.tab === 'ajustes' ? 'Ajustes del video' : 'Terminal · Pago con tarjeta';
     mkvEditorTerminal();
     return;
   }
   const it = _mkv.items[_mkv.sel];
   const tab = _mkv.tab;
+  document.getElementById('mkv-editor-tit').textContent = tab === 'ajustes' ? 'Ajustes del video' : (it ? it.nombre : 'Editar');
   document.getElementById('mkv-vacio').style.display = (!it && tab !== 'ajustes') ? 'flex' : 'none';
   ['producto', 'precio', 'ajustes'].forEach(k =>
     document.getElementById(`mkv-pan-${k}`).classList.toggle('on', k === tab && (k === 'ajustes' || !!it)));
@@ -14690,6 +14838,13 @@ function mkvEditor() {
   // Producto
   const th = document.getElementById('mkv-thumb');
   th.style.display = it.imagen_url ? '' : 'none';
+  document.getElementById('mkv-foto-aviso').classList.toggle('hidden', !it.foto_chica);
+  const th2 = document.getElementById('mkv-thumb2');
+  th2.style.display = it.imagen_url ? '' : 'none';
+  if (it.imagen_url && th2.getAttribute('src') !== it.imagen_url) th2.src = it.imagen_url;
+  document.getElementById('mkv-ia-linea').textContent = _mkvIAcola.includes(it.producto_id) ? 'La IA está escribiendo la descripción…'
+    : (it.desc || it.ia_origen === 'ia' || (it.ia_desc && it.ia_origen !== 'inventario')) ? 'Descripción y beneficios: los escribe la IA'
+    : 'Descripción y beneficios: tomados de tu inventario';
   if (it.imagen_url && th.getAttribute('src') !== it.imagen_url) th.src = it.imagen_url;
   document.getElementById('mkv-inv-info').innerHTML = `<b style="color:#243366;font-size:13px">${_mkvEsc(it.nombre)}</b><br>Precio en inventario: ${_mkvPrecio(it.precio)}` +
     (it.precio_pieza ? `<br>Por pieza: ${_mkvPrecio(it.precio_pieza)}` : '') +
@@ -14715,11 +14870,15 @@ function mkvEditor() {
   document.getElementById('mkv-pieza-wrap').style.display = it.precio_pieza ? 'flex' : 'none';
   document.getElementById('mkv-pieza-txt').textContent = `Mostrar precio por pieza: ${_mkvPrecio(it.precio_pieza)} (etiqueta amarilla)`;
   document.getElementById('mkv-tag').value = it.tag || '';
+  const ss = document.getElementById('mkv-secs'), g = _mkv.config.seconds || 8;
+  ss.innerHTML = `<option value="0">Igual que todos (${g} s)</option>` +
+    [3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map(x => `<option value="${x}">${x} segundos</option>`).join('');
+  ss.value = String(it.seconds || 0);
   icons();
   mkvPreviewLuego(50);
 }
 
-function mkvSel(i) { _mkv.sel = i; _mkv.term = false; mkvRender(); }
+function mkvSel(i) { _mkv.sel = i; _mkv.term = false; _mkvPrevModo = ''; mkvRender(); }
 function mkvToggle(i, v) {
   const it = _mkv.items[i]; if (!it) return;
   if (v && !it.tiene_foto) { toast('Este producto no tiene foto. Agrégala en Inventario para usarlo en el video.', 'warning'); v = false; }
@@ -14737,10 +14896,13 @@ function mkvMover(i, d) {
   if (_mkv.sel === i) _mkv.sel = j; else if (_mkv.sel === j) _mkv.sel = i;
   mkvGuardar(); mkvRender();
 }
-function mkvQuitar(i) {
-  if (_mkv.term) { toast('La terminal no se quita: apágala con su casilla', 'info'); return; }
+function mkvQuitar(i, fila = false) {
+  if (_mkv.term && !fila) { toast('La terminal no se quita: apágala con su casilla', 'info'); return; }
   if (!_mkv.items[i]) return;
+  const nom = _mkv.items[i].nombre;
   _mkv.items.splice(i, 1);
+  if (fila && i < _mkv.sel) _mkv.sel--;
+  toast(`Se quitó ${nom} de la lista`, 'success');
   if (_mkv.sel >= _mkv.items.length) _mkv.sel = _mkv.items.length - 1;
   mkvGuardar(); mkvRender();
 }
@@ -14762,7 +14924,70 @@ function mkvTag(t) { document.getElementById('mkv-tag').value = t; mkvCampo('tag
 
 function _mkvItemBody(it) {
   return { producto_id: it.producto_id, style: it.style, enabled: it.enabled, desc: it.desc || '', bens: it.bens || ['', '', ''],
-           tag: it.tag || '', old_price: String(it.old_price || ''), show_piece: it.show_piece !== false, unit: it.unit || '' };
+           tag: it.tag || '', old_price: String(it.old_price || ''), show_piece: it.show_piece !== false, unit: it.unit || '',
+           seconds: parseInt(it.seconds) || 0 };
+}
+function _mkvDur(s) { s = Math.max(0, Math.round(s)); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60 ? (s % 60) + ' s' : ''}`.trim(); }
+
+// precios que cambiaron desde el último video: la tele estaría mostrando un precio viejo
+function mkvCambiosPintar() {
+  const el = document.getElementById('mkv-cambios'), cs = _mkv.cambios || [];
+  if (!cs.length) { el.classList.add('hidden'); return; }
+  const lista = cs.slice(0, 3).map(c => `${_mkvEsc(c.nombre)} (${_mkvPrecio(c.antes)} → ${_mkvPrecio(c.ahora)})`).join(', ');
+  el.innerHTML = `<i data-lucide="alert-triangle" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"></i>
+    <span>${cs.length === 1 ? 'Cambió el precio de' : `Cambiaron ${cs.length} precios:`} ${lista}${cs.length > 3 ? '…' : ''}. Genera el video de nuevo para que la tele muestre el precio correcto.</span>`;
+  el.classList.remove('hidden'); icons();
+}
+
+// anuncio de servicios (con código QR de WhatsApp)
+let _mkvServT = null, _mkvPrevModo = '';
+function _mkvServBody() {
+  return {
+    enabled: document.getElementById('mkv-s-on').checked,
+    posicion: document.getElementById('mkv-s-pos').value,
+    titulo: document.getElementById('mkv-s-titulo').value,
+    lineas: [0, 1, 2, 3].map(k => document.getElementById(`mkv-s-l${k}`).value),
+    horario: document.getElementById('mkv-s-horario').value,
+    whatsapp: document.getElementById('mkv-s-wa').value,
+    qr: (_mkv.config.servicios || {}).qr || '',
+  };
+}
+function _mkvServCampos() { document.getElementById('mkv-s-campos').style.display = document.getElementById('mkv-s-on').checked ? '' : 'none'; }
+function mkvServ() { _mkvServCampos(); _mkv.config.servicios = _mkvServBody(); mkvConfig(); if (_mkvPrevModo === 'servicios') mkvPreviewLuego(400); }
+function mkvServLuego() { clearTimeout(_mkvServT); _mkvServT = setTimeout(mkvServ, 700); }
+function mkvServVer() { _mkvPrevModo = 'servicios'; mkvPreview(); }
+
+// vista previa en movimiento: la animación al ritmo real, dibujada por el mismo motor del video
+let _mkvVivoOn = false, _mkvVivoT = null;
+function _mkvVivoBoton(on) {
+  const b = document.getElementById('mkv-vivo-btn');
+  b.innerHTML = on ? '<i data-lucide="square" style="width:13px;height:13px"></i> Detener' : '<i data-lucide="play" style="width:13px;height:13px"></i> En movimiento';
+  b.style.background = on ? '#DC2626' : '#16A34A'; icons();
+}
+function _mkvVivoStop() {
+  if (!_mkvVivoOn) return;
+  _mkvVivoOn = false; clearTimeout(_mkvVivoT); _mkvVivoBoton(false);
+  const img = document.getElementById('mkv-preview'); img.removeAttribute('src');
+}
+async function mkvVivo() {
+  if (_mkvVivoOn) { _mkvVivoStop(); mkvPreview(); return; }
+  let body, dur = _mkv.config.seconds || 8;
+  if (_mkvPrevModo === 'servicios') body = { servicios: _mkvServBody() };
+  else if (_mkv.term) body = { terminal: Object.assign({}, _mkv.config.terminal, { diseno: _mkvTermVer || (_mkv.config.terminal.disenos || [])[0] || 'terminal' }) };
+  else {
+    const it = _mkv.items[_mkv.sel];
+    if (!it) { toast('Selecciona un producto', 'warning'); return; }
+    if (!it.tiene_foto) { toast('Este producto no tiene foto', 'warning'); return; }
+    body = { item: _mkvItemBody(it) }; dur = it.seconds || dur;
+  }
+  const img = document.getElementById('mkv-preview'), msg = document.getElementById('mkv-preview-msg');
+  try {
+    const r = await apiFetch('/marketing/video/vivo', { method:'POST', body: JSON.stringify(body) });
+    ++_mkvPrevTok; clearTimeout(_mkvPrevT);
+    _mkvVivoOn = true; _mkvVivoBoton(true);
+    img.src = r.url; img.classList.remove('hidden'); msg.classList.add('hidden');
+    _mkvVivoT = setTimeout(() => { _mkvVivoOn = false; _mkvVivoBoton(false); }, (dur * 3 + 4) * 1000);   // se ve 3 veces
+  } catch (e) { toast(e.message, 'error'); }
 }
 function mkvGuardar() {
   clearTimeout(_mkvSaveT);
@@ -14799,7 +15024,9 @@ async function mkvCatAbrir() {
   if (!(_mktProds || []).length) { try { await loadMarketing(); } catch (_) {} }   // inventario aún sin cargar
   mkvCatSel.clear();
   if (!_mkvUsos) { try { _mkvUsos = await apiFetch('/marketing/video/usos'); } catch (_) { _mkvUsos = { grupos: [], productos: {} }; } }
-  const m = document.getElementById('mkv-cat'); m.style.display = 'flex';
+  const m = document.getElementById('mkv-cat');
+  if (m.parentElement !== document.body) document.body.appendChild(m);
+  m.style.display = 'flex';
   document.getElementById('mkv-cat-q').value = '';
   mkvCatPintar();
   setTimeout(() => document.getElementById('mkv-cat-q').focus(), 50);
@@ -14855,10 +15082,10 @@ function mkvCatPintar() {
     const foto = !!p.imagen_url, en = ya.has(p.id), sel = mkvCatSel.has(p.id);
     const borde = sel ? '#16A34A' : en ? '#93C5FD' : '#E2E8F0';
     const click = foto && !en ? `mkvCatToggle(${p.id})` : '';
-    return `<div onclick="${click}" class="bg-white rounded-2xl border-2 p-2 flex flex-col gap-1 relative ${click ? 'cursor-pointer hover:shadow-md' : ''}" style="border-color:${borde};${foto ? '' : 'opacity:.5'}">
+    return `<div onclick="${click}" class="rounded-2xl border-2 p-2 flex flex-col gap-1 relative transition ${click ? 'cursor-pointer hover:shadow-md' : ''}" style="background:${sel ? '#F6FEF9' : '#fff'};border-color:${borde};${foto ? '' : 'opacity:.5'}">
       <div class="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white" style="background:${sel ? '#16A34A' : en ? '#3373B9' : foto ? '#CBD5E1' : 'transparent'}">${sel ? '<i data-lucide="check" style="width:14px;height:14px"></i>' : en ? '<i data-lucide="film" style="width:13px;height:13px"></i>' : ''}</div>
-      <div class="rounded-xl flex items-center justify-center overflow-hidden" style="height:120px;background:#F8FAFC">
-        ${foto ? `<img src="${_mkvEsc(p.imagen_url)}" loading="lazy" class="max-w-full max-h-full object-contain">` : '<span class="text-[11px] font-bold" style="color:#DC2626">Sin foto</span>'}
+      <div class="rounded-xl flex items-center justify-center overflow-hidden p-2" style="height:120px;background:${sel ? '#ECFDF3' : en ? '#EEF4FC' : '#F3F6FB'}">
+        ${foto ? `<img src="${_mkvEsc(p.imagen_url)}" loading="lazy" class="max-w-full max-h-full object-contain" style="mix-blend-mode:multiply">` : '<span class="text-[11px] font-bold" style="color:#DC2626">Sin foto</span>'}
       </div>
       <p class="text-xs font-bold leading-tight" style="color:#0F172A;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px">${_mkvEsc(p.nombre)}</p>
       <div class="flex items-center justify-between">
@@ -14946,8 +15173,10 @@ async function mkvIA(forzar) {
 // vista previa (dibujada por el mismo motor del video)
 function mkvPreviewLuego(ms) { clearTimeout(_mkvPrevT); _mkvPrevT = setTimeout(mkvPreview, ms); }
 async function mkvPreview() {
+  _mkvVivoStop();
   const it = _mkv.items[_mkv.sel];
   const img = document.getElementById('mkv-preview'), msg = document.getElementById('mkv-preview-msg');
+  if (_mkvPrevModo === 'servicios') return _mkvPintarPreview('/marketing/video/vista-previa-servicios', { servicios: _mkvServBody() });
   if (_mkv.term) return _mkvPintarPreview('/marketing/video/vista-previa-terminal',
     { terminal: Object.assign({}, _mkv.config.terminal, { diseno: _mkvTermVer || (_mkv.config.terminal.disenos || [])[0] || 'terminal' }) });
   if (!it) return;
@@ -15020,7 +15249,11 @@ function _mkvConfigBody() {
     out_dir: document.getElementById('mkv-c-out').value.trim(),
     drive_auto: document.getElementById('mkv-d-on').checked,
     drive_dir: document.getElementById('mkv-c-drive').value.trim(),
+    drive_reemplazar: document.getElementById('mkv-d-reemp').checked,
+    auto_noche: document.getElementById('mkv-a-noche').checked,
+    auto_hora: parseInt(document.getElementById('mkv-a-hora').value),
     terminal: _mkv.config.terminal,
+    servicios: _mkv.config.servicios ? Object.assign({}, _mkv.config.servicios) : undefined,
   };
 }
 async function mkvConfig() {
@@ -15067,12 +15300,15 @@ function mkvSeguir() {
     try {
       const t = await apiFetch('/marketing/video/progreso');
       document.getElementById('mkv-barra').style.width = `${Math.round((t.pct || 0) * 100)}%`;
-      document.getElementById('mkv-estado').textContent = t.state === 'trabajando' ? `Generando · ${t.msg}` : t.msg;
+      const falta = t.restante != null ? ` · faltan ~${_mkvDur(t.restante)}` : '';
+      document.getElementById('mkv-estado').textContent = t.state === 'trabajando' ? `Generando · ${t.msg}${falta}` : t.msg;
+      _mkvAbrirEstado(t);
       document.getElementById('mkv-pct').textContent = t.state === 'trabajando' ? `${Math.round((t.pct || 0) * 100)}%` : (t.state === 'listo' ? '100%' : '');
       if (t.state !== 'trabajando') {
         clearInterval(_mkvPoll); btn.disabled = false; btn.style.opacity = 1; can.classList.add('hidden');
         bt2.disabled = false; bt2.style.opacity = 1;
         if (t.state === 'listo') {
+          if (!t.file || !t.file.includes('PAGO_CON_TARJETA')) { _mkv.cambios = []; mkvCambiosPintar(); }
           const drv = (t.msg || '').includes('Drive');
           toast(t.drive ? 'Video listo y copiado a Google Drive' : 'Video listo', drv && !t.drive ? 'warning' : 'success');
           document.getElementById('mkv-estado').textContent = `Guardado en ${t.file}` + (t.drive ? ' · Copiado a Google Drive' : (drv ? ` · ${t.msg}` : ''));
@@ -15081,6 +15317,18 @@ function mkvSeguir() {
       }
     } catch (e) { clearInterval(_mkvPoll); btn.disabled = false; btn.style.opacity = 1; bt2.disabled = false; bt2.style.opacity = 1; }
   }, 700);
+}
+function mkvEditorAbrir(tab) {
+  const m = document.getElementById('mkv-editor');
+  if (m.parentElement !== document.body) document.body.appendChild(m);
+  m.style.display = 'flex';
+  if (tab) mkvTab(tab); else mkvRender();
+  icons();
+}
+function mkvEditorCerrar() { document.getElementById('mkv-editor').style.display = 'none'; }
+function _mkvAbrirEstado(t) {
+  const txt = document.getElementById('mkv-abrir-txt'); if (!txt) return;
+  txt.textContent = t && t.state === 'trabajando' ? `Generando… ${Math.round((t.pct || 0) * 100)}%` : 'Generar video';
 }
 async function mkvCancelar() { await api('/marketing/video/cancelar', { method:'POST' }); }
 async function mkvAbrir(que) {

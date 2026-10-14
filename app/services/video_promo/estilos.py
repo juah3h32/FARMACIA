@@ -73,7 +73,7 @@ def color_of(p):
 
 
 # =====================================================================
-#  DESTACADO  (estilo póster de oferta: franjas de color a los lados, producto en un círculo grande,
+#  DESTACADO  (estilo póster de oferta a todo lo ancho: panel diagonal de color, producto en un círculo grande,
 #              nombre gigante con listón encimado y etiqueta de precio colgando con contador)
 # =====================================================================
 def _num(price):
@@ -87,9 +87,10 @@ def _num(price):
 
 
 D_CX, D_CY, D_R = 560, 560, 330          # círculo del producto
-D_PIV = (880, 92)                        # de dónde cuelga la etiqueta del precio
-D_STR, D_TR = 190, 128                   # largo del hilo y radio de la etiqueta
-D_X, D_RW = 1030, 690                    # columna de texto
+D_PIV = (850, 92)                        # de dónde cuelga la etiqueta del precio
+D_STR, D_TR = 175, 150                   # largo del hilo y radio de la etiqueta
+D_X, D_RW = 1075, 700                    # columna de texto
+D_PANEL = (0, 820, 600)                  # panel diagonal: arriba llega a x=820, abajo a x=600
 DARK = (31, 41, 55)
 
 
@@ -97,17 +98,29 @@ def build_destacado(p):
     L = M.build(p)                       # reutiliza el precio por pieza (extra)
     col = color_of(p); L['col'] = col
     deep = darken(col, 0.3)
-    # franjas laterales
-    for k, (w, h) in (('band_l', (150, H)), ('band_r', (150, H - 170))):
-        b = vgrad((w, h), lighten(col, 0.08), deep).convert('RGBA')
-        dr = ImageDraw.Draw(b)
-        x = w - 14 if k == 'band_l' else 0
-        dr.rectangle((x, 0, x + 13, h), fill=lighten(col, 0.35) + (255,))
-        if k == 'band_r':
-            m = Image.new('L', (w * 3, h * 3), 0)
-            ImageDraw.Draw(m).rounded_rectangle((0, 0, w * 3 + 200, h * 3 + 200), 60 * 3, fill=255)
-            b.putalpha(m.resize((w, h), Image.LANCZOS))
-        L[k] = b
+    # fondo a todo lo ancho (nada de marco): degradado muy suave del color del producto
+    L['bg'] = vgrad((W, H), (255, 255, 255), lighten(col, 0.9)).convert('RGBA')
+    # panel diagonal de color detrás del producto, con anillos que irradian desde el círculo
+    pw_ = D_PANEL[1] + 40
+    pan = Image.new('RGBA', (pw_, H), (0, 0, 0, 0))
+    g = Image.new('RGBA', (pw_, H)); g.paste(vgrad((pw_, H), lighten(col, 0.1), deep))
+    dg = ImageDraw.Draw(g)
+    for r in range(D_R + 90, 1400, 95):
+        dg.ellipse((D_CX - r, D_CY - r, D_CX + r, D_CY + r), outline=(255, 255, 255, 255), width=2)
+    base_ = Image.new('RGBA', (pw_, H)); base_.paste(vgrad((pw_, H), lighten(col, 0.1), deep))
+    g = Image.blend(base_, g, 0.16)
+    ss = 3
+    m = Image.new('L', (pw_ * ss, H * ss), 0)
+    ImageDraw.Draw(m).polygon([(0, 0), (D_PANEL[0] * ss, 0), (D_PANEL[1] * ss, 0), (D_PANEL[2] * ss, H * ss), (0, H * ss)], fill=255)
+    m = m.resize((pw_, H), Image.LANCZOS)
+    pan.paste(g, (0, 0), m)
+    # filo claro en la diagonal
+    edge = Image.new('RGBA', (pw_, H), (0, 0, 0, 0)); de = Image.new('L', (pw_ * ss, H * ss), 0)
+    ImageDraw.Draw(de).line([(D_PANEL[1] * ss, 0), (D_PANEL[2] * ss, H * ss)], fill=255, width=10 * ss)
+    edge.paste(Image.new('RGBA', (pw_, H), lighten(col, 0.55) + (255,)), (0, 0), de.resize((pw_, H), Image.LANCZOS))
+    pan.alpha_composite(edge)
+    L['panel'] = pan
+    L['bg_panel'] = L['bg'].copy(); L['bg_panel'].alpha_composite(pan)
     # círculo con borde blanco, fondo de color y "piso"
     s = 2; R = D_R; D = 2 * (R + 18)
     c = Image.new('RGBA', (D * s, D * s), (0, 0, 0, 0)); dc = ImageDraw.Draw(c)
@@ -137,12 +150,19 @@ def build_destacado(p):
         while fn.size > 44 and (len(wrap(fn, name, D_RW)) > 3 or any(text_w(fn, l) > D_RW for l in wrap(fn, name, D_RW))):
             fn = font(BLACK, fn.size - 4)
     L['dname'] = []
-    for i, l in enumerate(wrap(fn, name, D_RW)[:3]):
-        im = text_layer(l, fn, DARK if i == 0 else col)
+    lineas = wrap(fn, name, D_RW)[:3]
+    if len(lineas) == 2:                                 # renglones parejos: "ACEITE / DE OLIVO"
+        pal = name.split()
+        op = [(' '.join(pal[:i]), ' '.join(pal[i:])) for i in range(1, len(pal))]
+        op = [o for o in op if max(text_w(fn, o[0]), text_w(fn, o[1])) <= D_RW]
+        if op: lineas = list(min(op, key=lambda o: max(text_w(fn, o[0]), text_w(fn, o[1]))))
+    for i, l in enumerate(lineas):
+        im = text_layer(l, fn, NAVY if i == 0 else col)
         if im.width > D_RW + 20:                         # una sola palabra larguísima: se encoge
             im = im.resize((D_RW + 20, int(im.height * (D_RW + 20) / im.width)), Image.LANCZOS)
         L['dname'].append(im)
     sub = (p.get('sub') or '').upper()
+    if sub and sub in name: sub = ''
     L['dsub'] = text_layer(sub, fit_font(SEMI, sub, D_RW, 30, 18), col) if sub else None
     # listón ladeado encimado al nombre
     txt = tag_txt(p.get('tag')) or 'PRECIO ESPECIAL'
@@ -151,16 +171,16 @@ def build_destacado(p):
     ban = Image.new('RGBA', (bw, bh), col + (255,)); ImageDraw.Draw(ban).text((bw / 2, bh / 2), txt, font=fb, fill='white', anchor='mm')
     L['banner'] = shadow(ban, blur=10, off=(0, 8), opacity=0.25, pad=30)[0]
     # descripción
-    fd = font(SEMI, 34)
-    L['ddesc'] = [text_layer(l, fd, (90, 96, 108)) for l in wrap(fd, p.get('desc') or '', D_RW)][:2]
+    fd = font(SEMI, 38)
+    L['ddesc'] = [text_layer(l, fd, (70, 76, 90)) for l in wrap(fd, p.get('desc') or '', D_RW)][:2]
     # palomitas
-    fbn = font(BOLD, 26); L['chips'] = []
+    fbn = font(BOLD, 34); L['chips'] = []
     for s_ in [b for b in p.get('bens', []) if b.strip()][:3]:
-        w = text_w(fbn, s_) + 96; h = 58
-        ch = Image.new('RGBA', (w, h), lighten(col, 0.9) + (255,)); ch.putalpha(rr_mask((w, h), 29))
+        w = min(text_w(fbn, s_) + 110, D_RW + 40); h = 70
+        ch = Image.new('RGBA', (w, h), lighten(col, 0.88) + (255,)); ch.putalpha(rr_mask((w, h), 35))
         dr = ImageDraw.Draw(ch)
-        dr.line([(26, 29), (34, 38), (50, 20)], fill=col + (255,), width=5, joint='curve')
-        dr.text((64, h // 2), s_, font=fbn, fill=col, anchor='lm')
+        dr.line([(30, 35), (40, 46), (60, 23)], fill=col + (255,), width=6, joint='curve')
+        dr.text((76, h // 2), s_, font=fit_font(BOLD, s_, w - 100, 34, 24), fill=darken(col, 0.15), anchor='lm')
         L['chips'].append(ch)
     # etiqueta del precio (base sin número; el número se dibuja con contador)
     price = (p.get('price') or '').strip()
@@ -171,8 +191,8 @@ def build_destacado(p):
     dt.ellipse((10 * s, 10 * s, (2 * TR - 10) * s, (2 * TR - 10) * s), outline=(255, 255, 255, 70), width=3 * s)
     dt.ellipse(((TR - 11) * s, 16 * s, (TR + 11) * s, 38 * s), fill=(255, 255, 255, 255))           # ojillo
     L['tagbase'] = tg.resize((2 * TR, 2 * TR), Image.LANCZOS)
-    L['f_lbl'] = font(BOLD, 24)
-    L['f_price'] = fit_font(BLACK, '$' + price, 2 * TR - 84, 96, 40)
+    L['f_lbl'] = font(BOLD, 30)
+    L['f_price'] = fit_font(BLACK, '$' + price, 2 * TR - 80, 124, 48)
     L['f_dol'] = font(BLACK, int(L['f_price'].size * 0.5))
     unit = (p.get('unit') or '').strip()
     L['dunit'] = unit
@@ -186,10 +206,10 @@ def _tag_img(L, value_text):
     TR = D_TR
     im = L['tagbase'].copy(); dr = ImageDraw.Draw(im)
     lbl = ('ANTES $' + L['dold']) if L['dold'] else 'PRECIO'
-    dr.text((TR, TR - 52), lbl, font=L['f_lbl'], fill=lighten(L['col'], 0.55) if not L['dold'] else (255, 170, 170), anchor='mm')
+    dr.text((TR, TR - 66), lbl, font=L['f_lbl'], fill=lighten(L['col'], 0.55) if not L['dold'] else (255, 170, 170), anchor='mm')
     if L['dold']:
         w = text_w(L['f_lbl'], lbl)
-        dr.line((TR - w / 2, TR - 51, TR + w / 2, TR - 51), fill=(255, 90, 90), width=3)
+        dr.line((TR - w / 2, TR - 64, TR + w / 2, TR - 64), fill=(255, 90, 90), width=4)
     fp, fd = L['f_price'], L['f_dol']
     nb = fp.getbbox(value_text, anchor='ls')            # caja real del número (respecto a la línea base)
     db = fd.getbbox('$', anchor='ls')
@@ -201,21 +221,22 @@ def _tag_img(L, value_text):
     dr.text((x0 - db[0], by + nb[1] - db[1]), '$', font=fd, fill='white', anchor='ls')   # "$" alineado arriba
     dr.text((x0 + (db[2] - db[0]) + gap - nb[0], by), value_text, font=fp, fill='white', anchor='ls')
     if L['dunit']:
-        dr.text((TR, by + 30), L['dunit'], font=L['f_lbl'], fill=(200, 205, 215), anchor='mm')
+        dr.text((TR, by + 38), L['dunit'], font=L['f_lbl'], fill=(200, 205, 215), anchor='mm')
     return im
 
 
 def render_destacado(L, p, t):
     S = M.SLIDE
-    fr = base_frame()
     out = ease_in_cubic((t - (S - 0.55)) / 0.55); vis = 1 - out
     col = L['col']
-    # franjas de color que entran por los lados
-    # entran por los lados y al final salen igual (no se quedan pegadas al pasar al otro producto)
+    # panel diagonal: aparece suave (fundido + pequeño deslizamiento) y al final se va igual; sin barrido
     k = ease_out_cubic(t / 0.6) * vis
-    if k > 0.005:
-        fr.alpha_composite(M.with_alpha(L['band_l'], min(1, k * 1.5)), (int(-150 * (1 - k)), 0))
-        fr.alpha_composite(M.with_alpha(L['band_r'], min(1, k * 1.5)), (int(W - 150 + 150 * (1 - k)), 170))
+    if k >= 0.999:
+        fr = L['bg_panel'].copy()                        # ya quieto: fondo y panel en una sola capa
+    else:
+        fr = L['bg'].copy()
+        if k > 0.005:
+            fr.alpha_composite(M.with_alpha(L['panel'], k), (int(-120 * (1 - k)), 0))
     # círculo y producto
     dx = -300 * out
     a = ease_out_back((t - 0.1) / 0.8, 1.4)
@@ -238,13 +259,14 @@ def render_destacado(L, p, t):
         dr = ImageDraw.Draw(fr)
         dr.line((px, py, hole[0], hole[1]), fill=(90, 96, 108, int(255 * vis)), width=4)
         dr.ellipse((px - 9, py - 9, px + 9, py + 9), fill=DARK)
-        kc = ease_out_cubic((t - 1.2) / 1.1)
+        kc = ease_out_cubic((t - 0.9) / 0.6)
         if L['pnum'] is not None:
-            v = L['pnum'] * kc
+            v0 = _num(L['dold'])[0] or 0
+            v = v0 + (L['pnum'] - v0) * kc
             txt = f"{v:,.{L['pdec']}f}" if ',' in L['ptxt'] else f"{v:.{L['pdec']}f}"
         else:
             txt = L['ptxt']
-        bump = 1 + 0.08 * math.sin(min(max((t - 2.3) / 0.35, 0), 1) * math.pi)
+        bump = 1 + 0.08 * math.sin(min(max((t - 1.5) / 0.35, 0), 1) * math.pi)
         tg = _tag_img(L, txt).rotate(ang, resample=Image.BICUBIC, expand=True)
         paste(fr, shadow(tg, blur=12, off=(0, 10), opacity=0.3, pad=30)[0], cx, cy, min(1, kt) * vis, scale=bump)
     if 'extra' in L:
@@ -260,13 +282,20 @@ def render_destacado(L, p, t):
     items += [('desc', l) for l in L['ddesc']]
     hs = {'sub': lambda i: i.height - 4, 'name': lambda i: i.height - 22, 'banner': lambda i: i.height - 6,
           'desc': lambda i: i.height - 8}
-    total = sum(hs[k](i) for k, i in items) + (90 if L['chips'] else 0)
-    y = max(150, 520 - total / 2)
+    filas, xx = 1, D_X                                   # renglones que ocupan las palomitas
+    for c in L['chips']:
+        if xx + c.width > D_X + D_RW + 40 and xx > D_X: filas += 1; xx = D_X
+        xx += c.width + 16
+    total = sum(hs[k](i) for k, i in items) + ((24 + filas * 82) if L['chips'] else 0)
+    y = max(140, min(500 - total / 2, 800 - total))
     for n_, (k, it) in enumerate(items):
         if k == 'banner':
             a = ease_out_back((t - 0.95) / 0.55, 2.0)
             rot = -4 - 8 * (1 - min(a, 1))
-            b = it.rotate(rot, resample=Image.BICUBIC, expand=True)
+            if a >= 1:
+                b = L.get('banner_rot') or L.setdefault('banner_rot', it.rotate(-4, resample=Image.BICUBIC, expand=True))
+            else:
+                b = it.rotate(rot, resample=Image.BICUBIC, expand=True)
             paste(fr, b, D_X + b.width / 2 - 34 + sx, y + 36 + it.height / 2 - 30, min(1, max(a, 0)) * vis, scale=max(a, 0.01))
         else:
             a = ease_out_cubic((t - (0.35 + 0.1 * n_)) / 0.6)
@@ -276,7 +305,7 @@ def render_destacado(L, p, t):
         y += 24
         x = D_X
         for i, c in enumerate(L['chips']):
-            if x + c.width > D_X + D_RW + 40:
+            if x + c.width > D_X + D_RW + 40 and x > D_X:
                 x = D_X; y += c.height + 12
             a = ease_out_back((t - 1.5 - 0.15 * i) / 0.5, 1.6)
             paste(fr, c, x + c.width / 2 + sx, y + c.height / 2 + 20 * (1 - min(a, 1)), min(1, max(a, 0)) * vis,
@@ -410,12 +439,15 @@ def render_cortinilla(L, p, t):
     pw, ph = L['cprod'].width, L['cprod'].height
     poner_sello(fr, L, t, min(SPLIT / 2 + pw / 2 - 40, SPLIT - 140) - 300 * out, max(560 - ph / 2 + 20, 230), vis, 1.1)
 
-    # la cortinilla entra desde la derecha y al final sale igual
-    k = ease_out_cubic(t / 0.7) * (1 - ease_in_cubic((t - (S - 0.5)) / 0.5))
-    x0 = int(W - (W - SPLIT) * k)
-    if x0 < W:
-        fr.alpha_composite(L['edge'], (max(x0 - 50, 0), 0))
-        fr.alpha_composite(L['panel'].crop((0, 0, W - x0, H)), (x0, 0))
+    # el panel de color aparece suave (fundido + pequeño deslizamiento) y al final se va igual; sin barrido
+    k = ease_out_cubic(t / 0.6) * (1 - ease_in_cubic((t - (S - 0.5)) / 0.5))
+    if k > 0.005:
+        x0 = int(SPLIT + 120 * (1 - k))
+        pan, edge = L['panel'].crop((0, 0, W - x0, H)), L['edge']
+        if k < 0.999:
+            pan, edge = M.with_alpha(pan, k), M.with_alpha(edge, k)
+        fr.alpha_composite(edge, (max(x0 - 50, 0), 0))
+        fr.alpha_composite(pan, (x0, 0))
 
     def put(layer, y, start, dy=36):
         a = ease_out_cubic((t - start) / 0.55)
@@ -789,7 +821,7 @@ def _texto_derecha(fr, L, t, out, vis):
 
 
 # ---------- diseños extra del anuncio de pago con tarjeta ----------
-DISENOS_TERMINAL = {'terminal': 'Terminal', 'abanico': 'Abanico de tarjetas', 'contacto': 'Sin contacto', 'persona': 'Persona pagando'}
+DISENOS_TERMINAL = {'terminal': 'Terminal', 'abanico': 'Abanico de tarjetas', 'contacto': 'Sin contacto'}
 
 _CARD_LOOK = {
     'visa': ((26, 31, 113), (52, 86, 190)),
@@ -1160,3 +1192,144 @@ def render_persona(L, p, t):
 def ease_in_out(x):
     x = min(max(x, 0), 1)
     return 3 * x * x - 2 * x * x * x
+
+
+# =====================================================================
+#  SERVICIOS  (anuncio de la farmacia: servicios, horario y código QR para escribir por WhatsApp)
+#             misma composición que Destacado: panel diagonal a la izquierda con la tarjeta del QR
+#             y la información a la derecha.
+# =====================================================================
+def _wa_link(p):
+    """Texto del QR: la liga que se escribió, o WhatsApp con el número (10 dígitos → México)."""
+    q = (p.get('qr') or '').strip()
+    if q:
+        return q
+    dig = ''.join(ch for ch in (p.get('whatsapp') or '') if ch.isdigit())
+    if not dig:
+        return ''
+    if len(dig) == 10:
+        dig = '52' + dig
+    return 'https://wa.me/' + dig
+
+
+def _qr_img(texto, size, col=NAVY):
+    import qrcode
+    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0, box_size=10)
+    q.add_data(texto); q.make(fit=True)
+    im = q.make_image(fill_color=col, back_color=(255, 255, 255)).convert('RGB')
+    return im.resize((size, size), Image.NEAREST).convert('RGBA')
+
+
+def _icono_reloj(d, col):
+    s = 3; D = d * s
+    im = Image.new('RGBA', (D, D), (0, 0, 0, 0)); dr = ImageDraw.Draw(im)
+    dr.ellipse((3 * s, 3 * s, D - 3 * s, D - 3 * s), outline=col + (255,), width=4 * s)
+    c = D / 2
+    dr.line([(c, c), (c, D * 0.24)], fill=col + (255,), width=4 * s)
+    dr.line([(c, c), (D * 0.7, c)], fill=col + (255,), width=4 * s)
+    return im.resize((d, d), Image.LANCZOS)
+
+
+def build_servicios(p):
+    col = BLUE; deep = NAVY
+    L = {}
+    L['bg'] = vgrad((W, H), (255, 255, 255), lighten(col, 0.9)).convert('RGBA')
+    # panel diagonal de marca (igual que Destacado)
+    pw_ = D_PANEL[1] + 40
+    g = Image.new('RGBA', (pw_, H)); g.paste(vgrad((pw_, H), lighten(col, 0.05), deep))
+    rings = g.copy(); dg = ImageDraw.Draw(rings)
+    for r in range(D_R + 90, 1400, 95):
+        dg.ellipse((D_CX - r, D_CY - r, D_CX + r, D_CY + r), outline=(255, 255, 255, 255), width=2)
+    g = Image.blend(g, rings, 0.16)
+    ss = 3
+    m = Image.new('L', (pw_ * ss, H * ss), 0)
+    ImageDraw.Draw(m).polygon([(0, 0), (D_PANEL[1] * ss, 0), (D_PANEL[2] * ss, H * ss), (0, H * ss)], fill=255)
+    pan = Image.new('RGBA', (pw_, H), (0, 0, 0, 0)); pan.paste(g, (0, 0), m.resize((pw_, H), Image.LANCZOS))
+    L['panel'] = pan
+    L['bg_panel'] = L['bg'].copy(); L['bg_panel'].alpha_composite(pan)
+    # tarjeta blanca: QR para escribir por WhatsApp (o el logo si no hay número)
+    cw, chh = 560, 640
+    card = Image.new('RGBA', (cw, chh), (255, 255, 255, 255)); card.putalpha(rr_mask((cw, chh), 44))
+    dc = ImageDraw.Draw(card)
+    link = _wa_link(p)
+    if link:
+        qs = 400
+        card.alpha_composite(_qr_img(link, qs), ((cw - qs) // 2, 54))
+        dc.text((cw / 2, 54 + qs + 52), 'Escanea y escríbenos', font=font(BOLD, 34), fill=NAVY, anchor='mm')
+        num = (p.get('whatsapp') or '').strip()
+        if num:
+            dc.text((cw / 2, 54 + qs + 104), 'WhatsApp ' + num, font=fit_font(BLACK, 'WhatsApp ' + num, cw - 60, 40, 24),
+                    fill=(22, 140, 70), anchor='mm')
+    elif M.LOGO_BIG is not None:
+        lg = M.LOGO_BIG.copy(); sc = min((cw - 80) / lg.width, (chh - 200) / lg.height)
+        lg = lg.resize((int(lg.width * sc), int(lg.height * sc)), Image.LANCZOS)
+        card.alpha_composite(lg, ((cw - lg.width) // 2, (chh - lg.height) // 2 - 20))
+    L['card'] = shadow(card, blur=26, off=(0, 18), opacity=0.28, pad=70)[0]
+    # columna de texto
+    kick = 'SERVICIOS'
+    fk = font(BLACK, 30)
+    kw, kh = text_w(fk, kick) + 60, 54
+    kp = Image.new('RGBA', (kw, kh), BLUE + (255,)); kp.putalpha(rr_mask((kw, kh), kh // 2))
+    ImageDraw.Draw(kp).text((kw / 2, kh / 2), kick, font=fk, fill='white', anchor='mm')
+    L['kick'] = kp
+    titulo = ' '.join((p.get('titulo') or 'Te atendemos como en casa').split())
+    ft = font(BLACK, 96)
+    while ft.size > 50 and len(wrap(ft, titulo, D_RW)) > 2:
+        ft = font(BLACK, ft.size - 4)
+    L['title'] = [text_layer(l, ft, NAVY if i == 0 else BLUE) for i, l in enumerate(wrap(ft, titulo, D_RW)[:2])]
+    fl = font(BOLD, 40)
+    L['lineas'] = []
+    for s_ in [x.strip() for x in (p.get('lineas') or []) if (x or '').strip()][:4]:
+        f_ = fit_font(BOLD, s_, D_RW - 100, 40, 26)
+        row = Image.new('RGBA', (D_RW, 76), (0, 0, 0, 0))
+        row.alpha_composite(check_icon(BLUE, 62), (0, 7))
+        ImageDraw.Draw(row).text((86, 38), s_, font=f_, fill=(40, 46, 60), anchor='lm')
+        L['lineas'].append(row)
+    hor = (p.get('horario') or '').strip()
+    if hor:
+        fh = fit_font(BOLD, hor, D_RW - 120, 34, 22)
+        hw, hh = text_w(fh, hor) + 120, 70
+        hp = Image.new('RGBA', (hw, hh), lighten(BLUE, 0.86) + (255,)); hp.putalpha(rr_mask((hw, hh), hh // 2))
+        hp.alpha_composite(_icono_reloj(40, NAVY), (26, 15))
+        ImageDraw.Draw(hp).text((84, hh / 2), hor, font=fh, fill=NAVY, anchor='lm')
+        L['horario'] = hp
+    else:
+        L['horario'] = None
+    return L
+
+
+def render_servicios(L, p, t):
+    S = M.SLIDE
+    out = ease_in_cubic((t - (S - 0.55)) / 0.55); vis = 1 - out
+    k = ease_out_cubic(t / 0.6) * vis
+    if k >= 0.999:
+        fr = L['bg_panel'].copy()
+    else:
+        fr = L['bg'].copy()
+        if k > 0.005:
+            fr.alpha_composite(M.with_alpha(L['panel'], k), (int(-120 * (1 - k)), 0))
+    # tarjeta del QR: entra con rebote y luego flota suave
+    a = ease_out_back((t - 0.15) / 0.8, 1.4)
+    fy = math.sin((t - 1.2) * 2 * math.pi / 3.4) * 7 * ease_out_cubic((t - 1.2) / 0.6)
+    paste(fr, L['card'], D_CX - 200 * out, D_CY - 20 + fy, min(1, max(a, 0)) * vis, scale=max(0.01, 0.8 + 0.2 * min(a, 1.05)))
+    # texto
+    sx = 160 * out
+    blocks = [('kick', L['kick'], 22)] + [('t', l, -18) for l in L['title']]
+    blocks[-1] = (blocks[-1][0], blocks[-1][1], 20)
+    blocks += [('l', r, 6) for r in L['lineas']]
+    if L['horario'] is not None:
+        blocks.append(('h', L['horario'], 0))
+    total = sum(b.height + g for _, b, g in blocks) + (16 if L['horario'] is not None else 0)
+    y = max(140, min(490 - total / 2, 800 - total))
+    for i, (kind, b, g) in enumerate(blocks):
+        if kind == 'h':
+            y += 16
+        if kind in ('l', 'h'):
+            a = ease_out_back((t - (1.0 + 0.15 * i)) / 0.5, 1.6)
+            paste(fr, b, D_X + b.width / 2 + sx, y + b.height / 2 + 20 * (1 - min(a, 1)), min(1, max(a, 0)) * vis,
+                  scale=max(0.01, 0.9 + 0.1 * min(a, 1)))
+        else:
+            a = ease_out_cubic((t - (0.3 + 0.1 * i)) / 0.6)
+            paste(fr, b, D_X - (10 if kind == 't' else 0) + sx, y - 30 * (1 - a), a * vis, anchor='tl')
+        y += b.height + g
+    return finish(fr)
