@@ -18,7 +18,7 @@ def quitar_fondo_bytes(raw: bytes) -> bytes:
         resp = requests.post(
             "https://api.remove.bg/v1.0/removebg",
             files={"image_file": raw},
-            data={"size": "auto", "bg_color": "FFFFFF", "format": "jpg"},
+            data={"size": "auto", "format": "png"},          # PNG con transparencia: la silueta
             headers={"X-Api-Key": cfg.REMOVEBG_API_KEY},
             timeout=30,
         )
@@ -33,8 +33,36 @@ def quitar_fondo_bytes(raw: bytes) -> bytes:
         except Exception:
             pass
         raise RuntimeError(detail)
-    standardized = _standardize_image_bytes(resp.content, _STANDARD_SIZE["medicamentos"])
-    return standardized if standardized is not None else resp.content
+    final = _silueta_sobre_original(raw, resp.content)
+    standardized = _standardize_image_bytes(final, _STANDARD_SIZE["medicamentos"])
+    return standardized if standardized is not None else final
+
+
+def _silueta_sobre_original(raw: bytes, recorte: bytes) -> bytes:
+    """remove.bg (sin créditos pagados) regresa una vista previa chica. En vez de usar esa
+    imagen chica, se toma solo su silueta (transparencia), se agranda al tamaño de la foto
+    original y se aplica sobre la original: el producto queda con TODA su resolución y
+    sobre fondo blanco. Si algo no cuadra, se usa el recorte tal cual sobre blanco."""
+    import io
+    from PIL import Image, ImageOps, ImageFilter
+    cut = Image.open(io.BytesIO(recorte)).convert("RGBA")
+
+    def blanco(im, mascara):
+        fondo = Image.new("RGB", im.size, (255, 255, 255))
+        fondo.paste(im.convert("RGB"), (0, 0), mascara)
+        return fondo
+
+    try:
+        orig = ImageOps.exif_transpose(Image.open(io.BytesIO(raw))).convert("RGB")
+        if abs(orig.width / orig.height - cut.width / cut.height) > 0.02 or orig.width < cut.width:
+            raise ValueError("proporciones distintas")
+        mask = cut.split()[3].resize(orig.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(0.6))
+        res = blanco(orig, mask)
+    except Exception:
+        res = blanco(cut, cut.split()[3])
+    out = io.BytesIO()
+    res.save(out, format="JPEG", quality=95)
+    return out.getvalue()
 
 
 def check_account() -> dict:

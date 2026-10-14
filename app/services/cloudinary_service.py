@@ -58,6 +58,12 @@ def _fit_white_square(img: Image.Image, size: int) -> Image.Image:
     que ya vienen sin fondo (remove.bg), donde perder un pedazo se ve peor
     que en una con fondo normal. Además deja TODAS las fotos —tengan o no
     fondo removido— sobre el mismo fondo blanco parejo."""
+    if img.mode in ("RGBA", "LA", "PA") or (img.mode == "P" and "transparency" in img.info):
+        # foto con fondo transparente (PNG): el fondo va blanco, no negro
+        rgba = img.convert("RGBA")
+        fondo = Image.new("RGB", rgba.size, (255, 255, 255))
+        fondo.paste(rgba, (0, 0), rgba)
+        img = fondo
     img = img.convert("RGB")
     if size >= 800:                                    # fotos de producto: sin margen blanco de sobra
         img = _recortar_margen(img)

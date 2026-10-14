@@ -40,7 +40,7 @@ SERVICIOS_DEFAULT = dict(
     horario='', whatsapp='', qr='',
 )
 DEFAULT_CONFIG = dict(
-    seconds=8, intro=True, quality='Máxima', repeat=1, default_style='destacado',
+    seconds=8, intro=True, quality='Máxima', repeat=1, default_style='cortinilla',
     footer_left='FARMACIA EBENEZER  ·  Cerca de ti, como una roca firme',
     footer_right='Precios sujetos a cambio sin previo aviso. Consulte a su médico.',
     out_dir=str(OUT_DIR_DEFAULT),
@@ -54,7 +54,7 @@ DEFAULT_CONFIG = dict(
     auto_ultimo='',              # fecha de la última generación automática
     ms_cuadro=0,                 # cuánto tardó cada cuadro la última vez (para estimar el tiempo)
 )
-ITEM_DEFAULT = dict(producto_id=None, style='destacado', enabled=True, desc='', bens=['', '', ''], tag='',
+ITEM_DEFAULT = dict(producto_id=None, style='cortinilla', enabled=True, desc='', bens=['', '', ''], tag='',
                     old_price='', show_piece=True, unit='', seconds=0)
 
 _lock = threading.Lock()          # el motor usa estado global: una sola tarea a la vez
@@ -99,11 +99,19 @@ def cargar_proyecto():
     if conf['terminal'].get('diseno') == 'persona': conf['terminal']['diseno'] = 'terminal'
     if 'disenos' not in (d.get('config', {}).get('terminal') or {}):      # proyectos de antes: un solo diseño
         conf['terminal']['disenos'] = [conf['terminal'].get('diseno') or 'terminal']
-    if conf.get('default_style') not in ESTILOS: conf['default_style'] = 'destacado'
+    if conf.get('default_style') not in ESTILOS: conf['default_style'] = 'cortinilla'
     conf['quality'] = 'Máxima'                     # siempre máxima calidad
     items = [dict(ITEM_DEFAULT, **it) for it in d.get('items', []) if it.get('producto_id')]
     for it in items:                       # el estilo clásico se retiró
-        if it.get('style') not in ESTILOS: it['style'] = 'destacado'
+        if it.get('style') not in ESTILOS: it['style'] = 'cortinilla'
+    if not conf.get('cortinilla_v1'):      # una sola vez: Cortinilla queda como diseño elegido
+        conf['cortinilla_v1'] = True
+        conf['default_style'] = 'cortinilla'
+        for it in items: it['style'] = 'cortinilla'
+        try:
+            _write(PROYECTO, dict(d, config=conf, items=items))
+        except Exception:
+            pass
     return {'config': conf, 'items': items}
 
 
@@ -613,6 +621,10 @@ def productos_por_id(ids):
         db.close()
 
 
+def hay_existencia(p):
+    return (p.stock or 0) > 0 or (getattr(p, 'piezas_sueltas', 0) or 0) > 0
+
+
 def armar_slides(proy):
     """(fichas, precios, sin_foto) de los productos marcados, con tarjetas y servicios en su lugar."""
     items = [it for it in proy['items'] if it.get('enabled', True)]
@@ -621,8 +633,8 @@ def armar_slides(proy):
     slides, precios, sin_foto = [], {}, []
     for it in items:
         p = prods.get(it['producto_id'])
-        if not p:
-            continue
+        if not p or not hay_existencia(p):
+            continue                                   # sin existencia no se anuncia
         try:
             sl = slide(p, it, cache)
         except Exception:

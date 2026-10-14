@@ -91,7 +91,7 @@ def estado(payload: dict = Depends(get_current_api_user)):
         origen = "ia" if c else "inventario"          # sin IA: descripción armada con los datos del inventario
         c = c or s.texto_inventario(p)
         items.append(dict(it, nombre=p.nombre, precio=p.precio_venta, imagen_url=p.imagen_url or "",
-                          tiene_foto=bool(p.imagen_url), activo=bool(p.activo), foto_chica=s.foto_chica(p),
+                          tiene_foto=bool(p.imagen_url), activo=bool(p.activo), foto_chica=s.foto_chica(p), sin_stock=not s.hay_existencia(p),
                           ia_desc=c.get("desc", ""), ia_bens=c.get("bens", ["", "", ""]), ia_origen=origen,
                           precio_tachado=p.precio_tachado, precio_pieza=p.precio_pieza if p.venta_fraccionada else None))
     return {"config": proy["config"], "items": items, "estilos": s.ESTILOS,
@@ -138,7 +138,7 @@ class ConfigIn(BaseModel):
     intro: bool = True
     quality: str = "Máxima"
     repeat: int = 1
-    default_style: str = "destacado"
+    default_style: str = "cortinilla"
     footer_left: str = ""
     footer_right: str = ""
     out_dir: str = ""
@@ -172,7 +172,7 @@ def guardar_config(body: ConfigIn, payload: dict = Depends(get_current_api_user)
     c["seconds"] = max(4, min(15, c["seconds"]))
     c["repeat"] = max(1, min(10, c["repeat"]))
     c["quality"] = "Máxima"                      # siempre máxima calidad
-    if c["default_style"] not in _svc().ESTILOS: c["default_style"] = "destacado"
+    if c["default_style"] not in _svc().ESTILOS: c["default_style"] = "cortinilla"
     if not c["out_dir"]: c.pop("out_dir")
     if c["drive_auto"] is None: c.pop("drive_auto")
     if c["drive_dir"] is None: c.pop("drive_dir")
@@ -189,7 +189,7 @@ def guardar_config(body: ConfigIn, payload: dict = Depends(get_current_api_user)
 
 class ItemIn(BaseModel):
     producto_id: int
-    style: str = "destacado"
+    style: str = "cortinilla"
     enabled: bool = True
     desc: str = ""
     bens: list[str] = ["", "", ""]
@@ -352,6 +352,8 @@ def generar(body: GenerarIn, payload: dict = Depends(get_current_api_user)):
     if not items and not c["terminal"].get("enabled") and not c["servicios"].get("enabled"):
         raise HTTPException(status_code=400, detail="Agrega al menos un producto al video.")
     slides, precios, sin_foto = s.armar_slides(proy)
+    if not slides:
+        raise HTTPException(status_code=400, detail="Ninguno de los productos marcados tiene existencia.")
     if sin_foto:
         raise HTTPException(status_code=400, detail="Estos productos no tienen foto (agrégala en Inventario o quítalos del video): "
                                                     + ", ".join(sin_foto[:8]))

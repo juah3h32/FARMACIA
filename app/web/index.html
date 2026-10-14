@@ -3823,6 +3823,9 @@
               <label class="flex items-center gap-2 text-xs cursor-pointer select-none" style="color:#334155">
                 <input id="mkv-cat-sinfoto" type="checkbox" class="mkv-switch" onchange="mkvCatPintar()"> Mostrar también sin foto
               </label>
+              <label class="flex items-center gap-2 text-xs cursor-pointer select-none" style="color:#334155">
+                <input id="mkv-cat-sinstock" type="checkbox" class="mkv-switch" onchange="mkvCatPintar()"> Mostrar también sin existencia
+              </label>
               <div class="flex-1"></div>
               <button onclick="mkvCatCerrar()" class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100" style="color:#64748B"><i data-lucide="x" style="width:18px;height:18px"></i></button>
             </div>
@@ -9660,6 +9663,17 @@ function pmLoadImagePreview(url) {
 // para siempre porque el fetch original nunca resuelve. Con AbortController el
 // finally SIEMPRE corre a más tardar a los `timeoutMs`, pase lo que pase del
 // lado del servidor.
+// Cambia el ícono de un botón. lucide reemplaza cada <i data-lucide> por un <svg>, así que
+// una referencia guardada al <i> ya no está en pantalla: hay que cambiar lo que se ve.
+function _pmIcono(btn, id, nombre, girar) {
+  const viejo = btn.querySelector('svg, i');
+  const i = document.createElement('i');
+  i.id = id; i.setAttribute('data-lucide', nombre); i.style.width = '12px'; i.style.height = '12px';
+  if (girar) i.classList.add('animate-spin');
+  if (viejo) viejo.replaceWith(i); else btn.prepend(i);
+  icons();
+}
+
 async function _fetchConLimite(url, opts, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -9713,9 +9727,7 @@ async function pmQuitarFondo() {
   const txt  = document.getElementById('pm-quitar-fondo-txt');
   const st   = document.getElementById('pm-img-status');
   btn.disabled = true;
-  icon.setAttribute('data-lucide', 'loader-2');
-  icon.classList.add('animate-spin');
-  icons();
+  _pmIcono(btn, 'pm-quitar-fondo-icon', 'loader-2', true);
   txt.textContent = 'Quitando fondo...';
   st.style.color = '#0EA5E9';
   const progreso = _iniciarProgreso(st, 'Quitando fondo...', 8000, '#0EA5E9'); // remove.bg suele tardar 3-8s
@@ -9744,9 +9756,7 @@ async function pmQuitarFondo() {
     toast(e.message || 'No se pudo quitar el fondo', 'error');
   } finally {
     btn.disabled = false;
-    icon.setAttribute('data-lucide', 'eraser');
-    icon.classList.remove('animate-spin');
-    icons();
+    _pmIcono(btn, 'pm-quitar-fondo-icon', 'eraser', false);
     txt.textContent = 'Quitar fondo';
   }
 }
@@ -9763,9 +9773,7 @@ async function pmMejorarCalidad() {
   const txt  = document.getElementById('pm-mejorar-txt');
   const st   = document.getElementById('pm-img-status');
   btn.disabled = true;
-  icon.setAttribute('data-lucide', 'loader-2');
-  icon.classList.add('animate-spin');
-  icons();
+  _pmIcono(btn, 'pm-mejorar-icon', 'loader-2', true);
   txt.textContent = 'Mejorando con IA...';
   st.style.color = '#92400E';
   const progreso = _iniciarProgreso(st, 'Mejorando con IA...', 30000, '#D97706'); // gpt-image-1 suele tardar 10-30s
@@ -9797,9 +9805,7 @@ async function pmMejorarCalidad() {
     toast(e.message || 'No se pudo mejorar la imagen', 'error');
   } finally {
     btn.disabled = false;
-    icon.setAttribute('data-lucide', 'sparkles');
-    icon.classList.remove('animate-spin');
-    icons();
+    _pmIcono(btn, 'pm-mejorar-icon', 'sparkles', false);
     txt.textContent = 'Mejorar calidad (IA)';
   }
 }
@@ -14665,7 +14671,7 @@ function _mkvPrecio(v) { return v == null ? '' : '$' + (Math.round(v) === v ? v 
 
 function mkvRender() {
   const list = document.getElementById('mkv-lista');
-  const on = _mkv.items.filter(i => i.enabled);
+  const on = _mkv.items.filter(i => i.enabled && !i.sin_stock);     // sin existencia no sale en el video
   document.getElementById('mkv-count').textContent = _mkv.items.length;
   if (!_mkv.items.length) {
     list.innerHTML = '<p class="text-xs text-center p-4" style="color:#9AA8D0">Aún no hay productos en el video.<br>Búscalos arriba para agregarlos.</p>';
@@ -14675,6 +14681,7 @@ function mkvRender() {
       let det;
       if (_mkvIAcola.includes(it.producto_id)) det = '<span style="color:#D8B4FE">La IA está escribiendo…</span>';
       else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">Sin foto</span>';
+      else if (it.sin_stock) det = `<span style="color:#FCA5A5">${_mkvPrecio(it.precio)} · Sin existencia: no sale</span>`;
       else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>` +
         (it.foto_chica ? ' <span style="color:#FCD34D" title="La foto es pequeña: se verá borrosa en la tele. Sube una más grande en Inventario.">· Foto pequeña</span>' : '');
       const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" style="mix-blend-mode:multiply;${it.enabled ? '' : 'filter:grayscale(1);opacity:.55'}" onerror="this.style.display='none'">` : '';
@@ -15005,10 +15012,10 @@ function mkvBuscar() {
   const res = (_mktProds || []).filter(p => p.activo !== false && !ya.has(p.id) &&
     ((p.nombre || '').toLowerCase().includes(q) || (p.nombre_generico || '').toLowerCase().includes(q) || (p.codigo_barras || '').includes(q))).slice(0, 30);
   box.innerHTML = res.length ? res.map(p => `
-    <div onclick="${p.imagen_url ? `mkvAgregar(${p.id})` : ''}" class="flex items-center gap-2 px-3 py-2 ${p.imagen_url ? 'cursor-pointer hover:bg-slate-50' : ''}" style="${p.imagen_url ? '' : 'opacity:.5'}" title="${p.imagen_url ? '' : 'Sin foto: agrégala en Inventario'}">
+    <div onclick="${p.imagen_url && _mkvHay(p) ? `mkvAgregar(${p.id})` : ''}" class="flex items-center gap-2 px-3 py-2 ${p.imagen_url && _mkvHay(p) ? 'cursor-pointer hover:bg-slate-50' : ''}" style="${p.imagen_url && _mkvHay(p) ? '' : 'opacity:.5'}" title="${!p.imagen_url ? 'Sin foto: agrégala en Inventario' : _mkvHay(p) ? '' : 'Sin existencia'}">
       <div class="w-8 h-8 rounded-md border bg-white overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">${p.imagen_url ? `<img src="${_mkvEsc(p.imagen_url)}" class="w-full h-full object-contain">` : ''}</div>
       <div class="flex-1 min-w-0"><p class="text-xs font-semibold truncate" style="color:#0F172A">${_mkvEsc(p.nombre)}</p>
-        <p class="text-[10px]" style="color:${p.imagen_url ? '#64748B' : '#DC2626'}">${_mkvPrecio(p.precio_venta)}${p.imagen_url ? '' : ' · sin foto'}</p></div>
+        <p class="text-[10px]" style="color:${p.imagen_url && _mkvHay(p) ? '#64748B' : '#DC2626'}">${_mkvPrecio(p.precio_venta)}${!p.imagen_url ? ' · sin foto' : _mkvHay(p) ? '' : ' · sin existencia'}</p></div>
     </div>`).join('') : '<p class="text-xs p-3" style="color:#94A3B8">Sin resultados</p>';
   box.classList.remove('hidden');
 }
@@ -15037,7 +15044,8 @@ function _mkvCatLista() {
   const orden = document.getElementById('mkv-cat-orden').value;
   const mn = parseFloat(document.getElementById('mkv-cat-min').value), mx = parseFloat(document.getElementById('mkv-cat-max').value);
   const sinFoto = document.getElementById('mkv-cat-sinfoto').checked;
-  let l = (_mktProds || []).filter(p => p.activo !== false && (sinFoto || p.imagen_url) &&
+  const sinStock = document.getElementById('mkv-cat-sinstock').checked;
+  let l = (_mktProds || []).filter(p => p.activo !== false && (sinFoto || p.imagen_url) && (sinStock || _mkvHay(p)) &&
     (!q || (p.nombre || '').toLowerCase().includes(q) || (p.nombre_generico || '').toLowerCase().includes(q) || (p.codigo_barras || '').includes(q)) &&
     (isNaN(mn) || (p.precio_venta || 0) >= mn) && (isNaN(mx) || (p.precio_venta || 0) <= mx) &&
     (!_mkvUsoSel || _mkvUsosDe(p.id).includes(_mkvUsoSel)));
@@ -15048,6 +15056,7 @@ function _mkvCatLista() {
   else l.sort((a, b) => ((a.precio_venta || 0) - (b.precio_venta || 0)) * (orden === 'desc' ? -1 : 1));
   return l;
 }
+function _mkvHay(p) { return (p.stock || 0) > 0 || (p.piezas_sueltas || 0) > 0; }     // hay existencia para vender
 function _mkvUsosDe(id) { return ((_mkvUsos || {}).productos || {})[id] || ['otros']; }
 function _mkvUsoPrincipal(id) { const u = _mkvUsosDe(id); return _mkvUsoSel && u.includes(_mkvUsoSel) ? _mkvUsoSel : u[0]; }
 function mkvCatUso(k) { _mkvUsoSel = _mkvUsoSel === k ? '' : k; mkvCatPintar(); }
@@ -15079,10 +15088,11 @@ function mkvCatPintar() {
       <span class="flex-1" style="height:1px;background:#E2E8F0"></span></div>`;
   };
   grid.innerHTML = l.length ? l.slice(0, 400).map(p => titulo(p) + (() => {
-    const foto = !!p.imagen_url, en = ya.has(p.id), sel = mkvCatSel.has(p.id);
+    const foto = !!p.imagen_url, en = ya.has(p.id), sel = mkvCatSel.has(p.id), hay = _mkvHay(p);
     const borde = sel ? '#16A34A' : en ? '#93C5FD' : '#E2E8F0';
-    const click = foto && !en ? `mkvCatToggle(${p.id})` : '';
-    return `<div onclick="${click}" class="rounded-2xl border-2 p-2 flex flex-col gap-1 relative transition ${click ? 'cursor-pointer hover:shadow-md' : ''}" style="background:${sel ? '#F6FEF9' : '#fff'};border-color:${borde};${foto ? '' : 'opacity:.5'}">
+    const click = foto && hay && !en ? `mkvCatToggle(${p.id})` : '';
+    return `<div onclick="${click}" class="rounded-2xl border-2 p-2 flex flex-col gap-1 relative transition ${click ? 'cursor-pointer hover:shadow-md' : ''}" style="background:${sel ? '#F6FEF9' : '#fff'};border-color:${borde};${foto && hay ? '' : 'opacity:.5'}">
+      ${hay ? '' : '<span class="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#FEE2E2;color:#DC2626">Sin existencia</span>'}
       <div class="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white" style="background:${sel ? '#16A34A' : en ? '#3373B9' : foto ? '#CBD5E1' : 'transparent'}">${sel ? '<i data-lucide="check" style="width:14px;height:14px"></i>' : en ? '<i data-lucide="film" style="width:13px;height:13px"></i>' : ''}</div>
       <div class="rounded-xl flex items-center justify-center overflow-hidden p-2" style="height:120px;background:${sel ? '#ECFDF3' : en ? '#EEF4FC' : '#F3F6FB'}">
         ${foto ? `<img src="${_mkvEsc(p.imagen_url)}" loading="lazy" class="max-w-full max-h-full object-contain" style="mix-blend-mode:multiply">` : '<span class="text-[11px] font-bold" style="color:#DC2626">Sin foto</span>'}
@@ -15106,7 +15116,7 @@ function mkvCatPintar() {
 function mkvCatToggle(id) { if (mkvCatSel.has(id)) mkvCatSel.delete(id); else mkvCatSel.add(id); mkvCatPintar(); }
 function mkvCatSelTodos() {
   const ya = new Set(_mkv.items.map(i => i.producto_id));
-  _mkvCatLista().slice(0, 400).forEach(p => { if (p.imagen_url && !ya.has(p.id)) mkvCatSel.add(p.id); });
+  _mkvCatLista().slice(0, 400).forEach(p => { if (p.imagen_url && _mkvHay(p) && !ya.has(p.id)) mkvCatSel.add(p.id); });
   mkvCatPintar();
 }
 function mkvCatAgregar() {
@@ -15125,8 +15135,9 @@ function mkvCatAgregar() {
 function mkvAgregar(id, varios = false) {
   const p = (_mktProds || []).find(x => x.id === id); if (!p) return false;
   if (!p.imagen_url) { toast('Este producto no tiene foto. Agrégala en Inventario para poder usarlo en el video.', 'warning'); return false; }
+  if (!_mkvHay(p)) { toast(`${p.nombre} no tiene existencia: no se puede anunciar`, 'warning'); return false; }
   if (_mkv.items.some(i => i.producto_id === id)) return false;
-  _mkv.items.push({ producto_id: p.id, style: _mkv.config.default_style || 'destacado', enabled: true, desc: '', bens: ['', '', ''],
+  _mkv.items.push({ producto_id: p.id, style: _mkv.config.default_style || 'cortinilla', enabled: true, desc: '', bens: ['', '', ''],
                     tag: '', old_price: '', show_piece: true, unit: '', nombre: p.nombre, precio: p.precio_venta,
                     imagen_url: p.imagen_url || '', tiene_foto: !!p.imagen_url, precio_tachado: p.precio_tachado,
                     precio_pieza: p.venta_fraccionada ? p.precio_pieza : null, ia_desc: '', ia_bens: ['', '', ''] });
