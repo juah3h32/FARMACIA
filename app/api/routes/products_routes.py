@@ -640,6 +640,10 @@ async def quitar_fondo_producto(
         raw = local.read_bytes()
     elif imagen_url:
         import requests
+        from urllib.parse import urlparse
+        _u = urlparse(imagen_url)
+        if _u.scheme != "https" or not (_u.hostname or "").endswith("cloudinary.com"):
+            raise HTTPException(status_code=400, detail="Solo se pueden procesar fotos guardadas en Cloudinary")
         try:
             r = await asyncio.to_thread(requests.get, imagen_url, timeout=15)
             r.raise_for_status()

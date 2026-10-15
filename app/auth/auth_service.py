@@ -20,6 +20,41 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+# Hash de relleno: el login lo verifica aunque el usuario no exista, así tarda lo mismo
+# y no se puede saber por el tiempo de respuesta qué usuarios existen.
+DUMMY_HASH = bcrypt.hashpw(b"no-existe", bcrypt.gensalt()).decode("utf-8")
+
+# Contraseñas con las que se crean las cuentas de fábrica: son públicas, hay que cambiarlas.
+_PASSWORDS_DE_FABRICA = {"admin123", "cajero123"}
+
+
+def es_password_por_defecto(plain: str) -> bool:
+    return (plain or "") in _PASSWORDS_DE_FABRICA
+
+
+# ── Códigos de respaldo (recuperar la cuenta de admin sin internet) ──────────
+_ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"     # sin 0/O ni 1/I para no confundirlos
+
+
+def normalizar_codigo(codigo: str) -> str:
+    return "".join(ch for ch in (codigo or "").upper() if ch.isalnum())
+
+
+def generar_codigos_respaldo(n: int = 8) -> list[str]:
+    import secrets
+    out = []
+    for _ in range(n):
+        c = "".join(secrets.choice(_ALFABETO) for _ in range(10))
+        out.append(f"{c[:4]}-{c[4:8]}-{c[8:]}")
+    return out
+
+
+def hash_codigo(codigo: str) -> str:
+    """SHA-256 del código de respaldo ya normalizado (10 caracteres al azar ≈ 50 bits)."""
+    import hashlib
+    return hashlib.sha256(normalizar_codigo(codigo).encode("utf-8")).hexdigest()
+
+
 def login(username: str, password: str) -> Usuario | None:
     global current_user
     db = get_db_session()
@@ -55,23 +90,24 @@ def is_admin() -> bool:
 
 
 def create_api_token(user_id: int, username: str, nombre: str = "", rol: str = "cajero",
-                     typ: str = "pos") -> str:
+                     typ: str = "pos", token_version: int = 0) -> str:
     """typ separa tokens de empleados del POS ("pos") y de clientes de la app
     ("cliente"): ambos se firman con la misma SECRET_KEY y el `sub` es un id de
     tablas distintas — sin esto, el cliente id=1 de la app pasaba como el
     Usuario id=1 (admin) del POS."""
     expire = datetime.utcnow() + timedelta(hours=config.ACCESS_TOKEN_EXPIRE_HOURS)
     payload = {"sub": str(user_id), "username": username, "nombre": nombre, "rol": rol,
-               "exp": expire, "typ": typ}
+               "exp": expire, "typ": typ, "tv": int(token_version or 0)}
     return jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
 
 
 def create_long_token(user_id: int, username: str, nombre: str = "", rol: str = "admin",
-                      days: int = 365, token_name: str = "API Token") -> str:
+                      days: int = 365, token_name: str = "API Token", token_version: int = 0) -> str:
     expire = datetime.utcnow() + timedelta(days=days)
     payload = {
         "sub": str(user_id), "username": username, "nombre": nombre, "rol": rol,
         "exp": expire, "token_name": token_name, "long_lived": True, "typ": "pos",
+        "tv": int(token_version or 0),
     }
     return jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
 

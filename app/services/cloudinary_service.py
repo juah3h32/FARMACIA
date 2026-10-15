@@ -461,7 +461,12 @@ def local_path_for_url(url: str) -> Path | None:
     """Ruta en disco de una foto guardada localmente (imagen_url tipo /uploads/imagenes/...)."""
     if not url or url.startswith("http"):
         return None
-    p = cfg.DATA_DIR / url.lstrip("/")
+    base = (cfg.DATA_DIR / "uploads").resolve()
+    p = (cfg.DATA_DIR / url.lstrip("/\\")).resolve()
+    try:
+        p.relative_to(base)                    # nunca fuera de uploads (p. ej. ../secret.key)
+    except ValueError:
+        return None
     return p if p.is_file() else None
 
 

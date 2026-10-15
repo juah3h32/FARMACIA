@@ -54,7 +54,7 @@ _FULL_SYNC = frozenset({
 
 # Tables that are shared across PCs — never delete rows from Turso by absence
 # (each PC may have a subset; deletions happen via soft-delete / purge only)
-_NO_TURSO_DELETE = frozenset({"productos", "lotes", "ventas", "items_venta",
+_NO_TURSO_DELETE = frozenset({"usuarios", "productos", "lotes", "ventas", "items_venta",
                                "compras", "items_compra", "cortes_caja", "retiros_caja",
                                "cfdi_facturas_globales", "cfdi_facturas_individuales", "facturas_compra",
                                "pacientes", "promociones", "promociones_productos", "pagos_credito", "recetas",
@@ -83,7 +83,9 @@ _PUSH_APPEND_ONLY = frozenset({"items_venta"})
 # Tablas de dinero editables (cerrar turno, editar retiro): last-writer-wins por
 # actualizado_en en ambos sentidos. Antes era INSERT OR REPLACE ciego — una PC
 # con copia vieja reabría turnos cerrados o revertía el tipo de un retiro.
-_LWW_CAJA = frozenset({"cortes_caja", "retiros_caja"})
+# usuarios: también gana el cambio más reciente — con INSERT OR REPLACE una PC con copia vieja
+# regresaba una contraseña ya cambiada (o restablecida) en otra PC.
+_LWW_CAJA = frozenset({"cortes_caja", "retiros_caja", "usuarios"})
 
 
 def _lww_upsert_sql(table: str, cols: list) -> str:

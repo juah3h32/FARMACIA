@@ -210,6 +210,10 @@ def _migrate():
         ("ventas",       "referencia_pago", "VARCHAR(120)"),
         ("productos",    "anaquel",         "VARCHAR(20)"),
         ("productos",    "seccion",         "VARCHAR(20)"),
+        ("usuarios",     "actualizado_en",  "TEXT"),
+        ("usuarios",     "token_version",   "INTEGER DEFAULT 0"),
+        ("usuarios",     "recovery_codes",  "TEXT"),
+        ("usuarios",     "debe_cambiar_password", "BOOLEAN DEFAULT 0"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []
@@ -445,6 +449,7 @@ def _seed_initial_data():
                 password_hash=hash_password("admin123"),
                 nombre="Administrador",
                 rol=RolUsuario.admin,
+                debe_cambiar_password=True,     # contraseña de fábrica: se cambia al entrar
             ))
 
         if "cajero" not in existing_users:
@@ -454,6 +459,7 @@ def _seed_initial_data():
                 password_hash=_hp2("cajero123"),
                 nombre="Cajero Prueba",
                 rol=RolUsuario.cajero,
+                debe_cambiar_password=True,
             ))
 
         # Batch-check existing categories (1 query instead of 10)

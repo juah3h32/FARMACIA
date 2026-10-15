@@ -33,9 +33,12 @@ def _client_ip(request: Request) -> str:
     # Detrás de un proxy (Vercel) request.client.host es la IP del proxy, no la
     # del cliente real — usar X-Forwarded-For evita que todos los clientes
     # compartan el mismo contador de intentos.
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    # Solo en Vercel (lo pone su proxy); en las PCs ese encabezado lo puede inventar cualquiera.
+    import app.config as _cfg
+    if _cfg._ON_VERCEL:
+        real = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for", "")
+        if real:
+            return real.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -145,9 +148,10 @@ def login(body: LoginIn, request: Request):
             ClienteApp.email == body.email.lower(),
             ClienteApp.activo == True,
         ).first()
-        if not cliente or not cliente.password_hash:
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
-        if not verify_password(body.password, cliente.password_hash):
+        from app.auth.auth_service import DUMMY_HASH
+        # siempre se verifica un hash: el tiempo de respuesta no revela qué correos existen
+        ok = verify_password(body.password, cliente.password_hash if cliente and cliente.password_hash else DUMMY_HASH)
+        if not cliente or not cliente.password_hash or not ok:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
         return _token_response(cliente)
     finally:

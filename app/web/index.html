@@ -1276,8 +1276,143 @@
               style="background:linear-gradient(135deg,#1d2140,#1d2140)">
         Iniciar Sesión
       </button>
+      <button type="button" onclick="abrirRecuperar()" class="w-full text-center text-xs font-semibold mt-3 hover:underline"
+              style="color:#475569;background:none;border:none;cursor:pointer">¿Olvidaste tu contraseña?</button>
 
       <p class="text-center text-[11px] mt-6" style="color:#CBD5E1">Farmacia Eben-Ezer<span id="l-sucursal"></span> &nbsp;·&nbsp; <span id="l-version">v1.0.0</span></p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Recuperar contraseña ─────────────────────────────────────────────── -->
+<div id="modal-recuperar" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)"></div>
+  <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:420px;max-width:100%">
+    <div class="h-1.5" style="background:#1d2140"></div>
+    <div class="p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:#EEF2FF">
+          <i data-lucide="key-round" style="width:20px;height:20px;color:#1d2140"></i>
+        </div>
+        <div>
+          <p class="font-black text-base" style="color:#0F172A">Recuperar contraseña</p>
+          <p class="text-xs" style="color:#64748B">Elige cómo comprobar que eres tú</p>
+        </div>
+        <button id="rec-x" onclick="closeModal('modal-recuperar')" class="ml-auto w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="border:none;cursor:pointer;color:#64748B"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      </div>
+      <div id="rec-paso1" class="space-y-3">
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">USUARIO DEL ADMINISTRADOR</label><input id="rec-user" type="text" autocomplete="username" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <button onclick="recEnviarCorreo()" id="rec-btn-correo" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Enviarme un código por correo</button>
+        <button onclick="recPaso2('respaldo')" class="w-full h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Tengo un código de respaldo (sin internet)</button>
+        <p class="text-[11px] leading-snug" style="color:#64748B">Solo para el administrador. Si eres cajero, pídele al administrador que te ponga una contraseña nueva en Empleados.</p>
+      </div>
+      <div id="rec-paso2" class="space-y-3 hidden">
+        <p id="rec-ayuda" class="text-xs leading-snug" style="color:#475569"></p>
+        <div><label id="rec-lbl-codigo" class="text-xs font-bold mb-1 block" style="color:#64748B">CÓDIGO</label><input id="rec-codigo" type="text" autocomplete="one-time-code" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">CONTRASEÑA NUEVA (MÍNIMO 8)</label><input id="rec-nueva" type="password" autocomplete="new-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">REPÍTELA</label><input id="rec-nueva2" type="password" autocomplete="new-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <button onclick="recConfirmar()" id="rec-btn-ok" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Cambiar contraseña</button>
+        <button onclick="recVolver()" class="w-full h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Volver</button>
+      </div>
+      <p id="rec-err" class="text-xs mt-3 hidden" style="color:#DC2626"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cambiar contraseña (también obligatoria con contraseña de fábrica o temporal) ── -->
+<div id="modal-cambiar-pass" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)"></div>
+  <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:420px;max-width:100%">
+    <div class="h-1.5" style="background:#1d2140"></div>
+    <div class="p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:#EEF2FF">
+          <i data-lucide="lock-keyhole" style="width:20px;height:20px;color:#1d2140"></i>
+        </div>
+        <div>
+          <p class="font-black text-base" style="color:#0F172A">Cambiar contraseña</p>
+          <p class="text-xs" style="color:#64748B">Mínimo 8 caracteres</p>
+        </div>
+        <button id="cp-x" onclick="closeModal('modal-cambiar-pass')" class="ml-auto w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="border:none;cursor:pointer;color:#64748B"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      </div>
+      <p id="cp-obligatorio" class="text-xs leading-snug mb-3 hidden rounded-xl px-3 py-2" style="background:#FEF3C7;color:#92400E">Tu contraseña es la de fábrica o una temporal que te dio el administrador. Elige una nueva para continuar.</p>
+      <div class="space-y-3">
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">CONTRASEÑA ACTUAL</label><input id="cp-actual" type="password" autocomplete="current-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">CONTRASEÑA NUEVA</label><input id="cp-nueva" type="password" autocomplete="new-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">REPÍTELA</label><input id="cp-nueva2" type="password" autocomplete="new-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"
+             onkeydown="if(event.key==='Enter')cpGuardar()"></div>
+        <button onclick="cpGuardar()" id="cp-btn" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Guardar contraseña nueva</button>
+      </div>
+      <p id="cp-err" class="text-xs mt-3 hidden" style="color:#DC2626"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Correo de recuperación (admin) ───────────────────────────────────── -->
+<div id="modal-correo-rec" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)" onclick="closeModal('modal-correo-rec')"></div>
+  <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:460px;max-width:100%">
+    <div class="h-1.5" style="background:#1d2140"></div>
+    <div class="p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:#EEF2FF">
+          <i data-lucide="mail" style="width:20px;height:20px;color:#1d2140"></i>
+        </div>
+        <div>
+          <p class="font-black text-base" style="color:#0F172A">Correo de recuperación</p>
+          <p id="cr-estado" class="text-xs" style="color:#64748B"></p>
+        </div>
+        <button onclick="closeModal('modal-correo-rec')" class="ml-auto w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100" style="border:none;cursor:pointer;color:#64748B"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">TU CORREO (AQUÍ LLEGA EL CÓDIGO)</label><input id="cr-email" type="email" placeholder="tucorreo@gmail.com" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">CONTRASEÑA DE APLICACIÓN DE GOOGLE</label><input id="cr-app" type="password" placeholder="16 letras, ej. abcd efgh ijkl mnop" autocomplete="off" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"></div>
+        <p class="text-[11px] leading-snug rounded-xl px-3 py-2" style="background:#F8FAFC;color:#475569">
+          Se crea en <b>myaccount.google.com/apppasswords</b> (necesitas la verificación en 2 pasos activa). Escribe un nombre, por ejemplo "Punto de venta", y copia las 16 letras aquí. No es tu contraseña normal de Gmail.</p>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">TU CONTRASEÑA DEL PUNTO DE VENTA</label><input id="cr-pass" type="password" autocomplete="current-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"
+             onkeydown="if(event.key==='Enter')crGuardar()"></div>
+        <button id="cr-btn" onclick="crGuardar()" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Guardar y enviar correo de prueba</button>
+      </div>
+      <p id="cr-err" class="text-xs mt-3 hidden" style="color:#DC2626"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Códigos de respaldo (admin) ──────────────────────────────────────── -->
+<div id="modal-codigos" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+  <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)"></div>
+  <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:460px;max-width:100%">
+    <div class="h-1.5" style="background:#16A34A"></div>
+    <div class="p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:#EEF2FF">
+          <i data-lucide="shield-check" style="width:20px;height:20px;color:#1d2140"></i>
+        </div>
+        <div>
+          <p class="font-black text-base" style="color:#0F172A">Códigos de respaldo</p>
+          <p class="text-xs" style="color:#64748B">Para entrar si olvidas tu contraseña, aun sin internet</p>
+        </div>
+        
+      </div>
+      <div id="cod-pedir" class="space-y-3">
+        <p class="text-xs leading-snug" style="color:#475569">Se crean 8 códigos nuevos y los anteriores dejan de servir. Confirma con tu contraseña.</p>
+        <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">TU CONTRASEÑA</label><input id="cod-pass" type="password" autocomplete="current-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"
+             onkeydown="if(event.key==='Enter')codGenerar()"></div>
+        <button onclick="codGenerar()" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Crear códigos</button>
+        <button onclick="closeModal('modal-codigos')" class="w-full h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Cancelar</button>
+      </div>
+      <div id="cod-lista-wrap" class="hidden">
+        <p class="text-xs leading-snug mb-3" style="color:#475569">Guárdalos en un lugar seguro (impresos o en tu correo). Cada código sirve <b>una sola vez</b>. Solo se muestran ahora.</p>
+        <div id="cod-lista" class="grid grid-cols-2 gap-2 mb-4 font-mono text-sm font-bold" style="color:#0F172A"></div>
+        <div class="flex gap-2 mb-3">
+          <button onclick="codDescargar()" class="flex-1 h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Descargar .txt</button>
+          <button onclick="codCopiar()" class="flex-1 h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Copiar</button>
+        </div>
+        <label class="flex items-center gap-2 text-xs mb-3" style="color:#334155"><input id="cod-ok" type="checkbox" onchange="document.getElementById('cod-cerrar').disabled=!this.checked"> Ya los guardé</label>
+        <button id="cod-cerrar" disabled onclick="closeModal('modal-codigos')" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Listo</button>
+      </div>
+      <p id="cod-err" class="text-xs mt-3 hidden" style="color:#DC2626"></p>
     </div>
   </div>
 </div>
@@ -5452,7 +5587,7 @@
       </div>
       <div>
         <h2 class="font-bold" style="color:#7F1D1D">Eliminar Historial</h2>
-        <p class="text-xs mt-0.5" style="color:#EF4444">Acción irreversible — requiere clave de seguridad</p>
+        <p class="text-xs mt-0.5" style="color:#EF4444">Acción irreversible — confirma con tu contraseña de administrador</p>
       </div>
     </div>
     <div class="p-6 flex flex-col gap-4">
@@ -5466,7 +5601,7 @@
         <p class="text-xs mt-2 font-medium" style="color:#64748B">Se conservan: productos, clientes, empleados, categorías.</p>
       </div>
       <div>
-        <label class="lbl">Clave de seguridad</label>
+        <label class="lbl">Tu contraseña de administrador</label>
         <input id="purge-clave" type="password" class="inp" placeholder="••••••"
                onkeydown="if(event.key==='Enter')executePurgeHistorial()">
       </div>
@@ -5997,8 +6132,9 @@
       </div>
       <div>
         <label class="lbl">Contraseña <span id="em-pass-req">*</span></label>
-        <input id="em-pass" type="password" class="inp" placeholder="Contraseña">
+        <input id="em-pass" type="password" class="inp" placeholder="Mínimo 8 caracteres">
         <p id="em-pass-hint" class="hidden text-[10px] mt-0.5" style="color:#94A3B8">Dejar vacío para no cambiar</p>
+        <p class="text-[10px] mt-0.5" style="color:#94A3B8">Es temporal: el empleado la cambia al entrar. Pide su correo para que pueda recuperar su contraseña.</p>
       </div>
       <div><label class="lbl">Rol</label>
         <select id="em-rol" class="inp">
@@ -6208,6 +6344,33 @@
       <!-- ── Sesión ──────────────────────────────────────── -->
       <div style="height:1px;background:#F1F5F9;margin:8px 0 10px"></div>
       <p class="text-[9px] font-black uppercase tracking-[.16em] px-1 mb-2" style="color:#94A3B8">Sesión</p>
+      <button onclick="closeProfileModal();abrirCambiarPassword(false)"
+          class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+          style="color:#1d2140;background:none;border:none;cursor:pointer"
+          onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EEF2FF">
+          <i data-lucide="lock-keyhole" style="width:14px;height:14px;color:#1d2140"></i>
+        </div>
+        Cambiar mi contraseña
+      </button>
+      <button id="btn-correo-rec" onclick="closeProfileModal();abrirCorreoRec()"
+          class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+          style="color:#1d2140;background:none;border:none;cursor:pointer"
+          onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#EEF2FF">
+          <i data-lucide="mail" style="width:14px;height:14px;color:#1d2140"></i>
+        </div>
+        Correo de recuperación
+      </button>
+      <button id="btn-codigos-respaldo" onclick="closeProfileModal();abrirCodigos()"
+          class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
+          style="color:#1d2140;background:none;border:none;cursor:pointer"
+          onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#F0FDF4">
+          <i data-lucide="shield-check" style="width:14px;height:14px;color:#16A34A"></i>
+        </div>
+        Códigos de respaldo
+      </button>
       <button onclick="closeProfileModal();doLogoutSafe()"
           class="w-full h-10 rounded-xl flex items-center gap-3 px-3 text-sm font-semibold transition-all"
           style="color:#EF4444;background:none;border:none;cursor:pointer"
@@ -7392,7 +7555,9 @@ async function doLogin() {
       body: JSON.stringify({username:u, password:p}),
     });
     if (!res.ok) {
-      errEl.innerHTML='<i data-lucide="alert-circle" style="width:12px;height:12px;display:inline"></i> Usuario o contraseña incorrectos';
+      let msg = 'Usuario o contraseña incorrectos';
+      if (res.status === 429) { try { msg = (await res.json()).detail || 'Demasiados intentos. Espera unos minutos.'; } catch (_) {} }
+      errEl.innerHTML='<i data-lucide="alert-circle" style="width:12px;height:12px;display:inline"></i> ' + msg;
       icons();
       document.getElementById('l-pass').value='';
     } else {
@@ -7401,10 +7566,191 @@ async function doLogin() {
       S.user  = {id:data.user_id, username:data.username, nombre:data.nombre||data.username, rol:data.rol, foto_url:data.foto_url||null};
       _SES.setItem('token', S.token);
       _SES.setItem('user', JSON.stringify(S.user));
-      launchApp();
+      document.getElementById('l-pass').value='';
+      if (data.debe_cambiar_password) {
+        // contraseña de fábrica o temporal: primero se cambia, luego se entra
+        abrirCambiarPassword(true, p, data.sin_codigos_respaldo);
+      } else {
+        launchApp();
+        if (data.sin_codigos_respaldo) setTimeout(() => abrirCodigos(p), 800);
+      }
     }
   } catch(e) { errEl.textContent='Error de conexión'; }
   btn.textContent='Iniciar Sesión'; btn.disabled=false;
+}
+
+
+// ── Contraseñas: recuperar, cambiar y códigos de respaldo ───────────────────
+function _msg(id, txt) { const e = document.getElementById(id); e.textContent = txt || ''; e.classList.toggle('hidden', !txt); }
+async function _post(path, body, conToken) {
+  const res = await fetch('/api' + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(conToken && S.token ? { Authorization: 'Bearer ' + S.token } : {}) },
+    body: JSON.stringify(body),
+  });
+  let data = {}; try { data = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error(data.detail || 'No se pudo completar');
+  return data;
+}
+
+let _recModo = 'email';
+function abrirRecuperar() {
+  _recModo = 'email';
+  document.getElementById('rec-user').value = document.getElementById('l-user').value.trim();
+  ['rec-codigo', 'rec-nueva', 'rec-nueva2'].forEach(id => document.getElementById(id).value = '');
+  recVolver();
+  openModal('modal-recuperar'); icons();
+  setTimeout(() => document.getElementById('rec-user').focus(), 100);
+}
+function recVolver() {
+  document.getElementById('rec-paso1').classList.remove('hidden');
+  document.getElementById('rec-paso2').classList.add('hidden');
+  _msg('rec-err', '');
+}
+function recPaso2(modo, ayuda) {
+  if (!document.getElementById('rec-user').value.trim()) { _msg('rec-err', 'Escribe tu usuario'); return; }
+  _recModo = modo;
+  document.getElementById('rec-lbl-codigo').textContent = modo === 'email' ? 'CÓDIGO DE 6 DÍGITOS' : 'CÓDIGO DE RESPALDO (EJ. ABCD-EFGH-JK)';
+  document.getElementById('rec-ayuda').textContent = ayuda ||
+    'Escribe uno de los códigos de respaldo que guardaste. Cada uno sirve una sola vez.';
+  document.getElementById('rec-paso1').classList.add('hidden');
+  document.getElementById('rec-paso2').classList.remove('hidden');
+  _msg('rec-err', '');
+  setTimeout(() => document.getElementById('rec-codigo').focus(), 100);
+}
+async function recEnviarCorreo() {
+  const u = document.getElementById('rec-user').value.trim();
+  if (!u) { _msg('rec-err', 'Escribe tu usuario'); return; }
+  const b = document.getElementById('rec-btn-correo'); b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    const r = await _post('/auth/recuperar/solicitar', { username: u });
+    recPaso2('email', r.mensaje + ' El código vence en 15 minutos.');
+  } catch (e) { _msg('rec-err', e.message); }
+  b.disabled = false; b.textContent = 'Enviarme un código por correo';
+}
+async function recConfirmar() {
+  const u = document.getElementById('rec-user').value.trim();
+  const codigo = document.getElementById('rec-codigo').value.trim();
+  const nueva = document.getElementById('rec-nueva').value, nueva2 = document.getElementById('rec-nueva2').value;
+  if (!codigo) { _msg('rec-err', 'Escribe el código'); return; }
+  if (nueva.length < 8) { _msg('rec-err', 'La contraseña nueva debe tener al menos 8 caracteres'); return; }
+  if (nueva !== nueva2) { _msg('rec-err', 'Las contraseñas no coinciden'); return; }
+  const b = document.getElementById('rec-btn-ok'); b.disabled = true;
+  try {
+    const r = await _post(_recModo === 'email' ? '/auth/recuperar/confirmar' : '/auth/recuperar/respaldo', { username: u, codigo, nueva });
+    closeModal('modal-recuperar');
+    document.getElementById('l-user').value = u;
+    document.getElementById('l-pass').value = '';
+    document.getElementById('l-pass').focus();
+    let txt = 'Contraseña cambiada. Ya puedes iniciar sesión.';
+    if (r.codigos_restantes !== undefined) txt += ` Te quedan ${r.codigos_restantes} códigos de respaldo.`;
+    toast(txt, 'success');
+  } catch (e) { _msg('rec-err', e.message); }
+  b.disabled = false;
+}
+
+let _cpObligatorio = false, _cpPedirCodigos = false;
+function abrirCambiarPassword(obligatorio, actual, pedirCodigos) {
+  _cpObligatorio = !!obligatorio; _cpPedirCodigos = !!pedirCodigos;
+  document.getElementById('cp-actual').value = actual || '';
+  document.getElementById('cp-nueva').value = '';
+  document.getElementById('cp-nueva2').value = '';
+  document.getElementById('cp-obligatorio').classList.toggle('hidden', !_cpObligatorio);
+  document.getElementById('cp-x').classList.toggle('hidden', _cpObligatorio);
+  _msg('cp-err', '');
+  openModal('modal-cambiar-pass'); icons();
+  setTimeout(() => document.getElementById(actual ? 'cp-nueva' : 'cp-actual').focus(), 100);
+}
+async function cpGuardar() {
+  const actual = document.getElementById('cp-actual').value;
+  const nueva = document.getElementById('cp-nueva').value, nueva2 = document.getElementById('cp-nueva2').value;
+  if (nueva.length < 8) { _msg('cp-err', 'La contraseña nueva debe tener al menos 8 caracteres'); return; }
+  if (nueva !== nueva2) { _msg('cp-err', 'Las contraseñas no coinciden'); return; }
+  const b = document.getElementById('cp-btn'); b.disabled = true;
+  try {
+    const r = await _post('/auth/cambiar-password', { actual, nueva }, true);
+    S.token = r.access_token; _SES.setItem('token', S.token);
+    closeModal('modal-cambiar-pass');
+    toast('Contraseña cambiada. Las demás sesiones se cerraron.', 'success');
+    if (_cpObligatorio) launchApp();
+    if (r.sin_codigos_respaldo || _cpPedirCodigos) setTimeout(() => abrirCodigos(nueva), 800);
+  } catch (e) { _msg('cp-err', e.message); }
+  b.disabled = false;
+}
+
+async function abrirCorreoRec() {
+  if (S.user?.rol !== 'admin') return;
+  ['cr-app', 'cr-pass'].forEach(id => document.getElementById(id).value = '');
+  _msg('cr-err', '');
+  openModal('modal-correo-rec'); icons();
+  try {
+    const d = await apiFetch('/auth/recuperacion-correo');
+    document.getElementById('cr-email').value = d.email || '';
+    document.getElementById('cr-estado').textContent = d.smtp_listo && d.email
+      ? 'Activa: los códigos llegan a ' + d.email
+      : 'Sin configurar: si olvidas tu contraseña solo te servirán los códigos de respaldo';
+    document.getElementById('cr-app').placeholder = d.smtp_listo ? 'Guardada (escribe otra solo si cambió)' : '16 letras, ej. abcd efgh ijkl mnop';
+  } catch (e) { _msg('cr-err', e.message); }
+}
+async function crGuardar() {
+  const email = document.getElementById('cr-email').value.trim();
+  if (!email) { _msg('cr-err', 'Escribe tu correo'); return; }
+  const b = document.getElementById('cr-btn'); b.disabled = true; b.textContent = 'Enviando correo de prueba…';
+  try {
+    await _post('/auth/recuperacion-correo', {
+      email, smtp_user: email,
+      smtp_password: document.getElementById('cr-app').value,
+      password: document.getElementById('cr-pass').value,
+    }, true);
+    closeModal('modal-correo-rec');
+    toast('Listo: te enviamos un correo de prueba a ' + email, 'success');
+  } catch (e) { _msg('cr-err', e.message); }
+  b.disabled = false; b.textContent = 'Guardar y enviar correo de prueba';
+}
+
+let _codigos = [];
+async function abrirCodigos(passwordConocida) {
+  if (S.user?.rol !== 'admin') return;
+  _codigos = [];
+  document.getElementById('cod-pass').value = '';
+  document.getElementById('cod-ok').checked = false;
+  document.getElementById('cod-cerrar').disabled = true;
+  document.getElementById('cod-pedir').classList.remove('hidden');
+  document.getElementById('cod-lista-wrap').classList.add('hidden');
+  _msg('cod-err', '');
+  openModal('modal-codigos'); icons();
+  if (passwordConocida) { document.getElementById('cod-pass').value = passwordConocida; codGenerar(); }
+  else setTimeout(() => document.getElementById('cod-pass').focus(), 100);
+}
+async function codGenerar() {
+  try {
+    const r = await _post('/auth/codigos-respaldo', { password: document.getElementById('cod-pass').value }, true);
+    _codigos = r.codigos;
+    document.getElementById('cod-pass').value = '';
+    const lista = document.getElementById('cod-lista');
+    lista.replaceChildren(...r.codigos.map(c => {
+      const d = document.createElement('div');
+      d.className = 'px-3 py-2 rounded-xl text-center'; d.style.background = '#F1F5F9'; d.textContent = c;
+      return d;
+    }));
+    document.getElementById('cod-pedir').classList.add('hidden');
+    document.getElementById('cod-lista-wrap').classList.remove('hidden');
+    _msg('cod-err', '');
+  } catch (e) { _msg('cod-err', e.message); }
+}
+function _codTexto() {
+  return 'Códigos de respaldo — Punto de venta Farmacia Eben-Ezer\nUsuario: ' + (S.user?.username || '') +
+    '\nCada código sirve una sola vez. Úsalos en "¿Olvidaste tu contraseña?" > "Tengo un código de respaldo".\n\n' +
+    _codigos.join('\n') + '\n';
+}
+function codDescargar() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([_codTexto()], { type: 'text/plain' }));
+  a.download = 'codigos-respaldo-farmacia.txt'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function codCopiar() {
+  navigator.clipboard.writeText(_codTexto()).then(() => toast('Códigos copiados', 'success'));
 }
 
 function doLogout() {
@@ -7700,6 +8046,8 @@ function _applyAvatarPhoto(elemId, photo, initials, bg) {
 function openProfileModal() {
   const u = S.user;
   if (!u) return;
+  document.getElementById('btn-codigos-respaldo').classList.toggle('hidden', u.rol !== 'admin');
+  document.getElementById('btn-correo-rec').classList.toggle('hidden', u.rol !== 'admin');
   const displayName = u.nombre || u.username;
   const initials    = (displayName||'?')[0].toUpperCase();
 
@@ -12725,7 +13073,7 @@ async function saveEmployee() {
   if (_empEditId) {
     // Edit mode: password optional
     if (!nombre) { toast('El nombre es requerido','warning'); return; }
-    if (pass && pass.length < 4) { toast('Contraseña mínimo 4 caracteres','warning'); return; }
+    if (pass && pass.length < 8) { toast('Contraseña mínimo 8 caracteres','warning'); return; }
     const body={
       nombre, username: user,
       rol:     document.getElementById('em-rol').value,
@@ -12908,7 +13256,11 @@ function supAsignarTodos(id, nombre) {
 // ══════════════════════════════════════════════════════════
 // SETTINGS — API TOKEN MANAGER
 // ══════════════════════════════════════════════════════════
-const _SECRET = '171215';
+// Los tokens solo se ven al generarlos (ya no se guardan en el navegador ni hay clave fija).
+try {
+  const _h = JSON.parse(localStorage.getItem('api_tokens') || '[]');
+  if (_h.some(e => e.token)) localStorage.setItem('api_tokens', JSON.stringify(_h.map(({ token, ...r }) => r)));
+} catch (e) {}
 let _storedToken = '';
 let _revealTimer  = null;
 let _revealCode   = '';
@@ -12937,7 +13289,6 @@ async function generateToken() {
   history.unshift({
     nombre: data.nombre, expires_at: data.expires_at, dias: data.dias,
     created: new Date().toLocaleDateString('es-MX'),
-    token: data.token,   // persist actual token value
   });
   if (history.length > 20) history.pop();
   localStorage.setItem('api_tokens', JSON.stringify(history));
@@ -12954,6 +13305,12 @@ function copyToken() {
 
 // ── Secret code reveal ─────────────────────────────────────
 function promptRevealToken(idx=null) {
+  if (idx !== null) {
+    toast('Por seguridad un token solo se puede ver al generarlo. Genera uno nuevo si lo necesitas.', 'warning');
+    return;
+  }
+  if (!_storedToken) { toast('Genera un token primero', 'warning'); return; }
+  _revealIdx = null; _mostrarToken(); return;
   _revealIdx  = idx;
   _revealCode = '';
   updateRevealDots();
@@ -12998,19 +13355,9 @@ function updateRevealDots() {
   });
 }
 
-function checkRevealCode() {
-  if (_revealCode !== _SECRET) {
-    document.getElementById('reveal-err').textContent = 'Código incorrecto';
-    // Shake dots
-    const dots = document.getElementById('reveal-dots');
-    dots.style.animation = 'none';
-    requestAnimationFrame(()=>{ dots.style.animation = 'shake .3s ease'; });
-    setTimeout(()=>{ _revealCode=''; updateRevealDots(); }, 600);
-    return;
-  }
-  // Correct!
-  closeReveal();
+function checkRevealCode() { closeReveal(); _mostrarToken(); }
 
+function _mostrarToken() {
   // If revealing a history entry, load that token into the main view first
   if (_revealIdx !== null) {
     const history = JSON.parse(localStorage.getItem('api_tokens')||'[]');
@@ -13807,7 +14154,7 @@ function confirmPurgeVentas() {
 
 async function executePurgeHistorial() {
   const clave = document.getElementById('purge-clave').value;
-  if (!clave) { showPurgeError('Ingresa la clave de seguridad'); return; }
+  if (!clave) { showPurgeError('Escribe tu contraseña de administrador'); return; }
   const errEl = document.getElementById('purge-error');
   errEl.classList.add('hidden');
   try {

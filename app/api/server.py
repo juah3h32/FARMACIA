@@ -174,6 +174,21 @@ app.add_middleware(
 from app.database.sucursales import SucursalMiddleware
 app.add_middleware(SucursalMiddleware)
 
+# En las PCs, con "Catálogo público" el servidor escucha en la red (0.0.0.0). Desde otra
+# máquina solo se puede usar el catálogo y la app de clientes; el POS (login, respaldos,
+# configuración, ventas…) solo responde a la propia PC.
+_RUTAS_RED = ("/api/public/", "/api/app/auth/", "/api/app/pedidos/", "/api/health", "/uploads/")
+
+
+@app.middleware("http")
+async def _solo_esta_pc(request, call_next):
+    if not cfg._ON_VERCEL:
+        ip = request.client.host if request.client else ""
+        if ip not in ("127.0.0.1", "::1", "localhost") and not request.url.path.startswith(_RUTAS_RED):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Solo disponible en la computadora del punto de venta"}, status_code=403)
+    return await call_next(request)
+
 app.include_router(auth_routes.router,      prefix="/api/auth",       tags=["Auth"])
 app.include_router(products_routes.router,  prefix="/api/productos",  tags=["Productos"])
 app.include_router(sales_routes.router,     prefix="/api/ventas",     tags=["Ventas"])

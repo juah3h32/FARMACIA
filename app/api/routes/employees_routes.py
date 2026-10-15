@@ -54,8 +54,8 @@ def listar_empleados(incluir_inactivos: bool = False, payload: dict = Depends(ge
 @router.post("/")
 def crear_empleado(body: EmpleadoIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)
-    if not body.password or len(body.password) < 4:
-        raise HTTPException(status_code=400, detail="Contraseña requerida (mínimo 4 caracteres)")
+    if not body.password or len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Contraseña requerida (mínimo 8 caracteres)")
     db = get_db_session()
     try:
         try:
@@ -69,6 +69,7 @@ def crear_empleado(body: EmpleadoIn, bg: BackgroundTasks, payload: dict = Depend
             telefono=body.telefono,
             email=body.email,
             password_hash=hash_password(body.password),
+            debe_cambiar_password=True,    # la pone el admin: el empleado la cambia al entrar
         )
         db.add(u)
         db.commit()
@@ -102,11 +103,24 @@ def actualizar_empleado(uid: int, body: EmpleadoIn, bg: BackgroundTasks, payload
             u.rol = RolUsuario(body.rol)
         except ValueError:
             pass
+        cambio_password = False
         if body.password:
-            if len(body.password) < 4:
-                raise HTTPException(status_code=400, detail="Contraseña mínimo 4 caracteres")
+            if len(body.password) < 8:
+                raise HTTPException(status_code=400, detail="Contraseña mínimo 8 caracteres")
             u.password_hash = hash_password(body.password)
+            # contraseña temporal puesta por el admin: cierra las sesiones abiertas de ese
+            # empleado y le pide cambiarla al entrar (salvo que sea la cuenta del propio admin)
+            u.token_version = (u.token_version or 0) + 1
+            u.debe_cambiar_password = u.id != int(payload["sub"])
+            cambio_password = True
+        from datetime import datetime as _now
+        u.actualizado_en = _now.now()
         db.commit()
+        if cambio_password:
+            from app.database.models import AuditoriaLog
+            db.add(AuditoriaLog(usuario_id=int(payload["sub"]), accion="PASSWORD_ADMIN_RESET", tabla="usuarios",
+                                registro_id=u.id, detalles=f"El admin cambió la contraseña de {u.username}"))
+            db.commit()
         import app.config as _cfg
         if _cfg.TURSO_SYNC:
             from app.database.sync_service import sync_to_turso

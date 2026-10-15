@@ -147,6 +147,11 @@ def download_and_install(progress_callback=None, version_url=None, is_installer=
     url = version_url or st.get("url")
     if not url:
         return False, "No se encontró archivo de descarga"
+    # Solo se instalan archivos publicados en los releases de GitHub del POS: nunca una URL
+    # cualquiera (con una sesión de admin robada se podría instalar un programa ajeno).
+    permitidas = {st.get("url")} | {r.get("url") for r in st.get("releases", [])}
+    if url not in permitidas or not url.startswith("https://github.com/"):
+        return False, "Descarga no permitida: solo se instalan versiones publicadas del POS"
 
     if is_installer is None:
         is_installer = st.get("is_installer", False) or url.lower().endswith(".exe")
@@ -248,22 +253,22 @@ def _download_file(url: str, dest: Path, progress_callback=None, pct_max: float 
         return False, f"Error de descarga: {e}"
 
 
-def _verify_checksum(file_path: Path, checksums_url: str | None) -> tuple[bool, str]:
+def _verify_checksum(file_path: Path, checksums_url: str | None, nombre: str | None = None) -> tuple[bool, str]:
     """Verifica SHA256 del archivo descargado contra checksums.txt del release.
     Si el release no publicó checksums.txt (releases anteriores a este fix),
     deja pasar con solo un aviso — no hay nada contra qué comparar. Si el archivo
     SÍ existe pero el hash no coincide, bloquea la instalación (posible manipulación
     o descarga corrupta)."""
     if not checksums_url:
-        print("[Updater] checksums.txt no disponible en este release — se omite verificación")
-        return True, ""
+        return False, "Esta versión no trae checksums.txt: no se puede comprobar que el archivo sea auténtico"
     try:
         import hashlib
         import requests as _req
         resp = _req.get(checksums_url, timeout=15)
         resp.raise_for_status()
         expected_hash = None
-        target_name = file_path.name.lower()
+        # nombre con el que se publicó (el archivo se descarga con otro nombre local)
+        target_name = (nombre or file_path.name).lower()
         for line in resp.text.splitlines():
             line = line.strip()
             if not line:
@@ -273,8 +278,7 @@ def _verify_checksum(file_path: Path, checksums_url: str | None) -> tuple[bool, 
                 expected_hash = parts[0].strip().lower()
                 break
         if not expected_hash:
-            print(f"[Updater] {target_name} no aparece en checksums.txt — se omite verificación")
-            return True, ""
+            return False, f"{target_name} no aparece en checksums.txt: no se puede comprobar que sea auténtico"
 
         sha = hashlib.sha256()
         with open(file_path, "rb") as f:
@@ -289,11 +293,7 @@ def _verify_checksum(file_path: Path, checksums_url: str | None) -> tuple[bool, 
             )
         return True, ""
     except Exception as e:
-        # Si falla la verificación por red, no bloqueamos la actualización —
-        # el riesgo de un archivo manipulado ya es bajo (HTTPS + GitHub oficial),
-        # y no queremos dejar al usuario sin poder actualizar por un timeout.
-        print(f"[Updater] No se pudo verificar checksum ({e}) — se continúa sin verificar")
-        return True, ""
+        return False, f"No se pudo comprobar el archivo descargado ({e}). Intenta de nuevo."
 
 
 def _launch_shellexecute(exe: str, args: str) -> tuple[bool, str]:
@@ -325,7 +325,7 @@ def _install_via_exe(url: str, tmp: Path, progress_callback=None, checksums_url:
     if not ok:
         return False, err
 
-    ok, err = _verify_checksum(installer_path, checksums_url)
+    ok, err = _verify_checksum(installer_path, checksums_url, url.split("?")[0].rsplit("/", 1)[-1])
     if not ok:
         installer_path.unlink(missing_ok=True)
         return False, err
@@ -362,7 +362,7 @@ def _install_via_zip(url: str, tmp: Path, progress_callback=None, checksums_url:
     if not ok:
         return False, err
 
-    ok, err = _verify_checksum(zip_path, checksums_url)
+    ok, err = _verify_checksum(zip_path, checksums_url, url.split("?")[0].rsplit("/", 1)[-1])
     if not ok:
         zip_path.unlink(missing_ok=True)
         return False, err

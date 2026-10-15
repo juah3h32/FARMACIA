@@ -8,19 +8,8 @@ import app.config as cfg
 router = APIRouter()
 
 
-@router.get("/desktop-keys")
-def desktop_keys(payload: dict = Depends(get_current_api_user)):
-    """Devuelve las claves API al cliente de escritorio.
-    Solo accesible por admin. En Vercel, cfg las lee de env vars."""
-    if payload.get("rol") != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores")
-    return {
-        "OPENAI_API_KEY":        cfg.OPENAI_API_KEY,
-        "TURSO_AUTH_TOKEN":      cfg.TURSO_AUTH_TOKEN,
-        "CLOUDINARY_CLOUD_NAME": cfg.CLOUDINARY_CLOUD_NAME,
-        "CLOUDINARY_API_KEY":    cfg.CLOUDINARY_API_KEY,
-        "CLOUDINARY_API_SECRET": cfg.CLOUDINARY_API_SECRET,
-    }
+# (Se quitó /desktop-keys: devolvía en claro el token de Turso y las claves de OpenAI y
+# Cloudinary a cualquier sesión de admin, también desde la web. Nadie la usaba.)
 
 
 # ── Integraciones propias (Turso / OpenAI / Cloudinary) ──────────────────────
@@ -337,7 +326,7 @@ def get_alertas(payload: dict = Depends(get_current_api_user)):
         d = {r.clave: r.valor for r in rows}
         return {
             "numero":   d.get("whatsapp_numero", ""),
-            "token":    d.get("whatsapp_token", ""),
+            "token":    _mask(d.get("whatsapp_token", "")),
             "activas":  d.get("alertas_activas", "0") == "1",
         }
     finally:
@@ -363,6 +352,8 @@ def set_alertas(body: AlertasIn, payload: dict = Depends(get_current_api_user)):
             "whatsapp_token":  body.token.strip(),
             "alertas_activas": "1" if body.activas else "0",
         }
+        if not updates["whatsapp_token"] or updates["whatsapp_token"].startswith(_MASK_PREFIX):
+            updates.pop("whatsapp_token")          # no se tocó el campo: se conserva el actual
         for clave, valor in updates.items():
             row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
             if row:

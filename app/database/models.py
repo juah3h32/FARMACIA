@@ -50,6 +50,15 @@ class Usuario(Base):
     activo = Column(Boolean, default=True)
     foto_url = Column(String(500), nullable=True)
     creado_en = Column(DateTime, default=_dt.now)
+    # Sincronización entre PCs: gana el cambio más reciente (antes una PC con copia vieja
+    # regresaba la contraseña anterior).
+    actualizado_en = Column(DateTime, default=_dt.now, onupdate=_dt.now)
+    # Se incrementa al cambiar/restablecer la contraseña: cierra todas las sesiones abiertas.
+    token_version = Column(Integer, default=0)
+    # Hashes (JSON) de los códigos de respaldo del admin para recuperar la cuenta sin internet.
+    recovery_codes = Column(Text, nullable=True)
+    # Contraseña de fábrica o temporal puesta por el admin: hay que cambiarla al entrar.
+    debe_cambiar_password = Column(Boolean, default=False)
 
     ventas = relationship("Venta", back_populates="usuario")
     movimientos = relationship("MovimientoStock", back_populates="usuario")
@@ -479,6 +488,22 @@ class AuditoriaLog(Base):
     creado_en = Column(DateTime, default=_dt.now)
 
     usuario = relationship("Usuario", back_populates="auditoria")
+
+
+class PasswordReset(Base):
+    """Códigos de "¿Olvidaste tu contraseña?" enviados por correo. Solo viven en la PC (o
+    servidor) que los emitió: el código se escribe ahí mismo, no se sincroniza."""
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, nullable=False, index=True)
+    code_hash = Column(String(255), nullable=False)
+    canal = Column(String(20), default="email")
+    expira_en = Column(DateTime, nullable=False)
+    intentos = Column(Integer, default=0)
+    usado_en = Column(DateTime, nullable=True)
+    ip = Column(String(64))
+    creado_en = Column(DateTime, default=_dt.now)
 
 
 class Configuracion(Base):

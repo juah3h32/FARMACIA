@@ -21,6 +21,20 @@ def _require_admin(payload: dict):
         raise HTTPException(status_code=403, detail="Solo administradores")
 
 
+def _verificar_password_admin(payload: dict, clave: str):
+    """Acciones que borran datos: se confirman con la contraseña del admin que las pide."""
+    from app.database.connection import get_db_session
+    from app.database.models import Usuario
+    from app.auth.auth_service import verify_password
+    db = get_db_session()
+    try:
+        u = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
+        if not u or not verify_password(clave or "", u.password_hash):
+            raise HTTPException(status_code=403, detail="Contraseña incorrecta")
+    finally:
+        db.close()
+
+
 class TokenRequest(BaseModel):
     nombre: str = "Mi Token API"
     dias: int = 365
@@ -38,6 +52,7 @@ def generate_api_token(body: TokenRequest, payload: dict = Depends(get_current_a
         rol=payload.get("rol", "admin"),
         days=body.dias,
         token_name=body.nombre,
+        token_version=int(payload.get("tv", 0)),   # se revoca al cambiar la contraseña
     )
     expires_at = (datetime.now() + timedelta(days=body.dias)).strftime("%Y-%m-%d")
     return {
@@ -139,15 +154,7 @@ def purgar_historial(body: PurgarHistorialIn, payload: dict = Depends(get_curren
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
     from app.auth.auth_service import verify_password
-    db = get_db_session()
-    try:
-        cfg_row = db.query(Configuracion).filter(
-            Configuracion.clave == "purge_password_hash"
-        ).first()
-        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
-            raise HTTPException(status_code=403, detail="Clave incorrecta")
-    finally:
-        db.close()
+    _verificar_password_admin(payload, body.clave)
     from app.database.sync_service import purgar_ventas_historial_cierres
     purgar_ventas_historial_cierres()
     return {"ok": True}
@@ -159,15 +166,7 @@ def purgar_datos(body: PurgarHistorialIn, payload: dict = Depends(get_current_ap
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
     from app.auth.auth_service import verify_password
-    db = get_db_session()
-    try:
-        cfg_row = db.query(Configuracion).filter(
-            Configuracion.clave == "purge_password_hash"
-        ).first()
-        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
-            raise HTTPException(status_code=403, detail="Clave incorrecta")
-    finally:
-        db.close()
+    _verificar_password_admin(payload, body.clave)
     from app.database.sync_service import purgar_todos_los_datos
     purgar_todos_los_datos()
     return {"ok": True}
@@ -179,15 +178,7 @@ def factory_reset_endpoint(body: PurgarHistorialIn, payload: dict = Depends(get_
     from app.database.connection import get_db_session
     from app.database.models import Configuracion
     from app.auth.auth_service import verify_password
-    db = get_db_session()
-    try:
-        cfg_row = db.query(Configuracion).filter(
-            Configuracion.clave == "purge_password_hash"
-        ).first()
-        if not cfg_row or not verify_password(body.clave, cfg_row.valor):
-            raise HTTPException(status_code=403, detail="Clave incorrecta")
-    finally:
-        db.close()
+    _verificar_password_admin(payload, body.clave)
     from app.database.sync_service import factory_reset
     factory_reset()
     return {"ok": True}
