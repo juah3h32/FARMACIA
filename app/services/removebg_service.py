@@ -53,8 +53,14 @@ def _silueta_sobre_original(raw: bytes, recorte: bytes) -> bytes:
         return fondo
 
     try:
-        orig = ImageOps.exif_transpose(Image.open(io.BytesIO(raw))).convert("RGB")
-        if abs(orig.width / orig.height - cut.width / cut.height) > 0.02 or orig.width < cut.width:
+        abierta = Image.open(io.BytesIO(raw))
+        # remove.bg puede regresar la foto girada o sin girar según el EXIF: se usa la que cuadre
+        # (tolerancia relativa — en la vista previa chica el redondeo mueve un poco la proporción)
+        prop = cut.width / cut.height
+        orig = next((im.convert("RGB") for im in (ImageOps.exif_transpose(abierta), abierta)
+                     if abs(im.width / im.height - prop) / prop <= 0.03 and im.width >= cut.width), None)
+        if orig is None:
+            print("[remove.bg] la silueta no cuadra con la foto original; se usa la vista previa")
             raise ValueError("proporciones distintas")
         mask = cut.split()[3].resize(orig.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(0.6))
         res = blanco(orig, mask)

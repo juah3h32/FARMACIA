@@ -87,15 +87,16 @@ def estado(payload: dict = Depends(get_current_api_user)):
         p = prods.get(it["producto_id"])
         if not p:
             continue                       # producto eliminado del inventario
-        c = cache.get(str(p.id))
+        c = s.texto_ia_guardado(p, cache)
         origen = "ia" if c else "inventario"          # sin IA: descripción armada con los datos del inventario
         c = c or s.texto_inventario(p)
         items.append(dict(it, nombre=p.nombre, precio=p.precio_venta, imagen_url=p.imagen_url or "",
                           tiene_foto=bool(p.imagen_url), activo=bool(p.activo), foto_chica=s.foto_chica(p), sin_stock=not s.hay_existencia(p),
                           ia_desc=c.get("desc", ""), ia_bens=c.get("bens", ["", "", ""]), ia_origen=origen,
+                          ia_verificado=bool(c.get("verificado")), ia_fuente=c.get("fuente", ""),
                           precio_tachado=p.precio_tachado, precio_pieza=p.precio_pieza if p.venta_fraccionada else None))
     return {"config": proy["config"], "items": items, "estilos": s.ESTILOS,
-            "ia_lista": bool(getattr(cfg, "ANTHROPIC_API_KEY", "")), "tarea": s.estado_tarea(),
+            "ia_lista": s.ia.configurada(), "tarea": s.estado_tarea(),
             "drive_sugerido": s.drive_sugerido(), "drive_destino": s.carpeta_drive(proy["config"]),
             "cambios_precio": cambios}
 
@@ -220,10 +221,11 @@ def descripcion_ia(producto_id: int, forzar: bool = False, payload: dict = Depen
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     from app.services.video_promo.ia import IAError
     try:
-        r, nuevo = s.texto_ia(p, getattr(cfg, "ANTHROPIC_API_KEY", ""), forzar)
+        r, nuevo = s.texto_ia(p, forzar)
     except IAError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"desc": r["desc"], "bens": r["bens"], "uso_ia": nuevo}
+    return {"desc": r["desc"], "bens": r["bens"], "uso_ia": nuevo,
+            "verificado": bool(r.get("verificado")), "fuente": r.get("fuente", "")}
 
 
 # ── vista previa ──────────────────────────────────────────────────────────────
@@ -407,7 +409,7 @@ def abrir(body: AbrirIn, payload: dict = Depends(get_current_api_user)):
     return {"ok": True}
 
 
-# ── clave de Claude (se guarda igual que las demás integraciones: archivo en DATA_DIR) ──
+# ── clave de la IA (OpenAI sk-…, o Claude sk-ant-…): archivo en DATA_DIR, igual que Integraciones ──
 class ClaveIn(BaseModel):
     api_key: str
 
@@ -416,10 +418,14 @@ class ClaveIn(BaseModel):
 def guardar_clave(body: ClaveIn, payload: dict = Depends(get_current_api_user)):
     _admin(payload)
     k = body.api_key.strip()
-    if not k.startswith("sk-ant-"):
-        raise HTTPException(status_code=400, detail="La clave de Claude empieza con sk-ant-…")
-    (cfg.DATA_DIR / "anthropic.key").write_text(k, encoding="utf-8")
-    cfg.ANTHROPIC_API_KEY = k
+    if k.startswith("sk-ant-"):
+        (cfg.DATA_DIR / "anthropic.key").write_text(k, encoding="utf-8")
+        cfg.ANTHROPIC_API_KEY = k
+    elif k.startswith("sk-"):
+        (cfg.DATA_DIR / "openai.key").write_text(k, encoding="utf-8")
+        cfg.OPENAI_API_KEY = k
+    else:
+        raise HTTPException(status_code=400, detail="La clave de OpenAI empieza con sk-…")
     return {"ok": True}
 
 

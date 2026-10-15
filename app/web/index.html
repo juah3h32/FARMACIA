@@ -1001,6 +1001,44 @@
 </div>
 
 <script>
+// Campos con decimales (precios, montos): siempre con PUNTO, sin importar la región de Windows.
+// Un <input type="number"> toma el separador decimal de la configuración regional de la PC
+// (p. ej. "Español (España)" muestra 40,5 y no deja escribir el punto). Por eso los campos con
+// step decimal se vuelven de texto con teclado decimal, y la coma que se escriba se cambia a punto.
+(function () {
+  function prepara(el) {
+    if (el.type !== 'number' || !/\./.test(el.getAttribute('step') || '')) return;
+    el.type = 'text';
+    el.inputMode = 'decimal';
+    el.autocomplete = 'off';
+    el.dataset.decimal = '1';
+  }
+  function revisa(raiz) {
+    if (raiz.nodeType !== 1) return;
+    if (raiz.matches('input[type="number"]')) prepara(raiz);
+    raiz.querySelectorAll('input[type="number"]').forEach(prepara);
+  }
+  document.addEventListener('input', function (e) {
+    const el = e.target;
+    if (!el.dataset || el.dataset.decimal !== '1') return;
+    const v = el.value;
+    let limpio = v.replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+    const i = limpio.indexOf('.');
+    if (i >= 0) limpio = limpio.slice(0, i + 1) + limpio.slice(i + 1).replace(/\./g, '');
+    if (limpio !== v) {
+      const pos = Math.max(0, (el.selectionStart || 0) - (v.length - limpio.length));
+      el.value = limpio;
+      try { el.setSelectionRange(pos, pos); } catch (_) {}
+    }
+  }, true);   // captura: se limpia antes que el oninput propio del campo
+  document.addEventListener('DOMContentLoaded', function () {
+    revisa(document.body);
+    new MutationObserver(function (ms) {
+      ms.forEach(function (m) { m.addedNodes.forEach(revisa); });
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+})();
+
   tailwind.config = {
     theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'] } } }
   }
@@ -1686,7 +1724,7 @@
                   
                   <div class="relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">$</span>
-                    <input id="cart-pagado" type="number" placeholder="Monto recibido *"
+                    <input id="cart-pagado" type="number" step="0.01" min="0" placeholder="Monto recibido *"
                            class="w-full h-10 pl-6 pr-3 rounded-xl text-sm font-bold border" style="border-color:#E2E8F0;background:#F8FAFF"
                            oninput="updateCambio()">
                   </div>
@@ -3817,8 +3855,8 @@
                 <option value="tipo">Por tipo de medicamento</option>
               </select>
               <div class="flex items-center gap-1 text-xs" style="color:#64748B">
-                $<input id="mkv-cat-min" type="number" min="0" class="mkv-inp" style="width:80px" placeholder="mín" oninput="mkvCatPintar()">
-                –<input id="mkv-cat-max" type="number" min="0" class="mkv-inp" style="width:80px" placeholder="máx" oninput="mkvCatPintar()">
+                $<input id="mkv-cat-min" type="number" step="0.01" min="0" class="mkv-inp" style="width:80px" placeholder="mín" oninput="mkvCatPintar()">
+                –<input id="mkv-cat-max" type="number" step="0.01" min="0" class="mkv-inp" style="width:80px" placeholder="máx" oninput="mkvCatPintar()">
               </div>
               <label class="flex items-center gap-2 text-xs cursor-pointer select-none" style="color:#334155">
                 <input id="mkv-cat-sinfoto" type="checkbox" class="mkv-switch" onchange="mkvCatPintar()"> Mostrar también sin foto
@@ -3970,7 +4008,7 @@
                         <p class="text-[11px] font-bold uppercase tracking-wider" style="color:#AFC0E8" title="Foto, nombre y precio se cambian en Inventario">Precio</p>
                         <p class="font-extrabold leading-none text-white mt-1" style="font-size:42px"><span style="font-size:24px;vertical-align:12px">$</span><span id="mkv-precio-grande">0</span></p>
                         <p id="mkv-ia-linea" class="text-[11px] mt-1 flex items-center gap-1" style="color:#DDD6FE"></p>
-                        <p id="mkv-foto-aviso" class="hidden text-[11px] mt-1.5 font-bold rounded-lg px-2 py-1" style="background:#FEF3C7;color:#92400E">Foto pequeña: se verá borrosa en la tele. Sube una foto más grande en Inventario.</p>
+                        <p id="mkv-foto-aviso" class="hidden text-[11px] mt-1.5 font-bold rounded-lg px-2 py-1" style="background:#FEF3C7;color:#92400E">Foto con poco detalle: se verá borrosa en la tele. Toma una foto nueva más de cerca y súbela en Inventario.</p>
                       </div>
                       <div class="flex-shrink-0">
                         <p class="text-[11px] font-bold mb-1" style="color:#AFC0E8">Precio por</p>
@@ -4169,15 +4207,15 @@
                   <section class="mkv-card">
                     <div class="mkv-card-h">
                       <span class="mkv-ico" style="background:#F3EEFE;color:#7C3AED"><i data-lucide="sparkles" style="width:18px;height:18px"></i></span>
-                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Inteligencia artificial (Claude) <span id="mkv-ia-badge" class="text-xs ml-1"></span></p>
-                        <p class="mkv-card-s">Escribe la descripción y los beneficios de cada producto nuevo, una sola vez. Generar videos nunca gasta IA.</p></div>
+                      <div class="flex-1 min-w-0"><p class="mkv-card-t">Inteligencia artificial (OpenAI) <span id="mkv-ia-badge" class="text-xs ml-1"></span></p>
+                        <p class="mkv-card-s">Busca cada producto en internet y escribe su descripción y beneficios, una sola vez. Generar videos nunca gasta IA.</p></div>
                     </div>
                     <div class="flex gap-2 items-center">
-                      <input id="mkv-clave" type="password" class="mkv-inp flex-1" placeholder="Clave sk-ant-…">
+                      <input id="mkv-clave" type="password" class="mkv-inp flex-1" placeholder="Clave de OpenAI sk-…">
                       <button onclick="mkvGuardarClave()" class="mkv-btn2" style="background:#7C3AED;color:#fff">Guardar clave</button>
                     </div>
                     <div class="flex items-center gap-2">
-                      <p class="mkv-opt-d flex-1">Consíguela en console.anthropic.com → API Keys. Sin clave, la descripción se arma con los datos de tu inventario.</p>
+                      <p class="mkv-opt-d flex-1">Es la misma clave de OpenAI de Configuración &gt; Integraciones (platform.openai.com → API keys). Sin clave, la descripción se arma con los datos de tu inventario.</p>
                       <button onclick="mkvIATodos()" class="mkv-btn2" style="background:#F3EEFE;color:#6D28D9"><i data-lucide="wand-sparkles" style="width:14px;height:14px"></i> Llenar todos con IA</button>
                     </div>
                   </section>
@@ -5665,8 +5703,8 @@
             <div><label class="lbl">Categoría</label>
               <select id="pm-cat" class="inp"><option value="">Sin categoría</option></select>
             </div>
-            <div><label class="lbl">Precio compra</label><input id="pm-pcompra" type="number" class="inp" placeholder="0.00"></div>
-            <div><label class="lbl">Precio venta *</label><input id="pm-pventa" type="number" class="inp" placeholder="0.00"></div>
+            <div><label class="lbl">Precio compra</label><input id="pm-pcompra" type="number" step="0.01" min="0" class="inp" placeholder="0.00"></div>
+            <div><label class="lbl">Precio venta *</label><input id="pm-pventa" type="number" step="0.01" min="0" class="inp" placeholder="0.00"></div>
           </div>
 
           <!-- Presentación | Concentración | Contenido -->
@@ -9483,6 +9521,8 @@ async function saveProduct() {
   if (!nombre) { toast('El nombre es requerido','warning'); return; }
 
   const isEdit = !!S.prodEditId;
+  const pventa = parseFloat(document.getElementById('pm-pventa').value);
+  if (!(pventa > 0)) { toast('Escribe el precio de venta (ej. 40.50)','warning'); document.getElementById('pm-pventa').focus(); return; }
 
   // Validate lote fields on create
   if (!isEdit) {
@@ -9570,8 +9610,43 @@ async function saveProduct() {
   loadInventory();
 }
 
+// Subida inicial a la nube al guardar URL + token de Turso: avisa el avance hasta que termina.
+async function _seguirSubidaNube() {
+  toast('Conectando con la nube: subiendo todo lo de esta PC…', 'info');
+  let ultimo = '';
+  for (let i = 0; i < 600; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    let st;
+    try { st = await apiFetch('/config/integraciones/estado-nube'); } catch (e) { continue; }
+    if (st.paso && st.paso !== ultimo && st.corriendo) { ultimo = st.paso; toast(st.paso, 'info'); }
+    if (!st.corriendo) {
+      if (st.error) toast('No se pudo subir a la nube: ' + st.error, 'error');
+      else if (st.listo) toast('Listo: tu inventario ya está en la nube y se comparte con todas las computadoras', 'success');
+      return;
+    }
+  }
+}
+
 // ── Product image helpers ─────────────────────────────────────────────────
 let _removebgAuto = false; // cache de Config > Integraciones > remove.bg — ver launchApp() y loadIntegracionesConfig()
+let _removebgListo = false; // hay API key de remove.bg: si la foto trae fondo (no blanco) se quita sola
+
+// true si el borde de la foto es blanco (el producto ya está sobre fondo blanco). Una foto sobre
+// mesa, mano o fondo de color da false — mismo criterio que fondo_blanco() en el servidor.
+function _pmFondoBlanco(img) {
+  try {
+    const k = Math.min(1, 300 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(4, Math.round(img.naturalWidth * k)), h = Math.max(4, Math.round(img.naturalHeight * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let n = 0, ok = 0;
+    const ver = (x, y) => { const i = (y * w + x) * 4; n++; if (Math.min(d[i], d[i+1], d[i+2]) >= 232) ok++; };
+    for (let x = 0; x < w; x += 3) { ver(x, 0); ver(x, 1); ver(x, h - 2); ver(x, h - 1); }
+    for (let y = 0; y < h; y += 3) { ver(0, y); ver(1, y); ver(w - 2, y); ver(w - 1, y); }
+    return ok >= n * 0.9;
+  } catch (e) { return true; }
+}
 let _pmMejoraPendiente = null;       // data URL del resultado de IA sin aceptar todavía
 let _pmPreviewAntesDeMejora = null;  // src del preview antes de mostrar el resultado de IA, para poder descartar
 let _pmImageFile = null;
@@ -9612,7 +9687,12 @@ function pmHandleImageSelect(e) {
     document.getElementById('pm-btn-mejorar').classList.remove('hidden');
     // "Quitar fondo automáticamente" activo en Config > Integraciones > remove.bg
     // — se dispara solo, sin que el usuario tenga que apretar el botón cada vez.
+    // Sin esa opción, igual se quita solo cuando hace falta: la foto trae fondo (no blanco).
     if (_removebgAuto) pmQuitarFondo();
+    else if (_removebgListo) {
+      const revisar = () => { if (_pmImageFile === file && !_pmFondoBlanco(img)) pmQuitarFondo(); };
+      if (img.complete && img.naturalWidth) revisar(); else img.addEventListener('load', revisar, { once: true });
+    }
   };
   reader.readAsDataURL(file);
   const st = document.getElementById('pm-img-status');
@@ -14584,7 +14664,7 @@ async function mktDescargarManual() {
 
 
 // ── Marketing → Video promocional ─────────────────────────────────────────────
-// Productos del inventario + descripción corta de la IA (Claude, una vez por producto)
+// Productos del inventario + descripción corta de la IA (OpenAI con búsqueda web, una vez por producto)
 // → video 1920x1080 para la pantalla de la farmacia. Generar el video no gasta IA.
 const MKV_ESTILOS = [
   { k:'destacado',  l:'Destacado' },
@@ -14654,7 +14734,7 @@ async function loadVideoPromo() {
 
 function _mkvSinTextoIA(it) { return !it.desc && (!it.ia_desc || it.ia_origen === 'inventario'); }
 function mkvIATodos() {
-  if (!_mkv.iaLista) { toast('Primero guarda tu clave de Claude', 'warning'); return; }
+  if (!_mkv.iaLista) { toast('Primero guarda tu clave de OpenAI', 'warning'); return; }
   const pend = _mkv.items.filter(_mkvSinTextoIA);
   if (!pend.length) { toast('Todos los productos ya tienen descripción de la IA', 'info'); return; }
   pend.forEach(it => mkvEncolarIA(it.producto_id));
@@ -14683,7 +14763,7 @@ function mkvRender() {
       else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">Sin foto</span>';
       else if (it.sin_stock) det = `<span style="color:#FCA5A5">${_mkvPrecio(it.precio)} · Sin existencia: no sale</span>`;
       else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>` +
-        (it.foto_chica ? ' <span style="color:#FCD34D" title="La foto es pequeña: se verá borrosa en la tele. Sube una más grande en Inventario.">· Foto pequeña</span>' : '');
+        (it.foto_chica ? ' <span style="color:#FCD34D" title="La foto tiene poco detalle: se verá borrosa en la tele. Toma una foto nueva más de cerca.">· Foto pequeña</span>' : '');
       const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" style="mix-blend-mode:multiply;${it.enabled ? '' : 'filter:grayscale(1);opacity:.55'}" onerror="this.style.display='none'">` : '';
       return `<div onclick="mkvSel(${i})" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}${it.enabled ? '' : ' off'}">
         <input type="checkbox" ${it.enabled && it.tiene_foto ? 'checked' : ''} ${it.tiene_foto ? '' : 'disabled title="Sin foto"'} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvToggle(${i},this.checked)">
@@ -14849,8 +14929,10 @@ function mkvEditor() {
   const th2 = document.getElementById('mkv-thumb2');
   th2.style.display = it.imagen_url ? '' : 'none';
   if (it.imagen_url && th2.getAttribute('src') !== it.imagen_url) th2.src = it.imagen_url;
-  document.getElementById('mkv-ia-linea').textContent = _mkvIAcola.includes(it.producto_id) ? 'La IA está escribiendo la descripción…'
-    : (it.desc || it.ia_origen === 'ia' || (it.ia_desc && it.ia_origen !== 'inventario')) ? 'Descripción y beneficios: los escribe la IA'
+  document.getElementById('mkv-ia-linea').textContent = _mkvIAcola.includes(it.producto_id) ? 'La IA está buscando el producto en internet…'
+    : it.desc ? 'Descripción y beneficios: escritos por ti'
+    : (it.ia_origen === 'ia' && it.ia_verificado) ? `Verificado en internet: ${it.ia_fuente}`
+    : it.ia_origen === 'ia' ? 'La IA no encontró el producto exacto en internet: revisa el texto'
     : 'Descripción y beneficios: tomados de tu inventario';
   if (it.imagen_url && th.getAttribute('src') !== it.imagen_url) th.src = it.imagen_url;
   document.getElementById('mkv-inv-info').innerHTML = `<b style="color:#243366;font-size:13px">${_mkvEsc(it.nombre)}</b><br>Precio en inventario: ${_mkvPrecio(it.precio)}` +
@@ -14858,11 +14940,12 @@ function mkvEditor() {
     (it.tiene_foto ? '' : '<br><span style="color:#DC2626;font-weight:700">Sin foto: agrégala en Inventario</span>');
   const enCola = _mkvIAcola.includes(it.producto_id);
   const estIA = document.getElementById('mkv-ia-estado');
-  const [txt, bg, fg, tip] = enCola ? ['La IA está escribiendo…', '#F5F3FF', '#7C3AED', '']
+  const [txt, bg, fg, tip] = enCola ? ['La IA está buscando el producto…', '#F5F3FF', '#7C3AED', '']
     : it.desc ? ['Escrita por ti', '#ECFDF5', '#16A34A', '']
     : it.ia_origen === 'inventario' ? ['Del inventario', '#FFF7ED', '#C2410C',
-        _mkv.iaLista ? 'Usa "Llenar con IA" para que la IA la escriba' : 'Agrega tu clave de Claude en Ajustes para que la IA la escriba']
-    : it.ia_desc ? ['Escrita por la IA', '#F5F3FF', '#7C3AED', ''] : ['', '', '', ''];
+        _mkv.iaLista ? 'Usa "Llenar con IA" para que la IA la escriba' : 'Agrega tu clave de OpenAI en Ajustes para que la IA la escriba']
+    : (it.ia_desc && it.ia_verificado) ? ['Verificada', '#ECFDF5', '#16A34A', 'La IA encontró este producto en ' + it.ia_fuente]
+    : it.ia_desc ? ['Sin verificar', '#FEF3C7', '#92400E', 'La IA no encontró el producto exacto en internet: revisa el texto'] : ['', '', '', ''];
   estIA.textContent = txt; estIA.style.background = bg; estIA.style.color = fg; estIA.title = tip;
   document.getElementById('mkv-desc').value = it.desc || it.ia_desc || '';
   mkvContador();
@@ -15161,7 +15244,7 @@ async function _mkvSiguienteIA() {
   const id = _mkvIAcola[0];
   try {
     const r = await apiFetch(`/marketing/video/ia/${id}`, { method:'POST' });
-    _mkv.items.filter(i => i.producto_id === id).forEach(i => { i.ia_desc = r.desc; i.ia_bens = r.bens; i.ia_origen = 'ia'; });
+    _mkv.items.filter(i => i.producto_id === id).forEach(i => { i.ia_desc = r.desc; i.ia_bens = r.bens; i.ia_origen = 'ia'; i.ia_verificado = r.verificado; i.ia_fuente = r.fuente; });
   } catch (e) {
     toast(e.message, 'error'); _mkvIAcola = [];
   }
@@ -15171,12 +15254,14 @@ async function _mkvSiguienteIA() {
 }
 async function mkvIA(forzar) {
   const it = _mkv.items[_mkv.sel]; if (!it) return;
-  if (!_mkv.iaLista) { toast('Agrega tu clave de Claude en la pestaña Ajustes', 'warning'); mkvTab('ajustes'); return; }
+  if (!_mkv.iaLista) { toast('Agrega tu clave de OpenAI en la pestaña Ajustes', 'warning'); mkvTab('ajustes'); return; }
   const btn = document.getElementById('mkv-btn-ia'); btn.disabled = true;
   try {
     const r = await apiFetch(`/marketing/video/ia/${it.producto_id}?forzar=${forzar ? 'true' : 'false'}`, { method:'POST' });
-    it.ia_desc = r.desc; it.ia_bens = r.bens; it.ia_origen = 'ia'; it.desc = ''; it.bens = ['', '', ''];
-    mkvGuardar(); mkvEditor(); toast('Descripción lista', 'success');
+    it.ia_desc = r.desc; it.ia_bens = r.bens; it.ia_origen = 'ia'; it.ia_verificado = r.verificado; it.ia_fuente = r.fuente;
+    it.desc = ''; it.bens = ['', '', ''];
+    mkvGuardar(); mkvEditor();
+    toast(r.verificado ? `Descripción lista (verificada en ${r.fuente})` : 'No se encontró el producto exacto en internet: revisa la descripción', r.verificado ? 'success' : 'warning');
   } catch (e) { toast(e.message, 'error'); }
   btn.disabled = false;
 }
@@ -15283,7 +15368,7 @@ async function mkvGuardarClave() {
   try {
     await apiFetch('/marketing/video/clave', { method:'PUT', body: JSON.stringify({ api_key: k }) });
     document.getElementById('mkv-clave').value = '';
-    _mkv.iaLista = true; mkvBadgeIA(); toast('Clave de Claude guardada', 'success');
+    _mkv.iaLista = true; mkvBadgeIA(); toast('Clave guardada', 'success');
     _mkv.items.forEach(it => { if (_mkvSinTextoIA(it)) mkvEncolarIA(it.producto_id); });
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -18408,6 +18493,7 @@ async function loadIntegracionesConfig() {
     _setIntegMode('cloud',  d.on_vercel, cloudReady);
     _setIntegMode('removebg', d.on_vercel, removebgReady);
     document.getElementById('int-removebg-auto').checked = !!d.removebg_auto;
+    _removebgListo = removebgReady;
     _removebgAuto = !!d.removebg_auto; // cache global — lo usa pmHandleImageSelect sin tener que volver a pedirlo
     icons();
   } catch(e) {}
@@ -18427,6 +18513,7 @@ async function guardarIntegraciones() {
   try {
     const res = await apiFetch('/config/integraciones', { method:'POST', body: JSON.stringify(body) });
     toast(res.restart_required ? 'Guardado — reinicia el programa para aplicar Turso' : 'Integraciones guardadas', 'success');
+    if (res.subiendo_nube) _seguirSubidaNube();
     loadIntegracionesConfig();
     loadIntegracionesStatus(); // verifica la conexión real ahora mismo con la clave nueva
   } catch(e) { toast(e.message, 'error'); }

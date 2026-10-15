@@ -475,7 +475,7 @@ def _sucursal_coincide() -> bool:
     return True
 
 
-def sync_to_turso(only_incremental: bool = False) -> None:
+def sync_to_turso(only_incremental: bool = False, sin_borrar: bool = False) -> None:
     """
     Push local SQLite data to Turso via batched HTTP pipeline.
     TS_INCREMENTAL tables (productos, ventas, cfdi_*): only rows changed since the
@@ -485,6 +485,9 @@ def sync_to_turso(only_incremental: bool = False) -> None:
     id > last watermark.
     Remaining FULL_SYNC tables (small/reference-ish): upsert all rows + delete
     from Turso any IDs missing in local.
+
+    sin_borrar=True: nunca borra de la nube filas que esta PC no tiene (se usa al conectar una
+    PC por primera vez: se suma lo local a lo que ya hubiera en la nube, no se reemplaza).
 
     only_incremental=True skips the FULL_SYNC branch entirely (no `SELECT *`
     over tables like lotes/cortes_caja/compras/citas/gastos/historial_precios).
@@ -604,7 +607,7 @@ def sync_to_turso(only_incremental: bool = False) -> None:
                             # usuarios, etc.). For distributed tables (productos, ventas,
                             # lotes…) NEVER delete by absence — another PC may have rows
                             # this PC hasn't pulled yet.
-                            if table not in _NO_TURSO_DELETE:
+                            if table not in _NO_TURSO_DELETE and not sin_borrar:
                                 ids_str = ", ".join(str(r["id"]) for r in rows)
                                 stmts.append({
                                     "sql": f"DELETE FROM {table} WHERE id NOT IN ({ids_str})",
@@ -1350,7 +1353,104 @@ def start_image_watch(interval: int = 12) -> threading.Thread:
     return t
 
 
+def start_cloudinary_watch(interval: int = 90) -> threading.Thread:
+    """Para una PC que trabaja sin Turso (modo local/offline) pero con Cloudinary: igual toma de
+    Cloudinary las fotos cambiadas (Cloudinary es la copia maestra), sube las que solo están aquí
+    y baja las nuevas. Sin esto, en modo local las fotos se quedaban para siempre en la versión
+    vieja (p. ej. las chicas de antes del ajuste a 1200)."""
+    def _loop():
+        time.sleep(20)
+        while True:
+            _sync_product_images_bg()
+            time.sleep(interval)
+
+    t = threading.Thread(target=_loop, daemon=True, name="CloudWatch")
+    t.start()
+    return t
+
+
 _bg_thread: threading.Thread | None = None
+_img_watch_thread: threading.Thread | None = None
+
+# Estado de la subida al conectar (para mostrar avance en Configuración)
+estado_conexion: dict = {"corriendo": False, "paso": "", "error": "", "listo": False}
+
+
+def conectar_y_subir_todo(progreso=None) -> None:
+    """Al conectar esta PC a su BD de Turso: prepara las tablas en la nube, sube TODO lo que hay
+    en local (inventario, fotos, ventas, caja, clientes, usuarios…) sin borrar nada de lo que ya
+    hubiera allá, baja lo de las demás PCs y deja la sincronización corriendo, sin reiniciar."""
+    global _sucursal_ok, _img_watch_thread
+
+    def paso(txt):
+        estado_conexion["paso"] = txt
+        print(f"[Sync] {txt}")
+        if progreso:
+            try: progreso(txt)
+            except Exception: pass
+
+    estado_conexion.update(corriendo=True, error="", listo=False)
+    try:
+        from app.services import turso_cuenta
+        paso("Preparando las tablas en la nube…")
+        turso_cuenta._con_reintentos(lambda: turso_cuenta.pipeline(
+            cfg.TURSO_DATABASE_URL, cfg.TURSO_AUTH_TOKEN, turso_cuenta.esquema_local_ddl()))
+        with _lock:
+            _watermarks.clear()
+            _ts_watermarks.clear()
+            _sucursal_ok = False
+            _rellenar_actualizado_en()
+        paso("Subiendo inventario, ventas, caja y clientes de esta PC…")
+        sync_to_turso(sin_borrar=True)
+        if not _sucursal_ok:
+            raise RuntimeError("La base de la nube es de otra sucursal o no se pudo leer; no se subió nada")
+        paso("Bajando lo que hay en la nube de otras computadoras…")
+        sync_from_turso()
+        asegurar_background_sync()
+        if _img_watch_thread is None or not _img_watch_thread.is_alive():
+            _img_watch_thread = start_image_watch(interval=12)
+        paso("Listo: esta PC ya está vinculada a la nube")
+        estado_conexion["listo"] = True
+    except Exception as e:
+        estado_conexion["error"] = str(e)
+        print(f"[Sync] No se pudo conectar y subir: {e}")
+        raise
+    finally:
+        estado_conexion["corriendo"] = False
+
+
+def _rellenar_actualizado_en() -> None:
+    """Filas viejas sin actualizado_en (p. ej. ventas de antes de que existiera la columna) nunca
+    se subían: el push incremental solo manda actualizado_en > watermark. Se les pone su fecha
+    de creación (o la de ahora) para que suban con todo lo demás."""
+    lconn = _local_conn()
+    try:
+        for table in _TS_INCREMENTAL | _LWW_CAJA:
+            try:
+                cols = {r[1] for r in lconn.execute(f"PRAGMA table_info({table})")}
+            except Exception:
+                continue
+            if "actualizado_en" not in cols:
+                continue
+            origen = "creado_en" if "creado_en" in cols else "NULL"
+            n = lconn.execute(
+                f"UPDATE {table} SET actualizado_en = COALESCE({origen}, ?) WHERE actualizado_en IS NULL",
+                (_ahora_ts(),),
+            ).rowcount
+            if n:
+                print(f"[Sync] {table}: {n} fila(s) sin fecha de cambio, se suben con su fecha de creación")
+        lconn.commit()
+    finally:
+        lconn.close()
+
+
+def conectar_y_subir_todo_bg() -> None:
+    def _run():
+        try:
+            conectar_y_subir_todo()
+        except Exception:
+            pass
+    threading.Thread(target=_run, daemon=True, name="TursoConectar").start()
 
 
 def asegurar_background_sync(interval: int = 180) -> None:
@@ -1372,6 +1472,10 @@ def start_background_sync(interval: int = 30) -> threading.Thread:
         make_daily_backup()
         # Push local data first — preserves locally-set values (imagen_url, descripcion)
         # before pulling from Turso which may have older null values
+        try:
+            _rellenar_actualizado_en()
+        except Exception as e:
+            print(f"[Sync] rellenar actualizado_en: {e}")
         try:
             sync_to_turso()
         except Exception as e:

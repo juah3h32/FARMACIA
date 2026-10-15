@@ -133,14 +133,21 @@ def _fmt(v):
 
 
 def info_producto(prod):
-    return dict(nombre=prod.nombre, nombre_generico=prod.nombre_generico, marca=prod.marca,
-                presentacion=prod.presentacion, concentracion=prod.concentracion, contenido=prod.contenido,
-                descripcion=(prod.descripcion or '')[:600], requiere_receta=bool(prod.requiere_receta))
+    return {'nombre': prod.nombre, 'nombre_generico': prod.nombre_generico, 'marca': prod.marca,
+            'presentacion': prod.presentacion, 'concentracion': prod.concentracion, 'contenido': prod.contenido,
+            'codigo_barras': getattr(prod, 'codigo_barras', None),
+            'descripcion del inventario (escrita antes, puede tener errores)': (prod.descripcion or '')[:600],
+            'requiere_receta': bool(prod.requiere_receta)}
+
+
+# v2: la IA busca el producto exacto en internet. Los textos guardados antes (sin buscar, a veces
+# inventados) dejan de valer y se vuelven a escribir una vez.
+_FIRMA_VERSION = 'v2'
 
 
 def firma(prod):
-    s = '|'.join(str(x or '') for x in (prod.nombre, prod.nombre_generico, prod.presentacion,
-                                         prod.concentracion, prod.contenido))
+    s = '|'.join(str(x or '') for x in (_FIRMA_VERSION, prod.nombre, prod.nombre_generico, prod.marca,
+                                         prod.presentacion, prod.concentracion, prod.contenido))
     return hashlib.sha1(s.encode('utf-8')).hexdigest()[:16]
 
 
@@ -148,13 +155,19 @@ def ia_cache():
     return _read(IA_CACHE, {})
 
 
-def texto_ia(prod, api_key, forzar=False):
+def texto_ia_guardado(prod, cache=None):
+    """El texto de la IA guardado para este producto, solo si sigue vigente (mismos datos, versión actual)."""
+    c = (cache if cache is not None else ia_cache()).get(str(prod.id))
+    return c if c and c.get('firma') == firma(prod) else None
+
+
+def texto_ia(prod, forzar=False):
     """Descripción corta + beneficios. Usa la caché: la IA se llama una sola vez por producto."""
     cache = ia_cache()
     k = str(prod.id)
     if not forzar and k in cache and cache[k].get('firma') == firma(prod):
         return cache[k], False
-    r = ia.describir(info_producto(prod), api_key)
+    r = ia.describir(info_producto(prod))
     r['firma'] = firma(prod)
     cache[k] = r
     _write(IA_CACHE, cache)
@@ -223,6 +236,7 @@ def imagen_local(prod):
     url = (prod.imagen_url or '').strip()
     if not url: return None
     if url.startswith(('http://', 'https://')):
+        url = _url_vigente(prod.id, url)
         ext = os.path.splitext(url.split('?')[0])[1].lower()
         ext = ext if ext in ('.png', '.jpg', '.jpeg', '.webp') else '.png'
         man = _read(IMG_MANIFEST, {})
@@ -249,22 +263,34 @@ def imagen_local(prod):
     return _respaldo_pos(prod.id)
 
 
+def _url_vigente(prod_id, url):
+    """La URL de la versión vigente en Cloudinary (la copia maestra). Si la BD de esta PC tiene una
+    versión vieja (p. ej. en modo local, sin sincronizar), el video igual usa la foto nueva."""
+    try:
+        from app.services.cloudinary_service import cloudinary_product_images
+        c = cloudinary_product_images(max_age=120).get(int(prod_id))
+        if c and url != c['url']:
+            return c['url']
+    except Exception:
+        pass                                  # sin internet: se queda con la que hay
+    return url
+
+
+# Debajo de esto la foto tiene menos detalle del que ocupa el producto en pantalla (~500-700 px).
+FOTO_MIN_PX = 400
+
+
 def foto_chica(prod):
-    """True si el producto ocupa muy pocos píxeles en su foto (se verá borroso en la tele).
+    """True si la foto del producto tiene poco detalle real (se verá borrosa en la tele), aunque
+    el archivo sea grande: una foto chica agrandada a 1200 sigue siendo borrosa.
     Solo revisa la copia que ya está en esta PC (no descarga nada)."""
     act = next(iter(sorted(IMG_DIR.glob(f'producto_{prod.id}.*'))), None) or (
         Path(_respaldo_pos(prod.id)) if _respaldo_pos(prod.id) else None)
     if act is None:
         return False
-    try:
-        im = Image.open(act)
-        im.draft('L', (im.width // 2, im.height // 2))
-        g = im.convert('L')
-        k = im.width / g.width if g.width else 1
-        bb = g.point(lambda v: 255 if v < 238 else 0).getbbox()
-        return bool(bb) and max(bb[2] - bb[0], bb[3] - bb[1]) * k < 320
-    except Exception:
-        return False
+    from app.services.cloudinary_service import resolucion_efectiva
+    px = resolucion_efectiva(act)
+    return 0 < px < FOTO_MIN_PX
 
 
 def limpiar_fotos_viejas():
@@ -277,7 +303,7 @@ def limpiar_fotos_viejas():
 def slide(prod, item, cache=None):
     """Convierte producto del inventario + ajustes del video en la ficha que usa el motor."""
     cache = cache if cache is not None else ia_cache()
-    c = cache.get(str(prod.id)) or texto_inventario(prod)
+    c = texto_ia_guardado(prod, cache) or texto_inventario(prod)
     pres_ = (prod.presentacion or '').strip()
     if pres_.lower() in ('otro', 'otros', 'n/a', 'na', 'ninguno', '-'): pres_ = ''
     pres1 = ' '.join(x for x in (pres_, _unidades(prod.concentracion)) if x).strip()

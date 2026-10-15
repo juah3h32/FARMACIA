@@ -786,6 +786,10 @@ def _boot_and_launch(mostrar_splash: bool, esperar_webview2: bool = False) -> No
                 # producto nuevas/cambiadas, así se ven en las demás PCs en segundos sin
                 # esperar el latido de 180s (ver start_image_watch en sync_service.py).
                 start_image_watch(interval=12)
+            elif cfg.CLOUDINARY_CLOUD_NAME and cfg.CLOUDINARY_API_KEY and cfg.CLOUDINARY_API_SECRET:
+                # sin Turso, pero las fotos de producto siguen viniendo de Cloudinary
+                from app.database.sync_service import start_cloudinary_watch
+                start_cloudinary_watch(interval=90)
 
             _status("Iniciando servidor local...")
 

@@ -112,13 +112,20 @@ def set_integraciones(body: IntegracionesIn, payload: dict = Depends(get_current
         except Exception:
             pass
 
-    return {
-        "ok": True,
-        # El engine/hilo de sync de Turso se arma al iniciar el programa —
-        # aunque la prueba de conexión ya funciona en caliente (ver reload_setup
-        # arriba), el push/pull en segundo plano necesita reiniciar para activarse.
-        "restart_required": changed_turso or switched_to_turso,
-    }
+    # Con URL + token nuevos: en ese momento se sube todo lo de esta PC a la nube (sin borrar
+    # nada de lo que ya hubiera allá) y queda sincronizando, sin reiniciar el programa.
+    subiendo = False
+    if (changed_turso or switched_to_turso) and cfg.TURSO_DATABASE_URL and cfg.TURSO_AUTH_TOKEN:
+        from app.database.sync_service import conectar_y_subir_todo_bg
+        conectar_y_subir_todo_bg()
+        subiendo = True
+    return {"ok": True, "restart_required": False, "subiendo_nube": subiendo}
+
+
+@router.get("/integraciones/estado-nube")
+def estado_nube(payload: dict = Depends(get_current_api_user)):
+    from app.database.sync_service import estado_conexion
+    return dict(estado_conexion)
 
 
 # ── Catálogo público (exponer /api/public/* a la red/internet) ───────────────

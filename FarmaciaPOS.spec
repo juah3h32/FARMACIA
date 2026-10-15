@@ -37,7 +37,7 @@ a = Analysis(
         'app.api.routes.ai_routes',
         'app.api.routes.suppliers_routes',
         'openai', 'openai.resources', 'openai.resources.chat',
-        'openai.resources.chat.completions',
+        'openai.resources.chat.completions', 'openai.resources.responses',
         'httpx', 'httpcore',
         # Marketing → Video promocional
         'app.api.routes.video_promo_routes',

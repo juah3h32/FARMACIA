@@ -331,14 +331,9 @@ def conectar_esta_sucursal(api_token: str, org: str | None = None, progreso=prin
     cfg.SETUP_FILE.write_text(json.dumps(setup), encoding="utf-8")
     cfg.reload_setup()
 
-    progreso("Subiendo inventario, ventas y caja de esta sucursal…")
-    with S._lock:
-        S._watermarks.clear()
-        S._ts_watermarks.clear()
-        S._sucursal_ok = False
-    S.sync_to_turso()
-    S.sync_from_turso()
-    S.asegurar_background_sync()
+    # sube todo lo local sin borrar lo que ya hubiera en la nube, baja lo de otras PCs y deja la
+    # sincronización corriendo
+    S.conectar_y_subir_todo(progreso)
 
     progreso("Buscando otras sucursales de la cuenta…")
     try:

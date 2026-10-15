@@ -479,6 +479,7 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
         from datetime import datetime as _dt_now
         was_fraccionada = p.venta_fraccionada
         precio_anterior = p.precio_venta
+        nombre_anterior = (p.nombre, p.concentracion)
         # anaquel/seccion solo si el cliente los mandó — un cliente viejo que no
         # conoce esos campos no debe borrar la ubicación al editar el producto.
         excluir = {'stock', 'imagen_url', 'piezas_sueltas'} | ({'anaquel', 'seccion'} - body.model_fields_set)
@@ -500,6 +501,10 @@ def actualizar_producto(producto_id: int, body: ProductoIn, bg: BackgroundTasks,
             ))
             db.commit()
         db.refresh(p)
+        if nombre_anterior != (p.nombre, p.concentracion) and (p.imagen_url or "").startswith("http"):
+            # la foto en Cloudinary lleva el nombre del medicamento: se renombra con él
+            from app.services.cloudinary_service import renombrar_foto
+            bg.add_task(renombrar_foto, p.id)
         _sync_bg(bg)
         return p
     except HTTPException:
@@ -626,6 +631,13 @@ async def quitar_fondo_producto(
     import asyncio
     if file is not None:
         raw = await file.read()
+    elif imagen_url and not imagen_url.startswith(("http://", "https://")):
+        # foto que solo está en esta PC (/uploads/...): se lee del disco
+        from app.services.cloudinary_service import local_path_for_url
+        local = local_path_for_url(imagen_url.split("?")[0])
+        if local is None:
+            raise HTTPException(status_code=404, detail="No se encontró la foto guardada en esta PC")
+        raw = local.read_bytes()
     elif imagen_url:
         import requests
         try:

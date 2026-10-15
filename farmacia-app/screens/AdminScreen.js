@@ -144,9 +144,9 @@ function EditStockModal({ product, onClose, onSave }) {
   const handleSave = async () => {
     const val = parseInt(stock);
     if (isNaN(val) || val < 0) return;
-    const priceVal = parseFloat(price);
+    const priceVal = parseFloat(String(price).replace(",", "."));
     if (isNaN(priceVal) || priceVal < 0) return;
-    const tachadoVal = precioTachado.trim() ? parseFloat(precioTachado) : 0;
+    const tachadoVal = precioTachado.trim() ? parseFloat(precioTachado.replace(",", ".")) : 0;
     setSaving(true);
     // Si el stock es > 0 siempre activar; si es 0 respetar el toggle
     const payload = {
