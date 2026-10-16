@@ -88,6 +88,40 @@ def crear_empleado(body: EmpleadoIn, bg: BackgroundTasks, payload: dict = Depend
         db.close()
 
 
+@router.post("/{uid}/codigo-acceso")
+def generar_codigo_acceso_empleado(uid: int, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
+    """El admin genera un código de un solo uso (vence en 2 horas) para el empleado que olvidó
+    su contraseña. El empleado lo escribe en "¿Olvidaste tu contraseña?" y elige una nueva."""
+    _require_admin(payload)
+    import json as _json
+    from datetime import datetime as _dt, timedelta as _td
+    from app.auth.auth_service import generar_codigo_acceso, normalizar_codigo
+    db = get_db_session()
+    try:
+        u = db.query(Usuario).filter(Usuario.id == uid, Usuario.activo == True).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        codigo = generar_codigo_acceso()
+        vence = _dt.now() + _td(hours=2)
+        u.codigo_acceso = _json.dumps({"h": hash_password(normalizar_codigo(codigo)),
+                                       "vence": vence.isoformat(timespec="seconds"), "intentos": 0})
+        u.actualizado_en = _dt.now()
+        db.commit()
+        from app.database.models import AuditoriaLog
+        db.add(AuditoriaLog(usuario_id=int(payload["sub"]), accion="CODIGO_ACCESO", tabla="usuarios",
+                            registro_id=u.id, detalles=f"Código de acceso para {u.username} (vence {vence:%H:%M})"))
+        db.commit()
+        respuesta = {"codigo": codigo, "username": u.username, "nombre": u.nombre,
+                     "vence": vence.strftime("%H:%M")}
+    finally:
+        db.close()
+    import app.config as _cfg
+    if _cfg.TURSO_SYNC:
+        from app.database.sync_service import sync_to_turso
+        bg.add_task(sync_to_turso)
+    return respuesta
+
+
 @router.put("/{uid}")
 def actualizar_empleado(uid: int, body: EmpleadoIn, bg: BackgroundTasks, payload: dict = Depends(get_current_api_user)):
     _require_admin(payload)

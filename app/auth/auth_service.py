@@ -49,6 +49,13 @@ def generar_codigos_respaldo(n: int = 8) -> list[str]:
     return out
 
 
+def generar_codigo_acceso() -> str:
+    """Código que el admin le da en persona a quien olvidó su contraseña, ej. K7QM-4TXP."""
+    import secrets
+    c = "".join(secrets.choice(_ALFABETO) for _ in range(8))
+    return f"{c[:4]}-{c[4:]}"
+
+
 def hash_codigo(codigo: str) -> str:
     """SHA-256 del código de respaldo ya normalizado (10 caracteres al azar ≈ 50 bits)."""
     import hashlib

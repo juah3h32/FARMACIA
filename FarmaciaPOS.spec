@@ -41,6 +41,7 @@ a = Analysis(
         'httpx', 'httpcore',
         # Marketing → Video promocional
         'app.api.routes.video_promo_routes',
+        'app.api.routes.relay_routes', 'app.services.correo_recuperacion',
         'app.services.video_promo.servicio', 'app.services.video_promo.motor',
         'app.services.video_promo.estilos', 'app.services.video_promo.ia',
         'imageio_ffmpeg', 'anthropic',

@@ -209,6 +209,9 @@ app.include_router(marketing_routes.router,    prefix="/api/marketing",   tags=[
 app.include_router(config_routes.router,       prefix="/api/config",      tags=["Config"])
 from app.api.routes import sucursales_routes
 app.include_router(sucursales_routes.router,   prefix="/api/sucursales",  tags=["Sucursales"])
+# Envío de correos de recuperación para los POS sin correo propio (solo funciona en la web)
+from app.api.routes import relay_routes
+app.include_router(relay_routes.router,        prefix="/api/relay",       tags=["Relay correo"])
 # App móvil/web — público (sin auth)
 app.include_router(public_routes.router,       prefix="/api/public",      tags=["Público"])
 # App móvil/web — clientes autenticados

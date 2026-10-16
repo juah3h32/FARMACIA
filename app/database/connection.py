@@ -214,6 +214,7 @@ def _migrate():
         ("usuarios",     "token_version",   "INTEGER DEFAULT 0"),
         ("usuarios",     "recovery_codes",  "TEXT"),
         ("usuarios",     "debe_cambiar_password", "BOOLEAN DEFAULT 0"),
+        ("usuarios",     "codigo_acceso",   "TEXT"),
     ]
     # Local SQLite — collect only columns actually added (new installs / upgrades)
     added: list[tuple] = []

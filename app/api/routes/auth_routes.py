@@ -153,7 +153,13 @@ def api_login(body: LoginRequest, request: Request, bg: BackgroundTasks):
             _registrar_fallo(clave)
             if user:
                 _auditar(user.id, "LOGIN_FALLIDO", f"IP {ip}")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos")
+            # En la PC del punto de venta se dice cuál falló (más fácil para el usuario); en la web,
+            # abierta a internet, no se revela qué usuarios existen.
+            if cfg._ON_VERCEL:
+                detalle = "Usuario o contraseña incorrectos"
+            else:
+                detalle = "La contraseña no es correcta" if user else "Ese usuario no existe. Revisa cómo está escrito."
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detalle)
         _clear_attempts(ip, clave)
         # La contraseña de fábrica (admin123/cajero123) es pública: se obliga a cambiarla
         if es_password_por_defecto(body.password) and not user.debe_cambiar_password:
@@ -260,14 +266,13 @@ _SMTP_POR_DOMINIO = {"gmail.com": "smtp.gmail.com", "googlemail.com": "smtp.gmai
 def ver_recuperacion_correo(payload: dict = Depends(get_current_api_user)):
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
+    from app.services.correo_recuperacion import smtp_propio
     db = get_db_session()
     try:
         user = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
-        smtp = _smtp(db)
-        return {"email": user.email or "", "smtp_user": smtp.get("email_smtp_user", ""),
-                "smtp_host": smtp.get("email_smtp_host", ""),
-                "smtp_listo": bool(smtp.get("email_smtp_host") and smtp.get("email_smtp_user")
-                                   and smtp.get("email_smtp_password"))}
+        propio = smtp_propio(db)
+        return {"email": user.email or "", "modo": "propio" if propio else "sistema",
+                "smtp_user": (propio or {}).get("email_smtp_user", "")}
     finally:
         db.close()
 
@@ -275,50 +280,48 @@ def ver_recuperacion_correo(payload: dict = Depends(get_current_api_user)):
 class RecuperacionCorreoIn(BaseModel):
     password: str            # contraseña actual del admin (confirma que es él)
     email: str               # a dónde llega el código
-    smtp_user: str = ""      # cuenta que envía (por defecto, la misma)
-    smtp_password: str = ""  # contraseña de aplicación; vacía = conservar la guardada
+    smtp_password: str = ""  # opcional: contraseña de aplicación para enviar con el Gmail propio
 
 
 @router.post("/recuperacion-correo")
 def guardar_recuperacion_correo(body: RecuperacionCorreoIn, request: Request, bg: BackgroundTasks,
                                 payload: dict = Depends(get_current_api_user)):
-    """Guarda el correo del admin y la cuenta que envía, y manda un correo de prueba."""
+    """Guarda el correo del admin y manda un correo de prueba. Sin más datos se envía con el
+    servicio del sistema; con contraseña de aplicación, desde el propio Gmail de la farmacia."""
     if payload.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
     _check_rate_limit(_client_ip(request))
     import re as _re
+    from app.services.correo_recuperacion import enviar, nombre_farmacia, smtp_propio, contacto_farmacia, CorreoError
     email = body.email.strip().lower()
-    smtp_user = (body.smtp_user or email).strip().lower()
-    if not _re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or not _re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", smtp_user):
+    if not _re.fullmatch(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+", email):
         raise HTTPException(status_code=400, detail="Escribe un correo válido")
     db = get_db_session()
     try:
         user = db.query(Usuario).filter(Usuario.id == int(payload["sub"])).first()
         if not user or not verify_password(body.password, user.password_hash):
             raise HTTPException(status_code=400, detail="La contraseña no es correcta")
-        smtp = _smtp(db)
-        clave = "".join(body.smtp_password.split()) or smtp.get("email_smtp_password", "")   # Google la muestra con espacios
-        if not clave:
-            raise HTTPException(status_code=400, detail="Falta la contraseña de aplicación del correo que envía")
-        host = smtp.get("email_smtp_host") if smtp.get("email_smtp_user") == smtp_user and smtp.get("email_smtp_host") else ""
-        host = host or _SMTP_POR_DOMINIO.get(smtp_user.split("@")[-1], "smtp." + smtp_user.split("@")[-1])
-        puerto = int(smtp.get("email_smtp_port") or 587)
-        from app.services.email_service import enviar_email, EmailError
+        clave = "".join(body.smtp_password.split())          # Google la muestra con espacios
+        smtp = smtp_propio(db)
+        nuevo_smtp = None
+        if clave:
+            host = _SMTP_POR_DOMINIO.get(email.split("@")[-1], "smtp." + email.split("@")[-1])
+            nuevo_smtp = {"email_smtp_host": host, "email_smtp_port": "587", "email_smtp_user": email,
+                          "email_smtp_password": clave}
+            smtp = nuevo_smtp
+        farmacia = nombre_farmacia(db)
         try:
-            enviar_email(smtp_host=host, smtp_port=puerto, smtp_user=smtp_user, smtp_password=clave,
-                         destinatario=email, asunto="Correo de recuperación configurado",
-                         cuerpo=(f"Hola {user.nombre}:\n\nA este correo llegarán los códigos para restablecer la "
-                                 f"contraseña del administrador ({user.username}) del punto de venta.\n"))
-        except EmailError as e:
-            raise HTTPException(status_code=400, detail=f"No se pudo enviar el correo de prueba: {e}")
+            modo = enviar("prueba", email, farmacia, user.nombre, user.username, smtp=smtp,
+                          contacto=contacto_farmacia(db))
+        except CorreoError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             msg = str(e)
             if "535" in msg or "Username and Password not accepted" in msg or "BadCredentials" in msg:
-                msg = ("Gmail no aceptó la contraseña. Usa una contraseña de aplicación "
-                       "(myaccount.google.com/apppasswords), no tu contraseña normal.")
+                msg = ("Gmail no aceptó la contraseña de aplicación (myaccount.google.com/apppasswords). "
+                       "Déjala vacía para usar el servicio de correo del sistema.")
             raise HTTPException(status_code=400, detail=f"No se pudo enviar el correo de prueba: {msg[:200]}")
-        for k, v in {"email_smtp_host": host, "email_smtp_port": str(puerto), "email_smtp_user": smtp_user,
-                     "email_smtp_password": clave}.items():
+        for k, v in (nuevo_smtp or {}).items():
             row = db.query(Configuracion).filter(Configuracion.clave == k).first()
             if row:
                 row.valor = v
@@ -330,9 +333,9 @@ def guardar_recuperacion_correo(body: RecuperacionCorreoIn, request: Request, bg
         uid = user.id
     finally:
         db.close()
-    _auditar(uid, "RECUPERACION_CORREO", f"Correo de recuperación: {_ocultar_correo(email)}")
+    _auditar(uid, "RECUPERACION_CORREO", f"Correo de recuperación: {_ocultar_correo(email)} ({modo})")
     _sync_bg(bg)
-    return {"ok": True, "email": email}
+    return {"ok": True, "email": email, "modo": modo}
 
 
 # ── ¿Olvidaste tu contraseña? ────────────────────────────────────────────────
@@ -361,24 +364,23 @@ def _ocultar_correo(email: str) -> str:
     return (u[:2] + "•••@" + dom) if dom else ""
 
 
+def _correos_ultima_hora(db, usuario_id) -> int:
+    return db.query(PasswordReset).filter(PasswordReset.usuario_id == usuario_id, PasswordReset.canal == "email",
+                                          PasswordReset.creado_en > datetime.now() - timedelta(hours=1)).count()
+
+
 @router.post("/recuperar/solicitar")
 def recuperar_solicitar(body: SolicitarIn, request: Request):
     ip = _client_ip(request)
     _check_rate_limit(ip)
+    from app.services.correo_recuperacion import enviar, nombre_farmacia, smtp_propio, contacto_farmacia, CorreoError
     db = get_db_session()
     try:
-        smtp = _smtp(db)
-        if not (smtp.get("email_smtp_host") and smtp.get("email_smtp_user") and smtp.get("email_smtp_password")):
-            raise HTTPException(status_code=400, detail="El envío de correos no está configurado en este POS. "
-                                                        "Usa un código de respaldo o pide ayuda al administrador.")
         user = _admin_por_usuario(db, body.username)
         # Solo el administrador recupera su cuenta por correo (los cajeros se la piden al admin).
         if not user or not (user.email or "").strip():
             return {"ok": True, "mensaje": _MSG_GENERICO}
-        hace_1h = datetime.now() - timedelta(hours=1)
-        recientes = db.query(PasswordReset).filter(PasswordReset.usuario_id == user.id,
-                                                   PasswordReset.creado_en > hace_1h).count()
-        if recientes >= 3:
+        if _correos_ultima_hora(db, user.id) >= 3:
             return {"ok": True, "mensaje": _MSG_GENERICO}
         codigo = f"{secrets.randbelow(1_000_000):06d}"
         db.query(PasswordReset).filter(PasswordReset.usuario_id == user.id,
@@ -386,24 +388,17 @@ def recuperar_solicitar(body: SolicitarIn, request: Request):
         db.add(PasswordReset(usuario_id=user.id, code_hash=hash_password(codigo), canal="email",
                              expira_en=datetime.now() + timedelta(minutes=15), intentos=0, ip=ip))
         db.commit()
-        destino, uid, nombre = user.email.strip(), user.id, user.nombre
+        destino, uid, nombre, usuario = user.email.strip(), user.id, user.nombre, user.username
+        smtp, farmacia, contacto = smtp_propio(db), nombre_farmacia(db), contacto_farmacia(db)
     finally:
         db.close()
-    from app.services.email_service import enviar_email, EmailError
     try:
-        enviar_email(
-            smtp_host=smtp["email_smtp_host"], smtp_port=int(smtp.get("email_smtp_port") or 587),
-            smtp_user=smtp["email_smtp_user"], smtp_password=smtp["email_smtp_password"],
-            destinatario=destino, asunto="Código para restablecer tu contraseña",
-            cuerpo=(f"Hola {nombre}:\n\nTu código para restablecer la contraseña del punto de venta es:\n\n"
-                    f"    {codigo}\n\nVence en 15 minutos. Si tú no lo pediste, ignora este correo; "
-                    f"tu contraseña no cambia.\n"),
-        )
-    except EmailError as e:
-        raise HTTPException(status_code=502, detail=f"No se pudo enviar el correo: {e}")
+        modo = enviar("codigo", destino, farmacia, nombre, usuario, codigo, smtp=smtp, contacto=contacto)
+    except CorreoError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception:
         raise HTTPException(status_code=502, detail="No se pudo enviar el correo (¿sin internet?). Usa un código de respaldo.")
-    _auditar(uid, "RECUPERAR_SOLICITADO", f"Código enviado a {_ocultar_correo(destino)} desde IP {ip}")
+    _auditar(uid, "RECUPERAR_SOLICITADO", f"Código enviado a {_ocultar_correo(destino)} ({modo}) desde IP {ip}")
     return {"ok": True, "mensaje": _MSG_GENERICO}
 
 
@@ -427,7 +422,7 @@ def recuperar_confirmar(body: ConfirmarIn, request: Request, bg: BackgroundTasks
         if user:
             pr = (db.query(PasswordReset)
                   .filter(PasswordReset.usuario_id == user.id, PasswordReset.usado_en.is_(None),
-                          PasswordReset.expira_en > datetime.now())
+                          PasswordReset.canal == "email", PasswordReset.expira_en > datetime.now())
                   .order_by(PasswordReset.id.desc()).first())
         if not pr or (pr.intentos or 0) >= 5:
             _registrar_fallo((body.username or "").strip().lower())
@@ -445,6 +440,41 @@ def recuperar_confirmar(body: ConfirmarIn, request: Request, bg: BackgroundTasks
     finally:
         db.close()
     _auditar(uid, "PASSWORD_RESTABLECIDA", f"Con código por correo, IP {ip}")
+    _sync_bg(bg)
+    return {"ok": True}
+
+
+@router.post("/recuperar/codigo-admin")
+def recuperar_con_codigo_admin(body: ConfirmarIn, request: Request, bg: BackgroundTasks):
+    """Empleado que olvidó su contraseña: el código de acceso que le generó el admin."""
+    ip = _client_ip(request)
+    clave = (body.username or "").strip().lower()
+    _check_rate_limit(ip, clave)
+    db = get_db_session()
+    try:
+        user = db.query(Usuario).filter(Usuario.username == body.username.strip(), Usuario.activo == True).first()
+        datos = {}
+        try:
+            datos = json.loads(user.codigo_acceso or "{}") if user else {}
+        except Exception:
+            datos = {}
+        vigente = bool(datos.get("h")) and datos.get("vence", "") > datetime.now().isoformat(timespec="seconds") \
+            and int(datos.get("intentos", 0)) < 5
+        if not vigente or not verify_password(normalizar_codigo(body.codigo), datos["h"]):
+            if user and vigente:
+                datos["intentos"] = int(datos.get("intentos", 0)) + 1
+                user.codigo_acceso = json.dumps(datos)
+                db.commit()
+            _registrar_fallo(clave)
+            raise HTTPException(status_code=400, detail="El código no es válido o ya venció. Pídele uno nuevo al administrador.")
+        _validar_nueva(body.nueva, user.username)
+        cambiar_password_de(user, body.nueva)
+        user.codigo_acceso = None
+        db.commit()
+        uid = user.id
+    finally:
+        db.close()
+    _auditar(uid, "PASSWORD_RESTABLECIDA", f"Con código de acceso del administrador, IP {ip}")
     _sync_bg(bg)
     return {"ok": True}
 
@@ -475,3 +505,47 @@ def recuperar_con_respaldo(body: ConfirmarIn, request: Request, bg: BackgroundTa
     _auditar(uid, "PASSWORD_RESTABLECIDA", f"Con código de respaldo (quedan {quedan}), IP {ip}")
     _sync_bg(bg)
     return {"ok": True, "codigos_restantes": quedan}
+
+
+# ── Recuperación en un solo flujo (lo que usa la pantalla) ───────────────────
+@router.post("/recuperar/iniciar")
+def recuperar_iniciar(body: SolicitarIn, request: Request):
+    """Paso 1. Admin: el código SOLO llega a su correo de recuperación (escribir "admin" no basta para
+    obtener un código). Empleado (o usuario que no existe, misma respuesta): se lo pide al admin."""
+    db = get_db_session()
+    try:
+        user = _admin_por_usuario(db, body.username)
+        existe = user is not None or db.query(Usuario.id).filter(
+            Usuario.username == (body.username or "").strip(), Usuario.activo == True).first() is not None
+        email = (user.email or "").strip() if user else ""
+        agotado = bool(email) and _correos_ultima_hora(db, user.id) >= 3
+    finally:
+        db.close()
+    if not user:
+        _check_rate_limit(_client_ip(request))
+        if not existe and not cfg._ON_VERCEL:
+            raise HTTPException(status_code=404, detail="Ese usuario no existe. Revisa cómo está escrito.")
+        return {"tipo": "empleado"}
+    if not email:
+        _check_rate_limit(_client_ip(request))
+        return {"tipo": "admin", "via": "sin_correo"}
+    if agotado:
+        _check_rate_limit(_client_ip(request))
+        return {"tipo": "admin", "via": "correo", "destino": _ocultar_correo(email), "reenviado": False}
+    recuperar_solicitar(body, request)        # si no se pudo enviar responde el error (sin internet, etc.)
+    return {"tipo": "admin", "via": "correo", "destino": _ocultar_correo(email), "reenviado": True}
+
+
+@router.post("/recuperar/restablecer")
+def recuperar_restablecer(body: ConfirmarIn, request: Request, bg: BackgroundTasks):
+    """Paso 2: una sola casilla para cualquier código. Por su forma se sabe cuál es:
+    6 dígitos = correo o archivo de la PC · XXXX-XXXX = el que dio el admin · XXXX-XXXX-XX = respaldo."""
+    n = normalizar_codigo(body.codigo)
+    if len(n) == 6 and n.isdigit():
+        return recuperar_confirmar(body, request, bg)
+    if len(n) == 8:
+        return recuperar_con_codigo_admin(body, request, bg)
+    if len(n) == 10:
+        return recuperar_con_respaldo(body, request, bg)
+    _check_rate_limit(_client_ip(request), (body.username or "").strip().lower())
+    raise HTTPException(status_code=400, detail="Revisa el código: no tiene el formato correcto")

@@ -59,6 +59,9 @@ class Usuario(Base):
     recovery_codes = Column(Text, nullable=True)
     # Contraseña de fábrica o temporal puesta por el admin: hay que cambiarla al entrar.
     debe_cambiar_password = Column(Boolean, default=False)
+    # Código de acceso de un solo uso que genera el admin para quien olvidó su contraseña
+    # (JSON: hash, vence, intentos). Viaja con la sincronización: sirve en cualquier PC.
+    codigo_acceso = Column(Text, nullable=True)
 
     ventas = relationship("Venta", back_populates="usuario")
     movimientos = relationship("MovimientoStock", back_populates="usuario")
@@ -488,6 +491,18 @@ class AuditoriaLog(Base):
     creado_en = Column(DateTime, default=_dt.now)
 
     usuario = relationship("Usuario", back_populates="auditoria")
+
+
+class RelayEnvio(Base):
+    """Bitácora del servicio de envío de correos de recuperación (solo en la web): sirve para
+    limitar envíos por destinatario e IP."""
+    __tablename__ = "relay_envios"
+
+    id = Column(Integer, primary_key=True)
+    destinatario = Column(String(120), index=True)
+    ip = Column(String(64), index=True)
+    tipo = Column(String(20))
+    creado_en = Column(DateTime, default=_dt.now, index=True)
 
 
 class PasswordReset(Base):
