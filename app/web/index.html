@@ -1402,7 +1402,7 @@
 </div>
 
 <!-- ── Códigos de respaldo (admin) ──────────────────────────────────────── -->
-<div id="modal-codigos" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
+<div id="modal-codigos-respaldo" class="fixed inset-0 z-[95] hidden items-center justify-center" style="padding:20px">
   <div class="absolute inset-0" style="background:rgba(15,23,42,.65);backdrop-filter:blur(8px)"></div>
   <div class="modal-pane relative bg-white rounded-3xl overflow-hidden" style="width:460px;max-width:100%">
     <div class="h-1.5" style="background:#16A34A"></div>
@@ -1422,7 +1422,7 @@
         <div><label class="text-xs font-bold mb-1 block" style="color:#64748B">TU CONTRASEÑA</label><input id="cod-pass" type="password" autocomplete="current-password" class="w-full h-11 px-3 rounded-xl text-sm border" style="border-color:#E2E8F0;background:#fff"
              onkeydown="if(event.key==='Enter')codGenerar()"></div>
         <button onclick="codGenerar()" class="w-full h-11 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style="background:#1d2140;border:none;cursor:pointer">Crear códigos</button>
-        <button onclick="closeModal('modal-codigos')" class="w-full h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Cancelar</button>
+        <button onclick="closeModal('modal-codigos-respaldo')" class="w-full h-10 rounded-xl font-semibold text-sm transition-all hover:opacity-90" style="background:#F1F5F9;color:#1d2140;border:none;cursor:pointer">Cancelar</button>
       </div>
       <div id="cod-lista-wrap" class="hidden">
         <p class="text-xs leading-snug mb-3" style="color:#475569">Guárdalos en un lugar seguro (impresos o en tu correo). Cada código sirve <b>una sola vez</b>. Solo se muestran ahora.</p>
@@ -4056,7 +4056,7 @@
                 <i data-lucide="layout-grid" style="width:16px;height:16px"></i> Ver catálogo y elegir varios
               </button>
             </div>
-            <div id="mkv-estado" class="mx-4 mt-3 mb-1"></div>
+            <div id="mkv-aviso-lista" class="mx-4 mt-3 mb-1"></div>
             <div id="mkv-term" class="px-2 pb-1"></div>
             <p id="mkv-ayuda" class="px-4 pb-1 text-[10px] leading-snug" style="color:#8A9BCB">Interruptor verde = sale en el video · Arrastra para ordenar</p>
             <div id="mkv-lista" class="flex-1 overflow-y-auto px-2 flex flex-col gap-1 mkv-scroll"></div>
@@ -7793,7 +7793,7 @@ async function abrirCodigos(passwordConocida) {
   document.getElementById('cod-pedir').classList.remove('hidden');
   document.getElementById('cod-lista-wrap').classList.add('hidden');
   _msg('cod-err', '');
-  openModal('modal-codigos'); icons();
+  openModal('modal-codigos-respaldo'); icons();
   if (passwordConocida) { document.getElementById('cod-pass').value = passwordConocida; codGenerar(); }
   else setTimeout(() => document.getElementById('cod-pass').focus(), 100);
 }
@@ -7814,7 +7814,7 @@ async function codGenerar() {
   } catch (e) { _msg('cod-err', e.message); }
 }
 async function codListo() {
-  closeModal('modal-codigos');
+  closeModal('modal-codigos-respaldo');
   try {
     const d = await apiFetch('/auth/recuperacion-correo');
     if (!d.email) setTimeout(() => {
@@ -15279,7 +15279,7 @@ function mkvRender() {
     }).join('');
   }
   // aviso arriba de la lista: qué pasa con el video
-  const est = document.getElementById('mkv-estado');
+  const est = document.getElementById('mkv-aviso-lista');
   const conProblema = _mkv.items.filter(i => !i.tiene_foto || i.sin_stock).length;
   if (_mkv.items.length && !on.length) {
     est.innerHTML = `<div class="rounded-xl px-2.5 py-1.5 flex items-center gap-2" style="background:rgba(234,88,12,.18);border:1px solid rgba(251,146,60,.45)">
