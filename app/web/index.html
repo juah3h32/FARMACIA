@@ -1117,6 +1117,17 @@
   .mkv-fila { transition:background .15s; } .mkv-fila:hover { background:rgba(255,255,255,.07); }
   .mkv-fila.sel { background:#3373B9; box-shadow:inset 3px 0 0 #AFC0E8, 0 6px 14px rgba(10,20,50,.25); }
   .mkv-fila.off p { color:#8A98C7 !important; } .mkv-fila.off p span { color:#8A98C7 !important; }
+  .mkv-fila.off { background:rgba(0,0,0,.12); } .mkv-fila.off.sel { background:#3D4F86; }
+  .mkv-fila.off p.mkv-fuera, .mkv-fila.off p span.mkv-fuera { color:#FDBA74 !important; }
+  .mkv-fila.arrastre { opacity:.35; } .mkv-fila.destino { box-shadow:inset 0 3px 0 #FCD34D; }
+  .mkv-tg { position:relative; width:34px; height:20px; border-radius:999px; background:#56649A; flex-shrink:0; transition:background .15s; cursor:pointer; border:none; padding:0; }
+  .mkv-tg::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform .15s; }
+  .mkv-tg.on { background:#16A34A; } .mkv-tg.on::after { transform:translateX(14px); }
+  .mkv-tg:disabled { opacity:.4; cursor:not-allowed; }
+  .mkv-mv { width:22px; height:18px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#AFC0E8; }
+  .mkv-mv:hover { background:rgba(255,255,255,.15); color:#fff; }
+  .mkv-ord { display:flex; flex-direction:column; opacity:0; transition:opacity .15s; flex-shrink:0; }
+  .mkv-fila:hover .mkv-ord, .mkv-fila.sel .mkv-ord { opacity:1; }
   .mkv-chk { width:22px; height:22px; border-radius:50%; background:#EEF4FC; color:#3373B9; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .mkv-pan { display:none; }
   .mkv-pan.on { display:flex; }
@@ -4032,7 +4043,7 @@
               <span class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,.1);color:#fff"><i data-lucide="clapperboard" style="width:18px;height:18px"></i></span>
               <div class="min-w-0">
                 <p class="text-[10px] font-bold uppercase tracking-widest" style="color:#AFC0E8">Generador de promociones</p>
-                <p class="text-base font-extrabold text-white flex items-center gap-2">Productos del video <span id="mkv-count" class="text-[11px] font-bold px-2 py-0.5 rounded-full" style="background:#3373B9;color:#fff">0</span></p>
+                <p class="text-base font-extrabold text-white flex items-center gap-2 whitespace-nowrap">Productos del video <span id="mkv-count" class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style="background:#3373B9;color:#fff">0</span></p>
               </div>
             </div>
             <div class="relative px-4 mt-2">
@@ -4045,17 +4056,16 @@
                 <i data-lucide="layout-grid" style="width:16px;height:16px"></i> Ver catálogo y elegir varios
               </button>
             </div>
-            <div class="h-3"></div>
+            <div id="mkv-estado" class="mx-4 mt-3 mb-1"></div>
             <div id="mkv-term" class="px-2 pb-1"></div>
+            <p id="mkv-ayuda" class="px-4 pb-1 text-[10px] leading-snug" style="color:#8A9BCB">Interruptor verde = sale en el video · Arrastra para ordenar</p>
             <div id="mkv-lista" class="flex-1 overflow-y-auto px-2 flex flex-col gap-1 mkv-scroll"></div>
-            <div class="flex gap-1 px-4 pt-3 mt-1" style="border-top:1px solid rgba(255,255,255,.08)">
-              <button onclick="mkvMover(_mkv.sel,-1)" class="mkv-sb flex-1 flex items-center justify-center" title="Subir"><i data-lucide="chevron-up" style="width:18px;height:18px"></i></button>
-              <button onclick="mkvMover(_mkv.sel,1)" class="mkv-sb flex-1 flex items-center justify-center" title="Bajar"><i data-lucide="chevron-down" style="width:18px;height:18px"></i></button>
-              <button onclick="mkvQuitar(_mkv.sel)" class="mkv-sb mkv-sb-del" style="flex:2">Quitar</button>
-            </div>
-            <div class="flex gap-1 px-4 pt-1 pb-4">
-              <button onclick="mkvTodos(true)" class="mkv-sb-out flex-1">Activar todos</button>
-              <button onclick="mkvTodos(false)" class="mkv-sb-out flex-1">Desactivar todos</button>
+            <div class="px-4 pt-3 pb-4 mt-1 flex flex-col gap-1.5" style="border-top:1px solid rgba(255,255,255,.08)">
+              <div class="flex gap-1.5">
+                <button onclick="mkvTodos(true)" class="mkv-sb-out flex-1 flex items-center justify-center gap-1.5" title="Todos los productos con foto salen en el video"><i data-lucide="eye" style="width:13px;height:13px"></i> Todos salen</button>
+                <button onclick="mkvTodos(false)" class="mkv-sb-out flex-1 flex items-center justify-center gap-1.5" title="Ningún producto sale (siguen en la lista)"><i data-lucide="eye-off" style="width:13px;height:13px"></i> Ninguno sale</button>
+              </div>
+              <button onclick="mkvVaciar()" class="mkv-sb mkv-sb-del w-full flex items-center justify-center gap-1.5" title="Quita todos los productos de la lista"><i data-lucide="trash-2" style="width:14px;height:14px"></i> Vaciar lista</button>
             </div>
           </div>
 
@@ -15225,40 +15235,70 @@ function _mkvPrecio(v) { return v == null ? '' : '$' + (Math.round(v) === v ? v 
 
 function mkvRender() {
   const list = document.getElementById('mkv-lista');
-  const on = _mkv.items.filter(i => i.enabled && !i.sin_stock);     // sin existencia no sale en el video
-  document.getElementById('mkv-count').textContent = _mkv.items.length;
+  const on = _mkv.items.filter(i => i.enabled && i.tiene_foto && !i.sin_stock);     // sin foto o sin existencia no sale
+  const cnt = document.getElementById('mkv-count');
+  cnt.textContent = _mkv.items.length ? `${on.length} de ${_mkv.items.length}` : '0';
+  cnt.title = `${on.length} salen en el video de ${_mkv.items.length} en la lista`;
+  cnt.style.background = _mkv.items.length && !on.length ? '#C2410C' : '#3373B9';
+  document.getElementById('mkv-ayuda').style.display = _mkv.items.length ? '' : 'none';
   if (!_mkv.items.length) {
-    list.innerHTML = '<p class="text-xs text-center p-4" style="color:#9AA8D0">Aún no hay productos en el video.<br>Búscalos arriba para agregarlos.</p>';
+    list.innerHTML = `<div class="text-center px-4 py-6" style="color:#9AA8D0">
+        <i data-lucide="package-plus" style="width:30px;height:30px;margin:0 auto 8px;color:#6F82BE"></i>
+        <p class="text-sm font-bold text-white">La lista está vacía</p>
+        <p class="text-xs mt-1 leading-snug">Busca un producto arriba o toca <b style="color:#DBEAFE">Ver catálogo y elegir varios</b>. Solo se pueden usar productos con foto.</p>
+        ${_mkvVaciados && _mkvVaciados.length ? `<button onclick="mkvDeshacerVaciar()" class="mkv-sb-out mt-3 px-3 inline-flex items-center gap-1.5"><i data-lucide="undo-2" style="width:13px;height:13px"></i> Deshacer: recuperar ${_mkvVaciados.length} productos</button>` : ''}
+      </div>`;
   } else {
     list.innerHTML = _mkv.items.map((it, i) => {
       const sel = i === _mkv.sel && !_mkv.term;
       let det;
       if (_mkvIAcola.includes(it.producto_id)) det = '<span style="color:#D8B4FE">La IA está escribiendo…</span>';
-      else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">Sin foto</span>';
+      else if (!it.tiene_foto) det = '<span style="color:#FCA5A5">Sin foto: no puede salir</span>';
       else if (it.sin_stock) det = `<span style="color:#FCA5A5">${_mkvPrecio(it.precio)} · Sin existencia: no sale</span>`;
+      else if (!it.enabled) det = `<span class="mkv-fuera">${_mkvPrecio(it.precio)} · No sale en el video</span>`;
       else det = `<span style="color:${sel ? '#DBEAFE' : '#93C5FD'}">${_mkvPrecio(it.precio)}${it.tag ? ' · ' + _mkvEsc(it.tag) : ''}</span>` +
         (it.foto_chica ? ' <span style="color:#FCD34D" title="La foto tiene poco detalle: se verá borrosa en la tele. Toma una foto nueva más de cerca.">· Foto pequeña</span>' : '');
       const img = it.imagen_url ? `<img src="${_mkvEsc(it.imagen_url)}" class="w-full h-full object-contain" style="mix-blend-mode:multiply;${it.enabled ? '' : 'filter:grayscale(1);opacity:.55'}" onerror="this.style.display='none'">` : '';
-      return `<div onclick="mkvSel(${i})" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}${it.enabled ? '' : ' off'}">
-        <input type="checkbox" ${it.enabled && it.tiene_foto ? 'checked' : ''} ${it.tiene_foto ? '' : 'disabled title="Sin foto"'} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvToggle(${i},this.checked)">
+      const enc = it.enabled && it.tiene_foto;
+      return `<div onclick="mkvSel(${i})" draggable="true" ondragstart="mkvArrastrar(event,${i})" ondragover="mkvSobre(event,${i})" ondragleave="this.classList.remove('destino')" ondrop="mkvSoltar(event,${i})" ondragend="mkvArrastreFin()"
+          class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${sel ? ' sel' : ''}${it.enabled ? '' : ' off'}">
+        <div class="mkv-ord">
+          <button onclick="event.stopPropagation();mkvMover(${i},-1)" class="mkv-mv" title="Subir"${i ? '' : ' style="visibility:hidden"'}><i data-lucide="chevron-up" style="width:14px;height:14px"></i></button>
+          <button onclick="event.stopPropagation();mkvMover(${i},1)" class="mkv-mv" title="Bajar"${i < _mkv.items.length - 1 ? '' : ' style="visibility:hidden"'}><i data-lucide="chevron-down" style="width:14px;height:14px"></i></button>
+        </div>
         <div class="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center p-1" style="background:${it.enabled ? '#E9EFF9' : '#AEBBDB'}">${img}</div>
         <div class="flex-1 min-w-0">
           <p class="text-[12px] font-bold text-white leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${_mkvEsc(it.nombre)}</p>
           <p class="text-xs truncate">${det}</p>
         </div>
-        <button onclick="event.stopPropagation();mkvQuitar(${i}, true)" class="mkv-x" title="Quitar de la lista"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+        <div class="flex flex-col items-center gap-1 flex-shrink-0">
+          <button type="button" class="mkv-tg${enc ? ' on' : ''}" ${it.tiene_foto ? '' : 'disabled'} title="${enc ? 'Sale en el video: toca para quitarlo del video' : (it.tiene_foto ? 'No sale: toca para que salga' : 'Sin foto: agrégala en Inventario')}" onclick="event.stopPropagation();mkvToggle(${i},${!enc})"></button>
+          <button onclick="event.stopPropagation();mkvQuitar(${i}, true)" class="mkv-x" style="width:24px;height:22px" title="Quitar de la lista"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+        </div>
       </div>`;
     }).join('');
   }
+  // aviso arriba de la lista: qué pasa con el video
+  const est = document.getElementById('mkv-estado');
+  const conProblema = _mkv.items.filter(i => !i.tiene_foto || i.sin_stock).length;
+  if (_mkv.items.length && !on.length) {
+    est.innerHTML = `<div class="rounded-xl px-2.5 py-1.5 flex items-center gap-2" style="background:rgba(234,88,12,.18);border:1px solid rgba(251,146,60,.45)">
+        <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#FDBA74;flex-shrink:0"></i>
+        <p class="flex-1 text-[11px] leading-tight" style="color:#FED7AA"><b>Ningún producto sale</b> en el video</p>
+        <button onclick="mkvTodos(true)" class="text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0" style="background:#EA580C;color:#fff">Prender todos</button>
+      </div>`;
+  } else if (conProblema) {
+    est.innerHTML = `<p class="text-[11px] flex items-center gap-1.5" style="color:#FCA5A5"><i data-lucide="info" style="width:13px;height:13px;flex-shrink:0"></i>${conProblema} sin foto o sin existencia: no saldrán</p>`;
+  } else est.innerHTML = '';
   // fila fija del anuncio de terminal
   const T = _mkv.config.terminal || {};
-  document.getElementById('mkv-term').innerHTML = `<div onclick="mkvSelTerminal()" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${_mkv.term ? ' sel' : ''}" style="border:1px dashed #4A5C99;opacity:${T.enabled ? 1 : .55}">
-      <input type="checkbox" ${T.enabled ? 'checked' : ''} style="accent-color:#16A34A;width:16px;height:16px;flex-shrink:0" onclick="event.stopPropagation();mkvTerm('enabled', this.checked)">
-      <div class="w-12 h-12 rounded-lg bg-white flex-shrink-0 flex items-center justify-center" style="color:#243366"><i data-lucide="credit-card" style="width:24px;height:24px"></i></div>
+  document.getElementById('mkv-term').innerHTML = `<div onclick="mkvSelTerminal()" class="mkv-fila flex items-center gap-2 px-2 py-1.5 rounded-xl cursor-pointer${_mkv.term ? ' sel' : ''}${T.enabled ? '' : ' off'}" style="border:1px dashed #4A5C99">
+      <div class="w-12 h-12 rounded-lg bg-white flex-shrink-0 flex items-center justify-center" style="color:#243366;opacity:${T.enabled ? 1 : .55}"><i data-lucide="credit-card" style="width:24px;height:24px"></i></div>
       <div class="flex-1 min-w-0">
         <p class="text-[13px] font-bold truncate text-white">Terminal · Pago con tarjeta</p>
-        <p class="text-xs truncate" style="color:${_mkv.term ? '#DBEAFE' : '#93C5FD'}">${T.enabled ? `${nDisT(T)} · ${(MKV_POS.find(x => x.k === T.posicion) || MKV_POS[0]).l}` : 'No sale en el video'}</p>
+        <p class="text-xs truncate" style="color:${_mkv.term ? '#DBEAFE' : '#93C5FD'}">${T.enabled ? `${nDisT(T)} · ${(MKV_POS.find(x => x.k === T.posicion) || MKV_POS[0]).l}` : '<span class="mkv-fuera">Anuncio fijo · No sale en el video</span>'}</p>
       </div>
+      <button type="button" class="mkv-tg${T.enabled ? ' on' : ''}" title="${T.enabled ? 'Sale en el video: toca para quitarlo' : 'No sale: toca para que salga'}" onclick="event.stopPropagation();mkvTerm('enabled', ${!T.enabled})"></button>
     </div>`;
   let nTerm = 0;
   const nDis = (T.disenos || []).length || 1;
@@ -15448,13 +15488,51 @@ function mkvToggle(i, v) {
   if (v && !it.tiene_foto) { toast('Este producto no tiene foto. Agrégala en Inventario para usarlo en el video.', 'warning'); v = false; }
   it.enabled = v; mkvGuardar(); mkvRender();
 }
-function mkvTodos(v) { _mkv.items.forEach(it => it.enabled = v && it.tiene_foto); mkvGuardar(); mkvRender(); }
+function mkvTodos(v) {
+  if (!_mkv.items.length) return;
+  _mkv.items.forEach(it => it.enabled = v && it.tiene_foto); mkvGuardar(); mkvRender();
+  toast(v ? 'Todos los productos con foto salen en el video' : 'Ningún producto sale en el video (siguen en la lista)', 'info');
+}
+// quita todos los productos de la lista de una vez (con opción de deshacer)
+function mkvVaciar() {
+  if (!_mkv.items.length) { toast('La lista ya está vacía', 'info'); return; }
+  showConfirm({
+    title: 'Vaciar la lista', danger: true, icon: 'trash-2', confirmText: 'Sí, vaciar',
+    message: `Se quitarán los ${_mkv.items.length} productos de la lista del video. No se borra nada del inventario.`,
+    onConfirm: () => {
+      _mkvVaciados = _mkv.items.slice();
+      _mkv.items = []; _mkv.sel = 0; _mkv.term = false;
+      mkvGuardar(); mkvRender();
+      toast('Lista vacía', 'success');
+    },
+  });
+}
+let _mkvVaciados = null;
+function mkvDeshacerVaciar() {
+  if (!_mkvVaciados) return;
+  _mkv.items = _mkvVaciados.concat(_mkv.items); _mkvVaciados = null;
+  mkvGuardar(); mkvRender(); toast('Lista recuperada', 'success');
+}
+// ordenar arrastrando
+let _mkvArr = -1;
+function mkvArrastrar(e, i) { _mkvArr = i; e.dataTransfer.effectAllowed = 'move'; e.currentTarget.classList.add('arrastre'); }
+function mkvSobre(e, i) { if (_mkvArr < 0 || i === _mkvArr) return; e.preventDefault(); e.currentTarget.classList.add('destino'); }
+function mkvSoltar(e, i) {
+  e.preventDefault();
+  const de = _mkvArr; _mkvArr = -1;
+  if (de < 0 || de === i) return mkvRender();
+  const selId = (_mkv.items[_mkv.sel] || {}).producto_id;
+  const [it] = _mkv.items.splice(de, 1);
+  _mkv.items.splice(i, 0, it);
+  const k = _mkv.items.findIndex(x => x.producto_id === selId); if (k >= 0) _mkv.sel = k;
+  mkvGuardar(); mkvRender();
+}
+function mkvArrastreFin() { _mkvArr = -1; document.querySelectorAll('#mkv-lista .mkv-fila').forEach(f => f.classList.remove('arrastre', 'destino')); }
 function mkvEstiloTodos() {
   const st = document.getElementById('mkv-c-style').value;
   _mkv.items.forEach(it => it.style = st); mkvGuardar(); mkvRender(); toast('Estilo aplicado a todos', 'success');
 }
 function mkvMover(i, d) {
-  if (_mkv.term) return;
   const j = i + d; if (i < 0 || j < 0 || j >= _mkv.items.length) return;
   [_mkv.items[i], _mkv.items[j]] = [_mkv.items[j], _mkv.items[i]];
   if (_mkv.sel === i) _mkv.sel = j; else if (_mkv.sel === j) _mkv.sel = i;
@@ -15851,6 +15929,11 @@ async function mkvGuardarClave() {
 async function mkvGenerar(soloTerminal = false) {
   if (!soloTerminal && _mkvIAcola.length) { toast('Espera a que la IA termine las descripciones', 'warning'); return; }
   _mkv.items.forEach(it => { if (!it.tiene_foto) it.enabled = false; });     // sin foto no entran al video
+  if (!soloTerminal && !_mkv.items.some(it => it.enabled && !it.sin_stock) && !(_mkv.config.terminal || {}).enabled) {
+    toast(_mkv.items.length ? 'Ningún producto está prendido: prende con el interruptor los que deben salir en el video'
+      : 'Agrega productos a la lista antes de generar el video', 'warning');
+    return;
+  }
   try {
     clearTimeout(_mkvTermT);
     await apiFetch('/marketing/video/config', { method:'PUT', body: JSON.stringify(_mkvConfigBody()) });
