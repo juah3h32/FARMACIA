@@ -130,9 +130,9 @@ async def crear_factura_compra(
         try:
             from app.services.cloudinary_service import upload_documento
             if r.xml_path:
-                r.xml_url = upload_documento(r.xml_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.xml")
+                r.xml_url = await __import__("asyncio").to_thread(upload_documento, r.xml_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.xml")
             if r.pdf_path:
-                r.pdf_url = upload_documento(r.pdf_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.pdf")
+                r.pdf_url = await __import__("asyncio").to_thread(upload_documento, r.pdf_path, "FARMACIA/FACTURAS_COMPRA", f"{r.id}.pdf")
         except Exception:
             pass
         db.commit()

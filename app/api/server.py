@@ -90,7 +90,7 @@ async def _scheduler_cierre_automatico():
 
     # On startup: close any stale shifts from previous days immediately
     await asyncio.sleep(5)  # brief delay so DB is ready
-    stale = _run_cierre_cortes_viejos("Cierre automático — servidor reiniciado")
+    stale = await asyncio.to_thread(_run_cierre_cortes_viejos, "Cierre automático — servidor reiniciado")
     if stale:
         _logger.info(f"Startup: closed {stale} stale shift(s) from previous days")
 
@@ -113,19 +113,19 @@ async def _scheduler_cierre_automatico():
             today = now.date()
 
             # Always close stale shifts from previous days (handles any missed nights)
-            _run_cierre_cortes_viejos("Cierre automático — jornada anterior")
+            await asyncio.to_thread(_run_cierre_cortes_viejos, "Cierre automático — jornada anterior")
 
             # At 21:00 sharp, close today's shifts too
             if now.hour == 21 and now.minute < 2 and today not in _eod_done_on:
                 _eod_done_on.add(today)
-                n = _run_cierre_todos_hoy("Cierre automático 21:00")
+                n = await asyncio.to_thread(_run_cierre_todos_hoy, "Cierre automático 21:00")
                 if n:
                     _logger.info(f"Scheduler 21:00: closed {n} shift(s)")
             # At 7:00 send daily WhatsApp alerts if configured
             if now.hour == 7 and now.minute < 2:
                 try:
                     from app.services.alertas_service import enviar_alertas_diarias
-                    enviar_alertas_diarias()
+                    await asyncio.to_thread(enviar_alertas_diarias)
                 except Exception as exc:
                     _logger.error(f"Alertas 7am error: {exc}")
         except Exception as exc:

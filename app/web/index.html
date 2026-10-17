@@ -18,10 +18,13 @@
     font-style: normal;
   }
 </style>
-<script src="/static/tailwind.js"></script>
+<!-- Estilos ya compilados (scripts/estilos): antes Tailwind los calculaba mientras corría el programa -->
+<link rel="stylesheet" href="/static/tailwind.css">
 <script src="/static/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<!-- Códigos de barras y QR de etiquetas: copias locales (antes venían de internet y retrasaban el inicio;
+     la de QR apuntaba a un archivo que no existe en qrcode@1.5.3, así que el QR nunca se dibujaba) -->
+<script defer src="/static/JsBarcode.all.min.js"></script>
+<script defer src="/static/qrcode.min.js"></script>
 <!-- ═══════════ TURNO PANEL MODAL ═══════════ -->
 <!-- ═══════════ MODAL CIERRE MENSUAL RESICO ═══════════ -->
 <div id="modal-cierre-resico" class="fixed inset-0 z-[980] hidden items-center justify-center">
@@ -1039,7 +1042,7 @@
   });
 })();
 
-  tailwind.config = {
+  if (window.tailwind) tailwind.config = {        // (la configuración real está en scripts/estilos)
     theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'] } } }
   }
 </script>
@@ -1097,6 +1100,21 @@
   .page[data-page="settings"].active { display:block !important; overflow-y:auto; overflow-x:hidden; }
   .page[data-page="reports"].active { overflow-y:auto; overflow-x:hidden; }
   .page[data-page="marketing"].active { gap:0.75rem; overflow:hidden; }
+  .mkt-card { display:flex; align-items:center; gap:18px; text-align:left; background:#fff; border:1px solid #E2E8F0;
+    border-radius:20px; padding:26px 24px; min-height:150px; cursor:pointer; position:relative; overflow:hidden;
+    box-shadow:0 1px 2px rgba(15,23,42,.04); transition:transform .18s, box-shadow .18s, border-color .18s; }
+  .mkt-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--c); opacity:0; transition:opacity .18s; }
+  .mkt-card:hover { transform:translateY(-2px); border-color:var(--c); box-shadow:0 14px 30px rgba(15,23,42,.10); }
+  .mkt-card:hover::before { opacity:1; }
+  .mkt-card:focus-visible { outline:2px solid var(--c); outline-offset:2px; }
+  .mkt-card-ico { width:60px; height:60px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; background:var(--cb); color:var(--c); }
+  .mkt-card-txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .mkt-card-t { font-size:17px; font-weight:800; color:#0F172A; }
+  .mkt-card-d { font-size:13px; line-height:1.45; color:#64748B; }
+  .mkt-card-ir { width:36px; height:36px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; color:#94A3B8; background:#F1F5F9; transition:background .18s, color .18s, transform .18s; }
+  .mkt-card:hover .mkt-card-ir { background:var(--c); color:#fff; transform:translateX(3px); }
   .mkv-chip { height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:700; background:#FEF3C7; color:#B45309; }
   .mkv-chip:hover { filter:brightness(.96); }
   .mkv-dark { height:38px; padding:0 12px; border-radius:11px; font-size:13px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#fff; outline:none; }
@@ -3731,8 +3749,56 @@
       <!-- ─── MARKETING ─────────────────────────────── -->
       <div data-page="marketing" class="page flex flex-col gap-3" style="height:100%;overflow:hidden">
 
-        <!-- Tab bar -->
-        <div class="bg-white rounded-2xl border flex overflow-hidden flex-shrink-0" style="border-color:#E2E8F0">
+        <!-- Inicio de Marketing: una tarjeta por herramienta -->
+        <div id="mkt-panel-inicio" class="flex-1 overflow-y-auto" style="display:flex">
+          <div class="w-full max-w-5xl mx-auto flex flex-col justify-center py-4">
+            <div class="mb-5">
+              <p class="text-[11px] font-bold uppercase tracking-widest" style="color:#64748B">Marketing</p>
+              <h2 class="text-2xl font-extrabold" style="color:#0F172A">¿Qué quieres crear hoy?</h2>
+              <p class="text-sm mt-1" style="color:#64748B">Elige una herramienta. Los productos, precios y fotos salen de tu inventario.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <button onclick="mktSwitchTab('pdf')" class="mkt-card" style="--c:#2E4A8A;--cb:#EEF2F9">
+                <span class="mkt-card-ico"><i data-lucide="file-text" style="width:26px;height:26px"></i></span>
+                <span class="mkt-card-txt">
+                  <span class="mkt-card-t">Catálogo PDF</span>
+                  <span class="mkt-card-d">Lista de productos con precios y fotos, lista para imprimir o enviar.</span>
+                </span>
+                <span class="mkt-card-ir"><i data-lucide="arrow-right" style="width:18px;height:18px"></i></span>
+              </button>
+              <button onclick="mktSwitchTab('promo')" class="mkt-card" style="--c:#C2410C;--cb:#FFF4EC">
+                <span class="mkt-card-ico"><i data-lucide="image" style="width:26px;height:26px"></i></span>
+                <span class="mkt-card-txt">
+                  <span class="mkt-card-t">Imagen promocional</span>
+                  <span class="mkt-card-d">Imagen de una oferta o paquete para redes sociales y WhatsApp.</span>
+                </span>
+                <span class="mkt-card-ir"><i data-lucide="arrow-right" style="width:18px;height:18px"></i></span>
+              </button>
+              <button onclick="mktSwitchTab('video')" class="mkt-card" style="--c:#6D28D9;--cb:#F4EFFE">
+                <span class="mkt-card-ico"><i data-lucide="clapperboard" style="width:26px;height:26px"></i></span>
+                <span class="mkt-card-txt">
+                  <span class="mkt-card-t">Video promocional</span>
+                  <span class="mkt-card-d">Video de promociones para la pantalla de la farmacia.</span>
+                </span>
+                <span class="mkt-card-ir"><i data-lucide="arrow-right" style="width:18px;height:18px"></i></span>
+              </button>
+              <button onclick="mktSwitchTab('manual')" class="mkt-card" style="--c:#047857;--cb:#ECFDF5">
+                <span class="mkt-card-ico"><i data-lucide="book-open" style="width:26px;height:26px"></i></span>
+                <span class="mkt-card-txt">
+                  <span class="mkt-card-t">Manual PDF</span>
+                  <span class="mkt-card-d">Guía de uso del sistema para capacitar a tu equipo.</span>
+                </span>
+                <span class="mkt-card-ir"><i data-lucide="arrow-right" style="width:18px;height:18px"></i></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab bar (dentro de una sección; "Marketing" regresa a las tarjetas) -->
+        <div id="mkt-barra" class="bg-white rounded-2xl border flex overflow-hidden flex-shrink-0" style="border-color:#E2E8F0;display:none">
+          <button onclick="mktSwitchTab('inicio')" title="Volver a Marketing"
+            class="h-11 px-4 text-sm font-semibold flex items-center gap-1.5 flex-shrink-0 hover:bg-slate-50 transition-colors"
+            style="color:#1d2140;border-right:1px solid #E2E8F0"><i data-lucide="layout-grid" style="width:15px;height:15px"></i>Marketing</button>
           <button id="mkt-tab-pdf" onclick="mktSwitchTab('pdf')"
             class="flex-1 h-11 text-sm font-semibold transition-all"
             style="background:#1d2140;color:#fff"><i data-lucide="file-down" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"></i>Catálogo PDF</button>
@@ -3748,7 +3814,7 @@
         </div>
 
         <!-- ── PDF Panel ── -->
-        <div id="mkt-panel-pdf" class="flex flex-col gap-3 flex-1 overflow-hidden">
+        <div id="mkt-panel-pdf" class="flex flex-col gap-3 flex-1 overflow-hidden" style="display:none">
           <div class="bg-white rounded-2xl border p-3 flex items-center gap-3 flex-shrink-0 flex-wrap" style="border-color:#E2E8F0">
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold" style="color:#64748B">Filtro:</span>
@@ -6676,7 +6742,20 @@ const fmtDate = iso => {
   return `${d}/${m}/${y}`;
 };
 
-function icons() { if (window.lucide) lucide.createIcons(); }
+// Dibuja solo los íconos nuevos o los que cambiaron de nombre. Antes se redibujaban TODOS los del
+// documento en cada llamada (hasta ~4,000 con Inventario abierto): cada producto al carrito costaba ~100 ms.
+function icons(root) {
+  if (!window.lucide) return;
+  const base = root || document;
+  let n = 0;
+  base.querySelectorAll('[data-lucide]').forEach(el => {
+    const nm = el.getAttribute('data-lucide');
+    if (el.tagName.toLowerCase() !== 'svg' || !el.classList.contains('lucide-' + nm)) { el.setAttribute('data-lci', nm); n++; }
+  });
+  if (!n) return;
+  lucide.createIcons({ nameAttr: 'data-lci', root: base });
+  base.querySelectorAll('[data-lci]').forEach(el => el.removeAttribute('data-lci'));
+}
 
 // Fecha local YYYY-MM-DD para inputs type=date — toISOString() es UTC y en
 // México después de las 18:00 ya da el día siguiente.
@@ -6758,7 +6837,7 @@ function showConfirm({ title, message, confirmText='Confirmar', cancelText='Canc
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
   const close = () => overlay.remove();
   overlay.querySelector('[data-cfm-bg]').onclick    = close;
   overlay.querySelector('[data-cfm-cancel]').onclick = close;
@@ -7045,7 +7124,7 @@ async function startMpPayment(saleBody) {
   _mpSetMode('waiting');
   const m = document.getElementById('modal-mp-terminal');
   m.classList.remove('hidden'); m.classList.add('flex');
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
   _mpStart = Date.now();
   _mpStopTimers();
   _mpTickTimer = setInterval(_mpTick, 1000);
@@ -7192,18 +7271,14 @@ function _mpFinishSale(venta) {
     S._pruebaPag    = venta.total;
     S._pruebaMetodo = 'tarjeta';
   }
-  const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
-  const ticketEl   = document.getElementById('pay-ticket-texto');
-  if (venta.ticket_texto && ticketWrap && ticketEl) {
-    ticketEl.textContent = venta.ticket_texto;
-    ticketWrap.classList.remove('hidden');
-  } else if (ticketWrap) { ticketWrap.classList.add('hidden'); }
+  // Venta real: sin vista previa del ticket (solo el cambio y "Imprimir ticket" si el cliente lo pide)
+  document.getElementById('pay-ticket-preview-wrap')?.classList.add('hidden');
   openModal('modal-payment');
   S.cart = []; renderCart();
   document.getElementById('cart-pagado').value = '';
   updateCambio();
   _mpSaleBody = null; _mpOrderId = null;
-  loadPOS(); loadDashboard();
+  loadPOS(); if (document.querySelector('[data-page="dashboard"].active')) loadDashboard();
   if (document.querySelector('[data-page="caja"].active')) loadCajaAdmin();
 }
 
@@ -7380,7 +7455,7 @@ async function _ejecutarCorreccionAudit() {
   } else {
     const err = await res.json().catch(()=>({}));
     toast(err.detail || 'Error al corregir', 'error');
-    if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i data-lucide="wrench" style="width:12px;height:12px"></i> Corregir todo'; lucide.createIcons(); }
+    if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i data-lucide="wrench" style="width:12px;height:12px"></i> Corregir todo'; icons(); }
   }
 }
 
@@ -7516,7 +7591,7 @@ async function startUpdate() {
 function askCancelUpdate() {
   document.getElementById('dl-progress-panel').style.display = 'none';
   document.getElementById('dl-cancel-panel').style.display   = 'block';
-  lucide.createIcons();
+  icons();
 }
 
 function hideCancelConfirm() {
@@ -7838,7 +7913,14 @@ function codCopiar() {
   navigator.clipboard.writeText(_codTexto()).then(() => toast('Códigos copiados', 'success'));
 }
 
+// Revisiones periódicas de la sesión: se detienen al cerrar sesión (antes cada inicio de sesión
+// agregaba otra copia y al final del día cada revisión corría varias veces).
+let _sesionTimers = [];
+function _cadaSesion(fn, ms) { _sesionTimers.push(setInterval(fn, ms)); }
+function _pararTimersSesion() { _sesionTimers.forEach(clearInterval); _sesionTimers = []; }
+
 function doLogout() {
+  _pararTimersSesion();
   S.sucursalRemota = null; document.getElementById('_suc-banner')?.remove();
   S.token=null; S.user=null;
   _SES.removeItem('token'); _SES.removeItem('user');
@@ -7935,7 +8017,7 @@ function _showCierreLogoutModal({ horaAbierto, esperado, esHoraCierre, onCerrarY
     </div>`;
 
   document.body.appendChild(overlay);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 
   document.getElementById('_btn-cierre-y-salir').onclick = () => { overlay.remove(); onCerrarYSalir(); };
   document.getElementById('_btn-solo-salir').onclick    = () => { overlay.remove(); onSoloSalir(); };
@@ -7946,6 +8028,7 @@ function _showCierreLogoutModal({ horaAbierto, esperado, esHoraCierre, onCerrarY
 // APP BOOT
 // ══════════════════════════════════════════════════════════
 function launchApp() {
+  _pararTimersSesion();   // por si se llama otra vez sin cerrar sesión: no duplicar revisiones
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').classList.add('flex');
@@ -7964,24 +8047,24 @@ function launchApp() {
   if (integracionesWrap) integracionesWrap.classList.toggle('hidden', S.user?.rol !== 'admin');
   if (S.user?.rol === 'admin') {
     loadIntegracionesStatus();
-    setInterval(loadIntegracionesStatus, 2 * 60 * 1000); // cada 2 min — avisa pronto si cae Turso/Factura.com/OpenAI
+    _cadaSesion(loadIntegracionesStatus, 2 * 60 * 1000); // cada 2 min — avisa pronto si cae Turso/Factura.com/OpenAI
     loadImgSyncStatus();
-    setInterval(loadImgSyncStatus, 5 * 1000); // cada 5s — se ve "en vivo" mientras baja fotos
+    _cadaSesion(loadImgSyncStatus, 5 * 1000); // cada 5s — se ve "en vivo" mientras baja fotos
     loadIntegracionesConfig(); // solo para precargar _removebgAuto antes de abrir el editor de producto
   }
   loadTurnoStatus();
   // Refresca el botón de turno periódicamente — el turno puede haberse cerrado
   // por el scheduler automático (21:00) o desde otro dispositivo, y sin esto el
   // botón se quedaba mostrando "Turno abierto" hasta el próximo evento manual.
-  setInterval(loadTurnoStatus, 60 * 1000);
+  _cadaSesion(loadTurnoStatus, 60 * 1000);
   autoAbrirTurnoSiCorresponde();
   iniciarSchedulerCierreAutomatico();
   loadAlertasCaducidad();
-  setInterval(loadAlertasCaducidad, 5 * 60 * 1000);
+  _cadaSesion(loadAlertasCaducidad, 5 * 60 * 1000);
   loadSuppliers();  // populate proveedor selects in product modal
   checkUpdateSilent();
   // Re-check every 30 min while app is open — shows banner without re-login
-  setInterval(checkUpdateSilent, 30 * 60 * 1000);
+  _cadaSesion(checkUpdateSilent, 30 * 60 * 1000);
   if (S.user?.rol === 'admin') initSucursalSwitch();
 }
 
@@ -8231,7 +8314,8 @@ function tickClock() {
   const n=new Date();
   document.getElementById('clock').textContent=
     `${d[n.getDay()]} ${n.getDate()} ${m[n.getMonth()]}  ${n.toLocaleTimeString('es-MX')}`;
-  setTimeout(tickClock,1000);
+  clearTimeout(window._clockT);              // un solo reloj aunque se inicie sesión varias veces
+  window._clockT = setTimeout(tickClock,1000);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -8350,7 +8434,7 @@ function loadPage(page) {
   }
   if (page==='settings')   initSettings();
   if (page==='historial')  loadHistorial();
-  if (page==='marketing')  loadMarketing();
+  if (page==='marketing')  { mktSwitchTab('inicio'); loadMarketing(); }
   if (page==='citas')         { const hoy=_fechaLocal(new Date()); const fe=document.getElementById('citas-fecha'); if(fe)fe.value=hoy; loadCitas(); }
   if (page==='ordenes-compra') loadOrdenesCompra();
   if (page==='promociones')    loadPromociones();
@@ -8592,11 +8676,12 @@ async function loadPOS() {
     cobrarBtn.title = isAdmin ? 'Solo cajeros pueden cobrar' : '';
   }
   _mpCheckPendientes();  // cobros de terminal aprobados sin venta (1 vez por sesión)
+  const pCli = api('/clientes/');            // se piden los dos a la vez
   const res=await api('/productos/');
   if (!res.ok) return;
   S.allProducts=await res.json();
   renderPosGrid(S.allProducts);
-  const cr=await api('/clientes/');
+  const cr=await pCli;
   if (cr.ok) {
     const cs=await cr.json();
     S.allCustomers=cs;
@@ -9077,15 +9162,15 @@ function renderPosGrid(prods) {
 // _check_new_product_images en app/database/sync_service.py).
 async function _refreshPosImages() {
   try {
-    const res = await api('/productos/');
+    const res = await api('/productos/imagenes');      // solo id + foto (antes el catálogo completo)
     if (!res.ok) return;
-    const fresh = await res.json();
-    const freshById = new Map(fresh.map(p => [p.id, p]));
+    const fotos = new Map(await res.json());
     let changed = false;
     for (const p of S.allProducts) {
-      const f = freshById.get(p.id);
-      if (f && f.imagen_url !== p.imagen_url) {
-        p.imagen_url = f.imagen_url;
+      if (!fotos.has(p.id)) continue;
+      const url = fotos.get(p.id);
+      if (url !== p.imagen_url) {
+        p.imagen_url = url;
         changed = true;
         const thumb = document.querySelector(`#pos-grid [data-pid="${p.id}"] [data-thumb]`);
         if (thumb) thumb.innerHTML = posProductThumb(p.imagen_url, p.id);
@@ -9455,35 +9540,19 @@ async function _processSaleImpl() {
   S._pruebaItems  = body.items;
   S._pruebaPag    = pag;
   S._pruebaMetodo = metodo;
-  // Show ticket preview
-  const ticketWrap = document.getElementById('pay-ticket-preview-wrap');
-  const ticketEl   = document.getElementById('pay-ticket-texto');
-  if (data.ticket_texto && ticketWrap && ticketEl) {
-    ticketEl.textContent = data.ticket_texto;
-    ticketWrap.classList.remove('hidden');
-  } else if (ticketWrap) {
-    ticketWrap.classList.add('hidden');
-  }
+  // Venta real: sin vista previa del ticket (la ventana solo muestra total y cambio)
+  document.getElementById('pay-ticket-preview-wrap')?.classList.add('hidden');
   // Venta ya está en la BD local — mostrar éxito YA, sin esperar red.
   openModal('modal-payment');
   S.cart=[]; renderCart();
   document.getElementById('cart-pagado').value='';
   updateCambio();
-  // Refrescar stock de los productos vendidos, catálogo y dashboard en
-  // background — no bloquear el modal de "venta completada" en esto
-  // (antes se esperaba un GET por producto vendido antes de mostrar el modal).
-  const soldIds = [...new Set(body.items.map(i=>i.producto_id))];
-  Promise.all(soldIds.map(id =>
-    api(`/productos/${id}`).then(r=>r.ok ? r.json() : null).then(fresh=>{
-      if (!fresh || !S.allProducts) return;
-      const idx = S.allProducts.findIndex(p=>p.id===id);
-      if (idx>=0) S.allProducts[idx] = fresh; else S.allProducts.push(fresh);
-    })
-  )).then(() => renderPosGrid(S.allProducts));
-  // Full reload in background to also refresh customers / prune deleted products
+  // Refrescar stock y catálogo en background (no bloquea el modal de "venta completada").
+  // loadPOS ya trae todo el catálogo con el stock nuevo: antes además se pedía cada producto
+  // vendido y se redibujaba la cuadrícula dos veces justo cuando el cajero escanea lo siguiente.
   loadPOS();
-  // Refresh dashboard stats silently after every sale
-  loadDashboard();
+  // El dashboard se recarga solo al abrirlo (y cada 30 s mientras está abierto)
+  if (document.querySelector('[data-page="dashboard"].active')) loadDashboard();
   // If Control de Caja está abierto (misma terminal), refresca capital de
   // inversión/ganancia al instante en vez de esperar al poll de 20s
   if (document.querySelector('[data-page="caja"].active')) loadCajaAdmin();
@@ -9506,14 +9575,16 @@ async function loadInventory() {
   const audBtn = document.getElementById('inv-auditoria-btn');
   if (audBtn) audBtn.classList.toggle('hidden', S.user?.rol !== 'admin');
 
-  // Refresh expiry data so the "Próx. vencimiento" column is current
+  // Las tres consultas salen a la vez (antes una tras otra). Las alertas de caducidad
+  // terminan antes de dibujar la tabla, para que "Próx. vencimiento" salga al día.
+  const pCats = api('/productos/categorias');
+  const pProd = api('/productos/?solo_activos=true');
   await loadAlertasCaducidad();
-
-  const res=await api('/productos/?solo_activos=true');
+  const res=await pProd;
   if (!res.ok) return;
   S.allInv=await res.json();
   renderInvTable(S.allInv);
-  const cr=await api('/productos/categorias');
+  const cr=await pCats;
   if (cr.ok) {
     const cats=await cr.json();
     const sel=document.getElementById('pm-cat');
@@ -9522,7 +9593,8 @@ async function loadInventory() {
   }
 }
 
-function invFilter(q) { invApplyFilters(); }
+// Al escribir en la búsqueda se espera a que dejes de teclear (antes redibujaba la tabla en cada letra)
+function invFilter(q) { clearTimeout(S.invFiltroT); S.invFiltroT = setTimeout(invApplyFilters, 150); }
 
 function invApplyFilters() {
   const q      = (document.getElementById('inv-search')?.value || '').trim().toLowerCase();
@@ -9878,7 +9950,7 @@ function _mostrarAccionesVenta(venta, metodo, porTerminal) {
   if (acc) { acc.classList.toggle('hidden', !S._ultimaVenta); acc.classList.toggle('flex', !!S._ultimaVenta); }
   if (nota) nota.classList.toggle('hidden', !(S._ultimaVenta && tarjeta));
   if (btnT) { btnT.classList.toggle('hidden', !(S._ultimaVenta && porTerminal)); }
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 }
 
 async function reimprimirUltimaVenta() {
@@ -10377,7 +10449,7 @@ async function pmGenerarDescripcion() {
   const icon = document.getElementById('pm-generar-icon');
   const txt  = document.getElementById('pm-generar-txt');
   btn.disabled = true;
-  icon.setAttribute('data-lucide','loader-2'); lucide.createIcons();
+  icon.setAttribute('data-lucide','loader-2'); icons();
   txt.textContent  = 'Generando...';
   try {
     const body = {
@@ -10400,7 +10472,7 @@ async function pmGenerarDescripcion() {
     toast(e?.message||'Error al generar descripción','error');
   } finally {
     btn.disabled     = false;
-    icon.setAttribute('data-lucide','wand-2'); lucide.createIcons();
+    icon.setAttribute('data-lucide','wand-2'); icons();
     txt.textContent  = 'IA';
   }
 }
@@ -11893,7 +11965,7 @@ function openCierreResico() {
   const m = document.getElementById('modal-cierre-resico');
   m.classList.remove('hidden');
   m.classList.add('flex');
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 }
 
 function closeCierreResico() {
@@ -12211,7 +12283,7 @@ function _gmPintarEncabezado() {
     b.style.color = on ? (m === 'ganancia' ? '#15803D' : '#1d2140') : '#64748B';
     b.style.boxShadow = on ? '0 1px 4px rgba(15,23,42,.12)' : 'none';
   }
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 }
 
 function _gmCambiarModo(modo) {
@@ -12404,7 +12476,7 @@ function abrirReinicioSaldos() {
       </div>
     </div>`;
   document.body.appendChild(ov);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
   const cerrar = () => ov.remove();
   ov.addEventListener('click', e => { if (e.target === ov) cerrar(); });
   document.getElementById('_rein-cancel').onclick = cerrar;
@@ -12606,7 +12678,7 @@ function editarConceptoRetiro(id) {
     </div>`;
 
   document.body.appendChild(overlay);
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 
   const input  = document.getElementById('_input-editar-concepto');
   const errEl  = document.getElementById('_err-editar-concepto');
@@ -12767,7 +12839,7 @@ function iniciarSchedulerCierreAutomatico() {
   _cerrarCorteViejo();
 
   let _eodDoneOn = null;
-  setInterval(async () => {
+  _cadaSesion(async () => {
     if (!S.user) return;
     const now = new Date();
     const todayStr = now.toDateString();
@@ -12989,7 +13061,7 @@ async function cerrarTurnoAuto() {
   const res = await api('/cortes/cerrar', {method:'POST', body:JSON.stringify({monto_cierre:esperado, notas, automatico:true})});
   btn.disabled = false;
   btn.innerHTML = '<i data-lucide="zap" style="width:18px;height:18px"></i>Cierre automático<span class="font-normal opacity-80">Usa monto esperado</span>';
-  lucide.createIcons();
+  icons();
   await _procesarCierreRespuesta(res);
 }
 
@@ -13003,7 +13075,7 @@ async function cerrarTurno() {
   const res = await api('/cortes/cerrar', {method:'POST', body:JSON.stringify({monto_cierre:monto, notas:notas||null})});
   btn.disabled = false;
   btn.innerHTML = '<i data-lucide="square" style="width:16px;height:16px"></i> Cerrar Turno';
-  lucide.createIcons();
+  icons();
   await _procesarCierreRespuesta(res);
 }
 
@@ -14100,6 +14172,7 @@ async function posSearchKeydown(e) {
   if (exact) {
     addToCart(exact.id);
     document.getElementById('pos-search').value = '';
+    clearTimeout(S.searchT);   // la búsqueda pendiente de las teclas del escáner ya no hace falta (redibujaba otra vez)
     renderPosGrid(S.allProducts);
     toast(exact.nombre + ' agregado', 'success');
   } else {
@@ -14983,7 +15056,7 @@ async function cargarListaSucursales() {
   el.className = 'grid gap-3';
   el.style.gridTemplateColumns = 'repeat(auto-fill,minmax(170px,190px))';
   el.innerHTML = tarjetas + agregar;
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) icons();
 }
 async function agregarSucursal() {
   const body = {
@@ -15105,6 +15178,11 @@ function _mktUpdateDescStatus() {
 }
 
 function mktSwitchTab(tab) {
+  // 'inicio' = las 4 tarjetas; dentro de una sección se ve la barra de pestañas
+  const ini = document.getElementById('mkt-panel-inicio');
+  if (ini) ini.style.display = tab === 'inicio' ? 'flex' : 'none';
+  const barra = document.getElementById('mkt-barra');
+  if (barra) barra.style.display = tab === 'inicio' ? 'none' : 'flex';
   const tabs = ['pdf', 'promo', 'manual', 'video'];
   tabs.forEach(t => {
     const pan = document.getElementById(`mkt-panel-${t}`);
@@ -15126,7 +15204,7 @@ function mktSwitchTab(tab) {
 
 async function mktDescargarManual() {
   const btn = document.getElementById('mkt-btn-manual');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:16px;height:16px"></i> Generando...'; lucide.createIcons(); }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" style="width:16px;height:16px"></i> Generando...'; icons(); }
   toast('Generando manual PDF...', 'info');
   try {
     const res = await fetch('/api/marketing/manual-pdf', {
@@ -15142,7 +15220,7 @@ async function mktDescargarManual() {
   } catch(e) {
     toast('Error descargando manual', 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i> Descargar Manual PDF'; lucide.createIcons(); }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i> Descargar Manual PDF'; icons(); }
   }
 }
 
@@ -15172,7 +15250,7 @@ let _mkvSaveT = null, _mkvPrevT = null, _mkvPrevTok = 0, _mkvPoll = null, _mkvIA
 async function loadVideoPromo() {
   try {
     const d = await apiFetch('/marketing/video');
-    _mkv.config = d.config; _mkv.items = d.items; _mkv.iaLista = d.ia_lista; _mkv.cargado = true;
+    _mkv.config = d.config; _mkv.items = d.items; _mkv.iaLista = d.ia_lista; _mkv.iaProv = d.ia_proveedor || ''; _mkv.cargado = true;
     if (_mkv.sel >= _mkv.items.length) _mkv.sel = _mkv.items.length - 1;
     if (_mkv.sel < 0 && _mkv.items.length) _mkv.sel = 0;
     const c = d.config;
@@ -15226,8 +15304,11 @@ function mkvIATodos() {
 }
 function mkvBadgeIA() {
   const b = document.getElementById('mkv-ia-badge');
-  b.textContent = _mkv.iaLista ? '· conectada' : '· sin configurar';
-  b.style.color = _mkv.iaLista ? '#16A34A' : '#DC2626';
+  if (_mkv.iaProv === 'openai') { b.textContent = '· conectada'; b.style.color = '#16A34A'; b.title = ''; }
+  else if (_mkv.iaProv === 'claude') {
+    b.textContent = '· esta PC no tiene clave de OpenAI (se usa Claude)'; b.style.color = '#D97706';
+    b.title = 'Pega tu clave de OpenAI abajo para usar OpenAI en esta PC';
+  } else { b.textContent = '· sin configurar'; b.style.color = '#DC2626'; b.title = ''; }
 }
 
 function _mkvEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -15920,7 +16001,9 @@ async function mkvGuardarClave() {
   try {
     await apiFetch('/marketing/video/clave', { method:'PUT', body: JSON.stringify({ api_key: k }) });
     document.getElementById('mkv-clave').value = '';
-    _mkv.iaLista = true; mkvBadgeIA(); toast('Clave guardada', 'success');
+    _mkv.iaLista = true;
+    if (!k.startsWith('sk-ant-')) _mkv.iaProv = 'openai'; else if (!_mkv.iaProv) _mkv.iaProv = 'claude';
+    mkvBadgeIA(); toast('Clave guardada', 'success');
     _mkv.items.forEach(it => { if (_mkvSinTextoIA(it)) mkvEncolarIA(it.producto_id); });
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -16324,7 +16407,7 @@ function toggleChat() {
   panel.style.display = _chatOpen ? 'flex' : 'none';
   if (_chatOpen) {
     panel.style.flexDirection = 'column';
-    lucide.createIcons();
+    icons();
     document.getElementById('chat-input').focus();
   }
 }
@@ -16360,7 +16443,7 @@ function _chatAppendBot(text, sugeridos) {
       ${text.replace(/\n/g,'<br>')}${sugsHtml}
     </div>`;
   msgs.appendChild(div);
-  lucide.createIcons();
+  icons();
   msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -16390,7 +16473,7 @@ function _chatShowTyping() {
       </div>
     </div>`;
   msgs.appendChild(div);
-  lucide.createIcons();
+  icons();
   msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -17303,7 +17386,7 @@ let _codPreviewTimer = null;
 function openCodigosModal(pid = null) {
   _codSelPid = pid;
   openModal('modal-codigos');
-  lucide.createIcons();
+  icons();
   codLoadProducts();
 }
 

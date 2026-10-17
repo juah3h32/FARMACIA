@@ -1331,7 +1331,7 @@ def _reconstruir_historicos_run() -> dict:
     if _cfg.TURSO_SYNC:
         try:
             from app.database.sync_service import sync_from_turso
-            sync_from_turso()
+            sync_from_turso(completo=True)
         except Exception as _e:
             print(f"[reconstruir] sync_from_turso warning: {_e}")
 

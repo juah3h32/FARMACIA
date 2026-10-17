@@ -3,6 +3,18 @@ Minimal DB-API 2.0 adapter for Turso (LibSQL) HTTP API.
 Uses the /v2/pipeline endpoint — no native binary required.
 """
 import requests as _requests
+import threading as _threading
+
+# Una conexión HTTPS reutilizable por hilo: sin esto cada consulta a Turso abría una conexión
+# nueva (TCP + TLS) y un ciclo de sincronización hacía ~30 apretones de mano.
+_hilo = _threading.local()
+
+
+def sesion_http() -> _requests.Session:
+    s = getattr(_hilo, "sesion", None)
+    if s is None:
+        s = _hilo.sesion = _requests.Session()
+    return s
 
 # ── Parameter conversion ──────────────────────────────────────────────────────
 
@@ -171,7 +183,7 @@ class TursoConnection:
                 {"type": "close"},
             ]
         }
-        resp = _requests.post(self._url, headers=self._headers, json=payload, timeout=30)
+        resp = sesion_http().post(self._url, headers=self._headers, json=payload, timeout=30)
         if not resp.ok:
             body = resp.text[:800]
             print(f"[Turso] HTTP {resp.status_code} | SQL: {sql[:300]} | Body: {body}")

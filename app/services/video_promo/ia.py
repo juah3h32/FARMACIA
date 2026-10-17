@@ -52,21 +52,43 @@ class IAError(Exception):
     pass
 
 
+class IASinUso(IAError):
+    """La cuenta no se puede usar ahora (sin saldo o clave inválida): se intenta con la otra IA."""
+
+
 def configurada() -> bool:
     return bool(cfg.OPENAI_API_KEY or cfg.ANTHROPIC_API_KEY)
+
+
+def proveedor() -> str:
+    """La IA que se usa primero en esta PC: 'openai', 'claude' o ''."""
+    return 'openai' if cfg.OPENAI_API_KEY else ('claude' if cfg.ANTHROPIC_API_KEY else '')
 
 
 def describir(info: dict) -> dict:
     """info: nombre, nombre_generico, marca, presentacion, concentracion, contenido, descripcion, requiere_receta."""
     datos = 'Datos del producto en el inventario:\n' + '\n'.join(
         f'{k}: {v}' for k, v in info.items() if v not in (None, '', False))
-    if cfg.OPENAI_API_KEY:
-        text = _con_openai(datos, cfg.OPENAI_API_KEY)
-    elif cfg.ANTHROPIC_API_KEY:
-        text = _con_claude(datos, cfg.ANTHROPIC_API_KEY)
-    else:
-        raise IAError('Falta la clave de OpenAI. Agrégala en Configuración > Integraciones '
+    # OpenAI primero; si esa cuenta no se puede usar (sin saldo, clave mala) y hay clave de Claude, Claude.
+    intentos = [(n, f, k) for n, f, k in (('OpenAI', _con_openai, cfg.OPENAI_API_KEY),
+                                          ('Claude', _con_claude, cfg.ANTHROPIC_API_KEY)) if k]
+    if not intentos:
+        raise IAError('Falta la clave de OpenAI en esta PC. Agrégala en Configuración > Integraciones '
                       '(o en Marketing → Video promocional → Ajustes del video).')
+    fallos = []
+    text = None
+    for nombre, fn, clave in intentos:
+        try:
+            text = fn(datos, clave)
+            break
+        except IASinUso as e:
+            fallos.append(str(e))
+    if text is None:
+        msg = ' · '.join(fallos)
+        if not cfg.OPENAI_API_KEY:
+            msg += (' En esta PC no hay clave de OpenAI: agrégala en Configuración > Integraciones '
+                    '(o en Video promocional → Ajustes → Inteligencia artificial).')
+        raise IAError(msg)
     try:
         d = json.loads(text)
     except json.JSONDecodeError:
@@ -101,12 +123,12 @@ def _con_openai(datos: str, api_key: str) -> str:
             )
             return resp.output_text
         except openai.AuthenticationError:
-            raise IAError('La clave de OpenAI no es válida. Revísala en Configuración > Integraciones.')
+            raise IASinUso('La clave de OpenAI no es válida. Revísala en Configuración > Integraciones.')
         except openai.PermissionDeniedError:
             raise IAError('La clave de OpenAI no tiene permiso para este modelo. Revisa tu cuenta en platform.openai.com.')
         except openai.RateLimitError as e:
             if 'quota' in str(e).lower():
-                raise IAError('Sin créditos en OpenAI. Agrega saldo en platform.openai.com/billing')
+                raise IASinUso('Sin créditos en OpenAI. Agrega saldo en platform.openai.com/billing.')
             raise IAError('Demasiadas solicitudes seguidas. Espera un minuto e intenta de nuevo.')
         except (openai.NotFoundError, openai.BadRequestError) as e:
             ultimo = e                                     # modelo no disponible en la cuenta: el siguiente
@@ -144,7 +166,7 @@ def _con_claude(datos: str, api_key: str) -> str:
             # la búsqueda se pausó a medias: se reenvía tal cual y el servidor sigue donde iba
             messages = messages[:1] + [{'role': 'assistant', 'content': resp.content}]
     except anthropic.AuthenticationError:
-        raise IAError('La clave de Claude no es válida.')
+        raise IASinUso('La clave de Claude no es válida.')
     except anthropic.PermissionDeniedError:
         raise IAError('La clave de Claude no tiene permiso. Revisa tu cuenta en console.anthropic.com.')
     except anthropic.RateLimitError:
@@ -152,7 +174,7 @@ def _con_claude(datos: str, api_key: str) -> str:
     except anthropic.BadRequestError as e:
         msg = str(getattr(e, 'message', e))
         if 'credit' in msg.lower() or 'balance' in msg.lower():
-            raise IAError('Tu cuenta de Claude no tiene saldo. Agrega crédito en console.anthropic.com.')
+            raise IASinUso('La cuenta de Claude no tiene saldo.')
         raise IAError('Claude rechazó la solicitud: ' + msg[:200])
     except anthropic.APIConnectionError:
         raise IAError('Sin conexión a internet.')

@@ -17,6 +17,7 @@ from datetime import datetime
 import requests as _requests
 import app.config as cfg
 from app.database import ids_pc as _ids_pc
+from app.database.turso_http import sesion_http as _sesion_http
 
 BACKUP_DIR     = cfg.DATA_DIR / "backups"
 BACKUP_KEEP    = 7  # days of local backups to retain
@@ -211,7 +212,7 @@ def _turso_batch(stmts: list[dict]) -> int:
             "requests": [{"type": "execute", "stmt": s} for s in chunk]
             + [{"type": "close"}]
         }
-        resp = _requests.post(url, headers=hdrs, json=payload, timeout=60)
+        resp = _sesion_http().post(url, headers=hdrs, json=payload, timeout=60)
         if not resp.ok:
             raise RuntimeError(f"Turso HTTP {resp.status_code}: {resp.text[:300]}")
         errors = [
@@ -227,13 +228,14 @@ def _turso_batch(stmts: list[dict]) -> int:
     return n_errors
 
 
-def _turso_read_table(table: str) -> tuple[list[str], list[tuple]]:
-    """Read all rows from a Turso table. Returns (col_names, rows_as_python_tuples)."""
+def _turso_read_table(table: str, where: str = "", args: tuple = ()) -> tuple[list[str], list[tuple]]:
+    """Read all rows from a Turso table (or only those matching `where`).
+    Returns (col_names, rows_as_python_tuples)."""
     from app.database.turso_http import connect as turso_connect
     tconn = turso_connect(cfg.TURSO_DATABASE_URL, cfg.TURSO_AUTH_TOKEN)
     cur = tconn.cursor()
     try:
-        cur.execute(f"SELECT * FROM {table}")
+        cur.execute(f"SELECT * FROM {table}" + (f" WHERE {where}" if where else ""), args)
     except Exception as e:
         print(f"[Sync] Could not read Turso:{table} — {e}")
         return [], []
@@ -765,9 +767,9 @@ def _push_tombstones(lconn) -> None:
     ])
 
 
-def _pull_tombstones(lconn) -> None:
+def _pull_tombstones(lconn, bajado=None) -> None:
     lconn.execute(_TOMB_DDL)
-    cols, rows = _turso_read_table("sync_borrados")
+    cols, rows = bajado if bajado is not None else _turso_read_table("sync_borrados")
     if cols and rows:
         lconn.executemany(_TOMB_INSERT, [tuple(r) for r in rows])
 
@@ -932,28 +934,124 @@ def delete_ids_from_turso(table: str, ids: list[int]) -> None:
         _turso_batch([{"sql": f"DELETE FROM {table} WHERE id IN ({ids_str})", "args": []}])
 
 
-def sync_from_turso() -> int:
+# ── Pull incremental de las tablas que crecen sin fin ────────────────────────
+# ventas, items_venta y CFDI se bajaban COMPLETAS en cada latido (cada 3 min). Ahora solo lo que
+# cambió desde el último pull (con 15 min de margen por relojes desfasados entre PCs). Son
+# justo las que ya se SUBEN por actualizado_en / id, así que lo que llega a la nube trae esa
+# marca. Productos sigue completo: su stock viaja como delta y no mueve actualizado_en en la nube.
+# Un pull completo se hace igual al arrancar, con "Sincronizar ahora" y cada 30 min.
+_PULL_INCREMENTAL = ("ventas", "cfdi_facturas_globales", "cfdi_facturas_individuales")
+_PULL_MARGEN_MIN = 15
+_PULL_COMPLETO_CADA = 30 * 60
+_PULL_FILE = cfg.DATA_DIR / "pull_marcas.json"
+_pull_completo_en = 0.0      # time.time() del último pull completo (0 = nunca en esta sesión)
+
+
+def _leer_marcas_pull() -> dict:
+    try:
+        return json.loads(_PULL_FILE.read_text(encoding="utf-8")) if _PULL_FILE.exists() else {}
+    except Exception:
+        return {}
+
+
+def _guardar_marcas_pull(m: dict) -> None:
+    try:
+        _PULL_FILE.write_text(json.dumps(m), encoding="utf-8")
+    except Exception as e:
+        print(f"[Sync] No se pudieron guardar las marcas del pull: {e}")
+
+
+def _con_margen(ts: str) -> str:
+    from datetime import timedelta
+    try:
+        t = datetime.strptime(ts.replace("T", " ")[:19], "%Y-%m-%d %H:%M:%S")
+        return (t - timedelta(minutes=_PULL_MARGEN_MIN)).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ""
+
+
+def _filtros_pull(marcas: dict) -> dict:
+    """{tabla: (where, args)} para bajar solo lo nuevo; sin marca = esa tabla completa."""
+    f = {}
+    for t in _PULL_INCREMENTAL:
+        desde = _con_margen(marcas.get(t, ""))
+        if desde:
+            f[t] = (f"{_ts_sql('actualizado_en')} > ?", (desde,))
+    desde_v = _con_margen(marcas.get("ventas", ""))
+    if desde_v and marcas.get("items_venta_id"):
+        # renglones nuevos + los de ventas que cambiaron (devoluciones parciales)
+        f["items_venta"] = (f"id > ? OR venta_id IN (SELECT id FROM ventas WHERE {_ts_sql('actualizado_en')} > ?)",
+                            (int(marcas["items_venta_id"]), desde_v))
+    return f
+
+
+def _marcas_de(bajado: dict, marcas: dict) -> dict:
+    """Marcas nuevas a partir de lo que se bajó (las fechas son las de la nube)."""
+    m = dict(marcas)
+    for t in _PULL_INCREMENTAL:
+        r = bajado.get(t)
+        if isinstance(r, tuple) and r[0] and "actualizado_en" in r[0]:
+            i = r[0].index("actualizado_en")
+            ts = [str(x[i]).replace("T", " ") for x in r[1] if x[i]]
+            if ts:
+                m[t] = max([m.get(t, "")] + ts)
+    r = bajado.get("items_venta")
+    if isinstance(r, tuple) and r[0] and r[1] and "id" in r[0]:
+        i = r[0].index("id")
+        m["items_venta_id"] = max([int(m.get("items_venta_id") or 0)] + [int(x[i]) for x in r[1]])
+    return m
+
+
+def _bajar_tablas(tablas: list, filtros: dict | None = None) -> dict:
+    """Lee esas tablas de Turso (4 a la vez). Por tabla: (cols, rows) o la excepción."""
+    from concurrent.futures import ThreadPoolExecutor
+    filtros = filtros or {}
+
+    def _una(t):
+        try:
+            return _turso_read_table(t, *filtros[t]) if t in filtros else _turso_read_table(t)
+        except Exception as e:
+            return e
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        return dict(zip(tablas, ex.map(_una, tablas)))
+
+
+def sync_from_turso(completo: bool = False) -> int:
     """
     Pull all FULL_SYNC tables from Turso → local SQLite (INSERT OR REPLACE).
     Runs on every startup so that products added on other PCs appear locally.
+    ventas / items_venta / CFDI se bajan solo con lo que cambió (ver _PULL_INCREMENTAL),
+    salvo completo=True, el primer pull de la sesión o si pasaron 30 min del último completo.
     Returns total rows merged.
     """
+    global _pull_completo_en
     if not _sucursal_coincide():
         return 0
     with _lock:
+        marcas = _leer_marcas_pull()
+        es_completo = completo or not _pull_completo_en or (time.time() - _pull_completo_en > _PULL_COMPLETO_CADA)
+        filtros = {} if es_completo else _filtros_pull(marcas)
+        # Primero se baja todo de la nube y después se escribe de una vez: antes la base local
+        # quedaba bloqueada para escribir mientras esperaba ~30 respuestas de internet, y una
+        # venta en ese momento se quedaba esperando.
+        bajado = _bajar_tablas(["sync_borrados"] + [t for t in _TABLE_ORDER if t in _FULL_SYNC], filtros)
         lconn = _local_conn()
         try:
             lconn.execute("PRAGMA foreign_keys = OFF")
             total = 0
             try:
-                _pull_tombstones(lconn)
+                if isinstance(bajado["sync_borrados"], Exception):
+                    raise bajado["sync_borrados"]
+                _pull_tombstones(lconn, bajado["sync_borrados"])
             except Exception as e:
                 print(f"[Sync] sync_borrados pull warning: {e}")
             for table in _TABLE_ORDER:
                 if table not in _FULL_SYNC:
                     continue
                 try:
-                    cols, rows = _turso_read_table(table)
+                    if isinstance(bajado[table], Exception):
+                        raise bajado[table]
+                    cols, rows = bajado[table]
                     if not cols or not rows:
                         continue
                     col_str = ", ".join(cols)
@@ -1097,7 +1195,11 @@ def sync_from_turso() -> int:
                     lconn.execute(f"DELETE FROM {table} WHERE id IN ({ids_b})")
             lconn.execute("PRAGMA foreign_keys = ON")
             lconn.commit()
-            print(f"[Sync] Pull complete — {total} rows merged from Turso")
+            # Las marcas avanzan solo después de guardar (y solo con tablas que se bajaron bien)
+            _guardar_marcas_pull(_marcas_de(bajado, marcas))
+            if es_completo and not any(isinstance(bajado.get(t), Exception) for t in _PULL_INCREMENTAL + ("items_venta",)):
+                _pull_completo_en = time.time()
+            print(f"[Sync] Pull {'completo' if es_completo else 'incremental'} — {total} rows merged from Turso")
             _fire_post_sync()
             return total
         except Exception as e:
@@ -1118,7 +1220,7 @@ def force_sync() -> dict:
         push_err = str(e)
         print(f"[Sync] force_sync push error: {e}")
     try:
-        sync_from_turso()
+        sync_from_turso(completo=True)
     except Exception as e:
         pull_err = str(e)
         print(f"[Sync] force_sync pull error: {e}")
@@ -1259,7 +1361,7 @@ def sync_now() -> None:
     (ver /admin/sync-now) para no depender de los ~180s del heartbeat."""
     def _run():
         try:
-            sync_from_turso()
+            sync_from_turso(completo=True)
         except Exception as e:
             print(f"[Sync] sync_now pull error: {e}")
         _sync_product_images_bg()
@@ -1300,26 +1402,33 @@ def _check_new_product_images() -> int:
     if not rows:
         return 0
 
+    fotos_cambiadas = 0
     with _lock:
         lconn = _local_conn()
         try:
             for pid, url, ts in rows:
+                antes = lconn.execute("SELECT imagen_url FROM productos WHERE id = ?", (pid,)).fetchone()
                 # Mismo criterio last-writer-wins que sync_from_turso: solo pisa
                 # imagen_url local si el cambio de Turso es más nuevo — así una
                 # edición hecha en ESTA pc (todavía sin llegar a Turso) no se
                 # pierde si el pull corre justo en medio.
-                lconn.execute(
+                cur = lconn.execute(
                     "UPDATE productos SET imagen_url = ?, actualizado_en = ? "
                     "WHERE id = ? AND (actualizado_en IS NULL OR actualizado_en < ?)",
                     (url, ts, pid, ts),
                 )
+                if cur.rowcount and antes and (antes[0] or "") != (url or ""):
+                    fotos_cambiadas += 1
             lconn.commit()
         finally:
             lconn.close()
 
     _ts_watermarks[_IMG_WATERMARK_KEY] = rows[-1][2]
     _save_watermarks()
-    threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
+    # Una venta también mueve actualizado_en del producto (por el stock): solo se revisan las
+    # fotos si de verdad cambió alguna (antes se hacía una pasada completa tras cada venta).
+    if fotos_cambiadas:
+        threading.Thread(target=_sync_product_images_bg, daemon=True, name="ImgCache").start()
     return len(rows)
 
 
@@ -1407,7 +1516,7 @@ def conectar_y_subir_todo(progreso=None) -> None:
         if not _sucursal_ok:
             raise RuntimeError("La base de la nube es de otra sucursal o no se pudo leer; no se subió nada")
         paso("Bajando lo que hay en la nube de otras computadoras…")
-        sync_from_turso()
+        sync_from_turso(completo=True)
         asegurar_background_sync()
         if _img_watch_thread is None or not _img_watch_thread.is_alive():
             _img_watch_thread = start_image_watch(interval=12)

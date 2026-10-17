@@ -96,7 +96,7 @@ def estado(payload: dict = Depends(get_current_api_user)):
                           ia_verificado=bool(c.get("verificado")), ia_fuente=c.get("fuente", ""),
                           precio_tachado=p.precio_tachado, precio_pieza=p.precio_pieza if p.venta_fraccionada else None))
     return {"config": proy["config"], "items": items, "estilos": s.ESTILOS,
-            "ia_lista": s.ia.configurada(), "tarea": s.estado_tarea(),
+            "ia_lista": s.ia.configurada(), "ia_proveedor": s.ia.proveedor(), "tarea": s.estado_tarea(),
             "drive_sugerido": s.drive_sugerido(), "drive_destino": s.carpeta_drive(proy["config"]),
             "cambios_precio": cambios}
 

@@ -22,7 +22,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # Hash de relleno: el login lo verifica aunque el usuario no exista, así tarda lo mismo
 # y no se puede saber por el tiempo de respuesta qué usuarios existen.
-DUMMY_HASH = bcrypt.hashpw(b"no-existe", bcrypt.gensalt()).decode("utf-8")
+# (Ya calculado, mismo costo 12: generarlo en cada arranque costaba ~0.2 s.)
+DUMMY_HASH = "$2b$12$pCaBIuGaj9Jen.pLr7irL.2GBa8ZcUPoy1mpiZ6YD1AsHDamrfrP2"
 
 # Contraseñas con las que se crean las cuentas de fábrica: son públicas, hay que cambiarlas.
 _PASSWORDS_DE_FABRICA = {"admin123", "cajero123"}

@@ -235,7 +235,7 @@ async def subir_imagen(prod_id: int, file: UploadFile = File(...), payload: dict
             tmp_path = tmp.name
         try:
             from app.services.cloudinary_service import upload_product_image
-            url = upload_product_image(tmp_path, f"web_{prod_id}")
+            url = await __import__("asyncio").to_thread(upload_product_image, tmp_path, f"web_{prod_id}")   # sin congelar el POS
             prod.imagen_url = url
             db.commit()
             return {"imagen_url": url}

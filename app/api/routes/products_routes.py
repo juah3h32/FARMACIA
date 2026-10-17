@@ -359,6 +359,17 @@ def listar_productos(
         db.close()
 
 
+@router.get("/imagenes")
+def listar_imagenes(payload: dict = Depends(get_current_api_user)):
+    """Solo [id, imagen_url] de los productos activos: la pantalla de venta lo revisa cada 15 s
+    para cambiar fotos nuevas (antes bajaba el catálogo completo para eso)."""
+    db = get_db_session()
+    try:
+        return [[i, u] for i, u in db.query(Producto.id, Producto.imagen_url).filter(Producto.activo == True).all()]
+    finally:
+        db.close()
+
+
 @router.get("/categorias")
 def listar_categorias(payload: dict = Depends(get_current_api_user)):
     db = get_db_session()
@@ -600,7 +611,7 @@ async def subir_imagen_producto(
             tmp_path = tmp.name
         try:
             from app.services.cloudinary_service import upload_product_image
-            url = upload_product_image(tmp_path, producto_id)
+            url = await __import__("asyncio").to_thread(upload_product_image, tmp_path, producto_id)   # sin congelar el POS
             prod.imagen_url = url
             db.commit()
             return {"imagen_url": url}

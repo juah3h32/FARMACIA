@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import date, timedelta, datetime
 from app.database.connection import get_db_session
 from sqlalchemy import func
+from sqlalchemy.orm import contains_eager
 from app.database.models import Producto, Lote, MovimientoStock, TipoMovimiento, ItemVenta, Venta, EstadoVenta
 from app.api.routes.auth_routes import get_current_api_user
 import app.config as cfg
@@ -285,6 +286,7 @@ def alertas_caducidad(payload: dict = Depends(get_current_api_user)):
         lotes = (
             db.query(Lote)
             .join(Producto, Lote.producto_id == Producto.id)
+            .options(contains_eager(Lote.producto))   # el producto ya viene en el JOIN: sin una consulta extra por lote
             .filter(
                 Producto.activo == True,
                 Lote.cantidad > 0,
@@ -585,12 +587,16 @@ def auditoria_stock(payload: dict = Depends(get_current_api_user)):
         db.close()
 
 
+_pull_nube_lock = __import__("threading").Lock()
+
+
 @router.post("/pull-nube")
 def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
     """Trigger a Turso → local sync in background. Returns immediately."""
     import threading as _t
     import app.config as _cfg
-    if _cfg.TURSO_SYNC:
+    # Si el anterior sigue corriendo (internet lento) no se encima otro
+    if _cfg.TURSO_SYNC and _pull_nube_lock.acquire(blocking=False):
         from app.database.sync_service import sync_to_turso, sync_from_turso
 
         # Subir primero lo local: la pantalla de Inventario llama esto al abrir y
@@ -599,11 +605,14 @@ def pull_desde_nube(payload: dict = Depends(get_current_api_user)):
         # el Control de Caja "brincaba" al entrar a Inventario.
         def _push_then_pull():
             try:
-                sync_to_turso()
-            except Exception as e:
-                print(f"[PullNube] push previo falló, se omite el pull: {e}")
-                return
-            sync_from_turso()
+                try:
+                    sync_to_turso()
+                except Exception as e:
+                    print(f"[PullNube] push previo falló, se omite el pull: {e}")
+                    return
+                sync_from_turso()
+            finally:
+                _pull_nube_lock.release()
 
         _t.Thread(target=_push_then_pull, daemon=True, name="PullNube").start()
     return {"ok": True}

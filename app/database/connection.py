@@ -95,6 +95,8 @@ def _build_engine():
         cur.execute("PRAGMA synchronous=NORMAL")  # safe + fast with WAL
         cur.execute("PRAGMA foreign_keys=ON")
         cur.execute("PRAGMA busy_timeout=30000")  # 30s wait before "database is locked"
+        cur.execute("PRAGMA cache_size=-20000")   # ~20 MB de caché en memoria (antes ~2 MB)
+        cur.execute("PRAGMA temp_store=MEMORY")   # ordenamientos temporales en memoria
         cur.close()
 
     return eng
@@ -147,6 +149,10 @@ _INDEX_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_items_venta_producto_id ON items_venta(producto_id)",
     "CREATE INDEX IF NOT EXISTS ix_movimientos_stock_producto_id ON movimientos_stock(producto_id)",
     "CREATE INDEX IF NOT EXISTS ix_movimientos_stock_referencia   ON movimientos_stock(referencia_id, referencia_tipo)",
+    # lotes por producto: escanear código, cobrar (FEFO) y ver lotes
+    "CREATE INDEX IF NOT EXISTS ix_lotes_producto_id ON lotes(producto_id)",
+    "CREATE INDEX IF NOT EXISTS ix_movimientos_stock_creado_en ON movimientos_stock(creado_en)",
+    "CREATE INDEX IF NOT EXISTS ix_retiros_caja_creado_en ON retiros_caja(creado_en)",
 ]
 
 
@@ -493,7 +499,7 @@ def _seed_initial_data():
             "impresora_puerto":         "COM1",
             "impresora_ancho":          "32",
             "api_activa":               "true",
-            "purge_password_hash":      _hp("171215"),
+            "purge_password_hash":      lambda: _hp("171215"),   # solo se calcula si falta
             "turno_auto_activo":        "false",
             "turno_auto_inicio":        "09:00",
             "turno_auto_fin":           "21:00",
@@ -501,7 +507,7 @@ def _seed_initial_data():
         existing_cfg = {c.clave for c in db.query(Configuracion.clave).all()}
         for clave, valor in configs_default.items():
             if clave not in existing_cfg:
-                db.add(Configuracion(clave=clave, valor=valor))
+                db.add(Configuracion(clave=clave, valor=valor() if callable(valor) else valor))
 
 
 def _recalcular_cortes_v1():

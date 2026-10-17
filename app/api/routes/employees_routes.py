@@ -189,7 +189,7 @@ async def subir_foto_empleado(
             tmp_path = tmp.name
         try:
             from app.services.cloudinary_service import upload_profile_photo
-            url = upload_profile_photo(tmp_path, uid)
+            url = await __import__("asyncio").to_thread(upload_profile_photo, tmp_path, uid)   # sin congelar el POS
             u.foto_url = url
             db.commit()
             import app.config as _cfg

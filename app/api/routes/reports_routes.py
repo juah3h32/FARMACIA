@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import date, datetime, timedelta
 from sqlalchemy import func
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, selectinload, contains_eager
 import io, csv, os, tempfile
 
 from app.database.connection import get_db_session
@@ -272,6 +272,7 @@ def vencimientos(
         lotes = (
             db.query(Lote)
             .join(Producto, Lote.producto_id == Producto.id)
+            .options(contains_eager(Lote.producto))   # el producto ya viene en el JOIN: sin una consulta extra por lote
             .filter(Producto.activo == True, Lote.cantidad > 0)
             .order_by(Lote.fecha_vencimiento)
             .all()

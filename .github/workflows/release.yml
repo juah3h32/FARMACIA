@@ -67,6 +67,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Estilos de la pantalla compilados con las clases actuales de index.html
+      - name: Build CSS (Tailwind)
+        working-directory: scripts/estilos
+        run: npx -y tailwindcss@3.4.17 -c tailwind.config.js -i entrada.css -o ../../app/web/static/tailwind.css --minify
+
       - name: Build with PyInstaller
         run: pyinstaller FarmaciaPOS.spec --clean --noconfirm
 
